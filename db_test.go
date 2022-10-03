@@ -260,13 +260,26 @@ func Test(t *testing.T) {
 			mu.RUnlock()
 		}))
 	})
-	t.Run("batch set", func(t *testing.T) {
+	t.Run("batch set/delete/update", func(t *testing.T) {
 		assert.Nil(t, testDB(defaultCollections, func(ctx context.Context, db wolverine.DB) {
 			var records []*wolverine.Document
+			var ids []string
 			for i := 0; i < 5; i++ {
-				records = append(records, newUserDoc())
+				doc := newUserDoc()
+				records = append(records, doc)
+				ids = append(ids, doc.GetID())
 			}
 			assert.Nil(t, db.BatchSet(ctx, "user", records))
+			for _, record := range records {
+				record.Set("name", gofakeit.Name())
+			}
+			assert.Nil(t, db.BatchUpdate(ctx, "user", records))
+			assert.Nil(t, db.BatchDelete(ctx, "user", ids))
+			for _, id := range ids {
+				result, err := db.Get(ctx, "user", id)
+				assert.NotNil(t, err)
+				assert.Nil(t, result)
+			}
 		}))
 	})
 	t.Run("order by", func(t *testing.T) {

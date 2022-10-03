@@ -1,10 +1,12 @@
-package wolverine
+package wolverine_test
 
 import (
 	"testing"
 
 	"github.com/brianvoe/gofakeit/v6"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/autom8ter/wolverine"
 )
 
 func TestDocument(t *testing.T) {
@@ -19,12 +21,13 @@ func TestDocument(t *testing.T) {
 	}
 	const email = "john.smith@yahoo.com"
 	usr := user{ID: gofakeit.UUID(), Contact: contact{Email: email, Phone: gofakeit.Phone()}, Name: "john smith"}
-	r, err := NewDocumentFromAny(&usr)
+	r, err := wolverine.NewDocumentFromAny(&usr)
 	if err != nil {
 		t.Fatal(err)
 	}
 	r.SetID(usr.ID)
 	r.SetCollection("user")
+
 	t.Run("get id", func(t *testing.T) {
 		assert.Equal(t, usr.ID, r.GetID())
 	})
@@ -34,10 +37,9 @@ func TestDocument(t *testing.T) {
 	t.Run("get phone", func(t *testing.T) {
 		assert.Equal(t, usr.Contact.Phone, r.Get("contact.phone"))
 	})
-
 	t.Run("merge", func(t *testing.T) {
 		usr2 := user{ID: usr.ID, Contact: contact{Email: gofakeit.Email()}, Name: "john smith"}
-		r2, err := NewDocumentFromAny(&usr2)
+		r2, err := wolverine.NewDocumentFromAny(&usr2)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -47,5 +49,32 @@ func TestDocument(t *testing.T) {
 		assert.Equal(t, usr2.Contact.Email, r.GetString("contact.email"))
 		assert.Equal(t, usr.Contact.Phone, r.GetString("contact.phone"))
 	})
-
+	t.Run("empty", func(t *testing.T) {
+		r := wolverine.NewDocument()
+		assert.Equal(t, false, r.Empty())
+	})
+	t.Run("clone", func(t *testing.T) {
+		cloned := r.Clone()
+		assert.Equal(t, r.String(), cloned.String())
+	})
+	t.Run("del", func(t *testing.T) {
+		r.Del("annotations")
+		val := r.Get("annotations")
+		assert.Nil(t, val)
+	})
+	t.Run("del", func(t *testing.T) {
+		r.Del("annotations")
+		val := r.Get("annotations")
+		assert.Nil(t, val)
+	})
+	t.Run("del", func(t *testing.T) {
+		assert.Equal(t, r.Value()["name"], "john smith")
+	})
+	t.Run("select", func(t *testing.T) {
+		before := r.Get("contact.email")
+		selected := r.Select([]string{"contact.email"})
+		after := selected.Get("contact.email")
+		assert.Equal(t, before, after)
+		assert.Nil(t, selected.Get("name"))
+	})
 }

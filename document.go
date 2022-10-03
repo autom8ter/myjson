@@ -83,21 +83,13 @@ func (r Document) Select(fields []string) Document {
 	if len(fields) == 0 || fields[0] == "*" {
 		return r
 	}
-	fieldValues := r.result.Map()
-	var (
-		updateJSON string
-		err        error
-	)
-	for k, _ := range fieldValues {
-		if lo.Contains(fields, k) {
-			continue
-		}
-		updateJSON, err = sjson.Delete(r.result.Raw, k)
-		if err != nil {
-			panic(err)
-		}
+	patch := map[string]interface{}{}
+	for _, f := range fields {
+		patch[f] = r.Get(f)
 	}
-	return Document{lo.ToPtr(gjson.Parse(updateJSON))}
+	unflat, _ := flat.Unflatten(patch, nil)
+	doc, _ := NewDocumentFromMap(unflat)
+	return *doc
 }
 
 // Validate returns an error if the documents collection, id, or fields are empty
@@ -166,21 +158,12 @@ func (r *Document) SetAll(values map[string]any) {
 	}
 }
 
-// Map returns a Go map representation of the document
-func (d *Document) Map() map[string]interface{} {
-	data := map[string]interface{}{}
-	for k, v := range d.result.Map() {
-		data[k] = v.Value()
-	}
-	return data
-}
-
 // Merge merges the doument with the provided document. This is not an overwrite.
 func (d *Document) Merge(with *Document) {
 	if with == nil {
 		return
 	}
-	withMap := with.Map()
+	withMap := with.Value()
 	withFlat, err := flat.Flatten(withMap, nil)
 	if err != nil {
 		panic(err)
