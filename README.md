@@ -58,6 +58,7 @@ Features:
 - [ ] benchmarks
 - [ ] examples
 - [ ] http server(gokit)
+- [ ] 90% test coverage
 
 ## Beta+ Roadmap
 

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"sync"
 	"testing"
 	"time"
 
@@ -227,9 +228,12 @@ func Test(t *testing.T) {
 	t.Run("stream", func(t *testing.T) {
 		assert.Nil(t, testDB(defaultCollections, func(ctx context.Context, db wolverine.DB) {
 			found := 0
+			mu := sync.RWMutex{}
 			go func() {
 				assert.Nil(t, db.ChangeStream(ctx, []string{"user"}, func(ctx context.Context, records []*wolverine.Document) error {
+					mu.Lock()
 					found += len(records)
+					mu.Unlock()
 					return nil
 				}))
 			}()
@@ -237,7 +241,9 @@ func Test(t *testing.T) {
 				assert.Nil(t, db.Set(ctx, "user", newUserDoc()))
 			}
 			time.Sleep(1 * time.Second)
+			mu.RLock()
 			assert.Equal(t, 3, found)
+			mu.RUnlock()
 		}))
 	})
 	t.Run("batch set", func(t *testing.T) {
