@@ -67,8 +67,6 @@ func (d *db) saveBatch(ctx context.Context, collection string, mutation mutation
 			}
 			current.Merge(document)
 			bits = current.Bytes()
-		default:
-			return errors.New("invalid mutation")
 		}
 		switch mutation {
 		case set, update:
@@ -99,9 +97,12 @@ func (d *db) saveBatch(ctx context.Context, collection string, mutation mutation
 				}
 			}
 		case del:
-			for _, index := range collect.Indexes {
-				pindex := index.prefix(current.GetCollection())
-				if err := txn.Delete([]byte(pindex.GetIndex(current))); err != nil {
+			for _, i := range collect.Indexes {
+				pindex := i.prefix(current.GetCollection())
+				if err := txn.Delete([]byte(pindex.GetIndex(current.Value()))); err != nil {
+					return d.wrapErr(err, "")
+				}
+				if err := txn.Delete([]byte(prefix.PrimaryKey(current.GetCollection(), current.GetID()))); err != nil {
 					return d.wrapErr(err, "")
 				}
 			}
@@ -193,7 +194,7 @@ func (d *db) saveDocument(ctx context.Context, collection string, mutation mutat
 		case del:
 			for _, index := range collect.Indexes {
 				pindex := index.prefix(current.GetCollection())
-				if err := txn.Delete([]byte(pindex.GetIndex(current))); err != nil {
+				if err := txn.Delete([]byte(pindex.GetIndex(current.Value()))); err != nil {
 					return d.wrapErr(err, "")
 				}
 			}
@@ -249,24 +250,24 @@ func (d *db) BatchDelete(ctx context.Context, collection string, ids []string) e
 }
 
 func (d *db) QueryUpdate(ctx context.Context, update *Document, collection string, query Query) error {
-	records, err := d.Query(ctx, collection, query)
+	documents, err := d.Query(ctx, collection, query)
 	if err != nil {
 		return d.wrapErr(err, "")
 	}
-	for _, record := range records {
-		record.Merge(update)
+	for _, document := range documents {
+		document.Merge(update)
 	}
-	return d.BatchSet(ctx, collection, records)
+	return d.BatchSet(ctx, collection, documents)
 }
 
 func (d *db) QueryDelete(ctx context.Context, collection string, query Query) error {
-	records, err := d.Query(ctx, collection, query)
+	documents, err := d.Query(ctx, collection, query)
 	if err != nil {
 		return d.wrapErr(err, "")
 	}
 	var ids []string
-	for _, record := range records {
-		ids = append(ids, record.GetID())
+	for _, document := range documents {
+		ids = append(ids, document.GetID())
 	}
 	return d.BatchDelete(ctx, collection, ids)
 }

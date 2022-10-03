@@ -114,7 +114,7 @@ func Test(t *testing.T) {
 		result, err := db.Get(ctx, "user", usr.GetID())
 		assert.Nil(t, err)
 		assert.Equal(t, myEmail, result.Get("contact.email"))
-		results, err := db.Query(ctx, "user", wolverine.Query{
+		query := &wolverine.Query{
 			//Fields:  []string{"email"},
 			Where: []wolverine.Where{
 				{
@@ -125,10 +125,24 @@ func Test(t *testing.T) {
 			},
 			Limit:   1,
 			OrderBy: wolverine.OrderBy{},
-		})
+		}
+		results, err := db.Query(ctx, "user", *query)
 		assert.Nil(t, err)
 		assert.Equal(t, 1, len(results))
 		assert.Equal(t, myEmail, result.Get("contact.email"))
+		update := wolverine.NewDocument()
+		newEmail := gofakeit.Email()
+		update.Set("contact.email", newEmail)
+		assert.Equal(t, newEmail, update.Get("contact.email"))
+		assert.Nil(t, db.QueryUpdate(ctx, update, "user", *query))
+		result, err = db.Get(ctx, "user", usr.GetID())
+		assert.Nil(t, err)
+		assert.NotEqual(t, myEmail, result.Get("contact.email"))
+		query.Where[0].Value = newEmail
+		assert.Nil(t, db.QueryDelete(ctx, "user", *query))
+		result, err = db.Get(ctx, "user", usr.GetID())
+		assert.NotNil(t, err)
+		assert.Empty(t, result)
 	})
 	t.Run("search", func(t *testing.T) {
 		assert.Nil(t, testDB(defaultCollections, func(ctx context.Context, db wolverine.DB) {

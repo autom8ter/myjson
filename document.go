@@ -166,9 +166,27 @@ func (r *Document) SetAll(values map[string]any) {
 	}
 }
 
+// Map returns a Go map representation of the document
+func (d *Document) Map() map[string]interface{} {
+	data := map[string]interface{}{}
+	for k, v := range d.result.Map() {
+		data[k] = v.Value()
+	}
+	return data
+}
+
+// Merge merges the doument with the provided document. This is not an overwrite.
 func (d *Document) Merge(with *Document) {
 	if with == nil {
 		return
+	}
+	withMap := with.Map()
+	withFlat, err := flat.Flatten(withMap, nil)
+	if err != nil {
+		panic(err)
+	}
+	for k, v := range withFlat {
+		d.Set(k, v)
 	}
 }
 
