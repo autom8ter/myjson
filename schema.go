@@ -2,7 +2,8 @@ package wolverine
 
 import (
 	"context"
-	"io"
+
+	"github.com/xeipuuv/gojsonschema"
 )
 
 // WhereOp is an operator used to compare a value to a records field value in a where clause
@@ -95,7 +96,25 @@ type Collection struct {
 	// Name is the unique name of the collection - it should not contain any special characters
 	Name string `json:"name"`
 	// Indexes is a list of indexes associated with the collection - indexes should be used to tune database performance
-	Indexes []Index `json:"indexes"`
+	Indexes      []Index `json:"indexes"`
+	JSONSchema   string  `json:"json_schema"`
+	loadedSchema *gojsonschema.Schema
+}
+
+// Validate validates the document against the collections json schema (if it exists)
+func (c Collection) Validate(doc *Document) (bool, error) {
+	if c.loadedSchema == nil {
+		return true, nil
+	}
+	documentLoader := gojsonschema.NewBytesLoader(doc.Bytes())
+	result, err := c.loadedSchema.Validate(documentLoader)
+	if err != nil {
+		return false, err
+	}
+	if !result.Valid() {
+		return false, nil
+	}
+	return true, nil
 }
 
 // Index is a database index used for quickly finding records with specific field values
@@ -111,14 +130,6 @@ type Migration struct {
 	Name     string
 	Function func(ctx context.Context, db DB) error
 }
-
-// ReadHook is a function that is executed in response to an readable action taken against the database
-// Hooks should be use to create side effects based on the context and the data associated with a database action
-type ReadHook func(db DB, ctx context.Context, record Record) error
-
-// WriteHook is a function that is executed in response to a writeable action taken against the database
-// Hooks should be use to create side effects based on the context and the data associated with a database action
-type WriteHook func(db DB, ctx context.Context, before, after Record) error
 
 // CronJob is a function that runs against the database on a given crontab schedule
 type CronJob struct {
@@ -145,95 +156,23 @@ type Config struct {
 	// Logger is a custom database logger(optional)
 	Logger Logger
 	// BeforeSet is a hook that is executed before a set operation
-	BeforeSet WriteHook
+	BeforeSet WriteTrigger
 	// BeforeSet is a hook that is executed before a set operation
-	BeforeUpdate WriteHook
+	BeforeUpdate WriteTrigger
 	// BeforeDelete is a hook that is executed before a delete operation
-	BeforeDelete WriteHook
+	BeforeDelete WriteTrigger
 	// OnRead is a hook that is executed as a record is read
-	OnRead ReadHook
+	OnRead ReadTrigger
 	// OnStream is a hook that is executed as a record is sent to a stream
-	OnStream ReadHook
+	OnStream ReadTrigger
 	// AfterSet is a hook that is executed after a set operation
-	AfterSet WriteHook
+	AfterSet WriteTrigger
 	// AfterUpdate is a hook that is executed after an update operation
-	AfterUpdate WriteHook
+	AfterUpdate WriteTrigger
 	// AfterDelete is a hook that is executed after a delete operation
-	AfterDelete WriteHook
+	AfterDelete WriteTrigger
 	// Migrations are atomic database migrations to run on startup
 	Migrations []Migration
-}
-
-// DB is an embedded NOSQL database supporting a number of useful features including full text search, indexing, and streaming
-type DB interface {
-	// System is a database system manager
-	System
-	// Reader is a database reader
-	Reader
-	// Writer is a database writer
-	Writer
-	// Streamer is a datbase streamer
-	Streamer
-	// Aggregator is a database aggregator
-	Aggregator
-	// Logger is a structured logger
-	Logger
-}
-
-// System performs internal/system operations against the database
-type System interface {
-	// Config returns the config used to initialize the database
-	Config() Config
-	// ReIndex reindexes the entire database
-	ReIndex(ctx context.Context) error
-	// Backup performs a full database backup
-	Backup(ctx context.Context, w io.Writer) error
-	// IncrementalBackup performs an incremental backup based on changes since the last time it ran
-	IncrementalBackup(ctx context.Context, w io.Writer) error
-	// Restore restores a database backup then reindexes the database
-	Restore(ctx context.Context, r io.Reader) error
-	// Migrate runs all migrations that have not yet run(idempotent). The order must remain the same over time for migrations to run properly.
-	Migrate(ctx context.Context, migrations []Migration) error
-	// Close shuts down the database
-	Close(ctx context.Context) error
-}
-
-// Reader performs read operations against the database
-type Reader interface {
-	// Query queries the database for a list of records
-	Query(ctx context.Context, collection string, query Query) ([]Record, error)
-	// Get gets a single record from the database
-	Get(ctx context.Context, collection, id string) (Record, error)
-	// GetAll gets a list of records from the database by id
-	GetAll(ctx context.Context, collection string, ids []string) ([]Record, error)
-}
-
-// Writer performs transactional write operations against the database
-type Writer interface {
-	// Set overwrites a single record in the database. If a record does not exist under the records id, one will be created.
-	Set(ctx context.Context, record Record) error
-	// BatchSet overwrites many records in the database. If a record does not exist under each record's id, one will be created.
-	BatchSet(ctx context.Context, records []Record) error
-	// Update updates the fields of a single record in the database. This is not a full replace.
-	Update(ctx context.Context, record Record) error
-	// BatchUpdate updates the fields of many records in the database. This is not a full replace.
-	BatchUpdate(ctx context.Context, records []Record) error
-	// QueryUpdate updates records that belong to the given query
-	QueryUpdate(ctx context.Context, update Record, collection string, query Query) error
-	// Delete deletes a record from the database
-	Delete(ctx context.Context, collection, id string) error
-	// BatchDelete deletes many records from the database
-	BatchDelete(ctx context.Context, collection string, ids []string) error
-	// QueryDelete deletes records that belong to the given query
-	QueryDelete(ctx context.Context, collection string, query Query) error
-	// DropAll drops all of the collections
-	DropAll(ctx context.Context, collection []string) error
-}
-
-// Streamer streams changes to records in the database
-type Streamer interface {
-	// Stream streams changes to records to the given function until the context is cancelled or the function returns an error
-	Stream(ctx context.Context, collections []string, fn func(ctx context.Context, records []Record) error) error
 }
 
 // AggregateFunction is an aggregate function used within MapReduce
@@ -265,18 +204,4 @@ type AggregateQuery struct {
 	Where     []Where     `json:"where"`
 	OrderBy   OrderBy     `json:"order_by"`
 	Limit     int         `json:"limit"`
-}
-
-// Aggregator aggregates data
-type Aggregator interface {
-	// Aggregate
-	Aggregate(ctx context.Context, collection string, query AggregateQuery) ([]Record, error)
-}
-
-// Logger is a structured logger
-type Logger interface {
-	Error(ctx context.Context, msg string, err error, tags map[string]interface{})
-	Info(ctx context.Context, msg string, tags map[string]interface{})
-	Debug(ctx context.Context, msg string, tags map[string]interface{})
-	Warn(ctx context.Context, msg string, tags map[string]interface{})
 }

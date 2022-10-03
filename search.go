@@ -22,7 +22,7 @@ func (d *db) isSearchQuery(collection string, query Query) bool {
 	return false
 }
 
-func (d *db) search(ctx context.Context, collection string, query Query) ([]Record, error) {
+func (d *db) search(ctx context.Context, collection string, query Query) ([]*Document, error) {
 	if _, ok := d.fullText[collection]; !ok {
 		return nil, fmt.Errorf("unsupported full text search collection: %s", collection)
 	}
@@ -65,24 +65,27 @@ func (d *db) search(ctx context.Context, collection string, query Query) ([]Reco
 	if err != nil {
 		return nil, err
 	}
-	var data []Record
+	var data []*Document
 	for _, h := range results.Hits {
 		if len(h.Fields) == 0 {
 			continue
 		}
-		record := Record(h.Fields)
+		record, err := NewDocumentFromMap(h.Fields)
+		if err != nil {
+			return nil, err
+		}
 		if d.config.OnRead != nil {
 			if d.config.OnRead != nil {
 				if err := d.config.OnRead(d, ctx, record); err != nil {
-					return data, err
+					return data, d.wrapErr(err, "")
 				}
 			}
 		}
 		data = append(data, record)
 	}
 	if len(query.Select) > 0 {
-		for i, r := range data {
-			data[i] = r.Select(query.Select)
+		for _, r := range data {
+			r.Select(query.Select)
 		}
 	}
 	return data, nil

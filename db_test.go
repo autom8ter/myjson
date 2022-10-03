@@ -11,7 +11,7 @@ import (
 	"github.com/spf13/cast"
 	"github.com/stretchr/testify/assert"
 
-	"wolverine"
+	"github.com/autom8ter/wolverine"
 )
 
 var defaultCollections = []wolverine.Collection{
@@ -43,6 +43,41 @@ var defaultCollections = []wolverine.Collection{
 	},
 }
 
+func newUserDoc() *wolverine.Document {
+	doc, err := wolverine.NewDocumentFromMap(map[string]interface{}{
+		"_collection": "user",
+		"_id":         gofakeit.UUID(),
+		"name":        gofakeit.Name(),
+		"contact": map[string]interface{}{
+			"email": gofakeit.Email(),
+		},
+		"account_id":      gofakeit.IntRange(0, 100),
+		"language":        gofakeit.Language(),
+		"birthday_month":  gofakeit.Month(),
+		"favorite_number": gofakeit.Second(),
+		"gender":          gofakeit.Gender(),
+		"age":             gofakeit.IntRange(0, 100),
+		"annotations":     gofakeit.Map(),
+	})
+	if err != nil {
+		panic(err)
+	}
+	return doc
+}
+
+func newTaskDoc(usrID string) *wolverine.Document {
+	doc, err := wolverine.NewDocumentFromMap(map[string]interface{}{
+		"_collection": "task",
+		"_id":         gofakeit.UUID(),
+		"user":        usrID,
+		"content":     gofakeit.LoremIpsumSentence(5),
+	})
+	if err != nil {
+		panic(err)
+	}
+	return doc
+}
+
 func Test(t *testing.T) {
 	const myEmail = "colemanword@gmail.com"
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -58,63 +93,26 @@ func Test(t *testing.T) {
 	defer db.Close(ctx)
 	t.Run("seed_users_tasks", func(t *testing.T) {
 		for i := 0; i < 100; i++ {
-			id := fmt.Sprintf("%v", i)
-			usr := wolverine.Record{
-				"_collection": "user",
-				"_id":         id,
-				"name":        gofakeit.Name(),
-				"contact": map[string]interface{}{
-					"email": gofakeit.Email(),
-				},
-				"account_id":      gofakeit.IntRange(0, 100),
-				"language":        gofakeit.Language(),
-				"birthday_month":  gofakeit.Month(),
-				"favorite_number": gofakeit.Second(),
-				"gender":          gofakeit.Gender(),
-				"age":             gofakeit.IntRange(0, 100),
-			}
-			assert.Nil(t, db.Set(ctx, usr))
-			assert.Nil(t, db.Set(ctx, wolverine.Record{
-				"_collection": "task",
-				"_id":         gofakeit.UUID(),
-				"user":        id,
-				"content":     gofakeit.LoremIpsumSentence(25),
-			}))
-			if i%2 == 0 {
-				assert.Nil(t, db.Set(ctx, wolverine.Record{
-					"_collection": "task",
-					"_id":         gofakeit.UUID(),
-					"user":        id,
-					"content":     gofakeit.LoremIpsumSentence(5),
-				}))
-			}
-			result, err := db.Get(ctx, "user", id)
+			usr := newUserDoc()
+			assert.Nil(t, db.Set(ctx, "user", usr))
+			assert.Nil(t, db.Set(ctx, "task", newTaskDoc(usr.GetID())))
+			assert.Nil(t, db.Set(ctx, "task", newTaskDoc(usr.GetID())))
+			result, err := db.Get(ctx, "user", usr.GetID())
 			assert.Nil(t, err)
 			assert.Equal(t, "user", result.GetCollection())
-			assert.Equal(t, id, result.GetID())
+			assert.Equal(t, usr.GetID(), result.GetID())
 			assert.Nil(t, err)
-			assert.Equal(t, usr["name"], result["name"])
-			assert.Equal(t, usr["language"], result["language"])
+			assert.Equal(t, usr.Get("name"), result.Get("name"))
+			assert.Equal(t, usr.Get("language"), result.Get("language"))
 		}
 	})
 	t.Run("set-get-query", func(t *testing.T) {
-		id := gofakeit.UUID()
-		usr := wolverine.Record{
-			"_collection": "user",
-			"_id":         id,
-			"name":        gofakeit.Name(),
-			"contact": map[string]interface{}{
-				"email": myEmail,
-			},
-			"account_id":      gofakeit.IntRange(0, 100),
-			"language":        gofakeit.Language(),
-			"favorite_number": gofakeit.Second(),
-			"gender":          gofakeit.Gender(),
-		}
-		assert.Nil(t, db.Set(ctx, usr))
-		result, err := db.Get(ctx, "user", id)
+		usr := newUserDoc()
+		usr.Set("contact.email", myEmail)
+		assert.Nil(t, db.Set(ctx, "user", usr))
+		result, err := db.Get(ctx, "user", usr.GetID())
 		assert.Nil(t, err)
-		assert.Equal(t, myEmail, result["contact.email"])
+		assert.Equal(t, myEmail, result.Get("contact.email"))
 		results, err := db.Query(ctx, "user", wolverine.Query{
 			//Fields:  []string{"email"},
 			Where: []wolverine.Where{
@@ -129,37 +127,15 @@ func Test(t *testing.T) {
 		})
 		assert.Nil(t, err)
 		assert.Equal(t, 1, len(results))
-		assert.Equal(t, myEmail, results[0]["contact.email"])
+		assert.Equal(t, myEmail, result.Get("contact.email"))
 	})
 	t.Run("search", func(t *testing.T) {
 		assert.Nil(t, testDB(defaultCollections, func(ctx context.Context, db wolverine.DB) {
-			record := wolverine.Record{
-				"_collection": "user",
-				"_id":         gofakeit.UUID(),
-				"name":        gofakeit.Name(),
-				"language":    gofakeit.Language(),
-				"contact": map[string]interface{}{
-					"email": myEmail,
-				},
-				"account_id":      gofakeit.IntRange(0, 100),
-				"favorite_number": gofakeit.Second(),
-				"gender":          gofakeit.Gender(),
-			}
-			assert.Nil(t, db.Set(ctx, record))
+			record := newUserDoc()
+			record.Set("contact.email", myEmail)
+			assert.Nil(t, db.Set(ctx, "user", record))
 			for i := 0; i < 3; i++ {
-				record := wolverine.Record{
-					"_collection": "user",
-					"_id":         gofakeit.UUID(),
-					"name":        gofakeit.Name(),
-					"language":    gofakeit.Language(),
-					"contact": map[string]interface{}{
-						"email": gofakeit.Email(),
-					},
-					"account_id":      gofakeit.IntRange(0, 100),
-					"favorite_number": gofakeit.Second(),
-					"gender":          gofakeit.Gender(),
-				}
-				assert.Nil(t, db.Set(ctx, record))
+				assert.Nil(t, db.Set(ctx, "user", newUserDoc()))
 			}
 			{
 				results, err := db.Query(ctx, "user", wolverine.Query{
@@ -175,7 +151,7 @@ func Test(t *testing.T) {
 				})
 				assert.Nil(t, err)
 				assert.Equal(t, 1, len(results))
-				assert.EqualValues(t, myEmail, results[0]["contact.email"])
+				//assert.EqualValues(t, myEmail, results[0].Get("contact.email"))
 			}
 
 			{
@@ -197,7 +173,7 @@ func Test(t *testing.T) {
 				})
 				assert.Nil(t, err)
 				assert.Equal(t, 1, len(results))
-				assert.EqualValues(t, myEmail, results[0]["contact.email"])
+				assert.EqualValues(t, myEmail, results[0].Get("contact.email"))
 			}
 			{
 				results, err := db.Query(ctx, "user", wolverine.Query{
@@ -228,7 +204,7 @@ func Test(t *testing.T) {
 				})
 				assert.Nil(t, err)
 				assert.Equal(t, 1, len(results))
-				assert.EqualValues(t, myEmail, results[0]["contact.email"])
+				assert.EqualValues(t, myEmail, results[0].Get("contact.email"))
 			}
 			{
 				results, err := db.Query(ctx, "user", wolverine.Query{
@@ -244,53 +220,21 @@ func Test(t *testing.T) {
 				})
 				assert.Nil(t, err)
 				assert.Equal(t, 1, len(results))
-				assert.EqualValues(t, myEmail, results[0]["contact.email"])
+				assert.EqualValues(t, myEmail, results[0].Get("contact.email"))
 			}
-		}))
-	})
-	t.Run("ttl", func(t *testing.T) {
-		now := time.Now().Add(3 * time.Second)
-		id := gofakeit.UUID()
-		assert.Nil(t, testDB(defaultCollections, func(ctx context.Context, db wolverine.DB) {
-			assert.Nil(t, db.Set(ctx, wolverine.Record{
-				"_collection": "user",
-				"_id":         id,
-				"_expires_at": now,
-				"name":        gofakeit.Name(),
-				"contact": map[string]interface{}{
-					"email": gofakeit.Email(),
-				},
-				"account_id":      gofakeit.IntRange(0, 100),
-				"language":        gofakeit.Language(),
-				"favorite_number": gofakeit.Second(),
-				"gender":          gofakeit.Gender(),
-			}))
-			time.Sleep(3 * time.Second)
-			result, err := db.Get(ctx, "user", id)
-			assert.NotNil(t, err)
-			assert.Nil(t, result)
 		}))
 	})
 	t.Run("stream", func(t *testing.T) {
 		assert.Nil(t, testDB(defaultCollections, func(ctx context.Context, db wolverine.DB) {
 			found := 0
 			go func() {
-				assert.Nil(t, db.Stream(ctx, []string{"user"}, func(ctx context.Context, records []wolverine.Record) error {
+				assert.Nil(t, db.ChangeStream(ctx, []string{"user"}, func(ctx context.Context, records []*wolverine.Document) error {
 					found += len(records)
 					return nil
 				}))
 			}()
 			for i := 0; i < 3; i++ {
-				assert.Nil(t, db.Set(ctx, wolverine.Record{
-					"_collection": "user",
-					"_id":         gofakeit.UUID(),
-					"name":        gofakeit.Name(),
-					"contact": map[string]interface{}{
-						"email": gofakeit.Email(),
-					},
-					"account_id": gofakeit.IntRange(0, 100),
-					"language":   gofakeit.Language(),
-				}))
+				assert.Nil(t, db.Set(ctx, "user", newUserDoc()))
 			}
 			time.Sleep(1 * time.Second)
 			assert.Equal(t, 3, found)
@@ -298,21 +242,11 @@ func Test(t *testing.T) {
 	})
 	t.Run("batch set", func(t *testing.T) {
 		assert.Nil(t, testDB(defaultCollections, func(ctx context.Context, db wolverine.DB) {
-			var records []wolverine.Record
+			var records []*wolverine.Document
 			for i := 0; i < 5; i++ {
-				records = append(records, wolverine.Record{
-					"_collection": "user",
-					"_id":         gofakeit.UUID(),
-					"name":        gofakeit.Name(),
-					"contact": map[string]interface{}{
-						"email": gofakeit.Email(),
-					},
-					"account_id":      gofakeit.IntRange(0, 100),
-					"language":        gofakeit.Language(),
-					"favorite_number": gofakeit.Second(),
-				})
+				records = append(records, newUserDoc())
 			}
-			assert.Nil(t, db.BatchSet(ctx, records))
+			assert.Nil(t, db.BatchSet(ctx, "user", records))
 		}))
 	})
 	t.Run("order by", func(t *testing.T) {
@@ -330,8 +264,8 @@ func Test(t *testing.T) {
 		assert.Equal(t, 10, len(users))
 		var previous string
 		for _, usr := range users {
-			lang, _ := usr.Get("language")
-			name, _ := usr.Get("name")
+			lang := usr.Get("language")
+			name := usr.Get("name")
 			fmt.Println(lang, name)
 			if previous != "" {
 				assert.LessOrEqual(t, bytes.Compare([]byte(previous), []byte(cast.ToString(lang))), 0)
@@ -367,55 +301,152 @@ func Test(t *testing.T) {
 			fmt.Println(result.String())
 		}
 	})
-	t.Run("drop collections", func(t *testing.T) {
-		assert.Nil(t, db.DropAll(ctx, []string{"user", "task"}))
-	})
+	//t.Run("drop collections", func(t *testing.T) {
+	//	assert.Nil(t, db.DropAll(ctx, []string{"user", "task"}))
+	//})
 }
 
+// go test -bench=. -benchmem -run=^#
+
+/*
+goos: darwin
+goarch: amd64
+pkg: github.com/autom8ter/wolverine
+cpu: Intel(R) Core(TM) i9-9880H CPU @ 2.30GHz
+Benchmark/set-16                     565           2077823 ns/op         1332976 B/op      25417 allocs/op
+Benchmark/get-16                  278175              4103 ns/op            3355 B/op         34 allocs/op
+Benchmark/setget-16                  596           2142664 ns/op         1349257 B/op      25691 allocs/op
+Benchmark/query.1000-16            52450             20755 ns/op           14992 B/op        102 allocs/op
+Benchmark/search.1000-16            8380            120230 ns/op          219707 B/op        673 allocs/op
+Benchmark/batch.10-16                163           6564877 ns/op         6803312 B/op     112352 allocs/op
+*/
 func Benchmark(b *testing.B) {
 	// Benchmark/set-16         	      68	  16504072 ns/op
 	b.Run("set", func(b *testing.B) {
 		assert.Nil(b, testDB(defaultCollections, func(ctx context.Context, db wolverine.DB) {
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				id := fmt.Sprintf("%v", i)
-				if err := db.Set(ctx, wolverine.Record{
-					"_collection": "user",
-					"_id":         id,
-					"name":        gofakeit.Name(),
-					"email":       gofakeit.Email(),
-					"language":    gofakeit.Language(),
-				}); err != nil {
+				if err := db.Set(ctx, "user", newUserDoc()); err != nil {
 					b.Fatal(err)
 				}
 			}
 		}))
 	})
-	/*
-		goos: darwin
-		goarch: amd64
-		pkg: wolverine
-		cpu: Intel(R) Core(TM) i9-9880H CPU @ 2.30GHz
-		Benchmark
-		Benchmark/get
-		Benchmark/get-16         	  212913	      3865 ns/op
-	*/
 	b.Run("get", func(b *testing.B) {
 		assert.Nil(b, testDB(defaultCollections, func(ctx context.Context, db wolverine.DB) {
 			b.ResetTimer()
-			if err := db.Set(ctx, wolverine.Record{
-				"_collection": "user",
-				"_id":         "1",
-				"name":        gofakeit.Name(),
-				"email":       gofakeit.Email(),
-				"language":    gofakeit.Language(),
-			}); err != nil {
+			u := newUserDoc()
+			if err := db.Set(ctx, "user", u); err != nil {
 				b.Fatal(err)
 			}
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				_, err := db.Get(ctx, "user", "1")
+				_, err := db.Get(ctx, "user", u.GetString("_id"))
 				assert.Nil(b, err)
+			}
+		}))
+	})
+	b.Run("setget", func(b *testing.B) {
+		assert.Nil(b, testDB(defaultCollections, func(ctx context.Context, db wolverine.DB) {
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				doc := newUserDoc()
+				if err := db.Set(ctx, "user", doc); err != nil {
+					b.Fatal(err)
+				}
+				if _, err := db.Get(ctx, doc.GetCollection(), doc.GetID()); err != nil {
+					b.Fatal(err)
+				}
+			}
+		}))
+	})
+	b.Run("query.1000", func(b *testing.B) {
+		assert.Nil(b, testDB(defaultCollections, func(ctx context.Context, db wolverine.DB) {
+			doc := newUserDoc()
+			doc.Set("contact.email", "colemanword@gmail.com")
+			if err := db.Set(ctx, "user", doc); err != nil {
+				b.Fatal(err)
+			}
+			var docs []*wolverine.Document
+			for i := 0; i < 999; i++ {
+				docs = append(docs, newUserDoc())
+			}
+			if err := db.BatchSet(ctx, "user", docs); err != nil {
+				b.Fatal(err)
+			}
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				results, err := db.Query(ctx, "user", wolverine.Query{
+					Select: nil,
+					Where: []wolverine.Where{
+						{
+							Field: "contact.email",
+							Op:    "==",
+							Value: "colemanword@gmail.com",
+						},
+					},
+					StartAt: "",
+					Limit:   1000,
+					OrderBy: wolverine.OrderBy{},
+				})
+				if err != nil {
+					b.Fatal(err)
+				}
+				if len(results) != 1 {
+					b.Fatal("failed to query email", len(results))
+				}
+			}
+		}))
+	})
+	b.Run("search.1000", func(b *testing.B) {
+		assert.Nil(b, testDB(defaultCollections, func(ctx context.Context, db wolverine.DB) {
+			doc := newUserDoc()
+			doc.Set("contact.email", "colemanword@gmail.com")
+			if err := db.Set(ctx, "user", doc); err != nil {
+				b.Fatal(err)
+			}
+			var docs []*wolverine.Document
+			for i := 0; i < 999; i++ {
+				docs = append(docs, newUserDoc())
+			}
+			if err := db.BatchSet(ctx, "user", docs); err != nil {
+				b.Fatal(err)
+			}
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				results, err := db.Query(ctx, "user", wolverine.Query{
+					Select: nil,
+					Where: []wolverine.Where{
+						{
+							Field: "contact.email",
+							Op:    wolverine.PrefixOp,
+							Value: "colemanword",
+						},
+					},
+					StartAt: "",
+					Limit:   1000,
+					OrderBy: wolverine.OrderBy{},
+				})
+				if err != nil {
+					b.Fatal(err)
+				}
+				if len(results) != 1 {
+					b.Fatal("failed to search email", len(results))
+				}
+			}
+		}))
+	})
+	b.Run("batch.10000", func(b *testing.B) {
+		assert.Nil(b, testDB(defaultCollections, func(ctx context.Context, db wolverine.DB) {
+			var docs []*wolverine.Document
+			for i := 0; i < 10000; i++ {
+				docs = append(docs, newUserDoc())
+			}
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				if err := db.BatchSet(ctx, "user", docs); err != nil {
+					b.Fatal(err)
+				}
 			}
 		}))
 	})

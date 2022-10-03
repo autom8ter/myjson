@@ -23,6 +23,7 @@ Features:
     - [x] date range
     - [x] numeric range
 - [x] document storage engine
+- [x] kv cache engine supporting ttl/expiration
 - [x] change streams
 - [x] field based querying
 - [x] batch operations
@@ -47,13 +48,19 @@ Features:
 - [x] restore
 - [x] query update
 - [x] query delete
-- [x] examples
-- [x] insanely fast
+- [x] logger
+- [x] migrations
+- [x] optional json-schema validation
 
-## Roadmap
+## Road to Beta
 
-- [ ] optional json-schema validation
-- [ ] logger
-- [ ] migrations
+- [ ] decouple kv storage provider
+- [ ] benchmarks
+- [ ] examples
+- [ ] http server(gokit)
+
+## Beta+ Roadmap
+
 - [ ] multi-field order by
 - [ ] distributed
+- [ ] SQL support

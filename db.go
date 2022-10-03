@@ -2,15 +2,17 @@ package wolverine
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"sync"
-	"time"
 
+	"github.com/autom8ter/machine/v4"
 	"github.com/blevesearch/bleve"
 	"github.com/dgraph-io/badger/v3"
-	"github.com/dgraph-io/badger/v3/pb"
-	"github.com/robfig/cron/v3"
+	"github.com/palantir/stacktrace"
+	"github.com/robfig/cron"
+	"github.com/xeipuuv/gojsonschema"
+
+	"github.com/autom8ter/wolverine/internal/prefix"
 )
 
 type db struct {
@@ -21,9 +23,11 @@ type db struct {
 	mu          sync.RWMutex
 	collections map[string]Collection
 	cron        *cron.Cron
+	machine     machine.Machine
 }
 
-func New(ctx context.Context, config Config) (DB, error) {
+func New(ctx context.Context, cfg Config) (DB, error) {
+	config := &cfg
 	opts := badger.DefaultOptions(config.Path)
 	if config.Path == "inmem" {
 		opts.InMemory = true
@@ -76,20 +80,27 @@ func New(ctx context.Context, config Config) (DB, error) {
 				}
 			}
 		}
+		if collection.JSONSchema != "" {
+			schema, err := gojsonschema.NewSchema(gojsonschema.NewStringLoader(collection.JSONSchema))
+			if err != nil {
+				return nil, stacktrace.Propagate(err, "")
+			}
+			collection.loadedSchema = schema
+		}
 	}
 	d := &db{
-		config:      config,
+		config:      *config,
 		kv:          kv,
 		fullText:    fulltext,
 		mu:          sync.RWMutex{},
 		collections: collections,
 		cron:        cron.New(),
+		machine:     machine.New(),
 	}
 	for _, c := range config.CronJobs {
-		_, err := d.cron.AddFunc(c.Schedule, func() {
+		if err := d.cron.AddFunc(c.Schedule, func() {
 			c.Function(ctx, d)
-		})
-		if err != nil {
+		}); err != nil {
 			return nil, err
 		}
 	}
@@ -110,56 +121,52 @@ func New(ctx context.Context, config Config) (DB, error) {
 			return nil, fmt.Errorf("failed to reindex: %s", err)
 		}
 	}
-	if err := d.Migrate(ctx, config.Migrations); err != nil {
-		return nil, err
+	if config.Migrate {
+		if err := d.Migrate(ctx, config.Migrations); err != nil {
+			return nil, err
+		}
 	}
-	go d.cleanupExpiredSearch(ctx)
+
 	d.cron.Start()
 	return d, nil
 }
 
-func (d *db) cleanupExpiredSearch(ctx context.Context) error {
-	return d.kv.Subscribe(ctx, func(kv *badger.KVList) error {
-		for _, item := range kv.Kv {
-			var record Record
-			if err := json.Unmarshal(item.Value, &record); err != nil {
-				return err
-			}
-			if _, ok := d.fullText[record.GetCollection()]; ok {
-				if item.ExpiresAt <= uint64(time.Now().Unix()) {
-					if err := d.fullText[record.GetCollection()].Delete(record.GetID()); err != nil {
-						return err
-					}
-				}
+func (i Index) prefix(collection string) *prefix.PrefixIndexRef {
+	return prefix.NewPrefixedIndex(collection, i.Fields)
+}
+
+func chooseIndex(collection Collection, queryFields []string) *prefix.PrefixIndexRef {
+	//sort.Strings(queryFields)
+	var targetIndex = Index{
+		Fields:   []string{"_id"},
+		FullText: false,
+	}
+	for _, index := range collection.Indexes {
+		if len(index.Fields) != len(queryFields) {
+			continue
+		}
+		match := true
+		for i, f := range queryFields {
+			if index.Fields[i] != f {
+				match = false
 			}
 		}
-		return nil
-	}, []pb.Match{
-		{
-			Prefix: []byte(""),
-		},
-	})
+		if match {
+			targetIndex = index
+		}
+	}
+	return targetIndex.prefix(collection.Name)
 }
 
 func (d *db) getQueryPrefix(collection string, where []Where) []byte {
-	var whereVals = map[string]any{}
+	var whereFields []string
+	var whereValues = map[string]any{}
 	for _, w := range where {
-		if w.Op != "==" {
+		if w.Op != "==" && w.Op != "eq" {
 			continue
 		}
-		whereVals[w.Field] = w.Value
+		whereFields = append(whereFields, w.Field)
+		whereValues[w.Field] = w.Value
 	}
-	prefix := []byte(fmt.Sprintf("%s.", collection))
-	for _, i := range d.collections[collection].Indexes {
-		var vals []any
-		for _, f := range i.Fields {
-			if val, ok := whereVals[f]; ok {
-				vals = append(vals, val)
-			}
-		}
-		if len(vals) == len(i.Fields) {
-			prefix = fieldIndexPrefix(collection, vals)
-		}
-	}
-	return prefix
+	return []byte(chooseIndex(d.collections[collection], whereFields).GetIndex(whereValues))
 }

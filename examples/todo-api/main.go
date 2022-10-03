@@ -2,12 +2,11 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 
-	"github.com/brianvoe/gofakeit/v6"
+	wolverinehttp "github.com/autom8ter/wolverine/transport/http"
 
-	"wolverine"
+	"github.com/autom8ter/wolverine"
 )
 
 func main() {
@@ -39,19 +38,11 @@ func main() {
 			{
 				Name: "seed_task",
 				Function: func(ctx context.Context, db wolverine.DB) error {
-					var tasks []wolverine.Record
+					var tasks []*wolverine.Document
 					for i := 0; i < 1000; i++ {
-						tasks = append(tasks, map[string]interface{}{
-							"_id":         gofakeit.UUID(),
-							"_collection": "task",
-							"account_id":  gofakeit.IntRange(0, 50),
-							"owner":       gofakeit.Email(),
-							"content":     gofakeit.LoremIpsumSentence(15),
-							"done":        gofakeit.Bool(),
-							"created_at":  gofakeit.Date().Unix(),
-						})
+						tasks = append(tasks, randomTask())
 					}
-					if err := db.BatchSet(ctx, tasks); err != nil {
+					if err := db.BatchSet(ctx, "task", tasks); err != nil {
 						return err
 					}
 					return nil
@@ -60,12 +51,12 @@ func main() {
 		},
 	})
 	if err != nil {
-		fmt.Println(err)
+		db.Error(ctx, "server failure", err, map[string]interface{}{})
 		return
 	}
 	defer db.Close(ctx)
 
-	handler, err := wolverine.Handler(db)
+	handler, err := wolverinehttp.Handler(db)
 	if err != nil {
 		db.Error(ctx, "failed to setup handler", err, map[string]interface{}{})
 		return

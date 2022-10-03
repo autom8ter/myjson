@@ -4,13 +4,14 @@ import (
 	"context"
 	"fmt"
 	"sort"
-	"time"
 
 	"github.com/dgraph-io/badger/v3"
-	"github.com/spf13/cast"
+	"github.com/tidwall/gjson"
+
+	"github.com/autom8ter/wolverine/internal/prefix"
 )
 
-func (d *db) Query(ctx context.Context, collection string, query Query) ([]Record, error) {
+func (d *db) Query(ctx context.Context, collection string, query Query) ([]*Document, error) {
 	_, ok := d.collections[collection]
 	if !ok {
 		return nil, fmt.Errorf("unsupported collection: %s", collection)
@@ -19,7 +20,7 @@ func (d *db) Query(ctx context.Context, collection string, query Query) ([]Recor
 		return d.search(ctx, collection, query)
 	}
 	prefix := d.getQueryPrefix(collection, query.Where)
-	var records []Record
+	var documents []*Document
 	if err := d.kv.View(func(txn *badger.Txn) error {
 		opts := badger.DefaultIteratorOptions
 		opts.PrefetchValues = true
@@ -30,31 +31,39 @@ func (d *db) Query(ctx context.Context, collection string, query Query) ([]Recor
 		if query.StartAt != "" {
 			seek = []byte(fmt.Sprintf("%s.%s", string(prefix), query.StartAt))
 		}
+
 		it.Seek(seek)
 		defer it.Close()
-		for it.Valid() {
-			if query.Limit > 0 && len(records) >= query.Limit*3 {
+		for it.ValidForPrefix(prefix) {
+			if query.Limit > 0 && len(documents) >= query.Limit {
 				return nil
 			}
 			item := it.Item()
 			err := item.Value(func(bits []byte) error {
-				record, err := NewRecordFromJSON(bits)
+				document, err := NewDocumentFromBytes(bits)
 				if err != nil {
-					return err
+					return d.wrapErr(err, "")
 				}
-				if record.Where(query.Where) {
+				pass, err := document.Where(query.Where)
+				if err != nil {
+					return d.wrapErr(err, "")
+				}
+				if pass {
 					if d.config.OnRead != nil {
-						if err := d.config.OnRead(d, ctx, record); err != nil {
-							return err
+						if err := d.config.OnRead(d, ctx, document); err != nil {
+							return d.wrapErr(err, "")
 						}
 					}
-					records = append(records, record)
-					records = orderBy(query.OrderBy, query.Limit, records)
+					if err := document.Validate(); err != nil {
+						return d.wrapErr(err, "")
+					}
+					documents = append(documents, document)
+					documents = orderBy(query.OrderBy, query.Limit, documents)
 				}
 				return nil
 			})
 			if err != nil {
-				return err
+				return d.wrapErr(err, "")
 			}
 			it.Next()
 		}
@@ -62,127 +71,113 @@ func (d *db) Query(ctx context.Context, collection string, query Query) ([]Recor
 	}); err != nil {
 		return nil, err
 	}
-	records = orderBy(query.OrderBy, query.Limit, records)
+	documents = orderBy(query.OrderBy, query.Limit, documents)
 	if len(query.Select) > 0 {
-		for i, r := range records {
-			records[i] = r.Select(query.Select)
+		for _, r := range documents {
+			r.Select(query.Select)
 		}
 	}
-	if len(records) > query.Limit {
-		return records[:query.Limit], nil
+	if len(documents) > query.Limit {
+		return documents[:query.Limit], nil
 	}
-	return records, nil
+	return documents, nil
 }
 
-func (d *db) Get(ctx context.Context, collection, id string) (Record, error) {
+func (d *db) Get(ctx context.Context, collection, id string) (*Document, error) {
 	if _, ok := d.collections[collection]; !ok {
 		return nil, fmt.Errorf("unsupported collection: %s", collection)
 	}
 	var (
-		record Record
+		record *Document
 	)
+
 	if err := d.kv.View(func(txn *badger.Txn) error {
-		item, err := txn.Get([]byte(fmt.Sprintf("%s.%s", collection, id)))
+		item, err := txn.Get([]byte(prefix.PrimaryKey(collection, id)))
 		if err != nil {
-			return err
+			return d.wrapErr(err, "")
 		}
 		return item.Value(func(val []byte) error {
-			record, err = NewRecordFromJSON(val)
-			if err != nil {
-				return err
-			}
-			return nil
+			record, err = NewDocumentFromBytes(val)
+			return d.wrapErr(err, "")
 		})
 	}); err != nil {
-		return nil, err
+		return record, err
 	}
 	if d.config.OnRead != nil {
 		if err := d.config.OnRead(d, ctx, record); err != nil {
-			return nil, err
+			return record, err
 		}
 	}
 	return record, nil
 }
 
-func (d *db) GetAll(ctx context.Context, collection string, ids []string) ([]Record, error) {
+func (d *db) GetAll(ctx context.Context, collection string, ids []string) ([]*Document, error) {
 	if _, ok := d.collections[collection]; !ok {
 		return nil, fmt.Errorf("unsupported collection: %s", collection)
 	}
-	var records []Record
+	var documents []*Document
 	if err := d.kv.View(func(txn *badger.Txn) error {
 		for _, id := range ids {
-			var (
-				record Record
-			)
+
 			item, err := txn.Get([]byte(fmt.Sprintf("%s.%s", collection, id)))
 			if err != nil {
-				return err
+				return d.wrapErr(err, "")
 			}
 			if err := item.Value(func(val []byte) error {
-				record, err = NewRecordFromJSON(val)
+				record, err := NewDocumentFromBytes(val)
 				if err != nil {
-					return err
+					return d.wrapErr(err, "")
 				}
+				if d.config.OnRead != nil {
+					if err := d.config.OnRead(d, ctx, record); err != nil {
+						return d.wrapErr(err, "")
+					}
+				}
+				documents = append(documents, record)
 				return nil
 			}); err != nil {
-				return err
+				return d.wrapErr(err, "")
 			}
-			if d.config.OnRead != nil {
-				if err := d.config.OnRead(d, ctx, record); err != nil {
-					return err
-				}
-			}
-			records = append(records, record)
 		}
 		return nil
 	}); err != nil {
-		return records, err
+		return documents, err
 	}
-	return records, nil
+	return documents, nil
 }
 
-func orderBy(orderBy OrderBy, limit int, records []Record) []Record {
+func orderBy(orderBy OrderBy, limit int, documents []*Document) []*Document {
 	if orderBy.Field == "" {
-		return records
+		return documents
 	}
 	if orderBy.Direction == DESC {
-		sort.Slice(records, func(i, j int) bool {
-			return compareField(orderBy.Field, records[i], records[j])
+		sort.Slice(documents, func(i, j int) bool {
+			return compareField(orderBy.Field, documents[i], documents[j])
 		})
 	} else {
-		sort.Slice(records, func(i, j int) bool {
-			return !compareField(orderBy.Field, records[i], records[j])
+		sort.Slice(documents, func(i, j int) bool {
+			return !compareField(orderBy.Field, documents[i], documents[j])
 		})
 	}
-	if limit > 0 && len(records) > limit {
-		return records[:limit]
+	if limit > 0 && len(documents) > limit {
+		return documents[:limit]
 	}
-	return records
+	return documents
 }
 
-func compareField(field string, i, j Record) bool {
-	switch fieldVal := i[field].(type) {
-	case nil:
+func compareField(field string, i, j *Document) bool {
+	iFieldVal := i.result.Get(field)
+	jFieldVal := j.result.Get(field)
+	switch i.result.Get(field).Type {
+	case gjson.Null:
 		return false
-	case string:
-		return fieldVal > cast.ToString(j[field])
-	case float64:
-		return fieldVal > cast.ToFloat64(j[field])
-	case float32:
-		return fieldVal > cast.ToFloat32(j[field])
-	case int:
-		return fieldVal > cast.ToInt(j[field])
-	case int64:
-		return fieldVal > cast.ToInt64(j[field])
-	case int32:
-		return fieldVal > cast.ToInt32(j[field])
-	case time.Time:
-		return fieldVal.UnixMilli() > cast.ToTime(j[field]).UnixMilli()
-	case time.Duration:
-		return fieldVal > cast.ToDuration(j[field])
-	case bool:
-		return fieldVal && !cast.ToBool(j[field])
+	case gjson.False:
+		return iFieldVal.Bool() && !jFieldVal.Bool()
+	case gjson.Number:
+		return iFieldVal.Float() > jFieldVal.Float()
+	case gjson.String:
+		return iFieldVal.String() > jFieldVal.String()
 	default:
-		return cast.ToString(fieldVal) > cast.ToString(j[field])
+		return iFieldVal.String() > jFieldVal.String()
 	}
 }

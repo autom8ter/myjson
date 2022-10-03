@@ -2,392 +2,267 @@ package wolverine
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"os"
 
+	"github.com/autom8ter/machine/v4"
+	"github.com/blevesearch/bleve"
 	"github.com/dgraph-io/badger/v3"
+
+	"github.com/autom8ter/wolverine/internal/prefix"
 )
 
-func (d *db) Set(ctx context.Context, record Record) error {
-	if err := record.Validate(); err != nil {
-		return err
-	}
-	record, err := record.Flatten()
-	if err != nil {
-		return err
-	}
-	if _, ok := d.collections[record.GetCollection()]; !ok {
-		return fmt.Errorf("unsupported collection: %s", record.GetCollection())
-	}
-	collection := d.collections[record.GetCollection()]
-	current, _ := d.Get(ctx, record.GetCollection(), record.GetID())
-	if d.config.BeforeSet != nil {
-		if err := d.config.BeforeSet(d, ctx, current, record); err != nil {
-			return err
-		}
-	}
-	bits, err := record.Encode()
-	if err != nil {
-		return err
-	}
-	if err := d.kv.Update(func(txn *badger.Txn) error {
-		if err := txn.SetEntry(&badger.Entry{
-			Key:       record.key(),
-			Value:     bits,
-			ExpiresAt: uint64(record.GetExpiresAt().Unix()),
-		}); err != nil {
-			return err
-		}
-		for _, index := range collection.Indexes {
-			if err := txn.Delete(record.fieldIndexKey(index.Fields)); err != nil {
-				return err
-			}
-			if err := txn.SetEntry(&badger.Entry{
-				Key:       record.fieldIndexKey(index.Fields),
-				Value:     bits,
-				ExpiresAt: uint64(record.GetExpiresAt().Unix()),
-			}); err != nil {
-				return err
-			}
-		}
-		if _, ok := d.fullText[record.GetCollection()]; ok {
-			if err := d.fullText[record.GetCollection()].Index(record.GetID(), record); err != nil {
-				return err
-			}
-		}
+type mutation string
+
+const (
+	set    mutation = "set"
+	update mutation = "update"
+	del    mutation = "del"
+)
+
+func (d *db) saveBatch(ctx context.Context, collection string, mutation mutation, documents []*Document) error {
+	if len(documents) == 0 {
 		return nil
-	}); err != nil {
-		return err
 	}
-	if d.config.AfterSet != nil {
-		if err := d.config.AfterSet(d, ctx, current, record); err != nil {
-			return err
+	for _, document := range documents {
+		if err := document.Validate(); err != nil {
+			return d.wrapErr(err, "")
+		}
+		c, ok := d.collections[collection]
+		if !ok {
+			return fmt.Errorf("unsupported collection: %s", document.GetCollection())
+		}
+		valid, err := c.Validate(document)
+		if err != nil {
+			return d.wrapErr(err, "")
+		}
+		if !valid {
+			return fmt.Errorf("%s/%s document has invalid schema", document.GetCollection(), document.GetID())
 		}
 	}
-	return nil
-}
-
-func (d *db) BatchSet(ctx context.Context, records []Record) error {
-	for _, record := range records {
-		if err := record.Validate(); err != nil {
-			return err
-		}
-		if _, ok := d.collections[record.GetCollection()]; !ok {
-			return fmt.Errorf("unsupported collection: %s", record.GetCollection())
-		}
+	collect := d.collections[collection]
+	txn := d.kv.NewWriteBatch()
+	var batch *bleve.Batch
+	index := d.fullText[collection]
+	if index != nil {
+		batch = index.NewBatch()
 	}
-	if err := d.kv.Update(func(txn *badger.Txn) error {
-		for _, record := range records {
-			collection := d.collections[record.GetCollection()]
-			record, err := record.Flatten()
-			if err != nil {
-				return err
+	for _, document := range documents {
+		current, _ := d.Get(ctx, document.GetCollection(), document.GetID())
+		if current == nil {
+			current = NewDocument()
+		}
+		var bits []byte
+		switch mutation {
+		case set:
+			document.SetCollection(collection)
+			if err := document.Validate(); err != nil {
+				return d.wrapErr(err, "")
 			}
-			current, _ := d.Get(ctx, record.GetCollection(), record.GetID())
-			if d.config.BeforeSet != nil {
-				if err := d.config.BeforeSet(d, ctx, current, record); err != nil {
-					return err
-				}
+			bits = document.Bytes()
+		case update:
+			document.SetCollection(collection)
+			if err := document.Validate(); err != nil {
+				return d.wrapErr(err, "")
 			}
-
-			bits, err := record.Encode()
-			if err != nil {
-				return err
-			}
-
+			current.Merge(document)
+			bits = current.Bytes()
+		default:
+			return errors.New("invalid mutation")
+		}
+		switch mutation {
+		case set, update:
 			if err := txn.SetEntry(&badger.Entry{
-				Key:       record.key(),
-				Value:     bits,
-				ExpiresAt: uint64(record.GetExpiresAt().Unix()),
+				Key:   []byte(prefix.PrimaryKey(document.GetCollection(), document.GetID())),
+				Value: bits,
 			}); err != nil {
-				return err
+				return d.wrapErr(err, "")
 			}
-			for _, index := range collection.Indexes {
-				if err := txn.Delete(record.fieldIndexKey(index.Fields)); err != nil {
-					return err
+			for _, index := range collect.Indexes {
+				pindex := index.prefix(document.GetCollection())
+				if current != nil {
+					if err := txn.Delete([]byte(pindex.GetIndex(current.Value()))); err != nil {
+						return d.wrapErr(err, "")
+					}
 				}
+				i := pindex.GetIndex(document.Value())
 				if err := txn.SetEntry(&badger.Entry{
-					Key:       record.fieldIndexKey(index.Fields),
-					Value:     bits,
-					ExpiresAt: uint64(record.GetExpiresAt().Unix()),
+					Key:   []byte(i),
+					Value: bits,
 				}); err != nil {
-					return err
+					return d.wrapErr(err, "")
 				}
 			}
-			if _, ok := d.fullText[record.GetCollection()]; ok {
-				if err := d.fullText[record.GetCollection()].Index(record.GetID(), record); err != nil {
-					return err
+			if batch != nil {
+				if err := batch.Index(document.GetID(), document.Value()); err != nil {
+					return d.wrapErr(err, "")
 				}
 			}
-			if d.config.AfterSet != nil {
-				if err := d.config.AfterSet(d, ctx, current, record); err != nil {
-					return err
+		case del:
+			for _, index := range collect.Indexes {
+				pindex := index.prefix(current.GetCollection())
+				if err := txn.Delete([]byte(pindex.GetIndex(current))); err != nil {
+					return d.wrapErr(err, "")
 				}
+			}
+			if batch != nil {
+				batch.Delete(document.GetID())
 			}
 		}
-		return nil
-	}); err != nil {
-		return err
 	}
+	if err := index.Batch(batch); err != nil {
+		return d.wrapErr(err, "")
+	}
+	if err := txn.Flush(); err != nil {
+		return d.wrapErr(err, "")
+	}
+	d.machine.Publish(ctx, machine.Message{
+		Channel: collection,
+		Body:    documents,
+	})
 	return nil
 }
 
-func (d *db) Update(ctx context.Context, record Record) error {
-	if err := record.Validate(); err != nil {
-		return err
+func (d *db) saveDocument(ctx context.Context, collection string, mutation mutation, document *Document) error {
+	collect := d.collections[collection]
+	current, _ := d.Get(ctx, document.GetCollection(), document.GetID())
+	if current == nil {
+		current = NewDocument()
 	}
-	collection, ok := d.collections[record.GetCollection()]
-	if !ok {
-		return fmt.Errorf("unsupported collection: %s/%s", record.GetCollection(), record.GetID())
-	}
-	record, err := record.Flatten()
-	if err != nil {
-		return err
-	}
-	current, err := d.Get(ctx, record.GetCollection(), record.GetID())
-	if err != nil {
-		return err
-	}
-	if d.config.BeforeUpdate != nil {
-		if err := d.config.BeforeUpdate(d, ctx, current, record); err != nil {
-			return err
+	var bits []byte
+	switch mutation {
+	case set:
+		document.SetCollection(collection)
+		if err := document.Validate(); err != nil {
+			return d.wrapErr(err, "")
 		}
-	}
-	for k, v := range current {
-		if _, ok := record[k]; !ok {
-			record[k] = v
+		valid, err := collect.Validate(document)
+		if err != nil {
+			return d.wrapErr(err, "")
 		}
-	}
-	bits, err := record.Encode()
-	if err != nil {
-		return err
-	}
-	if err := d.kv.Update(func(txn *badger.Txn) error {
-		if err := txn.SetEntry(&badger.Entry{
-			Key:       record.key(),
-			Value:     bits,
-			ExpiresAt: uint64(record.GetExpiresAt().Unix()),
-		}); err != nil {
-			return err
+		if !valid {
+			return fmt.Errorf("%s/%s document has invalid schema", document.GetCollection(), document.GetID())
 		}
-		for _, index := range collection.Indexes {
-			if err := txn.Delete(record.fieldIndexKey(index.Fields)); err != nil {
-				return err
-			}
+		bits = document.Bytes()
+	case update:
+		document.SetCollection(collection)
+		if err := document.Validate(); err != nil {
+			return d.wrapErr(err, "")
+		}
+		current.Merge(document)
+		valid, err := collect.Validate(current)
+		if err != nil {
+			return d.wrapErr(err, "")
+		}
+		if !valid {
+			return fmt.Errorf("%s/%s document has invalid schema", current.GetCollection(), current.GetID())
+		}
+		bits = current.Bytes()
+	default:
+		return errors.New("invalid mutation")
+	}
+	return d.kv.Update(func(txn *badger.Txn) error {
+		switch mutation {
+		case set, update:
 			if err := txn.SetEntry(&badger.Entry{
-				Key:       record.fieldIndexKey(index.Fields),
-				Value:     bits,
-				ExpiresAt: uint64(record.GetExpiresAt().Unix()),
+				Key:   []byte(prefix.PrimaryKey(document.GetCollection(), document.GetID())),
+				Value: bits,
 			}); err != nil {
-				return err
+				return d.wrapErr(err, "")
 			}
-		}
-		if _, ok := d.fullText[record.GetCollection()]; ok {
-			if err := d.fullText[record.GetCollection()].Index(record.GetID(), record); err != nil {
-				return err
-			}
-		}
-		return nil
-	}); err != nil {
-		return err
-	}
-	if d.config.AfterUpdate != nil {
-		if err := d.config.AfterUpdate(d, ctx, current, record); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (d *db) BatchUpdate(ctx context.Context, records []Record) error {
-	for _, record := range records {
-		if err := record.Validate(); err != nil {
-			return err
-		}
-		if _, ok := d.collections[record.GetCollection()]; !ok {
-			return fmt.Errorf("unsupported collection: %s/%s", record.GetCollection(), record.GetID())
-		}
-	}
-
-	if err := d.kv.Update(func(txn *badger.Txn) error {
-		for _, record := range records {
-			collection := d.collections[record.GetCollection()]
-			record, err := record.Flatten()
-			if err != nil {
-				return err
-			}
-			current, err := d.Get(ctx, record.GetCollection(), record.GetID())
-			if err != nil {
-				return err
-			}
-			for k, v := range current {
-				if _, ok := record[k]; !ok {
-					record[k] = v
+			for _, index := range collect.Indexes {
+				pindex := index.prefix(document.GetCollection())
+				if current != nil {
+					if err := txn.Delete([]byte(pindex.GetIndex(current.Value()))); err != nil {
+						return d.wrapErr(err, "")
+					}
 				}
-			}
-			if d.config.BeforeUpdate != nil {
-				if err := d.config.BeforeUpdate(d, ctx, current, record); err != nil {
-					return err
-				}
-			}
-
-			bits, err := record.Encode()
-			if err != nil {
-				return err
-			}
-			if err := txn.SetEntry(&badger.Entry{
-				Key:       record.key(),
-				Value:     bits,
-				ExpiresAt: uint64(record.GetExpiresAt().Unix()),
-			}); err != nil {
-				return err
-			}
-			for _, index := range collection.Indexes {
-				if err := txn.Delete(record.fieldIndexKey(index.Fields)); err != nil {
-					return err
-				}
+				i := pindex.GetIndex(document.Value())
 				if err := txn.SetEntry(&badger.Entry{
-					Key:       record.fieldIndexKey(index.Fields),
-					Value:     bits,
-					ExpiresAt: uint64(record.GetExpiresAt().Unix()),
+					Key:   []byte(i),
+					Value: bits,
 				}); err != nil {
-					return err
+					return d.wrapErr(err, "")
 				}
 			}
-			if _, ok := d.fullText[record.GetCollection()]; ok {
-				if err := d.fullText[record.GetCollection()].Index(record.GetID(), record); err != nil {
-					return err
+			if index, ok := d.fullText[collection]; ok {
+				if err := index.Index(document.GetID(), document.Value()); err != nil {
+					return d.wrapErr(err, "")
 				}
 			}
-			if d.config.AfterUpdate != nil {
-				if err := d.config.AfterUpdate(d, ctx, current, record); err != nil {
-					return err
+		case del:
+			for _, index := range collect.Indexes {
+				pindex := index.prefix(current.GetCollection())
+				if err := txn.Delete([]byte(pindex.GetIndex(current))); err != nil {
+					return d.wrapErr(err, "")
+				}
+			}
+			if index, ok := d.fullText[collection]; ok {
+				if err := index.Delete(document.GetID()); err != nil {
+					return d.wrapErr(err, "")
 				}
 			}
 		}
+		d.machine.Publish(ctx, machine.Message{
+			Channel: collection,
+			Body:    document,
+		})
 		return nil
-	}); err != nil {
-		return err
-	}
-	return nil
+	})
+}
+
+func (d *db) Set(ctx context.Context, collection string, document *Document) error {
+	return d.saveDocument(ctx, collection, set, document)
+}
+
+func (d *db) BatchSet(ctx context.Context, collection string, batch []*Document) error {
+	return d.saveBatch(ctx, collection, set, batch)
+}
+
+func (d *db) Update(ctx context.Context, collection string, document *Document) error {
+	return d.saveDocument(ctx, collection, update, document)
+}
+
+func (d *db) BatchUpdate(ctx context.Context, collection string, batch []*Document) error {
+	return d.saveBatch(ctx, collection, update, batch)
 }
 
 func (d *db) Delete(ctx context.Context, collection, id string) error {
-	c, ok := d.collections[collection]
-	if !ok {
-		return fmt.Errorf("unsupported collection: %s/%s", collection, id)
-	}
-	record, err := d.Get(ctx, collection, id)
+	doc, err := d.Get(ctx, collection, id)
 	if err != nil {
-		return err
+		return d.wrapErr(err, "")
 	}
-	if d.config.BeforeDelete != nil {
-		if err := d.config.BeforeDelete(d, ctx, record, nil); err != nil {
-			return err
-		}
-	}
-	if err := d.kv.Update(func(txn *badger.Txn) error {
-		if err := txn.Delete([]byte(fmt.Sprintf("%s.%s", collection, id))); err != nil {
-			return err
-		}
-		for _, index := range c.Indexes {
-			if err := txn.Delete(record.fieldIndexKey(index.Fields)); err != nil {
-				return err
-			}
-		}
-		if _, ok := d.fullText[collection]; ok {
-			if err := d.fullText[collection].Delete(id); err != nil {
-				return err
-			}
-		}
-		return nil
-	}); err != nil {
-		return err
-	}
-	if d.config.AfterDelete != nil {
-		if err := d.config.AfterDelete(d, ctx, record, nil); err != nil {
-			return err
-		}
-	}
-	return nil
+	return d.saveDocument(ctx, collection, del, doc)
 }
 
 func (d *db) BatchDelete(ctx context.Context, collection string, ids []string) error {
-	if _, ok := d.collections[collection]; !ok {
-		return fmt.Errorf("unsupported collection: %s", collection)
-	}
-	if err := d.kv.Update(func(txn *badger.Txn) error {
-		for _, id := range ids {
-			c := d.collections[collection]
-			record, err := d.Get(ctx, collection, id)
-			if err != nil {
-				return err
-			}
-			if d.config.BeforeDelete != nil {
-				if err := d.config.BeforeDelete(d, ctx, record, nil); err != nil {
-					return err
-				}
-			}
-			if err := txn.Delete([]byte(fmt.Sprintf("%s.%s", collection, id))); err != nil {
-				return err
-			}
-			for _, index := range c.Indexes {
-				if err := txn.Delete(record.fieldIndexKey(index.Fields)); err != nil {
-					return err
-				}
-			}
-			if _, ok := d.fullText[collection]; ok {
-				if err := d.fullText[collection].Delete(id); err != nil {
-					return err
-				}
-			}
-			if d.config.AfterDelete != nil {
-				if err := d.config.AfterDelete(d, ctx, record, nil); err != nil {
-					return err
-				}
-			}
+	var documents []*Document
+	for _, id := range ids {
+		doc, err := d.Get(ctx, collection, id)
+		if err != nil {
+			return d.wrapErr(err, "")
 		}
-		return nil
-	}); err != nil {
-		return err
+		documents = append(documents, doc)
 	}
-	return nil
+
+	return d.saveBatch(ctx, collection, del, documents)
 }
 
-func (d *db) DropAll(ctx context.Context, collections []string) error {
-	for _, collection := range collections {
-		if err := d.kv.DropPrefix([]byte(collection)); err != nil {
-			return err
-		}
-		d.kv.DropPrefix([]byte(fmt.Sprintf("index.%s", collection)))
-		if _, ok := d.fullText[collection]; ok {
-			d.fullText[collection].Close()
-			if err := os.RemoveAll(fmt.Sprintf("%s/search/%s.bleve", d.config.Path, collection)); err != nil && err != os.ErrNotExist {
-				return err
-			}
-			delete(d.fullText, collection)
-		}
-	}
-	return nil
-}
-
-func (d *db) QueryUpdate(ctx context.Context, update Record, collection string, query Query) error {
+func (d *db) QueryUpdate(ctx context.Context, update *Document, collection string, query Query) error {
 	records, err := d.Query(ctx, collection, query)
 	if err != nil {
-		return err
+		return d.wrapErr(err, "")
 	}
 	for _, record := range records {
-		for k, v := range update {
-			record[k] = v
-		}
+		record.Merge(update)
 	}
-	return d.BatchSet(ctx, records)
+	return d.BatchSet(ctx, collection, records)
 }
 
 func (d *db) QueryDelete(ctx context.Context, collection string, query Query) error {
 	records, err := d.Query(ctx, collection, query)
 	if err != nil {
-		return err
+		return d.wrapErr(err, "")
 	}
 	var ids []string
 	for _, record := range records {
