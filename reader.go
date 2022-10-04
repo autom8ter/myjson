@@ -88,7 +88,7 @@ func (d *db) Get(ctx context.Context, collection, id string) (*Document, error) 
 		return nil, fmt.Errorf("unsupported collection: %s", collection)
 	}
 	var (
-		record *Document
+		document *Document
 	)
 
 	if err := d.kv.View(func(txn *badger.Txn) error {
@@ -97,18 +97,18 @@ func (d *db) Get(ctx context.Context, collection, id string) (*Document, error) 
 			return d.wrapErr(err, "")
 		}
 		return item.Value(func(val []byte) error {
-			record, err = NewDocumentFromBytes(val)
+			document, err = NewDocumentFromBytes(val)
 			return d.wrapErr(err, "")
 		})
 	}); err != nil {
-		return record, err
+		return document, err
 	}
 	if d.config.OnRead != nil {
-		if err := d.config.OnRead(d, ctx, record); err != nil {
-			return record, err
+		if err := d.config.OnRead(d, ctx, document); err != nil {
+			return document, err
 		}
 	}
-	return record, nil
+	return document, nil
 }
 
 func (d *db) GetAll(ctx context.Context, collection string, ids []string) ([]*Document, error) {
@@ -118,22 +118,21 @@ func (d *db) GetAll(ctx context.Context, collection string, ids []string) ([]*Do
 	var documents []*Document
 	if err := d.kv.View(func(txn *badger.Txn) error {
 		for _, id := range ids {
-
-			item, err := txn.Get([]byte(fmt.Sprintf("%s.%s", collection, id)))
+			item, err := txn.Get([]byte(prefix.PrimaryKey(collection, id)))
 			if err != nil {
 				return d.wrapErr(err, "")
 			}
 			if err := item.Value(func(val []byte) error {
-				record, err := NewDocumentFromBytes(val)
+				document, err := NewDocumentFromBytes(val)
 				if err != nil {
 					return d.wrapErr(err, "")
 				}
 				if d.config.OnRead != nil {
-					if err := d.config.OnRead(d, ctx, record); err != nil {
+					if err := d.config.OnRead(d, ctx, document); err != nil {
 						return d.wrapErr(err, "")
 					}
 				}
-				documents = append(documents, record)
+				documents = append(documents, document)
 				return nil
 			}); err != nil {
 				return d.wrapErr(err, "")

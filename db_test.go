@@ -144,6 +144,19 @@ func Test(t *testing.T) {
 		assert.NotNil(t, err)
 		assert.Empty(t, result)
 	})
+	t.Run("get all", func(t *testing.T) {
+		assert.Nil(t, testDB(defaultCollections, func(ctx context.Context, db wolverine.DB) {
+			var ids []string
+			for i := 0; i < 3; i++ {
+				u := newUserDoc()
+				ids = append(ids, u.GetID())
+				assert.Nil(t, db.Set(ctx, "user", u))
+			}
+			results, err := db.GetAll(ctx, "user", ids)
+			assert.Nil(t, err)
+			assert.Equal(t, 3, len(results))
+		}))
+	})
 	t.Run("search", func(t *testing.T) {
 		assert.Nil(t, testDB(defaultCollections, func(ctx context.Context, db wolverine.DB) {
 			record := newUserDoc()
