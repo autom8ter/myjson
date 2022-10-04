@@ -2,7 +2,6 @@ package wolverine
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	"github.com/autom8ter/machine/v4"
@@ -102,9 +101,9 @@ func (d *db) saveBatch(ctx context.Context, collection string, mutation mutation
 				if err := txn.Delete([]byte(pindex.GetIndex(current.Value()))); err != nil {
 					return d.wrapErr(err, "")
 				}
-				if err := txn.Delete([]byte(prefix.PrimaryKey(current.GetCollection(), current.GetID()))); err != nil {
-					return d.wrapErr(err, "")
-				}
+			}
+			if err := txn.Delete([]byte(prefix.PrimaryKey(current.GetCollection(), current.GetID()))); err != nil {
+				return d.wrapErr(err, "")
 			}
 			if batch != nil {
 				batch.Delete(document.GetID())
@@ -159,8 +158,6 @@ func (d *db) saveDocument(ctx context.Context, collection string, mutation mutat
 			return fmt.Errorf("%s/%s document has invalid schema", current.GetCollection(), current.GetID())
 		}
 		bits = current.Bytes()
-	default:
-		return errors.New("invalid mutation")
 	}
 	return d.kv.Update(func(txn *badger.Txn) error {
 		switch mutation {
@@ -197,6 +194,9 @@ func (d *db) saveDocument(ctx context.Context, collection string, mutation mutat
 				if err := txn.Delete([]byte(pindex.GetIndex(current.Value()))); err != nil {
 					return d.wrapErr(err, "")
 				}
+			}
+			if err := txn.Delete([]byte(prefix.PrimaryKey(current.GetCollection(), current.GetID()))); err != nil {
+				return d.wrapErr(err, "")
 			}
 			if index, ok := d.fullText[collection]; ok {
 				if err := index.Delete(document.GetID()); err != nil {

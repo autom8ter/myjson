@@ -155,6 +155,14 @@ func Test(t *testing.T) {
 			results, err := db.GetAll(ctx, "user", ids)
 			assert.Nil(t, err)
 			assert.Equal(t, 3, len(results))
+			for _, id := range ids {
+				assert.Nil(t, db.Delete(ctx, "user", id))
+			}
+			for _, id := range ids {
+				result, err := db.Get(ctx, "user", id)
+				assert.NotNil(t, err)
+				assert.Nil(t, result)
+			}
 		}))
 	})
 	t.Run("search", func(t *testing.T) {
