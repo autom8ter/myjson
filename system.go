@@ -114,17 +114,13 @@ func (d *db) IncrementalBackup(ctx context.Context, w io.Writer) error {
 
 func (d *db) Restore(ctx context.Context, r io.Reader) error {
 	if err := d.kv.Load(r, 256); err != nil {
-		d.mu.Unlock()
 		return d.wrapErr(err, "")
 	}
-	return d.ReIndex(ctx)
+	return d.wrapErr(d.ReIndex(ctx), "")
 }
 
 func (d *db) Migrate(ctx context.Context, migrations []Migration) error {
 	existing, _ := d.Get(ctx, systemCollection, lastMigrationID)
-	defer func() {
-
-	}()
 	if existing.Empty() {
 		existing = NewDocument()
 	}
