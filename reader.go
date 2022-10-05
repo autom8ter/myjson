@@ -76,7 +76,7 @@ func (d *db) Query(ctx context.Context, collection string, query Query) ([]*Docu
 			r.Select(query.Select)
 		}
 	}
-	if len(documents) > query.Limit {
+	if query.Limit > 0 && len(documents) > query.Limit {
 		return documents[:query.Limit], nil
 	}
 	return documents, nil

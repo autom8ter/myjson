@@ -222,12 +222,12 @@ func (d *db) GetCollection(ctx context.Context, collection string) (*Collection,
 
 func (d *db) GetCollections(ctx context.Context) ([]*Collection, error) {
 	var collections []*Collection
-	results, err := d.Query(ctx, systemCollection, Query{})
+	results, err := d.Query(ctx, systemCollection, Query{Limit: 1000})
 	if err != nil {
 		return nil, d.wrapErr(err, "")
 	}
 	for _, result := range results {
-		if strings.HasPrefix(result.GetID(), "collection.") {
+		if strings.HasPrefix(result.GetID(), "collections.") {
 			existing, err := d.Get(ctx, systemCollection, result.GetID())
 			if err != nil {
 				return nil, err

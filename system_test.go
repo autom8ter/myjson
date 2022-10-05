@@ -26,6 +26,9 @@ func TestSystem(t *testing.T) {
 			assert.Nil(t, err)
 			assert.Equal(t, c.Name, cv.Name)
 		}
+		results, err := db.GetCollections(context.Background())
+		assert.Nil(t, err)
+		assert.Equal(t, len(defaultCollections), len(results))
 	})
 	t.Run("backup restore", func(t *testing.T) {
 		assert.Nil(t, testDB(defaultCollections, func(ctx context.Context, db wolverine.DB) {

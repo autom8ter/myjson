@@ -80,7 +80,7 @@ func (d *db) loadCollections(ctx context.Context) error {
 	}
 	for _, collection := range collections {
 		for _, i := range collection.Indexes {
-			if i.FullText {
+			if collection.fullText == nil && i.FullText {
 				indexMapping := bleve.NewIndexMapping()
 				if len(i.Fields) > 0 && i.Fields[0] != "*" {
 					//document := bleve.NewDocumentMapping()
@@ -90,7 +90,10 @@ func (d *db) loadCollections(ctx context.Context) error {
 					//}
 					//indexMapping.AddDocumentMapping("index", document)
 				}
-
+				existing, ok := d.getInmemCollection(collection.Name)
+				if ok && existing.fullText != nil {
+					existing.fullText.Close()
+				}
 				if d.config.Path == "inmem" {
 					i, err := bleve.NewMemOnly(indexMapping)
 					if err != nil {
