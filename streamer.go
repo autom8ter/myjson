@@ -2,19 +2,16 @@ package wolverine
 
 import (
 	"context"
-	"sync"
 
 	"github.com/autom8ter/machine/v4"
 )
 
 func (d *db) ChangeStream(ctx context.Context, collections []string, fn ChangeStreamHandler) error {
-	wg := sync.WaitGroup{}
+	m := machine.New()
 	for _, collection := range collections {
-		wg.Add(1)
 		collection := collection
-		go func(collection string) {
-			defer wg.Done()
-			d.machine.Subscribe(ctx, collection, func(ctx context.Context, msg machine.Message) (bool, error) {
+		m.Go(ctx, func(ctx context.Context) error {
+			return d.machine.Subscribe(ctx, collection, func(ctx context.Context, msg machine.Message) (bool, error) {
 				switch document := msg.Body.(type) {
 				case *Document:
 					if err := fn(ctx, []*Document{document}); err != nil {
@@ -27,8 +24,7 @@ func (d *db) ChangeStream(ctx context.Context, collections []string, fn ChangeSt
 				}
 				return true, nil
 			})
-		}(collection)
+		})
 	}
-	wg.Wait()
-	return nil
+	return d.wrapErr(m.Wait(), "")
 }
