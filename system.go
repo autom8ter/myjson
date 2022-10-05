@@ -11,6 +11,12 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
+// Migration is an atomic database migration
+type Migration struct {
+	Name     string
+	Function func(ctx context.Context, db DB) error
+}
+
 func (d *db) Config() Config {
 	return d.config
 }

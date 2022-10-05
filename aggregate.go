@@ -10,6 +10,37 @@ import (
 	"github.com/spf13/cast"
 )
 
+// AggregateFunction is an aggregate function used within MapReduce
+type AggregateFunction string
+
+const (
+	// AggregateSum calculates the sum
+	AggregateSum AggregateFunction = "sum"
+	// AggregateMin calculates the min
+	AggregateMin AggregateFunction = "min"
+	// AggregateMax calculates the max
+	AggregateMax AggregateFunction = "max"
+	// AggregateAvg calculates the avg
+	AggregateAvg AggregateFunction = "avg"
+	// AggregateCount calculates the count
+	AggregateCount AggregateFunction = "count"
+)
+
+// Aggregate is an aggregate function applied to a field
+type Aggregate struct {
+	Function AggregateFunction `json:"function"`
+	Field    string            `json:"field"`
+}
+
+// AggregateQuery is an aggregate query against a database collection
+type AggregateQuery struct {
+	GroupBy   []string    `json:"group_by"`
+	Aggregate []Aggregate `json:"aggregate"`
+	Where     []Where     `json:"where"`
+	OrderBy   OrderBy     `json:"order_by"`
+	Limit     int         `json:"limit"`
+}
+
 func (d *db) Aggregate(ctx context.Context, collection string, query AggregateQuery) ([]*Document, error) {
 	_, ok := d.collections[collection]
 	if !ok {
