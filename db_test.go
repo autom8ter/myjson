@@ -15,7 +15,7 @@ import (
 	"github.com/autom8ter/wolverine"
 )
 
-var defaultCollections = []wolverine.Collection{
+var defaultCollections = []*wolverine.Collection{
 	{
 		Name: "user",
 		Indexes: []wolverine.Index{
@@ -92,7 +92,7 @@ func Test(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, c := range defaultCollections {
-		assert.Nil(t, db.SetCollection(ctx, &c))
+		assert.Nil(t, db.SetCollection(ctx, c))
 	}
 	defer db.Close(ctx)
 	t.Run("seed_users_tasks", func(t *testing.T) {
@@ -509,7 +509,7 @@ func Benchmark(b *testing.B) {
 	})
 }
 
-func testDB(collections []wolverine.Collection, fn func(ctx context.Context, db wolverine.DB)) error {
+func testDB(collections []*wolverine.Collection, fn func(ctx context.Context, db wolverine.DB)) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -520,10 +520,8 @@ func testDB(collections []wolverine.Collection, fn func(ctx context.Context, db 
 	if err != nil {
 		return err
 	}
-	for _, c := range defaultCollections {
-		if err := db.SetCollection(ctx, &c); err != nil {
-			return err
-		}
+	if err := db.SetCollections(ctx, collections); err != nil {
+		return err
 	}
 	defer db.Close(ctx)
 	fn(ctx, db)

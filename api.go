@@ -41,6 +41,8 @@ type System interface {
 	GetCollection(ctx context.Context, collection string) (*Collection, error)
 	// SetCollection sets a collection in the database
 	SetCollection(ctx context.Context, collection *Collection) error
+	// SetCollections sets 1-many collections in the database
+	SetCollections(ctx context.Context, collections []*Collection) error
 	// Close shuts down the database
 	Close(ctx context.Context) error
 }

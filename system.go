@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/autom8ter/machine/v4"
 	"github.com/hashicorp/go-multierror"
 	"github.com/palantir/stacktrace"
 	"github.com/spf13/cast"
@@ -275,4 +276,15 @@ func (d *db) SetCollection(ctx context.Context, collection *Collection) error {
 		return err
 	}
 	return d.ReIndexCollection(ctx, collection.Name)
+}
+
+func (d *db) SetCollections(ctx context.Context, collections []*Collection) error {
+	m := machine.New()
+	for _, c := range collections {
+		c := c
+		m.Go(ctx, func(ctx context.Context) error {
+			return d.SetCollection(ctx, c)
+		})
+	}
+	return d.wrapErr(m.Wait(), "")
 }

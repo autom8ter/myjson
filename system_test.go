@@ -11,7 +11,7 @@ import (
 )
 
 func TestSystem(t *testing.T) {
-	t.Run("collections", func(t *testing.T) {
+	t.Run("set collection", func(t *testing.T) {
 		db, err := wolverine.New(context.Background(), wolverine.Config{
 			Path:    "inmem",
 			Debug:   true,
@@ -19,8 +19,25 @@ func TestSystem(t *testing.T) {
 		})
 		assert.Nil(t, err)
 		for _, c := range defaultCollections {
-			assert.Nil(t, db.SetCollection(context.Background(), &c))
+			assert.Nil(t, db.SetCollection(context.Background(), c))
 		}
+		for _, c := range defaultCollections {
+			cv, err := db.GetCollection(context.Background(), c.Name)
+			assert.Nil(t, err)
+			assert.Equal(t, c.Name, cv.Name)
+		}
+		results, err := db.GetCollections(context.Background())
+		assert.Nil(t, err)
+		assert.Equal(t, len(defaultCollections), len(results))
+	})
+	t.Run("set collections", func(t *testing.T) {
+		db, err := wolverine.New(context.Background(), wolverine.Config{
+			Path:    "inmem",
+			Debug:   true,
+			ReIndex: false,
+		})
+		assert.Nil(t, err)
+		assert.Nil(t, db.SetCollections(context.Background(), defaultCollections))
 		for _, c := range defaultCollections {
 			cv, err := db.GetCollection(context.Background(), c.Name)
 			assert.Nil(t, err)
@@ -47,7 +64,7 @@ func TestSystem(t *testing.T) {
 			})
 			assert.Nil(t, err)
 			for _, c := range defaultCollections {
-				assert.Nil(t, restored.SetCollection(ctx, &c))
+				assert.Nil(t, restored.SetCollection(ctx, c))
 			}
 			assert.Nil(t, restored.Restore(ctx, buf))
 			for _, u := range usrs {
