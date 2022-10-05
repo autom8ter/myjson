@@ -16,7 +16,6 @@ import (
 )
 
 type db struct {
-	Logger
 	config      Config
 	kv          *badger.DB
 	fullText    map[string]bleve.Index
@@ -103,18 +102,6 @@ func New(ctx context.Context, cfg Config) (DB, error) {
 		}); err != nil {
 			return nil, err
 		}
-	}
-	d.Logger = config.Logger
-	if d.Logger == nil {
-		level := "info"
-		if config.Debug {
-			level = "debug"
-		}
-		lgger, err := NewLogger(level, map[string]any{})
-		if err != nil {
-			return nil, err
-		}
-		d.Logger = lgger
 	}
 	if config.ReIndex {
 		if err := d.ReIndex(ctx); err != nil {

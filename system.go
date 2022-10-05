@@ -35,7 +35,6 @@ func (d *db) Close(ctx context.Context) error {
 	err = multierror.Append(err, d.kv.Sync())
 	err = multierror.Append(err, d.kv.Close())
 	if err, ok := err.(*multierror.Error); ok && len(err.Errors) > 0 {
-		d.Logger.Error(ctx, "error closing database", err, map[string]interface{}{})
 		return d.wrapErr(err, "")
 	}
 	return d.wrapErr(err, "")
@@ -176,13 +175,7 @@ func (d *db) Migrate(ctx context.Context, migrations []Migration) error {
 	existing.SetCollection(systemCollection)
 	existing.SetID(lastMigrationID)
 	version := cast.ToInt(existing.Get("version"))
-	d.Debug(ctx, fmt.Sprintf("migration: last version=%v", version), map[string]interface{}{
-		"document": existing.String(),
-	})
 	for i, migration := range migrations[version:] {
-		d.Info(ctx, fmt.Sprintf("migration: starting %s", migration.Name), map[string]interface{}{
-			"document": existing.String(),
-		})
 		now := time.Now()
 		if err := migration.Function(ctx, d); err != nil {
 			if derr := d.Set(ctx, systemCollection, existing); derr != nil {
@@ -193,9 +186,6 @@ func (d *db) Migrate(ctx context.Context, migrations []Migration) error {
 		existing.Set("version", i+1)
 		existing.Set("name", migration.Name)
 		existing.Set("processing_time", time.Since(now).String())
-		d.Debug(ctx, fmt.Sprintf("migration: %s executed successfully", migration.Name), map[string]interface{}{
-			"document": existing.String(),
-		})
 	}
 	if err := d.Set(ctx, systemCollection, existing); err != nil {
 		return d.wrapErr(err, "")

@@ -18,7 +18,7 @@ type DB interface {
 	// Aggregator is a database aggregator
 	Aggregator
 	// Logger is a structured logger
-	Logger
+	//Logger
 }
 
 // System performs internal/system operations against the database
