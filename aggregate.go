@@ -42,9 +42,9 @@ type AggregateQuery struct {
 }
 
 func (d *db) Aggregate(ctx context.Context, collection string, query AggregateQuery) ([]*Document, error) {
-	_, ok := d.collections[collection]
+	_, ok := d.getInmemCollection(collection)
 	if !ok {
-		return nil, fmt.Errorf("unsupported collection: %s", collection)
+		return nil, d.wrapErr(fmt.Errorf("unsupported collection: %s", collection), "")
 	}
 	prefix := d.getQueryPrefix(collection, query.Where)
 	var records []*Document

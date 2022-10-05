@@ -12,9 +12,8 @@ import (
 )
 
 func (d *db) Query(ctx context.Context, collection string, query Query) ([]*Document, error) {
-	_, ok := d.collections[collection]
-	if !ok {
-		return nil, fmt.Errorf("unsupported collection: %s", collection)
+	if _, ok := d.getInmemCollection(collection); !ok {
+		return nil, d.wrapErr(fmt.Errorf("unsupported collection: %s", collection), "")
 	}
 	if d.isSearchQuery(collection, query) {
 		return d.search(ctx, collection, query)
@@ -84,8 +83,8 @@ func (d *db) Query(ctx context.Context, collection string, query Query) ([]*Docu
 }
 
 func (d *db) Get(ctx context.Context, collection, id string) (*Document, error) {
-	if _, ok := d.collections[collection]; !ok {
-		return nil, fmt.Errorf("unsupported collection: %s", collection)
+	if _, ok := d.getInmemCollection(collection); !ok {
+		return nil, d.wrapErr(fmt.Errorf("unsupported collection: %s", collection), "")
 	}
 	var (
 		document *Document
@@ -112,8 +111,8 @@ func (d *db) Get(ctx context.Context, collection, id string) (*Document, error) 
 }
 
 func (d *db) GetAll(ctx context.Context, collection string, ids []string) ([]*Document, error) {
-	if _, ok := d.collections[collection]; !ok {
-		return nil, fmt.Errorf("unsupported collection: %s", collection)
+	if _, ok := d.getInmemCollection(collection); !ok {
+		return nil, d.wrapErr(fmt.Errorf("unsupported collection: %s", collection), "")
 	}
 	var documents []*Document
 	if err := d.kv.View(func(txn *badger.Txn) error {

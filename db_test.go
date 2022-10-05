@@ -85,11 +85,14 @@ func Test(t *testing.T) {
 	defer cancel()
 
 	db, err := wolverine.New(ctx, wolverine.Config{
-		Path:        "inmem",
-		Collections: defaultCollections,
+		Path:  "inmem",
+		Debug: true,
 	})
 	if err != nil {
 		t.Fatal(err)
+	}
+	for _, c := range defaultCollections {
+		assert.Nil(t, db.SetCollection(ctx, &c))
 	}
 	defer db.Close(ctx)
 	t.Run("seed_users_tasks", func(t *testing.T) {
@@ -511,11 +514,16 @@ func testDB(collections []wolverine.Collection, fn func(ctx context.Context, db 
 	defer cancel()
 
 	db, err := wolverine.New(ctx, wolverine.Config{
-		Path:        "inmem",
-		Collections: collections,
+		Path:  "inmem",
+		Debug: true,
 	})
 	if err != nil {
 		return err
+	}
+	for _, c := range defaultCollections {
+		if err := db.SetCollection(ctx, &c); err != nil {
+			return err
+		}
 	}
 	defer db.Close(ctx)
 	fn(ctx, db)

@@ -23,15 +23,15 @@ func (d *db) saveBatch(ctx context.Context, collection string, mutation mutation
 	if len(documents) == 0 {
 		return nil
 	}
+	collect, ok := d.getInmemCollection(collection)
+	if !ok {
+		return d.wrapErr(fmt.Errorf("unsupported collection: %s", collection), "")
+	}
 	for _, document := range documents {
 		if err := document.Validate(); err != nil {
 			return d.wrapErr(err, "")
 		}
-		c, ok := d.collections[collection]
-		if !ok {
-			return fmt.Errorf("unsupported collection: %s", document.GetCollection())
-		}
-		valid, err := c.Validate(document)
+		valid, err := collect.Validate(document)
 		if err != nil {
 			return d.wrapErr(err, "")
 		}
@@ -39,10 +39,9 @@ func (d *db) saveBatch(ctx context.Context, collection string, mutation mutation
 			return fmt.Errorf("%s/%s document has invalid schema", document.GetCollection(), document.GetID())
 		}
 	}
-	collect := d.collections[collection]
 	txn := d.kv.NewWriteBatch()
 	var batch *bleve.Batch
-	index := d.fullText[collection]
+	index := collect.fullText
 	if index != nil {
 		batch = index.NewBatch()
 	}
@@ -110,8 +109,10 @@ func (d *db) saveBatch(ctx context.Context, collection string, mutation mutation
 			}
 		}
 	}
-	if err := index.Batch(batch); err != nil {
-		return d.wrapErr(err, "")
+	if index != nil {
+		if err := index.Batch(batch); err != nil {
+			return d.wrapErr(err, "")
+		}
 	}
 	if err := txn.Flush(); err != nil {
 		return d.wrapErr(err, "")
@@ -124,7 +125,10 @@ func (d *db) saveBatch(ctx context.Context, collection string, mutation mutation
 }
 
 func (d *db) saveDocument(ctx context.Context, collection string, mutation mutation, document *Document) error {
-	collect := d.collections[collection]
+	collect, ok := d.getInmemCollection(collection)
+	if !ok {
+		return d.wrapErr(fmt.Errorf("unsupported collection: %s", collection), "")
+	}
 	current, _ := d.Get(ctx, document.GetCollection(), document.GetID())
 	if current == nil {
 		current = NewDocument()
@@ -183,8 +187,8 @@ func (d *db) saveDocument(ctx context.Context, collection string, mutation mutat
 					return d.wrapErr(err, "")
 				}
 			}
-			if index, ok := d.fullText[collection]; ok {
-				if err := index.Index(document.GetID(), document.Value()); err != nil {
+			if collect.fullText != nil {
+				if err := collect.fullText.Index(document.GetID(), document.Value()); err != nil {
 					return d.wrapErr(err, "")
 				}
 			}
@@ -198,8 +202,8 @@ func (d *db) saveDocument(ctx context.Context, collection string, mutation mutat
 			if err := txn.Delete([]byte(prefix.PrimaryKey(current.GetCollection(), current.GetID()))); err != nil {
 				return d.wrapErr(err, "")
 			}
-			if index, ok := d.fullText[collection]; ok {
-				if err := index.Delete(document.GetID()); err != nil {
+			if collect.fullText != nil {
+				if err := collect.fullText.Delete(document.GetID()); err != nil {
 					return d.wrapErr(err, "")
 				}
 			}

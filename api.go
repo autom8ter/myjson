@@ -17,8 +17,6 @@ type DB interface {
 	Streamer
 	// Aggregator is a database aggregator
 	Aggregator
-	// Logger is a structured logger
-	//Logger
 }
 
 // System performs internal/system operations against the database
@@ -90,12 +88,4 @@ type Streamer interface {
 type Aggregator interface {
 	// Aggregate
 	Aggregate(ctx context.Context, collection string, query AggregateQuery) ([]*Document, error)
-}
-
-// Logger is a structured logger
-type Logger interface {
-	Error(ctx context.Context, msg string, err error, tags map[string]interface{})
-	Info(ctx context.Context, msg string, tags map[string]interface{})
-	Debug(ctx context.Context, msg string, tags map[string]interface{})
-	Warn(ctx context.Context, msg string, tags map[string]interface{})
 }

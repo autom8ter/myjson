@@ -1,6 +1,8 @@
 package wolverine
 
-import "context"
+import (
+	"context"
+)
 
 // CronJob is a function that runs against the database on a given crontab schedule
 type CronJob struct {

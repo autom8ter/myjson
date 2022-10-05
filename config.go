@@ -10,12 +10,8 @@ type Config struct {
 	Migrate bool
 	// ReIndex reindexes the database
 	ReIndex bool
-	// Collection configures each collection in the database
-	Collections []Collection
 	// CronJob are cron jobs that will run
 	CronJobs []CronJob
-	// Logger is a custom database logger(optional)
-	Logger Logger
 	// BeforeSet is a hook that is executed before a set operation
 	BeforeSet WriteTrigger
 	// BeforeSet is a hook that is executed before a set operation

@@ -8,7 +8,6 @@ import (
 	"github.com/autom8ter/machine/v4"
 	"github.com/blevesearch/bleve"
 	"github.com/dgraph-io/badger/v3"
-	"github.com/palantir/stacktrace"
 	"github.com/robfig/cron"
 	"github.com/xeipuuv/gojsonschema"
 
@@ -18,9 +17,8 @@ import (
 type db struct {
 	config      Config
 	kv          *badger.DB
-	fullText    map[string]bleve.Index
 	mu          sync.RWMutex
-	collections map[string]Collection
+	collections sync.Map
 	cron        *cron.Cron
 	machine     machine.Machine
 }
@@ -38,63 +36,20 @@ func New(ctx context.Context, cfg Config) (DB, error) {
 	if err != nil {
 		return nil, err
 	}
-	collections := map[string]Collection{
-		"system": {
-			Name: "system",
-		},
-	}
-	fulltext := map[string]bleve.Index{}
-	for _, collection := range config.Collections {
-		collections[collection.Name] = collection
-		for _, i := range collection.Indexes {
-			if i.FullText {
-				indexMapping := bleve.NewIndexMapping()
-				if len(i.Fields) > 0 && i.Fields[0] != "*" {
-					//document := bleve.NewDocumentMapping()
-					//for _, f := range i.Fields {
-					//	disabled := bleve.NewDocumentDisabledMapping()
-					//	document.AddSubDocumentMapping(f, disabled)
-					//}
-					//indexMapping.AddDocumentMapping("index", document)
-				}
 
-				if config.Path == "inmem" {
-					i, err := bleve.NewMemOnly(indexMapping)
-					if err != nil {
-						return nil, err
-					}
-					fulltext[collection.Name] = i
-				} else {
-					path := fmt.Sprintf("%s/search/%s.bleve", config.Path, collection.Name)
-					i, err := bleve.Open(path)
-					if err == nil {
-						fulltext[collection.Name] = i
-					} else {
-						i, err = bleve.New(path, indexMapping)
-						if err != nil {
-							return nil, err
-						}
-						fulltext[collection.Name] = i
-					}
-				}
-			}
-		}
-		if collection.JSONSchema != "" {
-			schema, err := gojsonschema.NewSchema(gojsonschema.NewStringLoader(collection.JSONSchema))
-			if err != nil {
-				return nil, stacktrace.Propagate(err, "")
-			}
-			collection.loadedSchema = schema
-		}
-	}
 	d := &db{
 		config:      *config,
 		kv:          kv,
-		fullText:    fulltext,
 		mu:          sync.RWMutex{},
-		collections: collections,
+		collections: sync.Map{},
 		cron:        cron.New(),
 		machine:     machine.New(),
+	}
+	d.collections.Store("system", &Collection{
+		Name: "system",
+	})
+	if err := d.loadCollections(ctx); err != nil {
+		return nil, err
 	}
 	for _, c := range config.CronJobs {
 		if err := d.cron.AddFunc(c.Schedule, func() {
@@ -118,11 +73,58 @@ func New(ctx context.Context, cfg Config) (DB, error) {
 	return d, nil
 }
 
-func (i Index) prefix(collection string) *prefix.PrefixIndexRef {
-	return prefix.NewPrefixedIndex(collection, i.Fields)
+func (d *db) loadCollections(ctx context.Context) error {
+	collections, err := d.GetCollections(ctx)
+	if err != nil {
+		return d.wrapErr(err, "")
+	}
+	for _, collection := range collections {
+		for _, i := range collection.Indexes {
+			if i.FullText {
+				indexMapping := bleve.NewIndexMapping()
+				if len(i.Fields) > 0 && i.Fields[0] != "*" {
+					//document := bleve.NewDocumentMapping()
+					//for _, f := range i.Fields {
+					//	disabled := bleve.NewDocumentDisabledMapping()
+					//	document.AddSubDocumentMapping(f, disabled)
+					//}
+					//indexMapping.AddDocumentMapping("index", document)
+				}
+
+				if d.config.Path == "inmem" {
+					i, err := bleve.NewMemOnly(indexMapping)
+					if err != nil {
+						return d.wrapErr(err, "")
+					}
+					collection.fullText = i
+				} else {
+					path := fmt.Sprintf("%s/search/%s.bleve", d.config.Path, collection.Name)
+					i, err := bleve.Open(path)
+					if err == nil {
+						collection.fullText = i
+					} else {
+						i, err = bleve.New(path, indexMapping)
+						if err != nil {
+							return d.wrapErr(err, "")
+						}
+						collection.fullText = i
+					}
+				}
+			}
+		}
+		if collection.JSONSchema != "" {
+			schema, err := gojsonschema.NewSchema(gojsonschema.NewStringLoader(collection.JSONSchema))
+			if err != nil {
+				return d.wrapErr(err, "")
+			}
+			collection.loadedSchema = schema
+		}
+		d.collections.Store(collection.Name, collection)
+	}
+	return nil
 }
 
-func chooseIndex(collection Collection, queryFields []string) *prefix.PrefixIndexRef {
+func chooseIndex(collection *Collection, queryFields []string) *prefix.PrefixIndexRef {
 	//sort.Strings(queryFields)
 	var targetIndex = Index{
 		Fields:   []string{"_id"},
@@ -145,7 +147,28 @@ func chooseIndex(collection Collection, queryFields []string) *prefix.PrefixInde
 	return targetIndex.prefix(collection.Name)
 }
 
+func (d *db) getInmemCollection(collection string) (*Collection, bool) {
+	c, ok := d.collections.Load(collection)
+	if !ok {
+		return nil, ok
+	}
+	return c.(*Collection), ok
+}
+
+func (d *db) getInmemCollections() []*Collection {
+	var c []*Collection
+	d.collections.Range(func(key, value any) bool {
+		c = append(c, value.(*Collection))
+		return true
+	})
+	return c
+}
+
 func (d *db) getQueryPrefix(collection string, where []Where) []byte {
+	c, ok := d.getInmemCollection(collection)
+	if !ok {
+		return nil
+	}
 	var whereFields []string
 	var whereValues = map[string]any{}
 	for _, w := range where {
@@ -155,5 +178,5 @@ func (d *db) getQueryPrefix(collection string, where []Where) []byte {
 		whereFields = append(whereFields, w.Field)
 		whereValues[w.Field] = w.Value
 	}
-	return []byte(chooseIndex(d.collections[collection], whereFields).GetIndex(whereValues))
+	return []byte(chooseIndex(c, whereFields).GetIndex(whereValues))
 }

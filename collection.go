@@ -1,6 +1,11 @@
 package wolverine
 
-import "github.com/xeipuuv/gojsonschema"
+import (
+	"github.com/blevesearch/bleve"
+	"github.com/xeipuuv/gojsonschema"
+
+	"github.com/autom8ter/wolverine/internal/prefix"
+)
 
 // Collection is a collection of records of a given type
 type Collection struct {
@@ -10,12 +15,20 @@ type Collection struct {
 	Indexes      []Index `json:"indexes"`
 	JSONSchema   string  `json:"json_schema"`
 	loadedSchema *gojsonschema.Schema
+	fullText     bleve.Index
 }
 
 // Validate validates the document against the collections json schema (if it exists)
-func (c Collection) Validate(doc *Document) (bool, error) {
-	if c.loadedSchema == nil {
+func (c *Collection) Validate(doc *Document) (bool, error) {
+	var err error
+	if c.JSONSchema == "" {
 		return true, nil
+	}
+	if c.loadedSchema == nil {
+		c.loadedSchema, err = gojsonschema.NewSchema(gojsonschema.NewStringLoader(c.JSONSchema))
+		if err != nil {
+			return false, err
+		}
 	}
 	documentLoader := gojsonschema.NewBytesLoader(doc.Bytes())
 	result, err := c.loadedSchema.Validate(documentLoader)
@@ -34,4 +47,8 @@ type Index struct {
 	Fields []string `json:"fields"`
 	// FullText is a boolean value indicating whether the fields will be full text search-able
 	FullText bool `json:"full_text"`
+}
+
+func (i Index) prefix(collection string) *prefix.PrefixIndexRef {
+	return prefix.NewPrefixedIndex(collection, i.Fields)
 }

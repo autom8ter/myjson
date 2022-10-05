@@ -10,7 +10,7 @@ import (
 )
 
 func (d *db) isSearchQuery(collection string, query Query) bool {
-	if _, ok := d.fullText[collection]; !ok {
+	if c, ok := d.getInmemCollection(collection); !ok || c.fullText == nil {
 		return false
 	}
 	for _, w := range query.Where {
@@ -23,7 +23,11 @@ func (d *db) isSearchQuery(collection string, query Query) bool {
 }
 
 func (d *db) search(ctx context.Context, collection string, query Query) ([]*Document, error) {
-	if _, ok := d.fullText[collection]; !ok {
+	c, ok := d.getInmemCollection(collection)
+	if !ok {
+		return nil, fmt.Errorf("unsupported full text search collection: %s", collection)
+	}
+	if c.fullText == nil {
 		return nil, fmt.Errorf("unsupported full text search collection: %s", collection)
 	}
 	var (
@@ -61,7 +65,7 @@ func (d *db) search(ctx context.Context, collection string, query Query) ([]*Doc
 	if searchRequest.Size == 0 {
 		searchRequest.Size = 100
 	}
-	results, err := d.fullText[collection].Search(searchRequest)
+	results, err := c.fullText.Search(searchRequest)
 	if err != nil {
 		return nil, err
 	}

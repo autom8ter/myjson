@@ -29,9 +29,13 @@ func (d *db) Close(ctx context.Context) error {
 	defer d.mu.Unlock()
 	d.cron.Stop()
 	err := d.machine.Wait()
-	for _, i := range d.fullText {
-		err = multierror.Append(err, i.Close())
-	}
+	d.collections.Range(func(key, value any) bool {
+		collection := value.(*Collection)
+		if collection.fullText != nil {
+			err = multierror.Append(err, collection.fullText.Close())
+		}
+		return true
+	})
 	err = multierror.Append(err, d.kv.Sync())
 	err = multierror.Append(err, d.kv.Close())
 	if err, ok := err.(*multierror.Error); ok && len(err.Errors) > 0 {
@@ -53,11 +57,14 @@ func (d *db) dropIndexes(ctx context.Context) error {
 
 // ReIndex locks and then reindexes the database
 func (d *db) ReIndex(ctx context.Context) error {
+	if err := d.loadCollections(ctx); err != nil {
+		return d.wrapErr(err, "")
+	}
 	//if err := d.dropIndexes(ctx); err != nil {
 	//	return err
 	//}
 	egp, ctx := errgroup.WithContext(ctx)
-	for _, c := range d.config.Collections {
+	for _, c := range d.getInmemCollections() {
 		c := c
 		egp.Go(func() error {
 			var startAt string
@@ -125,7 +132,7 @@ func (d *db) ReIndexCollection(ctx context.Context, collection string) error {
 		}
 		startAt = results[len(results)-1].GetID()
 	}
-	return nil
+	return d.wrapErr(d.loadCollections(ctx), "")
 }
 
 func (d *db) Backup(ctx context.Context, w io.Writer) error {
@@ -248,7 +255,7 @@ func (d *db) SetCollection(ctx context.Context, collection *Collection) error {
 	}
 	id := fmt.Sprintf("collections.%s", collection.Name)
 	existing, _ := d.Get(ctx, systemCollection, id)
-	if existing.Empty() {
+	if existing == nil || existing.Empty() {
 		existing = NewDocument()
 		existing.SetCollection(systemCollection)
 		existing.SetID(id)
@@ -262,6 +269,10 @@ func (d *db) SetCollection(ctx context.Context, collection *Collection) error {
 
 	if err := d.Set(ctx, systemCollection, existing); err != nil {
 		return d.wrapErr(err, "")
+	}
+	d.collections.Store(collection.Name, collection)
+	if err := d.wrapErr(d.loadCollections(ctx), ""); err != nil {
+		return err
 	}
 	return d.ReIndexCollection(ctx, collection.Name)
 }
