@@ -128,8 +128,8 @@ func (r Document) GetBool(field string) bool {
 	return r.result.Get(field).Bool()
 }
 
-// GetNumber gets a bool field value on the document
-func (r Document) GetNumber(field string) float64 {
+// GetFloat gets a bool field value on the document
+func (r Document) GetFloat(field string) float64 {
 	return r.result.Get(field).Float()
 }
 
@@ -205,21 +205,23 @@ func (d Document) Where(wheres []Where) (bool, error) {
 				return false, nil
 			}
 		case ">", "gt":
-			if d.GetNumber(w.Field) > cast.ToFloat64(w.Value) {
+			if d.GetFloat(w.Field) <= cast.ToFloat64(w.Value) {
 				return false, nil
 			}
 		case ">=", "gte":
-			if d.GetNumber(w.Field) >= cast.ToFloat64(w.Value) {
+			if d.GetFloat(w.Field) < cast.ToFloat64(w.Value) {
 				return false, nil
 			}
 		case "<", "lt":
-			if d.GetNumber(w.Field) < cast.ToFloat64(w.Value) {
+			if d.GetFloat(w.Field) >= cast.ToFloat64(w.Value) {
 				return false, nil
 			}
 		case "<=", "lte":
-			if d.GetNumber(w.Field) <= cast.ToFloat64(w.Value) {
+			if d.GetFloat(w.Field) > cast.ToFloat64(w.Value) {
 				return false, nil
 			}
+		default:
+			return false, fmt.Errorf("invalid operator: %s", w.Op)
 		}
 	}
 	return true, nil

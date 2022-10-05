@@ -18,9 +18,18 @@ func TestDocument(t *testing.T) {
 		ID      string  `json:"id"`
 		Contact contact `json:"contact"`
 		Name    string  `json:"name"`
+		Age     int     `json:"age"`
 	}
 	const email = "john.smith@yahoo.com"
-	usr := user{ID: gofakeit.UUID(), Contact: contact{Email: email, Phone: gofakeit.Phone()}, Name: "john smith"}
+	usr := user{
+		ID: gofakeit.UUID(),
+		Contact: contact{
+			Email: email,
+			Phone: gofakeit.Phone(),
+		},
+		Name: "john smith",
+		Age:  50,
+	}
 	r, err := wolverine.NewDocumentFromAny(&usr)
 	if err != nil {
 		t.Fatal(err)
@@ -76,5 +85,132 @@ func TestDocument(t *testing.T) {
 		after := selected.Get("contact.email")
 		assert.Equal(t, before, after)
 		assert.Nil(t, selected.Get("name"))
+	})
+	t.Run("where", func(t *testing.T) {
+		r, err = wolverine.NewDocumentFromAny(&usr)
+		if err != nil {
+			t.Fatal(err)
+		}
+		r.SetID(usr.ID)
+		r.SetCollection("user")
+		pass, err := r.Where([]wolverine.Where{
+			{
+				Field: "contact.email",
+				Op:    "==",
+				Value: email,
+			},
+		})
+		assert.Nil(t, err)
+		assert.True(t, pass)
+
+		pass, err = r.Where([]wolverine.Where{
+			{
+				Field: "contact.email",
+				Op:    "==",
+				Value: gofakeit.Email(),
+			},
+		})
+		assert.Nil(t, err)
+		assert.False(t, pass)
+
+		pass, err = r.Where([]wolverine.Where{
+			{
+				Field: "contact.email",
+				Op:    "!=",
+				Value: gofakeit.Email(),
+			},
+		})
+		assert.Nil(t, err)
+		assert.True(t, pass)
+
+		pass, err = r.Where([]wolverine.Where{
+			{
+				Field: "age",
+				Op:    ">",
+				Value: 10,
+			},
+		})
+		assert.Nil(t, err)
+		assert.True(t, pass)
+
+		pass, err = r.Where([]wolverine.Where{
+			{
+				Field: "age",
+				Op:    ">=",
+				Value: 50,
+			},
+		})
+		assert.Nil(t, err)
+		assert.True(t, pass)
+
+		pass, err = r.Where([]wolverine.Where{
+			{
+				Field: "age",
+				Op:    ">=",
+				Value: 51,
+			},
+		})
+		assert.Nil(t, err)
+		assert.False(t, pass)
+
+		pass, err = r.Where([]wolverine.Where{
+			{
+				Field: "age",
+				Op:    "<",
+				Value: 51,
+			},
+		})
+		assert.Nil(t, err)
+		assert.True(t, pass)
+
+		pass, err = r.Where([]wolverine.Where{
+			{
+				Field: "age",
+				Op:    "<=",
+				Value: 50,
+			},
+		})
+		assert.Nil(t, err)
+		assert.True(t, pass)
+
+		pass, err = r.Where([]wolverine.Where{
+			{
+				Field: "age",
+				Op:    "<=",
+				Value: 50,
+			},
+		})
+		assert.Nil(t, err)
+		assert.True(t, pass)
+
+		pass, err = r.Where([]wolverine.Where{
+			{
+				Field: "age",
+				Op:    ">=",
+				Value: 50,
+			},
+		})
+		assert.Nil(t, err)
+		assert.True(t, pass)
+
+		pass, err = r.Where([]wolverine.Where{
+			{
+				Field: "age",
+				Op:    "<",
+				Value: 49,
+			},
+		})
+		assert.Nil(t, err)
+		assert.False(t, pass)
+
+		pass, err = r.Where([]wolverine.Where{
+			{
+				Field: "age",
+				Op:    "8",
+				Value: 51,
+			},
+		})
+		assert.NotNil(t, err)
+		assert.False(t, pass)
 	})
 }
