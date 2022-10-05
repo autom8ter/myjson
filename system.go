@@ -4,10 +4,13 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"strings"
 	"time"
 
 	"github.com/hashicorp/go-multierror"
+	"github.com/palantir/stacktrace"
 	"github.com/spf13/cast"
+	"github.com/xeipuuv/gojsonschema"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -74,8 +77,13 @@ func (d *db) ReIndex(ctx context.Context) error {
 					break
 				}
 				for _, r := range results {
-					if err := d.Set(ctx, c.Name, r); err != nil {
-						return err
+					result, _ := d.Get(ctx, c.Name, r.GetID())
+					if result != nil {
+						if err := d.Set(ctx, c.Name, result); err != nil {
+							return err
+						}
+					} else {
+						d.Delete(ctx, c.Name, r.GetID())
 					}
 				}
 				startAt = results[len(results)-1].GetID()
@@ -84,6 +92,41 @@ func (d *db) ReIndex(ctx context.Context) error {
 		})
 	}
 	return egp.Wait()
+}
+
+// ReIndexCollection reindexes a specific collection
+func (d *db) ReIndexCollection(ctx context.Context, collection string) error {
+	//if err := d.dropIndexes(ctx); err != nil {
+	//	return err
+	//}
+	var startAt string
+	for {
+		results, err := d.Query(ctx, collection, Query{
+			Select:  nil,
+			Where:   nil,
+			StartAt: startAt,
+			Limit:   1000,
+			OrderBy: OrderBy{},
+		})
+		if err != nil {
+			return d.wrapErr(err, "")
+		}
+		if len(results) == 0 {
+			break
+		}
+		for _, r := range results {
+			result, _ := d.Get(ctx, collection, r.GetID())
+			if result != nil {
+				if err := d.Set(ctx, collection, result); err != nil {
+					return err
+				}
+			} else {
+				d.Delete(ctx, collection, r.GetID())
+			}
+		}
+		startAt = results[len(results)-1].GetID()
+	}
+	return nil
 }
 
 func (d *db) Backup(ctx context.Context, w io.Writer) error {
@@ -158,4 +201,77 @@ func (d *db) Migrate(ctx context.Context, migrations []Migration) error {
 		return d.wrapErr(err, "")
 	}
 	return nil
+}
+
+func (d *db) GetCollection(ctx context.Context, collection string) (*Collection, error) {
+	id := fmt.Sprintf("collections.%s", collection)
+	existing, err := d.Get(ctx, systemCollection, id)
+	if err != nil {
+		return nil, err
+	}
+	var c = &Collection{}
+	if err := existing.ScanJSON(c); err != nil {
+		return nil, d.wrapErr(err, "")
+	}
+	if c.JSONSchema != "" {
+		schema, err := gojsonschema.NewSchema(gojsonschema.NewStringLoader(c.JSONSchema))
+		if err != nil {
+			return nil, stacktrace.Propagate(err, "")
+		}
+		c.loadedSchema = schema
+	}
+	return c, nil
+}
+
+func (d *db) GetCollections(ctx context.Context) ([]*Collection, error) {
+	var collections []*Collection
+	results, err := d.Query(ctx, systemCollection, Query{})
+	if err != nil {
+		return nil, d.wrapErr(err, "")
+	}
+	for _, result := range results {
+		if strings.HasPrefix(result.GetID(), "collection.") {
+			existing, err := d.Get(ctx, systemCollection, result.GetID())
+			if err != nil {
+				return nil, err
+			}
+			var c = &Collection{}
+			if err := existing.ScanJSON(c); err != nil {
+				return nil, d.wrapErr(err, "")
+			}
+			if c.JSONSchema != "" {
+				schema, err := gojsonschema.NewSchema(gojsonschema.NewStringLoader(c.JSONSchema))
+				if err != nil {
+					return nil, stacktrace.Propagate(err, "")
+				}
+				c.loadedSchema = schema
+			}
+			collections = append(collections, c)
+		}
+	}
+	return collections, nil
+}
+
+func (d *db) SetCollection(ctx context.Context, collection *Collection) error {
+	if collection == nil {
+		return nil
+	}
+	id := fmt.Sprintf("collections.%s", collection.Name)
+	existing, _ := d.Get(ctx, systemCollection, id)
+	if existing.Empty() {
+		existing = NewDocument()
+		existing.SetCollection(systemCollection)
+		existing.SetID(id)
+	}
+	newDoc, err := NewDocumentFromAny(collection)
+	if err != nil {
+		return d.wrapErr(err, "")
+	}
+
+	existing.Merge(newDoc)
+
+	if err := d.Set(ctx, systemCollection, existing); err != nil {
+		return d.wrapErr(err, "")
+	}
+	return d.ReIndexCollection(ctx, collection.Name)
 }

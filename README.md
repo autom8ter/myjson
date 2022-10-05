@@ -23,12 +23,13 @@ Features:
     - [x] date range
     - [x] numeric range
 - [x] document storage engine
-- [x] kv cache engine supporting ttl/expiration
+    - [ ] ttl support
+    - [x] optional json schema based validation
 - [x] change streams
 - [x] field based querying
 - [x] batch operations
 - [x] ttl
-- [x] hooks
+- [ ] hooks
     - [x] on read
     - [x] on stream
     - [x] before update
@@ -50,7 +51,6 @@ Features:
 - [x] query delete
 - [x] logger
 - [x] migrations
-- [x] optional json-schema validation
 
 ## Road to Beta
 
@@ -59,6 +59,8 @@ Features:
 - [ ] examples
 - [ ] http server(gokit)
 - [ ] 90% test coverage
+- [ ] views
+- [ ] materialized views
 
 ## Beta+ Roadmap
 

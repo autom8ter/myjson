@@ -3,7 +3,6 @@ package wolverine
 import (
 	"context"
 	"io"
-	"time"
 )
 
 // DB is an embedded NOSQL database supporting a number of useful features including full text search, indexing, and streaming
@@ -20,8 +19,6 @@ type DB interface {
 	Aggregator
 	// Logger is a structured logger
 	Logger
-	// Cache is a caching interface
-	Cache
 }
 
 // System performs internal/system operations against the database
@@ -30,6 +27,8 @@ type System interface {
 	Config() Config
 	// ReIndex reindexes the entire database
 	ReIndex(ctx context.Context) error
+	// ReIndex reindexes a specific collection in the database
+	ReIndexCollection(ctx context.Context, collection string) error
 	// Backup performs a full database backup
 	Backup(ctx context.Context, w io.Writer) error
 	// IncrementalBackup performs an incremental backup based on changes since the last time it ran
@@ -38,6 +37,12 @@ type System interface {
 	Restore(ctx context.Context, r io.Reader) error
 	// Migrate runs all migrations that have not yet run(idempotent). The order must remain the same over time for migrations to run properly.
 	Migrate(ctx context.Context, migrations []Migration) error
+	// GetCollections gets all of the registered collections in the database
+	GetCollections(ctx context.Context) ([]*Collection, error)
+	// GetCollection gets a collection by name(if it exists)
+	GetCollection(ctx context.Context, collection string) (*Collection, error)
+	// SetCollection sets a collection in the database
+	SetCollection(ctx context.Context, collection *Collection) error
 	// Close shuts down the database
 	Close(ctx context.Context) error
 }
@@ -93,11 +98,4 @@ type Logger interface {
 	Info(ctx context.Context, msg string, tags map[string]interface{})
 	Debug(ctx context.Context, msg string, tags map[string]interface{})
 	Warn(ctx context.Context, msg string, tags map[string]interface{})
-}
-
-// Cache is a caching interface that supports setting keys with ttl/expiration
-type Cache interface {
-	SetCache(key string, value string, expiration time.Time) error
-	DelCache(key string) error
-	GetCache(key string) (string, error)
 }

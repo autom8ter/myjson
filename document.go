@@ -226,3 +226,8 @@ func (d Document) Where(wheres []Where) (bool, error) {
 	}
 	return true, nil
 }
+
+// ScanJSON scans the json document into the value
+func (d *Document) ScanJSON(value any) error {
+	return json.Unmarshal([]byte(d.String()), &value)
+}
