@@ -69,11 +69,6 @@ func (d *db) Aggregate(ctx context.Context, collection string, query AggregateQu
 					return d.wrapErr(err, "")
 				}
 				if pass {
-					if d.config.OnRead != nil {
-						if err := d.config.OnRead(d, ctx, document); err != nil {
-							return d.wrapErr(err, "")
-						}
-					}
 					records = append(records, document)
 				}
 				return nil

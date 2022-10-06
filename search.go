@@ -78,13 +78,6 @@ func (d *db) search(ctx context.Context, collection string, query Query) ([]*Doc
 		if err != nil {
 			return nil, err
 		}
-		if d.config.OnRead != nil {
-			if d.config.OnRead != nil {
-				if err := d.config.OnRead(d, ctx, record); err != nil {
-					return data, d.wrapErr(err, "")
-				}
-			}
-		}
 		data = append(data, record)
 	}
 	if len(query.Select) > 0 {

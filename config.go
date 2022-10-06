@@ -10,22 +10,6 @@ type Config struct {
 	Migrate bool
 	// ReIndex reindexes the database
 	ReIndex bool
-	// BeforeSet is a hook that is executed before a set operation
-	BeforeSet WriteTrigger
-	// BeforeSet is a hook that is executed before a set operation
-	BeforeUpdate WriteTrigger
-	// BeforeDelete is a hook that is executed before a delete operation
-	BeforeDelete WriteTrigger
-	// OnRead is a hook that is executed as a record is read
-	OnRead ReadTrigger
-	// OnStream is a hook that is executed as a record is sent to a stream
-	OnStream ReadTrigger
-	// AfterSet is a hook that is executed after a set operation
-	AfterSet WriteTrigger
-	// AfterUpdate is a hook that is executed after an update operation
-	AfterUpdate WriteTrigger
-	// AfterDelete is a hook that is executed after a delete operation
-	AfterDelete WriteTrigger
 	// Migrations are atomic database migrations to run on startup
 	Migrations []Migration
 }

@@ -48,11 +48,6 @@ func (d *db) Query(ctx context.Context, collection string, query Query) ([]*Docu
 					return d.wrapErr(err, "")
 				}
 				if pass {
-					if d.config.OnRead != nil {
-						if err := d.config.OnRead(d, ctx, document); err != nil {
-							return d.wrapErr(err, "")
-						}
-					}
 					if err := document.Validate(); err != nil {
 						return d.wrapErr(err, "")
 					}
@@ -102,11 +97,6 @@ func (d *db) Get(ctx context.Context, collection, id string) (*Document, error) 
 	}); err != nil {
 		return document, err
 	}
-	if d.config.OnRead != nil {
-		if err := d.config.OnRead(d, ctx, document); err != nil {
-			return document, err
-		}
-	}
 	return document, nil
 }
 
@@ -125,11 +115,6 @@ func (d *db) GetAll(ctx context.Context, collection string, ids []string) ([]*Do
 				document, err := NewDocumentFromBytes(val)
 				if err != nil {
 					return d.wrapErr(err, "")
-				}
-				if d.config.OnRead != nil {
-					if err := d.config.OnRead(d, ctx, document); err != nil {
-						return d.wrapErr(err, "")
-					}
 				}
 				documents = append(documents, document)
 				return nil
