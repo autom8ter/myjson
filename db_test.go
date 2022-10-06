@@ -122,7 +122,6 @@ func Test(t *testing.T) {
 			assert.Nil(t, db.Set(ctx, "task", newTaskDoc(usr.GetID())))
 			result, err := db.Get(ctx, "user", usr.GetID())
 			assert.Nil(t, err)
-			assert.Equal(t, "user", result.GetCollection())
 			assert.Equal(t, usr.GetID(), result.GetID())
 			assert.Nil(t, err)
 			assert.Equal(t, usr.Get("name"), result.Get("name"))
@@ -431,7 +430,7 @@ func Benchmark(b *testing.B) {
 				if err := db.Set(ctx, "user", doc); err != nil {
 					b.Fatal(err)
 				}
-				if _, err := db.Get(ctx, doc.GetCollection(), doc.GetID()); err != nil {
+				if _, err := db.Get(ctx, "user", doc.GetID()); err != nil {
 					b.Fatal(err)
 				}
 			}

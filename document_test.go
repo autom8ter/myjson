@@ -35,7 +35,6 @@ func TestDocument(t *testing.T) {
 		t.Fatal(err)
 	}
 	r.SetID(usr.ID)
-	r.SetCollection("user")
 
 	t.Run("get id", func(t *testing.T) {
 		assert.Equal(t, usr.ID, r.GetID())
@@ -53,7 +52,6 @@ func TestDocument(t *testing.T) {
 			t.Fatal(err)
 		}
 		r2.SetID(usr.ID)
-		r2.SetCollection("user")
 		r.Merge(r2)
 		assert.Equal(t, usr2.Contact.Email, r.GetString("contact.email"))
 		assert.Equal(t, usr.Contact.Phone, r.GetString("contact.phone"))
@@ -92,7 +90,6 @@ func TestDocument(t *testing.T) {
 			t.Fatal(err)
 		}
 		r.SetID(usr.ID)
-		r.SetCollection("user")
 		pass, err := r.Where([]wolverine.Where{
 			{
 				Field: "contact.email",

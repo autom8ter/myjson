@@ -162,7 +162,6 @@ func (d *db) IncrementalBackup(ctx context.Context, w io.Writer) error {
 	}
 	r := NewDocument()
 	r.SetID("last_backup")
-	r.SetCollection(systemCollection)
 	r.Set("version", int(next))
 	return d.Set(ctx, systemCollection, r)
 }
@@ -179,7 +178,6 @@ func (d *db) Migrate(ctx context.Context, migrations []Migration) error {
 	if existing.Empty() {
 		existing = NewDocument()
 	}
-	existing.SetCollection(systemCollection)
 	existing.SetID(lastMigrationID)
 	version := cast.ToInt(existing.Get("version"))
 	for i, migration := range migrations[version:] {
@@ -257,7 +255,6 @@ func (d *db) SetCollection(ctx context.Context, collection *Collection) error {
 	existing, _ := d.Get(ctx, systemCollection, id)
 	if existing == nil || existing.Empty() {
 		existing = NewDocument()
-		existing.SetCollection(systemCollection)
 		existing.SetID(id)
 	}
 	newDoc, err := NewDocumentFromAny(collection)

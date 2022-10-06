@@ -24,7 +24,7 @@ func (d *db) saveBatch(ctx context.Context, event *Event) error {
 		return nil
 	}
 	if len(event.Documents) == 1 {
-
+		return d.saveDocument(ctx, event)
 	}
 	collect, ok := d.getInmemCollection(event.Collection)
 	if !ok {
@@ -39,7 +39,7 @@ func (d *db) saveBatch(ctx context.Context, event *Event) error {
 			return d.wrapErr(err, "")
 		}
 		if !valid {
-			return fmt.Errorf("%s/%s document has invalid schema", document.GetCollection(), document.GetID())
+			return fmt.Errorf("%s/%s document has invalid schema", event.Collection, document.GetID())
 		}
 	}
 	txn := d.kv.NewWriteBatch()
@@ -49,20 +49,18 @@ func (d *db) saveBatch(ctx context.Context, event *Event) error {
 		batch = index.NewBatch()
 	}
 	for _, document := range event.Documents {
-		current, _ := d.Get(ctx, document.GetCollection(), document.GetID())
+		current, _ := d.Get(ctx, event.Collection, document.GetID())
 		if current == nil {
 			current = NewDocument()
 		}
 		var bits []byte
 		switch event.Action {
 		case Set:
-			document.SetCollection(event.Collection)
 			if err := document.Validate(); err != nil {
 				return d.wrapErr(err, "")
 			}
 			bits = document.Bytes()
 		case Update:
-			document.SetCollection(event.Collection)
 			if err := document.Validate(); err != nil {
 				return d.wrapErr(err, "")
 			}
@@ -72,13 +70,13 @@ func (d *db) saveBatch(ctx context.Context, event *Event) error {
 		switch event.Action {
 		case Set, Update:
 			if err := txn.SetEntry(&badger.Entry{
-				Key:   []byte(prefix.PrimaryKey(document.GetCollection(), document.GetID())),
+				Key:   []byte(prefix.PrimaryKey(event.Collection, document.GetID())),
 				Value: bits,
 			}); err != nil {
 				return d.wrapErr(err, "")
 			}
 			for _, index := range collect.Indexes {
-				pindex := index.prefix(document.GetCollection())
+				pindex := index.prefix(event.Collection)
 				if current != nil {
 					if err := txn.Delete([]byte(pindex.GetIndex(current.Value()))); err != nil {
 						return d.wrapErr(err, "")
@@ -99,12 +97,12 @@ func (d *db) saveBatch(ctx context.Context, event *Event) error {
 			}
 		case Delete:
 			for _, i := range collect.Indexes {
-				pindex := i.prefix(current.GetCollection())
+				pindex := i.prefix(event.Collection)
 				if err := txn.Delete([]byte(pindex.GetIndex(current.Value()))); err != nil {
 					return d.wrapErr(err, "")
 				}
 			}
-			if err := txn.Delete([]byte(prefix.PrimaryKey(current.GetCollection(), current.GetID()))); err != nil {
+			if err := txn.Delete([]byte(prefix.PrimaryKey(event.Collection, current.GetID()))); err != nil {
 				return d.wrapErr(err, "")
 			}
 			if batch != nil {
@@ -132,15 +130,20 @@ func (d *db) saveDocument(ctx context.Context, event *Event) error {
 	if !ok {
 		return d.wrapErr(fmt.Errorf("unsupported collection: %s", event.Collection), "")
 	}
+	if len(event.Documents) == 0 {
+		return nil
+	}
+	if len(event.Documents) > 1 {
+		return d.saveBatch(ctx, event)
+	}
 	document := event.Documents[0]
-	current, _ := d.Get(ctx, document.GetCollection(), document.GetID())
+	current, _ := d.Get(ctx, event.Collection, document.GetID())
 	if current == nil {
 		current = NewDocument()
 	}
 	var bits []byte
 	switch event.Action {
 	case Set:
-		document.SetCollection(event.Collection)
 		if err := document.Validate(); err != nil {
 			return d.wrapErr(err, "")
 		}
@@ -149,11 +152,10 @@ func (d *db) saveDocument(ctx context.Context, event *Event) error {
 			return d.wrapErr(err, "")
 		}
 		if !valid {
-			return fmt.Errorf("%s/%s document has invalid schema", document.GetCollection(), document.GetID())
+			return fmt.Errorf("%s/%s document has invalid schema", event.Collection, document.GetID())
 		}
 		bits = document.Bytes()
 	case Update:
-		document.SetCollection(event.Collection)
 		if err := document.Validate(); err != nil {
 			return d.wrapErr(err, "")
 		}
@@ -163,7 +165,7 @@ func (d *db) saveDocument(ctx context.Context, event *Event) error {
 			return d.wrapErr(err, "")
 		}
 		if !valid {
-			return fmt.Errorf("%s/%s document has invalid schema", current.GetCollection(), current.GetID())
+			return fmt.Errorf("%s/%s document has invalid schema", event.Collection, current.GetID())
 		}
 		bits = current.Bytes()
 	}
@@ -171,13 +173,13 @@ func (d *db) saveDocument(ctx context.Context, event *Event) error {
 		switch event.Action {
 		case Set, Update:
 			if err := txn.SetEntry(&badger.Entry{
-				Key:   []byte(prefix.PrimaryKey(document.GetCollection(), document.GetID())),
+				Key:   []byte(prefix.PrimaryKey(event.Collection, document.GetID())),
 				Value: bits,
 			}); err != nil {
 				return d.wrapErr(err, "")
 			}
 			for _, index := range collect.Indexes {
-				pindex := index.prefix(document.GetCollection())
+				pindex := index.prefix(event.Collection)
 				if current != nil {
 					if err := txn.Delete([]byte(pindex.GetIndex(current.Value()))); err != nil {
 						return d.wrapErr(err, "")
@@ -198,12 +200,12 @@ func (d *db) saveDocument(ctx context.Context, event *Event) error {
 			}
 		case Delete:
 			for _, index := range collect.Indexes {
-				pindex := index.prefix(current.GetCollection())
+				pindex := index.prefix(event.Collection)
 				if err := txn.Delete([]byte(pindex.GetIndex(current.Value()))); err != nil {
 					return d.wrapErr(err, "")
 				}
 			}
-			if err := txn.Delete([]byte(prefix.PrimaryKey(current.GetCollection(), current.GetID()))); err != nil {
+			if err := txn.Delete([]byte(prefix.PrimaryKey(event.Collection, current.GetID()))); err != nil {
 				return d.wrapErr(err, "")
 			}
 			if collect.fullText != nil {

@@ -94,18 +94,10 @@ func (r Document) Select(fields []string) Document {
 
 // Validate returns an error if the documents collection, id, or fields are empty
 func (r Document) Validate() error {
-	if r.GetCollection() == "" {
-		return errors.New("document validation: empty _collection")
-	}
 	if r.GetID() == "" {
 		return errors.New("document validation: empty _id")
 	}
 	return nil
-}
-
-// GetCollection gets the collection from the document
-func (r Document) GetCollection() string {
-	return r.result.Get("_collection").String()
 }
 
 // GetID gets the id from the document
@@ -174,11 +166,6 @@ func (r *Document) Del(field string) {
 		panic(err)
 	}
 	r.result = lo.ToPtr(gjson.Parse(result))
-}
-
-// SetCollection sets the collection on the document
-func (r *Document) SetCollection(collection string) {
-	r.Set("_collection", collection)
 }
 
 // SetID sets the id on the document
