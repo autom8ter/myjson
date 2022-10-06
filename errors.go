@@ -7,7 +7,7 @@ import (
 
 func (d *db) wrapErr(err error, msg string) error {
 	if err != nil {
-		if d.Config().Debug {
+		if d.config.Debug {
 			return stacktrace.Propagate(err, msg)
 		}
 		return errors.Wrap(err, msg)

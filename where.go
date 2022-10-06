@@ -3,20 +3,10 @@ package wolverine
 // WhereOp is an operator used to compare a value to a records field value in a where clause
 type WhereOp string
 
-// Valid returns true if it is a valid operation
-func (o WhereOp) Valid() bool {
-	switch o {
-	case LteOp, LtOp, GteOp, GtOp, EqOp, NeqOp, ContainsOp, FuzzyOp, PrefixOp, TermOp:
-		return true
-	default:
-		return false
-	}
-}
-
 // IsSearch returns true if the operator requires full text search
 func (o WhereOp) IsSearch() bool {
 	switch o {
-	case ContainsOp, FuzzyOp, PrefixOp, TermOp:
+	case Contains, Fuzzy, Prefix, Term:
 		return true
 	default:
 		return false
@@ -26,28 +16,28 @@ func (o WhereOp) IsSearch() bool {
 const (
 	// PrefixOp is a full text search type for finding records based on prefix matching. full text search operators can only be used
 	// against collections that have full text search enabled
-	PrefixOp WhereOp = "prefix"
+	Prefix WhereOp = "prefix"
 	// ContainsOp full text search type for finding records based on contains matching. full text search operators can only be used
 	// against collections that have full text search enabled
-	ContainsOp WhereOp = "contains"
+	Contains WhereOp = "contains"
 	// TermOp full text search type for finding records based on term matching. full text search operators can only be used
 	// against collections that have full text search enabled
-	TermOp WhereOp = "term"
+	Term WhereOp = "term"
 	// FuzzyOp full text search type for finding records based on a fuzzy search. full text search operators can only be used
 	// against collections that have full text search enabled
-	FuzzyOp WhereOp = "fuzzy"
+	Fuzzy WhereOp = "fuzzy"
 	// EqOp matches on equality
-	EqOp WhereOp = "eq"
+	Eq WhereOp = "eq"
 	// NeqOp matches on inequality
-	NeqOp WhereOp = "neq"
+	Neq WhereOp = "neq"
 	// GtOp matches on greater than
-	GtOp WhereOp = "gt"
+	Gt WhereOp = "gt"
 	// GteOp matches on greater than or equal to
-	GteOp WhereOp = "gte"
+	Gte WhereOp = "gte"
 	// LtOp matches on less than
-	LtOp WhereOp = "lt"
+	Lt WhereOp = "lt"
 	// LteOp matches on greater than or equal to
-	LteOp WhereOp = "lte"
+	Lte WhereOp = "lte"
 )
 
 // Where is field-level filter for database queries

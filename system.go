@@ -28,7 +28,6 @@ func (d *db) Config() Config {
 func (d *db) Close(ctx context.Context) error {
 	d.mu.Lock()
 	defer d.mu.Unlock()
-	d.cron.Stop()
 	err := d.machine.Wait()
 	d.collections.Range(func(key, value any) bool {
 		collection := value.(*Collection)

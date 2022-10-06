@@ -48,11 +48,11 @@ func (d *db) search(ctx context.Context, collection string, query Query) ([]*Doc
 	var searchRequest *bleve.SearchRequest
 	for _, where := range wheres {
 		switch where.Op {
-		case TermOp:
+		case Term:
 			searchRequest = bleve.NewSearchRequest(bleve.NewTermQuery(cast.ToString(where.Value)))
-		case PrefixOp:
+		case Prefix:
 			searchRequest = bleve.NewSearchRequest(bleve.NewPrefixQuery(cast.ToString(where.Value)))
-		case FuzzyOp:
+		case Fuzzy:
 			searchRequest = bleve.NewSearchRequest(bleve.NewFuzzyQuery(cast.ToString(where.Value)))
 		default:
 			searchRequest = bleve.NewSearchRequest(bleve.NewQueryStringQuery(cast.ToString(where.Value)))

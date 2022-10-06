@@ -8,7 +8,6 @@ import (
 	"github.com/autom8ter/machine/v4"
 	"github.com/blevesearch/bleve"
 	"github.com/dgraph-io/badger/v3"
-	"github.com/robfig/cron"
 	"github.com/xeipuuv/gojsonschema"
 
 	"github.com/autom8ter/wolverine/internal/prefix"
@@ -19,7 +18,6 @@ type db struct {
 	kv          *badger.DB
 	mu          sync.RWMutex
 	collections sync.Map
-	cron        *cron.Cron
 	machine     machine.Machine
 }
 
@@ -42,7 +40,6 @@ func New(ctx context.Context, cfg Config) (DB, error) {
 		kv:          kv,
 		mu:          sync.RWMutex{},
 		collections: sync.Map{},
-		cron:        cron.New(),
 		machine:     machine.New(),
 	}
 	d.collections.Store("system", &Collection{
@@ -50,13 +47,6 @@ func New(ctx context.Context, cfg Config) (DB, error) {
 	})
 	if err := d.loadCollections(ctx); err != nil {
 		return nil, err
-	}
-	for _, c := range config.CronJobs {
-		if err := d.cron.AddFunc(c.Schedule, func() {
-			c.Function(ctx, d)
-		}); err != nil {
-			return nil, err
-		}
 	}
 	if config.ReIndex {
 		if err := d.ReIndex(ctx); err != nil {
@@ -68,8 +58,6 @@ func New(ctx context.Context, cfg Config) (DB, error) {
 			return nil, err
 		}
 	}
-
-	d.cron.Start()
 	return d, nil
 }
 

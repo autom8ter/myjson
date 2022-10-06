@@ -142,7 +142,7 @@ func Test(t *testing.T) {
 			Where: []wolverine.Where{
 				{
 					Field: "contact.email",
-					Op:    "==",
+					Op:    wolverine.Eq,
 					Value: myEmail,
 				},
 			},
@@ -202,7 +202,7 @@ func Test(t *testing.T) {
 					Where: []wolverine.Where{
 						{
 							Field: "contact.email",
-							Op:    wolverine.PrefixOp,
+							Op:    wolverine.Prefix,
 							Value: "colemanword",
 						},
 					},
@@ -219,12 +219,12 @@ func Test(t *testing.T) {
 					Where: []wolverine.Where{
 						{
 							Field: "contact.email",
-							Op:    wolverine.ContainsOp,
+							Op:    wolverine.Contains,
 							Value: "colemanword",
 						},
 						{
 							Field: "name",
-							Op:    wolverine.ContainsOp,
+							Op:    wolverine.Contains,
 							Value: "colemanword",
 						},
 					},
@@ -240,7 +240,7 @@ func Test(t *testing.T) {
 					Where: []wolverine.Where{
 						{
 							Field: "search(age)",
-							Op:    wolverine.ContainsOp,
+							Op:    wolverine.Contains,
 							Value: "colemanword",
 						},
 					},
@@ -255,7 +255,7 @@ func Test(t *testing.T) {
 					Where: []wolverine.Where{
 						{
 							Field: "contact.email",
-							Op:    wolverine.FuzzyOp,
+							Op:    wolverine.Fuzzy,
 							Value: "colemanword",
 						},
 					},
@@ -271,7 +271,7 @@ func Test(t *testing.T) {
 					Where: []wolverine.Where{
 						{
 							Field: "contact.email",
-							Op:    wolverine.TermOp,
+							Op:    wolverine.Term,
 							Value: "colemanword",
 						},
 					},
@@ -288,9 +288,9 @@ func Test(t *testing.T) {
 			found := 0
 			mu := sync.RWMutex{}
 			go func() {
-				assert.Nil(t, db.ChangeStream(ctx, []string{"user"}, func(ctx context.Context, records []*wolverine.Document) error {
+				assert.Nil(t, db.ChangeStream(ctx, []string{"user"}, func(ctx context.Context, event *wolverine.Event) error {
 					mu.Lock()
-					found += len(records)
+					found += len(event.Documents)
 					mu.Unlock()
 					return nil
 				}))
@@ -458,7 +458,7 @@ func Benchmark(b *testing.B) {
 					Where: []wolverine.Where{
 						{
 							Field: "contact.email",
-							Op:    "==",
+							Op:    wolverine.Eq,
 							Value: "colemanword@gmail.com",
 						},
 					},
@@ -496,7 +496,7 @@ func Benchmark(b *testing.B) {
 					Where: []wolverine.Where{
 						{
 							Field: "contact.email",
-							Op:    wolverine.PrefixOp,
+							Op:    wolverine.Prefix,
 							Value: "colemanword",
 						},
 					},

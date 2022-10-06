@@ -77,8 +77,8 @@ type Writer interface {
 	QueryDelete(ctx context.Context, collection string, query Query) error
 }
 
-// ChangeStreamHandler is a function executed on changes to documents
-type ChangeStreamHandler func(ctx context.Context, documents []*Document) error
+// ChangeStreamHandler is a function executed on changes to documents which emit events
+type ChangeStreamHandler func(ctx context.Context, event *Event) error
 
 // Streamer streams changes to documents in the database
 type Streamer interface {

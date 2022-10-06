@@ -12,13 +12,13 @@ func (d *db) ChangeStream(ctx context.Context, collections []string, fn ChangeSt
 		collection := collection
 		m.Go(ctx, func(ctx context.Context) error {
 			return d.machine.Subscribe(ctx, collection, func(ctx context.Context, msg machine.Message) (bool, error) {
-				switch document := msg.Body.(type) {
-				case *Document:
-					if err := fn(ctx, []*Document{document}); err != nil {
+				switch event := msg.Body.(type) {
+				case *Event:
+					if err := fn(ctx, event); err != nil {
 						return false, err
 					}
-				case []*Document:
-					if err := fn(ctx, document); err != nil {
+				case Event:
+					if err := fn(ctx, &event); err != nil {
 						return false, err
 					}
 				}

@@ -10,8 +10,6 @@ type Config struct {
 	Migrate bool
 	// ReIndex reindexes the database
 	ReIndex bool
-	// CronJob are cron jobs that will run
-	CronJobs []CronJob
 	// BeforeSet is a hook that is executed before a set operation
 	BeforeSet WriteTrigger
 	// BeforeSet is a hook that is executed before a set operation

@@ -113,45 +113,39 @@ func (r Document) GetID() string {
 	return r.result.Get("_id").String()
 }
 
-// Get gets a field on the document
+// Get gets a field on the document. Get has GJSON syntax support and supports dot notation
 func (r Document) Get(field string) any {
 	return r.result.Get(field).Value()
 }
 
-// GetString gets a string field value on the document
+// GetString gets a string field value on the document. Get has GJSON syntax support and supports dot notation
 func (r Document) GetString(field string) string {
 	return r.result.Get(field).String()
 }
 
-// GetBool gets a bool field value on the document
+// GetBool gets a bool field value on the document. GetBool has GJSON syntax support and supports dot notation
 func (r Document) GetBool(field string) bool {
 	return r.result.Get(field).Bool()
 }
 
-// GetFloat gets a bool field value on the document
+// GetFloat gets a bool field value on the document. GetFloat has GJSON syntax support and supports dot notation
 func (r Document) GetFloat(field string) float64 {
 	return r.result.Get(field).Float()
 }
 
-// Set sets a field on the document
+// Set sets a field on the document. Dot notation is supported.
 func (r *Document) Set(field string, val any) {
 	switch val := val.(type) {
 	case gjson.Result:
-		result, err := sjson.Set(r.result.Raw, field, val.Value())
-		if err != nil {
-			panic(err)
-		}
+		result, _ := sjson.Set(r.result.Raw, field, val.Value())
 		r.result = lo.ToPtr(gjson.Parse(result))
 	default:
-		result, err := sjson.Set(r.result.Raw, field, val)
-		if err != nil {
-			panic(err)
-		}
+		result, _ := sjson.Set(r.result.Raw, field, val)
 		r.result = lo.ToPtr(gjson.Parse(result))
 	}
 }
 
-// SetAll sets a fields on the document
+// SetAll sets all fields on the document. Dot notation is supported.
 func (r *Document) SetAll(values map[string]any) {
 	for k, val := range values {
 		r.Set(k, val)
@@ -196,30 +190,32 @@ func (r *Document) SetID(id string) {
 func (d Document) Where(wheres []Where) (bool, error) {
 	for _, w := range wheres {
 		switch w.Op {
-		case "==", "eq":
+		case "==", Eq:
 			if w.Value != d.Get(w.Field) {
 				return false, nil
 			}
-		case "!=", "neq":
+		case "!=", Neq:
 			if w.Value == d.Get(w.Field) {
 				return false, nil
 			}
-		case ">", "gt":
+		case ">", Gt:
 			if d.GetFloat(w.Field) <= cast.ToFloat64(w.Value) {
 				return false, nil
 			}
-		case ">=", "gte":
+		case ">=", Gte:
 			if d.GetFloat(w.Field) < cast.ToFloat64(w.Value) {
 				return false, nil
 			}
-		case "<", "lt":
+		case "<", Lt:
 			if d.GetFloat(w.Field) >= cast.ToFloat64(w.Value) {
 				return false, nil
 			}
-		case "<=", "lte":
+		case "<=", Lte:
 			if d.GetFloat(w.Field) > cast.ToFloat64(w.Value) {
 				return false, nil
 			}
+		case "in":
+
 		default:
 			return false, fmt.Errorf("invalid operator: %s", w.Op)
 		}

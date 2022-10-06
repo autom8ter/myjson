@@ -19,15 +19,18 @@ const (
 	del    mutation = "del"
 )
 
-func (d *db) saveBatch(ctx context.Context, collection string, mutation mutation, documents []*Document) error {
-	if len(documents) == 0 {
+func (d *db) saveBatch(ctx context.Context, event *Event) error {
+	if len(event.Documents) == 0 {
 		return nil
 	}
-	collect, ok := d.getInmemCollection(collection)
-	if !ok {
-		return d.wrapErr(fmt.Errorf("unsupported collection: %s", collection), "")
+	if len(event.Documents) == 1 {
+
 	}
-	for _, document := range documents {
+	collect, ok := d.getInmemCollection(event.Collection)
+	if !ok {
+		return d.wrapErr(fmt.Errorf("unsupported collection: %s", event.Collection), "")
+	}
+	for _, document := range event.Documents {
 		if err := document.Validate(); err != nil {
 			return d.wrapErr(err, "")
 		}
@@ -45,29 +48,29 @@ func (d *db) saveBatch(ctx context.Context, collection string, mutation mutation
 	if index != nil {
 		batch = index.NewBatch()
 	}
-	for _, document := range documents {
+	for _, document := range event.Documents {
 		current, _ := d.Get(ctx, document.GetCollection(), document.GetID())
 		if current == nil {
 			current = NewDocument()
 		}
 		var bits []byte
-		switch mutation {
-		case set:
-			document.SetCollection(collection)
+		switch event.Action {
+		case Set:
+			document.SetCollection(event.Collection)
 			if err := document.Validate(); err != nil {
 				return d.wrapErr(err, "")
 			}
 			bits = document.Bytes()
-		case update:
-			document.SetCollection(collection)
+		case Update:
+			document.SetCollection(event.Collection)
 			if err := document.Validate(); err != nil {
 				return d.wrapErr(err, "")
 			}
 			current.Merge(document)
 			bits = current.Bytes()
 		}
-		switch mutation {
-		case set, update:
+		switch event.Action {
+		case Set, Update:
 			if err := txn.SetEntry(&badger.Entry{
 				Key:   []byte(prefix.PrimaryKey(document.GetCollection(), document.GetID())),
 				Value: bits,
@@ -94,7 +97,7 @@ func (d *db) saveBatch(ctx context.Context, collection string, mutation mutation
 					return d.wrapErr(err, "")
 				}
 			}
-		case del:
+		case Delete:
 			for _, i := range collect.Indexes {
 				pindex := i.prefix(current.GetCollection())
 				if err := txn.Delete([]byte(pindex.GetIndex(current.Value()))); err != nil {
@@ -118,25 +121,26 @@ func (d *db) saveBatch(ctx context.Context, collection string, mutation mutation
 		return d.wrapErr(err, "")
 	}
 	d.machine.Publish(ctx, machine.Message{
-		Channel: collection,
-		Body:    documents,
+		Channel: event.Collection,
+		Body:    event,
 	})
 	return nil
 }
 
-func (d *db) saveDocument(ctx context.Context, collection string, mutation mutation, document *Document) error {
-	collect, ok := d.getInmemCollection(collection)
+func (d *db) saveDocument(ctx context.Context, event *Event) error {
+	collect, ok := d.getInmemCollection(event.Collection)
 	if !ok {
-		return d.wrapErr(fmt.Errorf("unsupported collection: %s", collection), "")
+		return d.wrapErr(fmt.Errorf("unsupported collection: %s", event.Collection), "")
 	}
+	document := event.Documents[0]
 	current, _ := d.Get(ctx, document.GetCollection(), document.GetID())
 	if current == nil {
 		current = NewDocument()
 	}
 	var bits []byte
-	switch mutation {
-	case set:
-		document.SetCollection(collection)
+	switch event.Action {
+	case Set:
+		document.SetCollection(event.Collection)
 		if err := document.Validate(); err != nil {
 			return d.wrapErr(err, "")
 		}
@@ -148,8 +152,8 @@ func (d *db) saveDocument(ctx context.Context, collection string, mutation mutat
 			return fmt.Errorf("%s/%s document has invalid schema", document.GetCollection(), document.GetID())
 		}
 		bits = document.Bytes()
-	case update:
-		document.SetCollection(collection)
+	case Update:
+		document.SetCollection(event.Collection)
 		if err := document.Validate(); err != nil {
 			return d.wrapErr(err, "")
 		}
@@ -164,8 +168,8 @@ func (d *db) saveDocument(ctx context.Context, collection string, mutation mutat
 		bits = current.Bytes()
 	}
 	return d.kv.Update(func(txn *badger.Txn) error {
-		switch mutation {
-		case set, update:
+		switch event.Action {
+		case Set, Update:
 			if err := txn.SetEntry(&badger.Entry{
 				Key:   []byte(prefix.PrimaryKey(document.GetCollection(), document.GetID())),
 				Value: bits,
@@ -192,7 +196,7 @@ func (d *db) saveDocument(ctx context.Context, collection string, mutation mutat
 					return d.wrapErr(err, "")
 				}
 			}
-		case del:
+		case Delete:
 			for _, index := range collect.Indexes {
 				pindex := index.prefix(current.GetCollection())
 				if err := txn.Delete([]byte(pindex.GetIndex(current.Value()))); err != nil {
@@ -209,27 +213,43 @@ func (d *db) saveDocument(ctx context.Context, collection string, mutation mutat
 			}
 		}
 		d.machine.Publish(ctx, machine.Message{
-			Channel: collection,
-			Body:    document,
+			Channel: event.Collection,
+			Body:    event,
 		})
 		return nil
 	})
 }
 
 func (d *db) Set(ctx context.Context, collection string, document *Document) error {
-	return d.saveDocument(ctx, collection, set, document)
+	return d.saveDocument(ctx, &Event{
+		Collection: collection,
+		Action:     Set,
+		Documents:  []*Document{document},
+	})
 }
 
 func (d *db) BatchSet(ctx context.Context, collection string, batch []*Document) error {
-	return d.saveBatch(ctx, collection, set, batch)
+	return d.saveBatch(ctx, &Event{
+		Collection: collection,
+		Action:     Set,
+		Documents:  batch,
+	})
 }
 
 func (d *db) Update(ctx context.Context, collection string, document *Document) error {
-	return d.saveDocument(ctx, collection, update, document)
+	return d.saveDocument(ctx, &Event{
+		Collection: collection,
+		Action:     Update,
+		Documents:  []*Document{document},
+	})
 }
 
 func (d *db) BatchUpdate(ctx context.Context, collection string, batch []*Document) error {
-	return d.saveBatch(ctx, collection, update, batch)
+	return d.saveBatch(ctx, &Event{
+		Collection: collection,
+		Action:     Update,
+		Documents:  batch,
+	})
 }
 
 func (d *db) Delete(ctx context.Context, collection, id string) error {
@@ -237,7 +257,11 @@ func (d *db) Delete(ctx context.Context, collection, id string) error {
 	if err != nil {
 		return d.wrapErr(err, "")
 	}
-	return d.saveDocument(ctx, collection, del, doc)
+	return d.saveDocument(ctx, &Event{
+		Collection: collection,
+		Action:     Delete,
+		Documents:  []*Document{doc},
+	})
 }
 
 func (d *db) BatchDelete(ctx context.Context, collection string, ids []string) error {
@@ -250,7 +274,11 @@ func (d *db) BatchDelete(ctx context.Context, collection string, ids []string) e
 		documents = append(documents, doc)
 	}
 
-	return d.saveBatch(ctx, collection, del, documents)
+	return d.saveBatch(ctx, &Event{
+		Collection: collection,
+		Action:     Delete,
+		Documents:  documents,
+	})
 }
 
 func (d *db) QueryUpdate(ctx context.Context, update *Document, collection string, query Query) error {
