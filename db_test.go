@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io/ioutil"
+	"os"
 	"sync"
 	"testing"
 	"time"
@@ -14,6 +16,23 @@ import (
 
 	"github.com/autom8ter/wolverine"
 )
+
+func init() {
+	schema, err := os.Open("./testdata/schemas/user.json")
+	if err != nil {
+		panic(err)
+	}
+	defer schema.Close()
+	bits, err := ioutil.ReadAll(schema)
+	if err != nil {
+		panic(err)
+	}
+	for _, c := range defaultCollections {
+		if c.Name == "user" {
+			c.JSONSchema = string(bits)
+		}
+	}
+}
 
 var defaultCollections = []*wolverine.Collection{
 	{
@@ -110,6 +129,7 @@ func Test(t *testing.T) {
 			assert.Equal(t, usr.Get("language"), result.Get("language"))
 		}
 	})
+	assert.Nil(t, db.SetCollections(ctx, defaultCollections))
 	t.Run("set-get-query", func(t *testing.T) {
 		usr := newUserDoc()
 		usr.Set("contact.email", myEmail)

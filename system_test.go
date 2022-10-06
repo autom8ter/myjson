@@ -63,9 +63,6 @@ func TestSystem(t *testing.T) {
 				ReIndex: false,
 			})
 			assert.Nil(t, err)
-			for _, c := range defaultCollections {
-				assert.Nil(t, restored.SetCollection(ctx, c))
-			}
 			assert.Nil(t, restored.Restore(ctx, buf))
 			for _, u := range usrs {
 				result, err := restored.Get(ctx, "user", u.GetID())

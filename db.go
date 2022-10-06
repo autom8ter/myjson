@@ -90,10 +90,6 @@ func (d *db) loadCollections(ctx context.Context) error {
 					//}
 					//indexMapping.AddDocumentMapping("index", document)
 				}
-				existing, ok := d.getInmemCollection(collection.Name)
-				if ok && existing.fullText != nil {
-					existing.fullText.Close()
-				}
 				if d.config.Path == "inmem" {
 					i, err := bleve.NewMemOnly(indexMapping)
 					if err != nil {

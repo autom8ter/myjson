@@ -12,8 +12,9 @@ type Collection struct {
 	// Name is the unique name of the collection - it should not contain any special characters
 	Name string `json:"name"`
 	// Indexes is a list of indexes associated with the collection - indexes should be used to tune database performance
-	Indexes      []Index `json:"indexes"`
-	JSONSchema   string  `json:"json_schema"`
+	Indexes []Index `json:"indexes"`
+	// JSONSchema is a json schema used to validate documents stored in the collection
+	JSONSchema   string `json:"json_schema"`
 	loadedSchema *gojsonschema.Schema
 	fullText     bleve.Index
 }

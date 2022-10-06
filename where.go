@@ -78,9 +78,11 @@ type OrderBy struct {
 
 // Query is a query against the NOSQL database
 type Query struct {
-	Select  []string `json:"select"`
-	Where   []Where  `json:"where"`
-	StartAt string   `json:"start_at"`
-	Limit   int      `json:"limit"`
-	OrderBy OrderBy  `json:"order_by"`
+	Select    []string    `json:"select"`
+	Where     []Where     `json:"where"`
+	StartAt   string      `json:"start_at"`
+	Limit     int         `json:"limit"`
+	GroupBy   []string    `json:"group_by"`
+	Aggregate []Aggregate `json:"aggregate"`
+	OrderBy   OrderBy     `json:"order_by"`
 }
