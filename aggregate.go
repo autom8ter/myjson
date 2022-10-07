@@ -168,20 +168,28 @@ func countReducer() reducer {
 
 func maxReducer() reducer {
 	return func(aggField string, records []*Document) (*Document, error) {
+		var max = float64(0)
+		for _, record := range records {
+			if value := record.GetFloat(aggField); value > max {
+				max = value
+			}
+		}
 		return NewDocumentFromMap(map[string]interface{}{
-			fmt.Sprintf("%s.%s", aggField, AggregateMax): lo.MaxBy(records, func(this *Document, that *Document) bool {
-				return compareField(aggField, this, that)
-			}),
+			fmt.Sprintf("%s.%s", aggField, AggregateMax): max,
 		})
 	}
 }
 
 func minReducer() reducer {
 	return func(aggField string, records []*Document) (*Document, error) {
+		var min = float64(0)
+		for _, record := range records {
+			if value := record.GetFloat(aggField); value < min {
+				min = value
+			}
+		}
 		return NewDocumentFromMap(map[string]interface{}{
-			fmt.Sprintf("%s.%s", aggField, AggregateMin): lo.MinBy(records, func(this *Document, that *Document) bool {
-				return !compareField(aggField, this, that)
-			}),
+			fmt.Sprintf("%s.%s", aggField, AggregateMin): min,
 		})
 	}
 }
