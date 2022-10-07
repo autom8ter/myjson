@@ -11,14 +11,6 @@ import (
 	"github.com/autom8ter/wolverine/internal/prefix"
 )
 
-type mutation string
-
-const (
-	set    mutation = "set"
-	update mutation = "update"
-	del    mutation = "del"
-)
-
 func (d *db) saveBatch(ctx context.Context, event *Event) error {
 	if len(event.Documents) == 0 {
 		return nil
@@ -61,11 +53,13 @@ func (d *db) saveBatch(ctx context.Context, event *Event) error {
 			}
 			bits = document.Bytes()
 		case Update:
-			if err := document.Validate(); err != nil {
-				return d.wrapErr(err, "")
+			document.Merge(current)
+			bits = document.Bytes()
+		}
+		for _, c := range d.config.Triggers {
+			if err := c(ctx, event.Action, Before, current, document); err != nil {
+				return d.wrapErr(err, "trigger failure")
 			}
-			current.Merge(document)
-			bits = current.Bytes()
 		}
 		switch event.Action {
 		case Set, Update:
@@ -107,6 +101,11 @@ func (d *db) saveBatch(ctx context.Context, event *Event) error {
 			}
 			if batch != nil {
 				batch.Delete(document.GetID())
+			}
+		}
+		for _, t := range d.config.Triggers {
+			if err := t(ctx, event.Action, After, current, document); err != nil {
+				return d.wrapErr(err, "trigger failure")
 			}
 		}
 	}
@@ -156,18 +155,23 @@ func (d *db) saveDocument(ctx context.Context, event *Event) error {
 		}
 		bits = document.Bytes()
 	case Update:
+		document.Merge(current)
 		if err := document.Validate(); err != nil {
 			return d.wrapErr(err, "")
 		}
-		current.Merge(document)
-		valid, err := collect.Validate(current)
+		valid, err := collect.Validate(document)
 		if err != nil {
 			return d.wrapErr(err, "")
 		}
 		if !valid {
 			return fmt.Errorf("%s/%s document has invalid schema", event.Collection, current.GetID())
 		}
-		bits = current.Bytes()
+		bits = document.Bytes()
+	}
+	for _, t := range d.config.Triggers {
+		if err := t(ctx, event.Action, Before, current, document); err != nil {
+			return d.wrapErr(err, "trigger failure")
+		}
 	}
 	return d.kv.Update(func(txn *badger.Txn) error {
 		switch event.Action {
@@ -212,6 +216,11 @@ func (d *db) saveDocument(ctx context.Context, event *Event) error {
 				if err := collect.fullText.Delete(document.GetID()); err != nil {
 					return d.wrapErr(err, "")
 				}
+			}
+		}
+		for _, t := range d.config.Triggers {
+			if err := t(ctx, event.Action, After, current, document); err != nil {
+				return d.wrapErr(err, "trigger failure")
 			}
 		}
 		d.machine.Publish(ctx, machine.Message{

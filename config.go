@@ -12,4 +12,6 @@ type Config struct {
 	ReIndex bool
 	// Migrations are atomic database migrations to run on startup
 	Migrations []Migration
+	// Triggers are functions executed on documents before/after they change. They can be used to extend the functionality of the database.
+	Triggers []Trigger
 }
