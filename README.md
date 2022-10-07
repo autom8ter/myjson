@@ -57,8 +57,7 @@ Features:
 - [ ] decouple kv storage provider
 - [ ] benchmarks
 - [ ] examples
-- [ ] http server(gokit)
-- [ ] 90% test coverage
+- [ ] 80% test coverage
 - [ ] views
 - [ ] materialized views
 

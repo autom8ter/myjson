@@ -258,7 +258,7 @@ func (d *db) SetCollection(ctx context.Context, collection *Collection) error {
 		return d.wrapErr(err, "")
 	}
 
-	existing.Merge(newDoc)
+	existing.SetAll(newDoc.Value())
 
 	if err := d.Set(ctx, systemCollection, existing); err != nil {
 		return d.wrapErr(err, "")

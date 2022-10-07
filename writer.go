@@ -53,8 +53,9 @@ func (d *db) saveBatch(ctx context.Context, event *Event) error {
 			}
 			bits = document.Bytes()
 		case Update:
-			document.Merge(current)
-			bits = document.Bytes()
+			currentClone := current.Clone()
+			currentClone.Merge(document)
+			bits = currentClone.Bytes()
 		}
 		for _, c := range d.config.Triggers {
 			if err := c(ctx, event.Action, Before, current, document); err != nil {
@@ -136,16 +137,17 @@ func (d *db) saveDocument(ctx context.Context, event *Event) error {
 		return d.saveBatch(ctx, event)
 	}
 	document := event.Documents[0]
+	if err := document.Validate(); err != nil {
+		return d.wrapErr(err, "")
+	}
 	current, _ := d.Get(ctx, event.Collection, document.GetID())
 	if current == nil {
 		current = NewDocument()
 	}
+
 	var bits []byte
 	switch event.Action {
 	case Set:
-		if err := document.Validate(); err != nil {
-			return d.wrapErr(err, "")
-		}
 		valid, err := collect.Validate(document)
 		if err != nil {
 			return d.wrapErr(err, "")
@@ -155,18 +157,19 @@ func (d *db) saveDocument(ctx context.Context, event *Event) error {
 		}
 		bits = document.Bytes()
 	case Update:
-		document.Merge(current)
-		if err := document.Validate(); err != nil {
+		currentClone := current.Clone()
+		currentClone.Merge(document)
+		if err := currentClone.Validate(); err != nil {
 			return d.wrapErr(err, "")
 		}
-		valid, err := collect.Validate(document)
+		valid, err := collect.Validate(currentClone)
 		if err != nil {
 			return d.wrapErr(err, "")
 		}
 		if !valid {
-			return fmt.Errorf("%s/%s document has invalid schema", event.Collection, current.GetID())
+			return fmt.Errorf("%s/%s document has invalid schema", event.Collection, currentClone.GetID())
 		}
-		bits = document.Bytes()
+		bits = currentClone.Bytes()
 	}
 	for _, t := range d.config.Triggers {
 		if err := t(ctx, event.Action, Before, current, document); err != nil {

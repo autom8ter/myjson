@@ -166,7 +166,7 @@ func Test(t *testing.T) {
 		assert.NotNil(t, err)
 		assert.Empty(t, result)
 	})
-	t.Run("get all", func(t *testing.T) {
+	t.Run("get all then delete", func(t *testing.T) {
 		assert.Nil(t, testDB(defaultCollections, func(ctx context.Context, db wolverine.DB) {
 			var ids []string
 			for i := 0; i < 3; i++ {
@@ -184,6 +184,29 @@ func Test(t *testing.T) {
 				result, err := db.Get(ctx, "user", id)
 				assert.NotNil(t, err)
 				assert.Nil(t, result)
+			}
+		}))
+	})
+	t.Run("update", func(t *testing.T) {
+		assert.Nil(t, testDB(defaultCollections, func(ctx context.Context, db wolverine.DB) {
+			var documents []*wolverine.Document
+			for i := 0; i < 3; i++ {
+				u := newUserDoc()
+				documents = append(documents, u)
+				assert.Nil(t, db.Set(ctx, "user", u))
+			}
+			for _, doc := range documents {
+				email := gofakeit.Email()
+				newDoc, err := wolverine.NewDocumentFromMap(map[string]interface{}{
+					"_id":           doc.GetID(),
+					"contact.email": email,
+				})
+				assert.Nil(t, err)
+				assert.Equal(t, email, newDoc.Get("contact.email"))
+				assert.Nil(t, db.Update(ctx, "user", newDoc))
+				fetched, err := db.Get(ctx, "user", newDoc.GetID())
+				assert.Nil(t, err)
+				assert.Equal(t, email, fetched.Get("contact.email"))
 			}
 		}))
 	})
@@ -323,6 +346,25 @@ func Test(t *testing.T) {
 				assert.NotNil(t, err)
 				assert.Nil(t, result)
 			}
+		}))
+	})
+	t.Run("expect errors", func(t *testing.T) {
+		assert.Nil(t, testDB(defaultCollections, func(ctx context.Context, db wolverine.DB) {
+			var records []*wolverine.Document
+			var ids []string
+			for i := 0; i < 5; i++ {
+				doc := newUserDoc()
+				records = append(records, doc)
+				ids = append(ids, doc.GetID())
+			}
+			assert.NotNil(t, db.BatchSet(ctx, "use", records))
+			_, err := db.Get(ctx, "use", "isdf")
+			assert.NotNil(t, err)
+			err = db.Delete(ctx, "use", "isdf")
+			assert.NotNil(t, err)
+			results, err := db.Query(ctx, "test", wolverine.Query{})
+			assert.NotNil(t, err)
+			assert.Nil(t, results)
 		}))
 	})
 	t.Run("order by", func(t *testing.T) {

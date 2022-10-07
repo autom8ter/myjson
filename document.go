@@ -53,94 +53,95 @@ func NewDocumentFromAny(value any) (*Document, error) {
 	return d, nil
 }
 
-func (d Document) Empty() bool {
+func (d *Document) Empty() bool {
 	return d.result == nil || d.result.Raw == ""
 }
 
 // String returns the document as a json string
-func (r Document) String() string {
-	return r.result.Raw
+func (d *Document) String() string {
+	return d.result.Raw
 }
 
 // Bytes returns the document as json bytes
-func (r Document) Bytes() []byte {
-	return []byte(r.result.Raw)
+func (d *Document) Bytes() []byte {
+	return []byte(d.result.Raw)
 }
 
 // Value returns the document
-func (d Document) Value() map[string]any {
+func (d *Document) Value() map[string]any {
 	return d.result.Value().(map[string]interface{})
 }
 
 // Clone allocates a new document with identical values
-func (r Document) Clone() Document {
-	raw := r.result.Raw
-	return Document{result: lo.ToPtr(gjson.Parse(raw))}
+func (d *Document) Clone() *Document {
+	raw := d.result.Raw
+	return &Document{result: lo.ToPtr(gjson.Parse(raw))}
 }
 
 // Select returns the document with only the selected fields populated
-func (r Document) Select(fields []string) Document {
+func (d *Document) Select(fields []string) *Document {
 	if len(fields) == 0 || fields[0] == "*" {
-		return r
+		return d
 	}
 	patch := map[string]interface{}{}
 	for _, f := range fields {
-		patch[f] = r.Get(f)
+		patch[f] = d.Get(f)
 	}
 	unflat, _ := flat.Unflatten(patch, nil)
 	doc, _ := NewDocumentFromMap(unflat)
-	return *doc
+	*d = *doc
+	return doc
 }
 
 // Validate returns an error if the documents collection, id, or fields are empty
-func (r Document) Validate() error {
-	if r.GetID() == "" {
+func (d *Document) Validate() error {
+	if d.GetID() == "" {
 		return errors.New("document validation: empty _id")
 	}
 	return nil
 }
 
 // GetID gets the id from the document
-func (r Document) GetID() string {
-	return r.result.Get("_id").String()
+func (d *Document) GetID() string {
+	return d.result.Get("_id").String()
 }
 
 // Get gets a field on the document. Get has GJSON syntax support and supports dot notation
-func (r Document) Get(field string) any {
-	return r.result.Get(field).Value()
+func (d *Document) Get(field string) any {
+	return d.result.Get(field).Value()
 }
 
 // GetString gets a string field value on the document. Get has GJSON syntax support and supports dot notation
-func (r Document) GetString(field string) string {
-	return r.result.Get(field).String()
+func (d *Document) GetString(field string) string {
+	return d.result.Get(field).String()
 }
 
 // GetBool gets a bool field value on the document. GetBool has GJSON syntax support and supports dot notation
-func (r Document) GetBool(field string) bool {
-	return r.result.Get(field).Bool()
+func (d *Document) GetBool(field string) bool {
+	return d.result.Get(field).Bool()
 }
 
 // GetFloat gets a bool field value on the document. GetFloat has GJSON syntax support and supports dot notation
-func (r Document) GetFloat(field string) float64 {
-	return r.result.Get(field).Float()
+func (d *Document) GetFloat(field string) float64 {
+	return d.result.Get(field).Float()
 }
 
 // Set sets a field on the document. Dot notation is supported.
-func (r *Document) Set(field string, val any) {
+func (d *Document) Set(field string, val any) {
 	switch val := val.(type) {
 	case gjson.Result:
-		result, _ := sjson.Set(r.result.Raw, field, val.Value())
-		r.result = lo.ToPtr(gjson.Parse(result))
+		result, _ := sjson.Set(d.result.Raw, field, val.Value())
+		d.result = lo.ToPtr(gjson.Parse(result))
 	default:
-		result, _ := sjson.Set(r.result.Raw, field, val)
-		r.result = lo.ToPtr(gjson.Parse(result))
+		result, _ := sjson.Set(d.result.Raw, field, val)
+		d.result = lo.ToPtr(gjson.Parse(result))
 	}
 }
 
 // SetAll sets all fields on the document. Dot notation is supported.
-func (r *Document) SetAll(values map[string]any) {
+func (d *Document) SetAll(values map[string]any) {
 	for k, val := range values {
-		r.Set(k, val)
+		d.Set(k, val)
 	}
 }
 
@@ -160,21 +161,21 @@ func (d *Document) Merge(with *Document) {
 }
 
 // Del deletes a field from the document
-func (r *Document) Del(field string) {
-	result, err := sjson.Delete(r.result.Raw, field)
+func (d *Document) Del(field string) {
+	result, err := sjson.Delete(d.result.Raw, field)
 	if err != nil {
 		panic(err)
 	}
-	r.result = lo.ToPtr(gjson.Parse(result))
+	d.result = lo.ToPtr(gjson.Parse(result))
 }
 
 // SetID sets the id on the document
-func (r *Document) SetID(id string) {
-	r.Set("_id", id)
+func (d *Document) SetID(id string) {
+	d.Set("_id", id)
 }
 
 // Where executes the where clauses against the document and returns true if it passes the clauses
-func (d Document) Where(wheres []Where) (bool, error) {
+func (d *Document) Where(wheres []Where) (bool, error) {
 	for _, w := range wheres {
 		switch w.Op {
 		case "==", Eq:

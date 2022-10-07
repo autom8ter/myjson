@@ -36,7 +36,17 @@ func TestDocument(t *testing.T) {
 		t.Fatal(err)
 	}
 	r.SetID(usr.ID)
-
+	t.Run("validate", func(t *testing.T) {
+		assert.Nil(t, r.Validate())
+		c := r.Clone()
+		c.Del("_id")
+		assert.NotNil(t, c.Validate())
+	})
+	t.Run("scan json", func(t *testing.T) {
+		var u user
+		assert.Nil(t, r.ScanJSON(&u))
+		assert.EqualValues(t, u, usr)
+	})
 	t.Run("get id", func(t *testing.T) {
 		assert.Equal(t, usr.ID, r.GetID())
 	})
@@ -99,6 +109,14 @@ func TestDocument(t *testing.T) {
 		assert.Equal(t, before, after)
 		assert.Nil(t, selected.Get("name"))
 	})
+	t.Run("set all", func(t *testing.T) {
+		c := r.Clone()
+		c.SetAll(map[string]any{
+			"contact.email": gofakeit.Email(),
+		})
+		assert.NotEqual(t, r.Get("contact.email"), c.Get("contact.email"))
+	})
+
 	t.Run("where", func(t *testing.T) {
 		r, err = wolverine.NewDocumentFromAny(&usr)
 		if err != nil {
