@@ -19,6 +19,7 @@ func TestDocument(t *testing.T) {
 		Contact contact `json:"contact"`
 		Name    string  `json:"name"`
 		Age     int     `json:"age"`
+		Enabled bool    `json:"enabled"`
 	}
 	const email = "john.smith@yahoo.com"
 	usr := user{
@@ -43,7 +44,13 @@ func TestDocument(t *testing.T) {
 		assert.Equal(t, usr.Contact.Email, r.Get("contact.email"))
 	})
 	t.Run("get phone", func(t *testing.T) {
-		assert.Equal(t, usr.Contact.Phone, r.Get("contact.phone"))
+		assert.Equal(t, usr.Contact.Phone, r.GetString("contact.phone"))
+	})
+	t.Run("get age", func(t *testing.T) {
+		assert.Equal(t, float64(usr.Age), r.GetFloat("age"))
+	})
+	t.Run("get enabled", func(t *testing.T) {
+		assert.Equal(t, usr.Enabled, r.GetBool("enabled"))
 	})
 	t.Run("merge", func(t *testing.T) {
 		usr2 := user{ID: usr.ID, Contact: contact{Email: gofakeit.Email()}, Name: "john smith"}
@@ -76,6 +83,14 @@ func TestDocument(t *testing.T) {
 	})
 	t.Run("del", func(t *testing.T) {
 		assert.Equal(t, r.Value()["name"], "john smith")
+	})
+	t.Run("bytes", func(t *testing.T) {
+		assert.Equal(t, r.String(), string(r.Bytes()))
+	})
+	t.Run("new from bytes", func(t *testing.T) {
+		n, err := wolverine.NewDocumentFromBytes(r.Bytes())
+		assert.Nil(t, err)
+		assert.Equal(t, r.String(), string(n.Bytes()))
 	})
 	t.Run("select", func(t *testing.T) {
 		before := r.Get("contact.email")
