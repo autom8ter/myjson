@@ -21,8 +21,6 @@ type DB interface {
 
 // System performs internal/system operations against the database
 type System interface {
-	// Config returns the config used to initialize the database
-	Config() Config
 	// ReIndex reindexes the entire database
 	ReIndex(ctx context.Context) error
 	// ReIndex reindexes a specific collection in the database

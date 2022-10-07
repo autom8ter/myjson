@@ -21,10 +21,6 @@ type Migration struct {
 	Function func(ctx context.Context, db DB) error
 }
 
-func (d *db) Config() Config {
-	return d.config
-}
-
 func (d *db) Close(ctx context.Context) error {
 	d.mu.Lock()
 	defer d.mu.Unlock()
