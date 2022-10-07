@@ -149,7 +149,7 @@ func (d *db) IncrementalBackup(ctx context.Context, w io.Writer) error {
 		err  error
 		next uint64
 	)
-	if record.Empty() {
+	if record == nil || record.Empty() {
 		next, err = d.kv.Backup(w, uint64(0))
 		if err != nil {
 			return d.wrapErr(err, "")
@@ -175,7 +175,7 @@ func (d *db) Restore(ctx context.Context, r io.Reader) error {
 
 func (d *db) Migrate(ctx context.Context, migrations []Migration) error {
 	existing, _ := d.Get(ctx, systemCollection, lastMigrationID)
-	if existing.Empty() {
+	if existing == nil || existing.Empty() {
 		existing = NewDocument()
 	}
 	existing.SetID(lastMigrationID)
