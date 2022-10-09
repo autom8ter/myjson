@@ -78,12 +78,22 @@ func (d *db) search(ctx context.Context, collection string, query Query) ([]*Doc
 		if err != nil {
 			return nil, err
 		}
-		data = append(data, record)
+		ok, err := record.Where(query.Where)
+		if err != nil {
+			return nil, err
+		}
+		if ok {
+			data = append(data, record)
+		}
 	}
+	data = orderBy(query.OrderBy, query.Limit, data)
 	if len(query.Select) > 0 {
 		for _, r := range data {
 			r.Select(query.Select)
 		}
+	}
+	if query.Limit > 0 && len(data) > query.Limit {
+		return data[:query.Limit], nil
 	}
 	return data, nil
 }

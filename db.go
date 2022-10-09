@@ -70,14 +70,6 @@ func (d *db) loadCollections(ctx context.Context) error {
 		for _, i := range collection.Indexes {
 			if collection.fullText == nil && i.FullText {
 				indexMapping := bleve.NewIndexMapping()
-				if len(i.Fields) > 0 && i.Fields[0] != "*" {
-					//document := bleve.NewDocumentMapping()
-					//for _, f := range i.Fields {
-					//	disabled := bleve.NewDocumentDisabledMapping()
-					//	document.AddSubDocumentMapping(f, disabled)
-					//}
-					//indexMapping.AddDocumentMapping("index", document)
-				}
 				if d.config.Path == "inmem" {
 					i, err := bleve.NewMemOnly(indexMapping)
 					if err != nil {

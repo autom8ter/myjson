@@ -40,13 +40,13 @@ func (d PrefixIndexRef) GetIndex(value any) string {
 		fields = value
 	default:
 		bits, _ := json.Marshal(value)
-		json.Unmarshal(bits, &fields)
+		if err := json.Unmarshal(bits, &fields); err != nil {
+			panic(err)
+		}
 	}
 	fields, _ = flat.Flatten(fields, nil)
 	var path []string
-	for _, p := range d.initialPrefix {
-		path = append(path, p)
-	}
+	path = append(path, d.initialPrefix...)
 	for _, k := range d.fields {
 		if v, ok := fields[k]; ok {
 			path = append(path, fmt.Sprintf("%s%s", toStringHash(k), toStringHash(v)))

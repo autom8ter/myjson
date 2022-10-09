@@ -46,11 +46,6 @@ const (
 	systemCollection = "system"
 )
 
-// dropIndexes drops all the indexes
-func (d *db) dropIndexes(ctx context.Context) error {
-	return d.kv.DropPrefix([]byte("index."))
-}
-
 // ReIndex locks and then reindexes the database
 func (d *db) ReIndex(ctx context.Context) error {
 	if err := d.loadCollections(ctx); err != nil {
@@ -85,7 +80,7 @@ func (d *db) ReIndex(ctx context.Context) error {
 							return err
 						}
 					} else {
-						d.Delete(ctx, c.Name, r.GetID())
+						_ = d.Delete(ctx, c.Name, r.GetID())
 					}
 				}
 				startAt = results[len(results)-1].GetID()
@@ -123,7 +118,7 @@ func (d *db) ReIndexCollection(ctx context.Context, collection string) error {
 					return err
 				}
 			} else {
-				d.Delete(ctx, collection, r.GetID())
+				_ = d.Delete(ctx, collection, r.GetID())
 			}
 		}
 		startAt = results[len(results)-1].GetID()

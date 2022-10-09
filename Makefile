@@ -4,3 +4,6 @@ test:
 
 bench:
 	@go test -bench=. -benchmem -run=^#
+
+lint:
+	@golangci-lint run

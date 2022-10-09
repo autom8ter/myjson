@@ -51,15 +51,16 @@ Features:
 - [x] query delete
 - [x] logger
 - [x] migrations
+- [x] 80% test coverage
 
 ## Road to Beta
 
 - [ ] decouple kv storage provider
 - [ ] benchmarks
 - [ ] examples
-- [ ] 80% test coverage
 - [ ] views
 - [ ] materialized views
+- [ ] search boosting
 
 ## Beta+ Roadmap
 
