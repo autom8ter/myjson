@@ -204,7 +204,7 @@ func Test(t *testing.T) {
 				assert.Nil(t, err)
 				assert.Equal(t, email, newDoc.Get("contact.email"))
 				assert.Nil(t, db.Update(ctx, "user", newDoc))
-				fetched, err := db.Get(ctx, "user", newDoc.GetID())
+				fetched, err := db.Get(ctx, "user", doc.GetID())
 				assert.Nil(t, err)
 				assert.Equal(t, email, fetched.Get("contact.email"))
 			}
@@ -295,6 +295,22 @@ func Test(t *testing.T) {
 							Field: "contact.email",
 							Op:    wolverine.Term,
 							Value: "colemanword",
+						},
+					},
+					Limit: 100,
+				})
+				assert.Nil(t, err)
+				assert.Equal(t, 1, len(results))
+				assert.EqualValues(t, myEmail, results[0].Get("contact.email"))
+			}
+			{
+				results, err := db.Query(ctx, "user", wolverine.Query{
+					Select: []string{"name", "contact.email"},
+					Where: []wolverine.Where{
+						{
+							Field: "contact.email",
+							Op:    wolverine.Regex,
+							Value: "colemanword*",
 						},
 					},
 					Limit: 100,

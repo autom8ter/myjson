@@ -38,30 +38,35 @@ func (d *db) saveBatch(ctx context.Context, event *Event) error {
 		if current == nil {
 			current = NewDocument()
 		}
-		var bits []byte
-		switch event.Action {
-		case Set:
-			if err := document.Validate(); err != nil {
-				return d.wrapErr(err, "")
-			}
-			bits = document.Bytes()
-		case Update:
-			currentClone := current.Clone()
-			currentClone.Merge(document)
-			bits = currentClone.Bytes()
-		}
 		for _, c := range d.config.Triggers {
 			if err := c(ctx, event.Action, Before, current, document); err != nil {
 				return d.wrapErr(err, "trigger failure")
 			}
 		}
-		valid, err := collect.Validate(document)
-		if err != nil {
-			return d.wrapErr(err, "")
+		var bits []byte
+		switch event.Action {
+		case Set:
+			valid, err := collect.Validate(document)
+			if err != nil {
+				return d.wrapErr(err, "")
+			}
+			if !valid {
+				return fmt.Errorf("%s/%s document has invalid schema", event.Collection, document.GetID())
+			}
+			bits = document.Bytes()
+		case Update:
+			currentClone := current.Clone()
+			currentClone.Merge(document)
+			valid, err := collect.Validate(currentClone)
+			if err != nil {
+				return d.wrapErr(err, "")
+			}
+			if !valid {
+				return fmt.Errorf("%s/%s document has invalid schema", event.Collection, currentClone.GetID())
+			}
+			bits = currentClone.Bytes()
 		}
-		if !valid {
-			return fmt.Errorf("%s/%s document has invalid schema", event.Collection, document.GetID())
-		}
+
 		switch event.Action {
 		case Set, Update:
 			if err := txn.SetEntry(&badger.Entry{
@@ -144,27 +149,35 @@ func (d *db) saveDocument(ctx context.Context, event *Event) error {
 	if current == nil {
 		current = NewDocument()
 	}
-	var bits []byte
-	switch event.Action {
-	case Set:
-		bits = document.Bytes()
-	case Update:
-		currentClone := current.Clone()
-		currentClone.Merge(document)
-		bits = currentClone.Bytes()
-	}
 	for _, t := range d.config.Triggers {
 		if err := t(ctx, event.Action, Before, current, document); err != nil {
 			return d.wrapErr(err, "trigger failure")
 		}
 	}
-	valid, err := collect.Validate(document)
-	if err != nil {
-		return d.wrapErr(err, "")
+	var bits []byte
+	switch event.Action {
+	case Set:
+		valid, err := collect.Validate(document)
+		if err != nil {
+			return d.wrapErr(err, "")
+		}
+		if !valid {
+			return fmt.Errorf("%s/%s document has invalid schema", event.Collection, document.GetID())
+		}
+		bits = document.Bytes()
+	case Update:
+		currentClone := current.Clone()
+		currentClone.Merge(document)
+		valid, err := collect.Validate(currentClone)
+		if err != nil {
+			return d.wrapErr(err, "")
+		}
+		if !valid {
+			return fmt.Errorf("%s/%s document has invalid schema", event.Collection, document.GetID())
+		}
+		bits = currentClone.Bytes()
 	}
-	if !valid {
-		return fmt.Errorf("%s/%s document has invalid schema", event.Collection, document.GetID())
-	}
+
 	return d.kv.Update(func(txn *badger.Txn) error {
 		switch event.Action {
 		case Set, Update:

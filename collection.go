@@ -1,6 +1,9 @@
 package wolverine
 
 import (
+	"fmt"
+	"strings"
+
 	"github.com/blevesearch/bleve"
 	"github.com/xeipuuv/gojsonschema"
 
@@ -37,7 +40,11 @@ func (c *Collection) Validate(doc *Document) (bool, error) {
 		return false, err
 	}
 	if !result.Valid() {
-		return false, nil
+		var errs []string
+		for _, err := range result.Errors() {
+			errs = append(errs, err.String())
+		}
+		return false, fmt.Errorf("%s", strings.Join(errs, ","))
 	}
 	return true, nil
 }

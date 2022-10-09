@@ -17,7 +17,7 @@ type WhereOp string
 // IsSearch returns true if the operator requires full text search
 func (w WhereOp) IsSearch() bool {
 	switch w {
-	case Contains, Fuzzy, Prefix, Term:
+	case Contains, Fuzzy, Prefix, Term, Regex:
 		return true
 	default:
 		return false
@@ -25,29 +25,32 @@ func (w WhereOp) IsSearch() bool {
 }
 
 const (
-	// PrefixOp is a full text search type for finding records based on prefix matching. full text search operators can only be used
+	// Prefix is a full text search type for finding records based on prefix matching. full text search operators can only be used
 	// against collections that have full text search enabled
 	Prefix WhereOp = "prefix"
-	// ContainsOp full text search type for finding records based on contains matching. full text search operators can only be used
+	// Contains full text search type for finding records based on contains matching. full text search operators can only be used
 	// against collections that have full text search enabled
 	Contains WhereOp = "contains"
-	// TermOp full text search type for finding records based on term matching. full text search operators can only be used
+	// Term full text search type for finding records based on term matching. full text search operators can only be used
 	// against collections that have full text search enabled
 	Term WhereOp = "term"
-	// FuzzyOp full text search type for finding records based on a fuzzy search. full text search operators can only be used
+	// Fuzzy full text search type for finding records based on a fuzzy search. full text search operators can only be used
 	// against collections that have full text search enabled
 	Fuzzy WhereOp = "fuzzy"
-	// EqOp matches on equality
+	// Regex full text search type for finding records based on a regex matching. full text search operators can only be used
+	// against collections that have full text search enabled
+	Regex WhereOp = "regex"
+	// Eq matches on equality
 	Eq WhereOp = "eq"
-	// NeqOp matches on inequality
+	// Neq matches on inequality
 	Neq WhereOp = "neq"
-	// GtOp matches on greater than
+	// Gt matches on greater than
 	Gt WhereOp = "gt"
-	// GteOp matches on greater than or equal to
+	// Gte matches on greater than or equal to
 	Gte WhereOp = "gte"
-	// LtOp matches on less than
+	// Lt matches on less than
 	Lt WhereOp = "lt"
-	// LteOp matches on greater than or equal to
+	// Lte matches on greater than or equal to
 	Lte WhereOp = "lte"
 )
 
