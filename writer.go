@@ -26,13 +26,6 @@ func (d *db) saveBatch(ctx context.Context, event *Event) error {
 		if err := document.Validate(); err != nil {
 			return d.wrapErr(err, "")
 		}
-		valid, err := collect.Validate(document)
-		if err != nil {
-			return d.wrapErr(err, "")
-		}
-		if !valid {
-			return fmt.Errorf("%s/%s document has invalid schema", event.Collection, document.GetID())
-		}
 	}
 	txn := d.kv.NewWriteBatch()
 	var batch *bleve.Batch
@@ -61,6 +54,13 @@ func (d *db) saveBatch(ctx context.Context, event *Event) error {
 			if err := c(ctx, event.Action, Before, current, document); err != nil {
 				return d.wrapErr(err, "trigger failure")
 			}
+		}
+		valid, err := collect.Validate(document)
+		if err != nil {
+			return d.wrapErr(err, "")
+		}
+		if !valid {
+			return fmt.Errorf("%s/%s document has invalid schema", event.Collection, document.GetID())
 		}
 		switch event.Action {
 		case Set, Update:
@@ -144,37 +144,26 @@ func (d *db) saveDocument(ctx context.Context, event *Event) error {
 	if current == nil {
 		current = NewDocument()
 	}
-
 	var bits []byte
 	switch event.Action {
 	case Set:
-		valid, err := collect.Validate(document)
-		if err != nil {
-			return d.wrapErr(err, "")
-		}
-		if !valid {
-			return fmt.Errorf("%s/%s document has invalid schema", event.Collection, document.GetID())
-		}
 		bits = document.Bytes()
 	case Update:
 		currentClone := current.Clone()
 		currentClone.Merge(document)
-		if err := currentClone.Validate(); err != nil {
-			return d.wrapErr(err, "")
-		}
-		valid, err := collect.Validate(currentClone)
-		if err != nil {
-			return d.wrapErr(err, "")
-		}
-		if !valid {
-			return fmt.Errorf("%s/%s document has invalid schema", event.Collection, currentClone.GetID())
-		}
 		bits = currentClone.Bytes()
 	}
 	for _, t := range d.config.Triggers {
 		if err := t(ctx, event.Action, Before, current, document); err != nil {
 			return d.wrapErr(err, "trigger failure")
 		}
+	}
+	valid, err := collect.Validate(document)
+	if err != nil {
+		return d.wrapErr(err, "")
+	}
+	if !valid {
+		return fmt.Errorf("%s/%s document has invalid schema", event.Collection, document.GetID())
 	}
 	return d.kv.Update(func(txn *badger.Txn) error {
 		switch event.Action {
