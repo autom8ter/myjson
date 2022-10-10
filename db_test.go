@@ -214,6 +214,8 @@ func Test(t *testing.T) {
 		assert.Nil(t, testDB(defaultCollections, func(ctx context.Context, db wolverine.DB) {
 			record := newUserDoc()
 			record.Set("contact.email", myEmail)
+			record.Set("account_id", 1)
+			record.Set("language", "english")
 			assert.Nil(t, db.Set(ctx, "user", record))
 			for i := 0; i < 3; i++ {
 				assert.Nil(t, db.Set(ctx, "user", newUserDoc()))
@@ -222,6 +224,16 @@ func Test(t *testing.T) {
 				results, err := db.Search(ctx, "user", wolverine.SearchQuery{
 					Select: []string{"name", "contact.email"},
 					Where: []wolverine.SearchWhere{
+						{
+							Field: "account_id",
+							Op:    wolverine.Numeric,
+							Value: 1,
+						},
+						{
+							Field: "language",
+							Op:    wolverine.Match,
+							Value: "english",
+						},
 						{
 							Field: "contact.email",
 							Op:    wolverine.Prefix,

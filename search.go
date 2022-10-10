@@ -6,6 +6,7 @@ import (
 
 	"github.com/blevesearch/bleve"
 	"github.com/blevesearch/bleve/search/query"
+	"github.com/samber/lo"
 	"github.com/spf13/cast"
 )
 
@@ -27,7 +28,9 @@ const (
 	Fuzzy SearchOp = "fuzzy"
 	// Regex full text search type for finding records based on a regex matching. full text search operators can only be used
 	// against collections that have full text search enabled
-	Regex SearchOp = "regex"
+	Regex   SearchOp = "regex"
+	Match   SearchOp = "match"
+	Numeric SearchOp = "numeric"
 )
 
 // Where is field-level filter for database queries
@@ -74,6 +77,20 @@ func (d *db) Search(ctx context.Context, collection string, q SearchQuery) ([]*D
 	var queries []query.Query
 	for _, where := range q.Where {
 		switch where.Op {
+		case Numeric:
+			qry := bleve.NewNumericRangeQuery(lo.ToPtr(cast.ToFloat64(where.Value)), nil)
+			if where.Boost > 0 {
+				qry.SetBoost(where.Boost)
+			}
+			qry.SetField(where.Field)
+			queries = append(queries, qry)
+		case Match:
+			qry := bleve.NewMatchQuery(cast.ToString(where.Value))
+			if where.Boost > 0 {
+				qry.SetBoost(where.Boost)
+			}
+			qry.SetField(where.Field)
+			queries = append(queries, qry)
 		case Term:
 			qry := bleve.NewTermQuery(cast.ToString(where.Value))
 			if where.Boost > 0 {
