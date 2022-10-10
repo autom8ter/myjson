@@ -177,9 +177,6 @@ func (d *Document) SetID(id string) {
 // Where executes the where clauses against the document and returns true if it passes the clauses
 func (d *Document) Where(wheres []Where) (bool, error) {
 	for _, w := range wheres {
-		if w.Op.IsSearch() {
-			continue
-		}
 		switch w.Op {
 		case "==", Eq:
 			if w.Value != d.Get(w.Field) {
