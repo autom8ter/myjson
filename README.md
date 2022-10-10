@@ -60,7 +60,7 @@ Features:
 - [ ] examples
 - [ ] views
 - [ ] materialized views
-- [ ] search boosting
+- [ ] search boostingc
 
 ## Beta+ Roadmap
 

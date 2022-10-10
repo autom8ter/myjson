@@ -14,32 +14,7 @@ import (
 // WhereOp is an operator used to compare a value to a records field value in a where clause
 type WhereOp string
 
-// IsSearch returns true if the operator requires full text search
-func (w WhereOp) IsSearch() bool {
-	switch w {
-	case Contains, Fuzzy, Prefix, Term, Regex:
-		return true
-	default:
-		return false
-	}
-}
-
 const (
-	// Prefix is a full text search type for finding records based on prefix matching. full text search operators can only be used
-	// against collections that have full text search enabled
-	Prefix WhereOp = "prefix"
-	// Contains full text search type for finding records based on contains matching. full text search operators can only be used
-	// against collections that have full text search enabled
-	Contains WhereOp = "contains"
-	// Term full text search type for finding records based on term matching. full text search operators can only be used
-	// against collections that have full text search enabled
-	Term WhereOp = "term"
-	// Fuzzy full text search type for finding records based on a fuzzy search. full text search operators can only be used
-	// against collections that have full text search enabled
-	Fuzzy WhereOp = "fuzzy"
-	// Regex full text search type for finding records based on a regex matching. full text search operators can only be used
-	// against collections that have full text search enabled
-	Regex WhereOp = "regex"
 	// Eq matches on equality
 	Eq WhereOp = "eq"
 	// Neq matches on inequality
@@ -80,21 +55,20 @@ type OrderBy struct {
 	Direction OrderByDirection `json:"direction"`
 }
 
-// Query is a query against the NOSQL database
+// Query is a query against the NOSQL database - it does not support full text search
 type Query struct {
-	Select  []string `json:"select"`
-	Where   []Where  `json:"where"`
-	StartAt string   `json:"start_at"`
-	Limit   int      `json:"limit"`
-	OrderBy OrderBy  `json:"order_by"`
+	// Select is a list of fields to select from each record in the datbase(optional)
+	Select []string `json:"select"`
+	// Where is a list of where clauses used to filter records
+	Where   []Where `json:"where"`
+	StartAt string  `json:"start_at"`
+	Limit   int     `json:"limit"`
+	OrderBy OrderBy `json:"order_by"`
 }
 
 func (d *db) Query(ctx context.Context, collection string, query Query) ([]*Document, error) {
 	if _, ok := d.getInmemCollection(collection); !ok {
 		return nil, d.wrapErr(fmt.Errorf("unsupported collection: %s", collection), "")
-	}
-	if d.isSearchQuery(collection, query) {
-		return d.search(ctx, collection, query)
 	}
 	prefix := d.getQueryPrefix(collection, query.Where)
 	var documents []*Document

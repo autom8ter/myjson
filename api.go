@@ -47,6 +47,8 @@ type System interface {
 
 // Reader performs read operations against the database
 type Reader interface {
+	// Search executes a full text search query against the database
+	Search(ctx context.Context, collection string, q SearchQuery) ([]*Document, error)
 	// Query queries the database for a list of documents
 	Query(ctx context.Context, collection string, query Query) ([]*Document, error)
 	// Get gets a single record from the database

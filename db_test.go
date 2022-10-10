@@ -219,9 +219,9 @@ func Test(t *testing.T) {
 				assert.Nil(t, db.Set(ctx, "user", newUserDoc()))
 			}
 			{
-				results, err := db.Query(ctx, "user", wolverine.Query{
+				results, err := db.Search(ctx, "user", wolverine.SearchQuery{
 					Select: []string{"name", "contact.email"},
-					Where: []wolverine.Where{
+					Where: []wolverine.SearchWhere{
 						{
 							Field: "contact.email",
 							Op:    wolverine.Prefix,
@@ -236,34 +236,18 @@ func Test(t *testing.T) {
 			}
 
 			{
-				results, err := db.Query(ctx, "user", wolverine.Query{
+				results, err := db.Search(ctx, "user", wolverine.SearchQuery{
 					Select: []string{"name", "contact.email"},
-					Where: []wolverine.Where{
+					Where: []wolverine.SearchWhere{
 						{
 							Field: "contact.email",
-							Op:    wolverine.Contains,
-							Value: "colemanword",
+							Op:    wolverine.Wildcard,
+							Value: "colemanword*",
 						},
 						{
 							Field: "name",
-							Op:    wolverine.Contains,
-							Value: "colemanword",
-						},
-					},
-					Limit: 100,
-				})
-				assert.Nil(t, err)
-				assert.Equal(t, 1, len(results))
-				assert.EqualValues(t, myEmail, results[0].Get("contact.email"))
-			}
-			{
-				results, err := db.Query(ctx, "user", wolverine.Query{
-					Select: []string{"name", "contact.email"},
-					Where: []wolverine.Where{
-						{
-							Field: "search(age)",
-							Op:    wolverine.Contains,
-							Value: "colemanword",
+							Op:    wolverine.Wildcard,
+							Value: "colemanword*",
 						},
 					},
 					Limit: 100,
@@ -272,9 +256,24 @@ func Test(t *testing.T) {
 				assert.Equal(t, 0, len(results))
 			}
 			{
-				results, err := db.Query(ctx, "user", wolverine.Query{
+				results, err := db.Search(ctx, "user", wolverine.SearchQuery{
 					Select: []string{"name", "contact.email"},
-					Where: []wolverine.Where{
+					Where: []wolverine.SearchWhere{
+						{
+							Field: "search(age)",
+							Op:    wolverine.Wildcard,
+							Value: "colemanword*",
+						},
+					},
+					Limit: 100,
+				})
+				assert.Nil(t, err)
+				assert.Equal(t, 0, len(results))
+			}
+			{
+				results, err := db.Search(ctx, "user", wolverine.SearchQuery{
+					Select: []string{"name", "contact.email"},
+					Where: []wolverine.SearchWhere{
 						{
 							Field: "contact.email",
 							Op:    wolverine.Fuzzy,
@@ -288,9 +287,9 @@ func Test(t *testing.T) {
 				assert.EqualValues(t, myEmail, results[0].Get("contact.email"))
 			}
 			{
-				results, err := db.Query(ctx, "user", wolverine.Query{
+				results, err := db.Search(ctx, "user", wolverine.SearchQuery{
 					Select: []string{"name", "contact.email"},
-					Where: []wolverine.Where{
+					Where: []wolverine.SearchWhere{
 						{
 							Field: "contact.email",
 							Op:    wolverine.Term,
@@ -304,9 +303,9 @@ func Test(t *testing.T) {
 				assert.EqualValues(t, myEmail, results[0].Get("contact.email"))
 			}
 			{
-				results, err := db.Query(ctx, "user", wolverine.Query{
+				results, err := db.Search(ctx, "user", wolverine.SearchQuery{
 					Select: []string{"name", "contact.email"},
-					Where: []wolverine.Where{
+					Where: []wolverine.SearchWhere{
 						{
 							Field: "contact.email",
 							Op:    wolverine.Regex,
@@ -548,18 +547,16 @@ func Benchmark(b *testing.B) {
 			}
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				results, err := db.Query(ctx, "user", wolverine.Query{
+				results, err := db.Search(ctx, "user", wolverine.SearchQuery{
 					Select: nil,
-					Where: []wolverine.Where{
+					Where: []wolverine.SearchWhere{
 						{
 							Field: "contact.email",
 							Op:    wolverine.Prefix,
 							Value: "colemanword",
 						},
 					},
-					StartAt: "",
-					Limit:   1000,
-					OrderBy: wolverine.OrderBy{},
+					Limit: 1000,
 				})
 				if err != nil {
 					b.Fatal(err)
