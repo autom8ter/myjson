@@ -3,7 +3,11 @@ package wolverine
 import (
 	"context"
 	"fmt"
+	"io/fs"
+	"os"
+	"sort"
 	"sync"
+	"time"
 
 	"github.com/autom8ter/machine/v4"
 	"github.com/blevesearch/bleve"
@@ -44,7 +48,7 @@ func New(ctx context.Context, cfg Config) (DB, error) {
 		collections: sync.Map{},
 		machine:     machine.New(),
 	}
-	if err := d.loadFullText(); err != nil {
+	if err := d.loadFullText(false); err != nil {
 		return nil, err
 	}
 	if err := d.loadCollections(ctx); err != nil {
@@ -63,22 +67,33 @@ func New(ctx context.Context, cfg Config) (DB, error) {
 	return d, nil
 }
 
-func (d *db) loadFullText() error {
+func (d *db) loadFullText(reload bool) error {
+	d.mu.Lock()
+	defer d.mu.Unlock()
 	indexMapping := bleve.NewIndexMapping()
 	indexMapping.TypeField = "_collection"
-	if d.config.Path == "inmem" {
+
+	switch {
+	case d.config.Path == "inmem":
 		i, err := bleve.NewMemOnly(indexMapping)
 		if err != nil {
 			return stacktrace.Propagate(err, "")
 		}
 		d.fullText = bleve.NewIndexAlias(i)
-	} else {
-		path := fmt.Sprintf("%s/search/index.db", d.config.Path)
-		i, err := bleve.Open(path)
+	case reload:
+		path := fmt.Sprintf("%s/search/index_%v.db", d.config.Path, time.Now().Unix())
+		i, err := bleve.New(path, indexMapping)
+		if err != nil {
+			return stacktrace.Propagate(err, "")
+		}
+		d.fullText = bleve.NewIndexAlias(i)
+	default:
+		lastPath := d.getLastPath()
+		i, err := bleve.Open(lastPath)
 		if err == nil {
 			d.fullText = bleve.NewIndexAlias(i)
 		} else {
-			i, err = bleve.New(path, indexMapping)
+			i, err = bleve.New(lastPath, indexMapping)
 			if err != nil {
 				return stacktrace.Propagate(err, "")
 			}
@@ -86,6 +101,22 @@ func (d *db) loadFullText() error {
 		}
 	}
 	return nil
+}
+
+func (d *db) getLastPath() string {
+	fileSystem := os.DirFS(fmt.Sprintf("%s/search", d.config.Path))
+	var paths []string
+	if err := fs.WalkDir(fileSystem, ".", func(path string, d fs.DirEntry, err error) error {
+		if d.IsDir() {
+			return nil
+		}
+		paths = append(paths, path)
+		return nil
+	}); err != nil {
+		panic(err)
+	}
+	sort.Strings(paths)
+	return paths[len(paths)-1]
 }
 
 func (d *db) loadCollections(ctx context.Context) error {

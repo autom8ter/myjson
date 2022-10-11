@@ -46,6 +46,9 @@ const (
 
 // ReIndex locks and then reindexes the database
 func (d *db) ReIndex(ctx context.Context) error {
+	if err := d.loadFullText(true); err != nil {
+		return err
+	}
 	if err := d.loadCollections(ctx); err != nil {
 		return stacktrace.Propagate(err, "")
 	}
@@ -91,6 +94,10 @@ func (d *db) ReIndexCollection(ctx context.Context, collection string) error {
 	//if err := d.dropIndexes(ctx); err != nil {
 	//	return err
 	//}
+	if err := d.loadFullText(true); err != nil {
+		return stacktrace.Propagate(err, "")
+	}
+
 	var startAt string
 	for {
 		results, err := d.Query(ctx, collection, Query{

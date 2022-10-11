@@ -556,8 +556,8 @@ func Benchmark(b *testing.B) {
 					Where: []wolverine.SearchWhere{
 						{
 							Field: "contact.email",
-							Op:    wolverine.Prefix,
-							Value: "colemanword",
+							Op:    wolverine.Basic,
+							Value: myEmail,
 						},
 					},
 					Limit: 1000,
