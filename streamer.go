@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/autom8ter/machine/v4"
+	"github.com/palantir/stacktrace"
 )
 
 func (d *db) ChangeStream(ctx context.Context, collections []string, fn ChangeStreamHandler) error {
@@ -26,5 +27,5 @@ func (d *db) ChangeStream(ctx context.Context, collections []string, fn ChangeSt
 			})
 		})
 	}
-	return d.wrapErr(m.Wait(), "")
+	return stacktrace.Propagate(m.Wait(), "")
 }

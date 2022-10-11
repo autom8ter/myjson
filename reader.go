@@ -6,6 +6,7 @@ import (
 	"sort"
 
 	"github.com/dgraph-io/badger/v3"
+	"github.com/palantir/stacktrace"
 	"github.com/tidwall/gjson"
 
 	"github.com/autom8ter/wolverine/internal/prefix"
@@ -67,8 +68,10 @@ type Query struct {
 }
 
 func (d *db) Query(ctx context.Context, collection string, query Query) ([]*Document, error) {
-	if _, ok := d.getInmemCollection(collection); !ok {
-		return nil, d.wrapErr(fmt.Errorf("unsupported collection: %s", collection), "")
+	if collection != systemCollection {
+		if _, ok := d.getInmemCollection(collection); !ok {
+			return nil, stacktrace.Propagate(fmt.Errorf("unsupported collection: %s must be one of: %v", collection, d.collectionNames()), "")
+		}
 	}
 	prefix := d.getQueryPrefix(collection, query.Where)
 	var documents []*Document
@@ -93,15 +96,15 @@ func (d *db) Query(ctx context.Context, collection string, query Query) ([]*Docu
 			err := item.Value(func(bits []byte) error {
 				document, err := NewDocumentFromBytes(bits)
 				if err != nil {
-					return d.wrapErr(err, "")
+					return stacktrace.Propagate(err, "")
 				}
 				pass, err := document.Where(query.Where)
 				if err != nil {
-					return d.wrapErr(err, "")
+					return stacktrace.Propagate(err, "")
 				}
 				if pass {
 					if err := document.Validate(); err != nil {
-						return d.wrapErr(err, "")
+						return stacktrace.Propagate(err, "")
 					}
 					documents = append(documents, document)
 					documents = orderBy(query.OrderBy, query.Limit, documents)
@@ -109,7 +112,7 @@ func (d *db) Query(ctx context.Context, collection string, query Query) ([]*Docu
 				return nil
 			})
 			if err != nil {
-				return d.wrapErr(err, "")
+				return stacktrace.Propagate(err, "")
 			}
 			it.Next()
 		}
@@ -131,7 +134,7 @@ func (d *db) Query(ctx context.Context, collection string, query Query) ([]*Docu
 
 func (d *db) Get(ctx context.Context, collection, id string) (*Document, error) {
 	if _, ok := d.getInmemCollection(collection); !ok {
-		return nil, d.wrapErr(fmt.Errorf("unsupported collection: %s", collection), "")
+		return nil, stacktrace.Propagate(fmt.Errorf("unsupported collection: %s must be one of: %v", collection, d.collectionNames()), "")
 	}
 	var (
 		document *Document
@@ -140,11 +143,11 @@ func (d *db) Get(ctx context.Context, collection, id string) (*Document, error) 
 	if err := d.kv.View(func(txn *badger.Txn) error {
 		item, err := txn.Get([]byte(prefix.PrimaryKey(collection, id)))
 		if err != nil {
-			return d.wrapErr(err, "")
+			return stacktrace.Propagate(err, "")
 		}
 		return item.Value(func(val []byte) error {
 			document, err = NewDocumentFromBytes(val)
-			return d.wrapErr(err, "")
+			return stacktrace.Propagate(err, "")
 		})
 	}); err != nil {
 		return document, err
@@ -154,24 +157,24 @@ func (d *db) Get(ctx context.Context, collection, id string) (*Document, error) 
 
 func (d *db) GetAll(ctx context.Context, collection string, ids []string) ([]*Document, error) {
 	if _, ok := d.getInmemCollection(collection); !ok {
-		return nil, d.wrapErr(fmt.Errorf("unsupported collection: %s", collection), "")
+		return nil, stacktrace.Propagate(fmt.Errorf("unsupported collection: %s must be one of: %v", collection, d.collectionNames()), "")
 	}
 	var documents []*Document
 	if err := d.kv.View(func(txn *badger.Txn) error {
 		for _, id := range ids {
 			item, err := txn.Get([]byte(prefix.PrimaryKey(collection, id)))
 			if err != nil {
-				return d.wrapErr(err, "")
+				return stacktrace.Propagate(err, "")
 			}
 			if err := item.Value(func(val []byte) error {
 				document, err := NewDocumentFromBytes(val)
 				if err != nil {
-					return d.wrapErr(err, "")
+					return stacktrace.Propagate(err, "")
 				}
 				documents = append(documents, document)
 				return nil
 			}); err != nil {
-				return d.wrapErr(err, "")
+				return stacktrace.Propagate(err, "")
 			}
 		}
 		return nil

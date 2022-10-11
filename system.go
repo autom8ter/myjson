@@ -11,9 +11,13 @@ import (
 	"github.com/hashicorp/go-multierror"
 	"github.com/palantir/stacktrace"
 	"github.com/spf13/cast"
-	"github.com/xeipuuv/gojsonschema"
 	"golang.org/x/sync/errgroup"
 )
+
+type sysRecord struct {
+	ID         string                 `json:"_id"`
+	Properties map[string]interface{} `json:"properties"`
+}
 
 // Migration is an atomic database migration
 type Migration struct {
@@ -35,9 +39,9 @@ func (d *db) Close(ctx context.Context) error {
 	err = multierror.Append(err, d.kv.Sync())
 	err = multierror.Append(err, d.kv.Close())
 	if err, ok := err.(*multierror.Error); ok && len(err.Errors) > 0 {
-		return d.wrapErr(err, "")
+		return stacktrace.Propagate(err, "")
 	}
-	return d.wrapErr(err, "")
+	return stacktrace.Propagate(err, "")
 }
 
 const (
@@ -49,7 +53,7 @@ const (
 // ReIndex locks and then reindexes the database
 func (d *db) ReIndex(ctx context.Context) error {
 	if err := d.loadCollections(ctx); err != nil {
-		return d.wrapErr(err, "")
+		return stacktrace.Propagate(err, "")
 	}
 	//if err := d.dropIndexes(ctx); err != nil {
 	//	return err
@@ -68,7 +72,7 @@ func (d *db) ReIndex(ctx context.Context) error {
 					OrderBy: OrderBy{},
 				})
 				if err != nil {
-					return d.wrapErr(err, "")
+					return stacktrace.Propagate(err, "")
 				}
 				if len(results) == 0 {
 					break
@@ -106,7 +110,7 @@ func (d *db) ReIndexCollection(ctx context.Context, collection string) error {
 			OrderBy: OrderBy{},
 		})
 		if err != nil {
-			return d.wrapErr(err, "")
+			return stacktrace.Propagate(err, "")
 		}
 		if len(results) == 0 {
 			break
@@ -123,13 +127,13 @@ func (d *db) ReIndexCollection(ctx context.Context, collection string) error {
 		}
 		startAt = results[len(results)-1].GetID()
 	}
-	return d.wrapErr(d.loadCollections(ctx), "")
+	return stacktrace.Propagate(d.loadCollections(ctx), "")
 }
 
 func (d *db) Backup(ctx context.Context, w io.Writer) error {
 	_, err := d.kv.Backup(w, 0)
 	if err != nil {
-		return d.wrapErr(err, "")
+		return stacktrace.Propagate(err, "")
 	}
 	return nil
 }
@@ -143,48 +147,49 @@ func (d *db) IncrementalBackup(ctx context.Context, w io.Writer) error {
 	if record == nil || record.Empty() {
 		next, err = d.kv.Backup(w, uint64(0))
 		if err != nil {
-			return d.wrapErr(err, "")
+			return stacktrace.Propagate(err, "")
 		}
+		record = NewDocument()
+		record.SetID(lastBackupID)
 	} else {
-		next, err = d.kv.Backup(w, cast.ToUint64(record.Get("version")))
+		next, err = d.kv.Backup(w, cast.ToUint64(record.Get("properties.version")))
 		if err != nil {
-			return d.wrapErr(err, "")
+			return stacktrace.Propagate(err, "")
 		}
 	}
-	r := NewDocument()
-	r.SetID("last_backup")
-	r.Set("version", int(next))
-	return d.Set(ctx, systemCollection, r)
+	record.Set("properties.version", int(next))
+	return d.Set(ctx, systemCollection, record)
 }
 
 func (d *db) Restore(ctx context.Context, r io.Reader) error {
 	if err := d.kv.Load(r, 256); err != nil {
-		return d.wrapErr(err, "")
+		return stacktrace.Propagate(err, "")
 	}
-	return d.wrapErr(d.ReIndex(ctx), "")
+	return stacktrace.Propagate(d.ReIndex(ctx), "")
 }
 
 func (d *db) Migrate(ctx context.Context, migrations []Migration) error {
 	existing, _ := d.Get(ctx, systemCollection, lastMigrationID)
 	if existing == nil || existing.Empty() {
 		existing = NewDocument()
+		existing.SetID(lastMigrationID)
 	}
-	existing.SetID(lastMigrationID)
-	version := cast.ToInt(existing.Get("version"))
+
+	version := cast.ToInt(existing.Get("properties.version"))
 	for i, migration := range migrations[version:] {
 		now := time.Now()
 		if err := migration.Function(ctx, d); err != nil {
 			if derr := d.Set(ctx, systemCollection, existing); derr != nil {
 				return derr
 			}
-			return d.wrapErr(err, "")
+			return stacktrace.Propagate(err, "")
 		}
-		existing.Set("version", i+1)
-		existing.Set("name", migration.Name)
-		existing.Set("processing_time", time.Since(now).String())
+		existing.Set("properties.version", i+1)
+		existing.Set("properties.name", migration.Name)
+		existing.Set("properties.processing_time", time.Since(now).String())
 	}
 	if err := d.Set(ctx, systemCollection, existing); err != nil {
-		return d.wrapErr(err, "")
+		return stacktrace.Propagate(err, "")
 	}
 	return nil
 }
@@ -195,16 +200,9 @@ func (d *db) GetCollection(ctx context.Context, collection string) (*Collection,
 	if err != nil {
 		return nil, err
 	}
-	var c = &Collection{}
-	if err := existing.ScanJSON(c); err != nil {
-		return nil, d.wrapErr(err, "")
-	}
-	if c.JSONSchema != "" {
-		schema, err := gojsonschema.NewSchema(gojsonschema.NewStringLoader(c.JSONSchema))
-		if err != nil {
-			return nil, stacktrace.Propagate(err, "")
-		}
-		c.loadedSchema = schema
+	c, err := LoadCollection(cast.ToString(existing.Get("properties.schema")))
+	if err != nil {
+		return nil, stacktrace.Propagate(err, "")
 	}
 	return c, nil
 }
@@ -213,7 +211,7 @@ func (d *db) GetCollections(ctx context.Context) ([]*Collection, error) {
 	var collections []*Collection
 	results, err := d.Query(ctx, systemCollection, Query{Limit: 1000})
 	if err != nil {
-		return nil, d.wrapErr(err, "")
+		return nil, stacktrace.Propagate(err, "")
 	}
 	for _, result := range results {
 		if strings.HasPrefix(result.GetID(), "collections.") {
@@ -221,16 +219,9 @@ func (d *db) GetCollections(ctx context.Context) ([]*Collection, error) {
 			if err != nil {
 				return nil, err
 			}
-			var c = &Collection{}
-			if err := existing.ScanJSON(c); err != nil {
-				return nil, d.wrapErr(err, "")
-			}
-			if c.JSONSchema != "" {
-				schema, err := gojsonschema.NewSchema(gojsonschema.NewStringLoader(c.JSONSchema))
-				if err != nil {
-					return nil, stacktrace.Propagate(err, "")
-				}
-				c.loadedSchema = schema
+			c, err := LoadCollection(cast.ToString(existing.Get("properties.schema")))
+			if err != nil {
+				return nil, stacktrace.Propagate(err, "")
 			}
 			collections = append(collections, c)
 		}
@@ -248,21 +239,18 @@ func (d *db) SetCollection(ctx context.Context, collection *Collection) error {
 		existing = NewDocument()
 		existing.SetID(id)
 	}
-	newDoc, err := NewDocumentFromAny(collection)
-	if err != nil {
-		return d.wrapErr(err, "")
-	}
-
-	existing.SetAll(newDoc.Value())
+	existing.Set("properties", map[string]interface{}{
+		"schema": collection.Schema,
+	})
 
 	if err := d.Set(ctx, systemCollection, existing); err != nil {
-		return d.wrapErr(err, "")
+		return stacktrace.Propagate(err, "")
 	}
 	d.collections.Store(collection.Collection(), collection)
-	if err := d.wrapErr(d.loadCollections(ctx), ""); err != nil {
-		return err
+	if err := d.loadCollections(ctx); err != nil {
+		return stacktrace.Propagate(err, "")
 	}
-	return d.ReIndexCollection(ctx, collection.Collection())
+	return stacktrace.Propagate(d.ReIndexCollection(ctx, collection.Collection()), "")
 }
 
 func (d *db) SetCollections(ctx context.Context, collections []*Collection) error {
@@ -273,7 +261,7 @@ func (d *db) SetCollections(ctx context.Context, collections []*Collection) erro
 			return d.SetCollection(ctx, c)
 		})
 	}
-	return d.wrapErr(m.Wait(), "")
+	return stacktrace.Propagate(m.Wait(), "")
 }
 
 var systemCollectionSchema = `
@@ -281,6 +269,7 @@ var systemCollectionSchema = `
   "$id": "https://wolverine.io/system.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "System",
+  "collection": "system",
   "type": "object",
   "required": [
     "_id",

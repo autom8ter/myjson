@@ -4,6 +4,7 @@
   "title": "User",
   "collection": "user",
   "type": "object",
+  "full_text": true,
   "indexes": [
     {
       "fields": [

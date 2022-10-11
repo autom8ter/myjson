@@ -7,6 +7,7 @@ import (
 	"github.com/autom8ter/machine/v4"
 	"github.com/blevesearch/bleve"
 	"github.com/dgraph-io/badger/v3"
+	"github.com/palantir/stacktrace"
 
 	"github.com/autom8ter/wolverine/internal/prefix"
 )
@@ -20,11 +21,12 @@ func (d *db) saveBatch(ctx context.Context, event *Event) error {
 	}
 	collect, ok := d.getInmemCollection(event.Collection)
 	if !ok {
-		return d.wrapErr(fmt.Errorf("unsupported collection: %s", event.Collection), "")
+		return stacktrace.Propagate(fmt.Errorf("unsupported collection: %s must be one of: %v", event.Collection, d.collectionNames()), "")
 	}
 	for _, document := range event.Documents {
+		document.Set("_collection", event.Collection)
 		if err := document.Validate(); err != nil {
-			return d.wrapErr(err, "")
+			return stacktrace.Propagate(err, "")
 		}
 	}
 	txn := d.kv.NewWriteBatch()
@@ -39,7 +41,7 @@ func (d *db) saveBatch(ctx context.Context, event *Event) error {
 		}
 		for _, c := range d.config.Triggers {
 			if err := c(ctx, event.Action, Before, current, document); err != nil {
-				return d.wrapErr(err, "trigger failure")
+				return stacktrace.Propagate(err, "trigger failure")
 			}
 		}
 		var bits []byte
@@ -47,7 +49,7 @@ func (d *db) saveBatch(ctx context.Context, event *Event) error {
 		case Set:
 			valid, err := collect.Validate(document)
 			if err != nil {
-				return d.wrapErr(err, "")
+				return stacktrace.Propagate(err, "")
 			}
 			if !valid {
 				return fmt.Errorf("%s/%s document has invalid schema", event.Collection, document.GetID())
@@ -58,7 +60,7 @@ func (d *db) saveBatch(ctx context.Context, event *Event) error {
 			currentClone.Merge(document)
 			valid, err := collect.Validate(currentClone)
 			if err != nil {
-				return d.wrapErr(err, "")
+				return stacktrace.Propagate(err, "")
 			}
 			if !valid {
 				return fmt.Errorf("%s/%s document has invalid schema", event.Collection, currentClone.GetID())
@@ -72,13 +74,13 @@ func (d *db) saveBatch(ctx context.Context, event *Event) error {
 				Key:   []byte(prefix.PrimaryKey(event.Collection, document.GetID())),
 				Value: bits,
 			}); err != nil {
-				return d.wrapErr(err, "")
+				return stacktrace.Propagate(err, "")
 			}
 			for _, idx := range collect.Indexes() {
 				pindex := idx.prefix(event.Collection)
 				if current != nil {
 					if err := txn.Delete([]byte(pindex.GetIndex(current.Value()))); err != nil {
-						return d.wrapErr(err, "")
+						return stacktrace.Propagate(err, "")
 					}
 				}
 				i := pindex.GetIndex(document.Value())
@@ -86,23 +88,23 @@ func (d *db) saveBatch(ctx context.Context, event *Event) error {
 					Key:   []byte(i),
 					Value: bits,
 				}); err != nil {
-					return d.wrapErr(err, "")
+					return stacktrace.Propagate(err, "")
 				}
 			}
 			if batch != nil {
 				if err := batch.Index(document.GetID(), document.Value()); err != nil {
-					return d.wrapErr(err, "")
+					return stacktrace.Propagate(err, "")
 				}
 			}
 		case Delete:
 			for _, i := range collect.Indexes() {
 				pindex := i.prefix(event.Collection)
 				if err := txn.Delete([]byte(pindex.GetIndex(current.Value()))); err != nil {
-					return d.wrapErr(err, "")
+					return stacktrace.Propagate(err, "")
 				}
 			}
 			if err := txn.Delete([]byte(prefix.PrimaryKey(event.Collection, current.GetID()))); err != nil {
-				return d.wrapErr(err, "")
+				return stacktrace.Propagate(err, "")
 			}
 			if batch != nil {
 				batch.Delete(document.GetID())
@@ -110,17 +112,17 @@ func (d *db) saveBatch(ctx context.Context, event *Event) error {
 		}
 		for _, t := range d.config.Triggers {
 			if err := t(ctx, event.Action, After, current, document); err != nil {
-				return d.wrapErr(err, "trigger failure")
+				return stacktrace.Propagate(err, "trigger failure")
 			}
 		}
 	}
 	if batch != nil {
 		if err := d.fullText.Batch(batch); err != nil {
-			return d.wrapErr(err, "")
+			return stacktrace.Propagate(err, "")
 		}
 	}
 	if err := txn.Flush(); err != nil {
-		return d.wrapErr(err, "")
+		return stacktrace.Propagate(err, "")
 	}
 	d.machine.Publish(ctx, machine.Message{
 		Channel: event.Collection,
@@ -132,7 +134,7 @@ func (d *db) saveBatch(ctx context.Context, event *Event) error {
 func (d *db) saveDocument(ctx context.Context, event *Event) error {
 	collect, ok := d.getInmemCollection(event.Collection)
 	if !ok {
-		return d.wrapErr(fmt.Errorf("unsupported collection: %s", event.Collection), "")
+		return stacktrace.Propagate(fmt.Errorf("unsupported collection: %s must be one of: %v", event.Collection, d.collectionNames()), "")
 	}
 	if len(event.Documents) == 0 {
 		return nil
@@ -142,15 +144,16 @@ func (d *db) saveDocument(ctx context.Context, event *Event) error {
 	}
 	document := event.Documents[0]
 	if err := document.Validate(); err != nil {
-		return d.wrapErr(err, "")
+		return stacktrace.Propagate(err, "")
 	}
+	document.Set("_collection", event.Collection)
 	current, _ := d.Get(ctx, event.Collection, document.GetID())
 	if current == nil {
 		current = NewDocument()
 	}
 	for _, t := range d.config.Triggers {
 		if err := t(ctx, event.Action, Before, current, document); err != nil {
-			return d.wrapErr(err, "trigger failure")
+			return stacktrace.Propagate(err, "trigger failure")
 		}
 	}
 	var bits []byte
@@ -158,7 +161,7 @@ func (d *db) saveDocument(ctx context.Context, event *Event) error {
 	case Set:
 		valid, err := collect.Validate(document)
 		if err != nil {
-			return d.wrapErr(err, "")
+			return stacktrace.Propagate(err, "")
 		}
 		if !valid {
 			return fmt.Errorf("%s/%s document has invalid schema", event.Collection, document.GetID())
@@ -169,7 +172,7 @@ func (d *db) saveDocument(ctx context.Context, event *Event) error {
 		currentClone.Merge(document)
 		valid, err := collect.Validate(currentClone)
 		if err != nil {
-			return d.wrapErr(err, "")
+			return stacktrace.Propagate(err, "")
 		}
 		if !valid {
 			return fmt.Errorf("%s/%s document has invalid schema", event.Collection, document.GetID())
@@ -184,13 +187,13 @@ func (d *db) saveDocument(ctx context.Context, event *Event) error {
 				Key:   []byte(prefix.PrimaryKey(event.Collection, document.GetID())),
 				Value: bits,
 			}); err != nil {
-				return d.wrapErr(err, "")
+				return stacktrace.Propagate(err, "")
 			}
 			for _, index := range collect.Indexes() {
 				pindex := index.prefix(event.Collection)
 				if current != nil {
 					if err := txn.Delete([]byte(pindex.GetIndex(current.Value()))); err != nil {
-						return d.wrapErr(err, "")
+						return stacktrace.Propagate(err, "")
 					}
 				}
 				i := pindex.GetIndex(document.Value())
@@ -198,33 +201,33 @@ func (d *db) saveDocument(ctx context.Context, event *Event) error {
 					Key:   []byte(i),
 					Value: bits,
 				}); err != nil {
-					return d.wrapErr(err, "")
+					return stacktrace.Propagate(err, "")
 				}
 			}
 			if collect.FullText() {
 				if err := d.fullText.Index(document.GetID(), document.Value()); err != nil {
-					return d.wrapErr(err, "")
+					return stacktrace.Propagate(err, "")
 				}
 			}
 		case Delete:
 			for _, index := range collect.Indexes() {
 				pindex := index.prefix(event.Collection)
 				if err := txn.Delete([]byte(pindex.GetIndex(current.Value()))); err != nil {
-					return d.wrapErr(err, "")
+					return stacktrace.Propagate(err, "")
 				}
 			}
 			if err := txn.Delete([]byte(prefix.PrimaryKey(event.Collection, current.GetID()))); err != nil {
-				return d.wrapErr(err, "")
+				return stacktrace.Propagate(err, "")
 			}
 			if collect.FullText() {
 				if err := d.fullText.Delete(document.GetID()); err != nil {
-					return d.wrapErr(err, "")
+					return stacktrace.Propagate(err, "")
 				}
 			}
 		}
 		for _, t := range d.config.Triggers {
 			if err := t(ctx, event.Action, After, current, document); err != nil {
-				return d.wrapErr(err, "trigger failure")
+				return stacktrace.Propagate(err, "trigger failure")
 			}
 		}
 		d.machine.Publish(ctx, machine.Message{
@@ -270,7 +273,7 @@ func (d *db) BatchUpdate(ctx context.Context, collection string, batch []*Docume
 func (d *db) Delete(ctx context.Context, collection, id string) error {
 	doc, err := d.Get(ctx, collection, id)
 	if err != nil {
-		return d.wrapErr(err, "")
+		return stacktrace.Propagate(err, "")
 	}
 	return d.saveDocument(ctx, &Event{
 		Collection: collection,
@@ -284,7 +287,7 @@ func (d *db) BatchDelete(ctx context.Context, collection string, ids []string) e
 	for _, id := range ids {
 		doc, err := d.Get(ctx, collection, id)
 		if err != nil {
-			return d.wrapErr(err, "")
+			return stacktrace.Propagate(err, "")
 		}
 		documents = append(documents, doc)
 	}
@@ -299,7 +302,7 @@ func (d *db) BatchDelete(ctx context.Context, collection string, ids []string) e
 func (d *db) QueryUpdate(ctx context.Context, update *Document, collection string, query Query) error {
 	documents, err := d.Query(ctx, collection, query)
 	if err != nil {
-		return d.wrapErr(err, "")
+		return stacktrace.Propagate(err, "")
 	}
 	for _, document := range documents {
 		document.Merge(update)
@@ -310,7 +313,7 @@ func (d *db) QueryUpdate(ctx context.Context, update *Document, collection strin
 func (d *db) QueryDelete(ctx context.Context, collection string, query Query) error {
 	documents, err := d.Query(ctx, collection, query)
 	if err != nil {
-		return d.wrapErr(err, "")
+		return stacktrace.Propagate(err, "")
 	}
 	var ids []string
 	for _, document := range documents {

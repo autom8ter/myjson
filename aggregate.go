@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/dgraph-io/badger/v3"
+	"github.com/palantir/stacktrace"
 	"github.com/samber/lo"
 	"github.com/spf13/cast"
 )
@@ -44,7 +45,7 @@ type AggregateQuery struct {
 func (d *db) Aggregate(ctx context.Context, collection string, query AggregateQuery) ([]*Document, error) {
 	_, ok := d.getInmemCollection(collection)
 	if !ok {
-		return nil, d.wrapErr(fmt.Errorf("unsupported collection: %s", collection), "")
+		return nil, stacktrace.Propagate(fmt.Errorf("unsupported collection: %s must be one of: %v", collection, d.collectionNames()), "")
 	}
 	prefix := d.getQueryPrefix(collection, query.Where)
 	var records []*Document
@@ -62,11 +63,11 @@ func (d *db) Aggregate(ctx context.Context, collection string, query AggregateQu
 			err := item.Value(func(bits []byte) error {
 				document, err := NewDocumentFromBytes(bits)
 				if err != nil {
-					return d.wrapErr(err, "")
+					return stacktrace.Propagate(err, "")
 				}
 				pass, err := document.Where(query.Where)
 				if err != nil {
-					return d.wrapErr(err, "")
+					return stacktrace.Propagate(err, "")
 				}
 				if pass {
 					records = append(records, document)
@@ -74,7 +75,7 @@ func (d *db) Aggregate(ctx context.Context, collection string, query AggregateQu
 				return nil
 			})
 			if err != nil {
-				return d.wrapErr(err, "")
+				return stacktrace.Propagate(err, "")
 			}
 			it.Next()
 		}

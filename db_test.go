@@ -52,7 +52,7 @@ func init() {
 	}
 }
 
-var defaultCollections = []*wolverine.Collection{}
+var defaultCollections []*wolverine.Collection
 
 func newUserDoc() *wolverine.Document {
 	doc, err := wolverine.NewDocumentFromMap(map[string]interface{}{

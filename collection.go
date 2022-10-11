@@ -13,29 +13,32 @@ import (
 
 // LoadCollection loads a collection from the provided json schema
 func LoadCollection(jsonSchema string) (*Collection, error) {
-	c := &Collection{JSONSchema: jsonSchema}
-	loadedSchema, err := gojsonschema.NewSchema(gojsonschema.NewStringLoader(c.JSONSchema))
+	c := &Collection{Schema: jsonSchema}
+	loadedSchema, err := gojsonschema.NewSchema(gojsonschema.NewStringLoader(c.Schema))
 	if err != nil {
 		return nil, err
 	}
 	c.loadedSchema = loadedSchema
+	if c.Collection() == "" {
+		return nil, fmt.Errorf("empty collection property in jsonSchema")
+	}
 	return c, nil
 }
 
 // Collection is a collection of records of a given type
 type Collection struct {
-	// JSONSchema is a json schema used to validate documents stored in the collection
-	JSONSchema   string `json:"json_schema"`
+	// Schema is a json schema used to validate documents stored in the collection
+	Schema       string `json:"schema"`
 	loadedSchema *gojsonschema.Schema
 }
 
 func (c *Collection) Collection() string {
-	return cast.ToString(gjson.Get(c.JSONSchema, "collection").Value())
+	return cast.ToString(gjson.Get(c.Schema, "collection").Value())
 }
 
 func (c *Collection) Indexes() []Index {
 	var is []Index
-	indexes := gjson.Get(c.JSONSchema, "indexes").Array()
+	indexes := gjson.Get(c.Schema, "indexes").Array()
 	for _, i := range indexes {
 		in := &Index{}
 		fields := i.Get("fields").Array()
@@ -50,11 +53,11 @@ func (c *Collection) Indexes() []Index {
 // Validate validates the document against the collections json schema (if it exists)
 func (c *Collection) Validate(doc *Document) (bool, error) {
 	var err error
-	if c.JSONSchema == "" {
+	if c.Schema == "" {
 		return true, nil
 	}
 	if c.loadedSchema == nil {
-		c.loadedSchema, err = gojsonschema.NewSchema(gojsonschema.NewStringLoader(c.JSONSchema))
+		c.loadedSchema, err = gojsonschema.NewSchema(gojsonschema.NewStringLoader(c.Schema))
 		if err != nil {
 			return false, err
 		}
@@ -75,7 +78,7 @@ func (c *Collection) Validate(doc *Document) (bool, error) {
 }
 
 func (c Collection) FullText() bool {
-	return gjson.Get(c.JSONSchema, "full_text").Bool()
+	return gjson.Get(c.Schema, "full_text").Bool()
 }
 
 // Index is a database index used for quickly finding records with specific field values

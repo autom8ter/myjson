@@ -8,6 +8,7 @@ import (
 
 	"github.com/blevesearch/bleve"
 	"github.com/blevesearch/bleve/search/query"
+	"github.com/palantir/stacktrace"
 	"github.com/samber/lo"
 	"github.com/spf13/cast"
 )
@@ -62,7 +63,7 @@ type SearchQuery struct {
 func (d *db) Search(ctx context.Context, collection string, q SearchQuery) ([]*Document, error) {
 	c, ok := d.getInmemCollection(collection)
 	if !ok || !c.FullText() {
-		return nil, fmt.Errorf("unsupported full text search collection: %s", collection)
+		return nil, fmt.Errorf("unsupported full text search collection: %s must be one of: %v", collection, d.collectionNames())
 	}
 	var (
 		fields []string
@@ -143,7 +144,7 @@ func (d *db) Search(ctx context.Context, collection string, q SearchQuery) ([]*D
 			)
 			split := strings.Split(cast.ToString(where.Value), ",")
 			if len(split) < 3 {
-				return nil, d.wrapErr(fmt.Errorf("geo distance where clause requires 3 comma separated values: lat(float), lng(float), distance(string)"), "")
+				return nil, stacktrace.Propagate(fmt.Errorf("geo distance where clause requires 3 comma separated values: lat(float), lng(float), distance(string)"), "")
 			}
 			from = cast.ToFloat64(split[0])
 			to = cast.ToFloat64(split[1])
@@ -203,7 +204,7 @@ func (d *db) Search(ctx context.Context, collection string, q SearchQuery) ([]*D
 	}
 	results, err := d.fullText.Search(searchRequest)
 	if err != nil {
-		return nil, d.wrapErr(err, "")
+		return nil, stacktrace.Propagate(err, "")
 	}
 
 	var data []*Document

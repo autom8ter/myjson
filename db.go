@@ -8,6 +8,7 @@ import (
 	"github.com/autom8ter/machine/v4"
 	"github.com/blevesearch/bleve"
 	"github.com/dgraph-io/badger/v3"
+	"github.com/palantir/stacktrace"
 	"github.com/xeipuuv/gojsonschema"
 
 	"github.com/autom8ter/wolverine/internal/prefix"
@@ -44,10 +45,11 @@ func New(ctx context.Context, cfg Config) (DB, error) {
 		machine:     machine.New(),
 	}
 	indexMapping := bleve.NewIndexMapping()
+	indexMapping.TypeField = "_collection"
 	if config.Path == "inmem" {
 		i, err := bleve.NewMemOnly(indexMapping)
 		if err != nil {
-			return nil, d.wrapErr(err, "")
+			return nil, stacktrace.Propagate(err, "")
 		}
 		d.fullText = i
 	} else {
@@ -58,12 +60,11 @@ func New(ctx context.Context, cfg Config) (DB, error) {
 		} else {
 			i, err = bleve.New(path, indexMapping)
 			if err != nil {
-				return nil, d.wrapErr(err, "")
+				return nil, stacktrace.Propagate(err, "")
 			}
 			d.fullText = i
 		}
 	}
-	d.collections.Store("system", systemCollection)
 	if err := d.loadCollections(ctx); err != nil {
 		return nil, err
 	}
@@ -83,13 +84,18 @@ func New(ctx context.Context, cfg Config) (DB, error) {
 func (d *db) loadCollections(ctx context.Context) error {
 	collections, err := d.GetCollections(ctx)
 	if err != nil {
-		return d.wrapErr(err, "")
+		return stacktrace.Propagate(err, "")
 	}
+	sysCollection, err := LoadCollection(systemCollectionSchema)
+	if err != nil {
+		return stacktrace.Propagate(err, "")
+	}
+	collections = append(collections, sysCollection)
 	for _, collection := range collections {
-		if collection.JSONSchema != "" {
-			schema, err := gojsonschema.NewSchema(gojsonschema.NewStringLoader(collection.JSONSchema))
+		if collection.Schema != "" {
+			schema, err := gojsonschema.NewSchema(gojsonschema.NewStringLoader(collection.Schema))
 			if err != nil {
-				return d.wrapErr(err, "")
+				return stacktrace.Propagate(err, "")
 			}
 			collection.loadedSchema = schema
 		}
@@ -152,4 +158,13 @@ func (d *db) getQueryPrefix(collection string, where []Where) []byte {
 		whereValues[w.Field] = w.Value
 	}
 	return []byte(chooseIndex(c, whereFields).GetIndex(whereValues))
+}
+
+func (d *db) collectionNames() []string {
+	var names []string
+	collections := d.getInmemCollections()
+	for _, c := range collections {
+		names = append(names, c.Collection())
+	}
+	return names
 }

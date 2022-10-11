@@ -7,13 +7,13 @@
   "indexes": [
     {
       "fields": [
-        "user_id"
+        "user"
       ]
     }
   ],
   "required": [
     "_id",
-    "user_id",
+    "user",
     "content"
   ],
   "properties": {
@@ -21,7 +21,7 @@
       "type": "string",
       "description": "The user's id."
     },
-    "user_id": {
+    "user": {
       "type": "string",
       "description": "The id of the user who owns the task"
     },
