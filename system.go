@@ -29,13 +29,7 @@ func (d *db) Close(ctx context.Context) error {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	err := d.machine.Wait()
-	//d.collections.Range(func(key, value any) bool {
-	//	collection := value.(*Collection)
-	//	if collection.fullText != nil {
-	//		err = multierror.Append(err, collection.fullText.Close())
-	//	}
-	//	return true
-	//})
+	err = multierror.Append(err, d.fullText.Close())
 	err = multierror.Append(err, d.kv.Sync())
 	err = multierror.Append(err, d.kv.Close())
 	if err, ok := err.(*multierror.Error); ok && len(err.Errors) > 0 {
@@ -55,9 +49,6 @@ func (d *db) ReIndex(ctx context.Context) error {
 	if err := d.loadCollections(ctx); err != nil {
 		return stacktrace.Propagate(err, "")
 	}
-	//if err := d.dropIndexes(ctx); err != nil {
-	//	return err
-	//}
 	egp, ctx := errgroup.WithContext(ctx)
 	for _, c := range d.getInmemCollections() {
 		c := c

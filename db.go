@@ -20,7 +20,7 @@ type db struct {
 	mu          sync.RWMutex
 	collections sync.Map
 	machine     machine.Machine
-	fullText    bleve.Index
+	fullText    bleve.IndexAlias
 }
 
 func New(ctx context.Context, cfg Config) (DB, error) {
@@ -44,26 +44,8 @@ func New(ctx context.Context, cfg Config) (DB, error) {
 		collections: sync.Map{},
 		machine:     machine.New(),
 	}
-	indexMapping := bleve.NewIndexMapping()
-	indexMapping.TypeField = "_collection"
-	if config.Path == "inmem" {
-		i, err := bleve.NewMemOnly(indexMapping)
-		if err != nil {
-			return nil, stacktrace.Propagate(err, "")
-		}
-		d.fullText = i
-	} else {
-		path := fmt.Sprintf("%s/search/index.db", d.config.Path)
-		i, err := bleve.Open(path)
-		if err == nil {
-			d.fullText = i
-		} else {
-			i, err = bleve.New(path, indexMapping)
-			if err != nil {
-				return nil, stacktrace.Propagate(err, "")
-			}
-			d.fullText = i
-		}
+	if err := d.loadFullText(); err != nil {
+		return nil, err
 	}
 	if err := d.loadCollections(ctx); err != nil {
 		return nil, err
@@ -79,6 +61,31 @@ func New(ctx context.Context, cfg Config) (DB, error) {
 		}
 	}
 	return d, nil
+}
+
+func (d *db) loadFullText() error {
+	indexMapping := bleve.NewIndexMapping()
+	indexMapping.TypeField = "_collection"
+	if d.config.Path == "inmem" {
+		i, err := bleve.NewMemOnly(indexMapping)
+		if err != nil {
+			return stacktrace.Propagate(err, "")
+		}
+		d.fullText = bleve.NewIndexAlias(i)
+	} else {
+		path := fmt.Sprintf("%s/search/index.db", d.config.Path)
+		i, err := bleve.Open(path)
+		if err == nil {
+			d.fullText = bleve.NewIndexAlias(i)
+		} else {
+			i, err = bleve.New(path, indexMapping)
+			if err != nil {
+				return stacktrace.Propagate(err, "")
+			}
+			d.fullText = bleve.NewIndexAlias(i)
+		}
+	}
+	return nil
 }
 
 func (d *db) loadCollections(ctx context.Context) error {
