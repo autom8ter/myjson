@@ -13,62 +13,54 @@ Built on top of BadgerDB and Bleve
 
 Features:
 
-- [x] full text search engine
-    - [x] prefix
-    - [x] basic
-    - [x] regex
-    - [x] wildcard
-    - [x] term range
-    - [x] date range
-    - [x] geo distance
+## Search Engine
+
+- [x] prefix
+- [x] basic
+- [x] regex
+- [x] wildcard
+- [x] term range
+- [x] date range
+- [x] geo distance
+- [x] boosting
+- [x] select fields
+
+## Document Storage Engine
 
 - [x] document storage engine
-    - [ ] ttl support
-    - [x] optional json schema based validation
-- [x] change streams
+- [x] json schema based validation & configuration
 - [x] field based querying
+- [x] change streams
 - [x] batch operations
-- [x] ttl
-- [ ] hooks
-    - [x] on read
-    - [x] on stream
-    - [x] before update
-    - [x] after update
-    - [x] before set
-    - [x] after set
-    - [x] before delete
-    - [x] after delete
+- [x] write hooks
 - [x] field based indexes
-- [x] ttl
-- [x] hooks
 - [x] select fields
 - [x] order by
-- [x] mapreduce
-- [x] cron jobs
-- [x] backup
-- [x] restore
+- [x] aggregation (min,max,sum,avg,count)
 - [x] query update
 - [x] query delete
-- [x] logger
-- [x] migrations
-- [x] 80% test coverage
-- [x] search boosting
+- [ ] multi-field order by
 
+## System/Admin Engine
+
+- [x] backup
+- [x] incremental backup
+- [x] restore
+- [x] migrations
+- [ ] distributed (raft)
 
 ## Road to Beta
+
 - [ ] awesome readme
-- [ ] decouple kv storage provider
 - [ ] benchmarks
 - [ ] examples
-- [ ] views
-- [ ] materialized views
 - [ ] pagination tests
-- [ ] better errors
-
-
+- [ ] better errors & error codes
+- [ ] 80% test coverage
+- [ ] extensive comments
 
 ## Beta+ Roadmap
 
-- [ ] multi-field order by
-- [ ] distributed
-- [ ] SQL support
+- [ ] SQL-like query language
+- [ ] views
+- [ ] materialized views
