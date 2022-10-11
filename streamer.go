@@ -16,16 +16,16 @@ func (d *db) ChangeStream(ctx context.Context, collections []string, fn ChangeSt
 				switch event := msg.Body.(type) {
 				case *Event:
 					if err := fn(ctx, event); err != nil {
-						return false, err
+						return false, stacktrace.Propagate(err, "")
 					}
 				case Event:
 					if err := fn(ctx, &event); err != nil {
-						return false, err
+						return false, stacktrace.Propagate(err, "")
 					}
 				}
 				return true, nil
 			})
 		})
 	}
-	return stacktrace.Propagate(m.Wait(), "")
+	return stacktrace.Propagate(m.Wait(), "change stream failure")
 }

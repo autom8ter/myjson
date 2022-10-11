@@ -9,17 +9,18 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/autom8ter/wolverine"
+	"github.com/autom8ter/wolverine/internal/testutil"
 )
 
 func TestSearch(t *testing.T) {
-	assert.Nil(t, testDB(defaultCollections, func(ctx context.Context, db wolverine.DB) {
-		record := newUserDoc()
-		record.Set("contact.email", myEmail)
+	assert.Nil(t, testutil.TestDB([]*wolverine.Collection{testutil.UserCollection, testutil.TaskCollection}, func(ctx context.Context, db wolverine.DB) {
+		record := testutil.NewUserDoc()
+		record.Set("contact.email", testutil.MyEmail)
 		record.Set("account_id", 1)
 		record.Set("language", "english")
 		assert.Nil(t, db.Set(ctx, "user", record))
 		for i := 0; i < 1000; i++ {
-			assert.Nil(t, db.Set(ctx, "user", newUserDoc()))
+			assert.Nil(t, db.Set(ctx, "user", testutil.NewUserDoc()))
 		}
 		t.Run("basic", func(t *testing.T) {
 			results, err := db.Search(ctx, "user", wolverine.SearchQuery{
@@ -38,14 +39,14 @@ func TestSearch(t *testing.T) {
 					{
 						Field: "contact.email",
 						Op:    wolverine.Basic,
-						Value: myEmail,
+						Value: testutil.MyEmail,
 					},
 				},
 				Limit: 100,
 			})
 			assert.Nil(t, err)
 			assert.Equal(t, 1, len(results))
-			assert.EqualValues(t, myEmail, results[0].Get("contact.email"))
+			assert.EqualValues(t, testutil.MyEmail, results[0].Get("contact.email"))
 
 			results, err = db.Search(ctx, "user", wolverine.SearchQuery{
 				Select: []string{"name", "contact.email"},
@@ -105,7 +106,7 @@ func TestSearch(t *testing.T) {
 			})
 			assert.Nil(t, err)
 			assert.Equal(t, 1, len(results))
-			assert.EqualValues(t, myEmail, results[0].Get("contact.email"))
+			assert.EqualValues(t, testutil.MyEmail, results[0].Get("contact.email"))
 
 			results, err = db.Search(ctx, "user", wolverine.SearchQuery{
 				Select: []string{"name", "contact.email"},
@@ -160,7 +161,7 @@ func TestSearch(t *testing.T) {
 			})
 			assert.Nil(t, err)
 			assert.Equal(t, 1, len(results))
-			assert.EqualValues(t, myEmail, results[0].Get("contact.email"))
+			assert.EqualValues(t, testutil.MyEmail, results[0].Get("contact.email"))
 
 			results, err = db.Search(ctx, "user", wolverine.SearchQuery{
 				Select: []string{"name", "contact.email"},
@@ -232,7 +233,7 @@ func TestSearch(t *testing.T) {
 			})
 			assert.Nil(t, err)
 			assert.Equal(t, 1, len(results))
-			assert.EqualValues(t, myEmail, results[0].Get("contact.email"))
+			assert.EqualValues(t, testutil.MyEmail, results[0].Get("contact.email"))
 
 			results, err = db.Search(ctx, "user", wolverine.SearchQuery{
 				Select: []string{"name", "contact.email"},

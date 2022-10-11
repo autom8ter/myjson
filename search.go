@@ -2,7 +2,6 @@ package wolverine
 
 import (
 	"context"
-	"fmt"
 	"strings"
 	"time"
 
@@ -63,7 +62,7 @@ type SearchQuery struct {
 func (d *db) Search(ctx context.Context, collection string, q SearchQuery) ([]*Document, error) {
 	c, ok := d.getInmemCollection(collection)
 	if !ok || !c.FullText() {
-		return nil, fmt.Errorf("unsupported full text search collection: %s must be one of: %v", collection, d.collectionNames())
+		return nil, stacktrace.NewError("unsupported full text search collection: %s must be one of: %v", collection, d.collectionNames())
 	}
 	var (
 		fields []string
@@ -72,12 +71,12 @@ func (d *db) Search(ctx context.Context, collection string, q SearchQuery) ([]*D
 		fields = append(fields, w.Field)
 	}
 	if len(q.Where) == 0 {
-		return nil, fmt.Errorf("%s search: invalid search query", collection)
+		return nil, stacktrace.NewError("%s search: invalid search query", collection)
 	}
 	var queries []query.Query
 	for _, where := range q.Where {
 		if where.Value == nil {
-			return nil, fmt.Errorf("empty where clause value")
+			return nil, stacktrace.NewError("empty where clause value")
 		}
 		switch where.Op {
 		case Basic:
@@ -144,7 +143,7 @@ func (d *db) Search(ctx context.Context, collection string, q SearchQuery) ([]*D
 			)
 			split := strings.Split(cast.ToString(where.Value), ",")
 			if len(split) < 3 {
-				return nil, stacktrace.Propagate(fmt.Errorf("geo distance where clause requires 3 comma separated values: lat(float), lng(float), distance(string)"), "")
+				return nil, stacktrace.NewError("geo distance where clause requires 3 comma separated values: lat(float), lng(float), distance(string)")
 			}
 			from = cast.ToFloat64(split[0])
 			to = cast.ToFloat64(split[1])
@@ -186,7 +185,7 @@ func (d *db) Search(ctx context.Context, collection string, q SearchQuery) ([]*D
 		}
 	}
 	if len(queries) == 0 {
-		return nil, fmt.Errorf("%s search: invalid search query", collection)
+		return nil, stacktrace.NewError("%s search: invalid search query", collection)
 	}
 	var searchRequest *bleve.SearchRequest
 	if len(queries) > 1 {
@@ -202,9 +201,9 @@ func (d *db) Search(ctx context.Context, collection string, q SearchQuery) ([]*D
 	if q.StartAt != "" {
 		searchRequest.SearchAfter = []string{q.StartAt}
 	}
-	results, err := d.fullText.Search(searchRequest)
+	results, err := d.getFullText(collection).Search(searchRequest)
 	if err != nil {
-		return nil, stacktrace.Propagate(err, "")
+		return nil, stacktrace.Propagate(err, "failed to search index: %s", collection)
 	}
 
 	var data []*Document
@@ -214,7 +213,7 @@ func (d *db) Search(ctx context.Context, collection string, q SearchQuery) ([]*D
 		}
 		record, err := NewDocumentFromMap(h.Fields)
 		if err != nil {
-			return nil, err
+			return nil, stacktrace.Propagate(err, "failed to search index: %s", collection)
 		}
 		data = append(data, record)
 	}

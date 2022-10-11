@@ -56,12 +56,15 @@ Features:
 
 
 ## Road to Beta
-
+- [ ] awesome readme
 - [ ] decouple kv storage provider
 - [ ] benchmarks
 - [ ] examples
 - [ ] views
 - [ ] materialized views
+- [ ] pagination tests
+- [ ] better errors
+
 
 
 ## Beta+ Roadmap

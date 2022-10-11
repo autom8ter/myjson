@@ -45,7 +45,7 @@ type AggregateQuery struct {
 func (d *db) Aggregate(ctx context.Context, collection string, query AggregateQuery) ([]*Document, error) {
 	_, ok := d.getInmemCollection(collection)
 	if !ok {
-		return nil, stacktrace.Propagate(fmt.Errorf("unsupported collection: %s must be one of: %v", collection, d.collectionNames()), "")
+		return nil, stacktrace.Propagate(stacktrace.NewError("unsupported collection: %s must be one of: %v", collection, d.collectionNames()), "")
 	}
 	prefix := d.getQueryPrefix(collection, query.Where)
 	var records []*Document
@@ -58,7 +58,7 @@ func (d *db) Aggregate(ctx context.Context, collection string, query AggregateQu
 		seek := prefix
 		it.Seek(seek)
 		defer it.Close()
-		for it.Valid() {
+		for it.ValidForPrefix(prefix) {
 			item := it.Item()
 			err := item.Value(func(bits []byte) error {
 				document, err := NewDocumentFromBytes(bits)

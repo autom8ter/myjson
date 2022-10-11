@@ -70,7 +70,7 @@ type Query struct {
 func (d *db) Query(ctx context.Context, collection string, query Query) ([]*Document, error) {
 	if collection != systemCollection {
 		if _, ok := d.getInmemCollection(collection); !ok {
-			return nil, stacktrace.Propagate(fmt.Errorf("unsupported collection: %s must be one of: %v", collection, d.collectionNames()), "")
+			return nil, stacktrace.Propagate(stacktrace.NewError("unsupported collection: %s must be one of: %v", collection, d.collectionNames()), "")
 		}
 	}
 	prefix := d.getQueryPrefix(collection, query.Where)
@@ -89,7 +89,7 @@ func (d *db) Query(ctx context.Context, collection string, query Query) ([]*Docu
 		it.Seek(seek)
 		defer it.Close()
 		for it.ValidForPrefix(prefix) {
-			if query.Limit > 0 && len(documents) >= query.Limit {
+			if query.OrderBy.Field == "" && query.Limit > 0 && len(documents) >= query.Limit {
 				return nil
 			}
 			item := it.Item()
@@ -134,7 +134,7 @@ func (d *db) Query(ctx context.Context, collection string, query Query) ([]*Docu
 
 func (d *db) Get(ctx context.Context, collection, id string) (*Document, error) {
 	if _, ok := d.getInmemCollection(collection); !ok {
-		return nil, stacktrace.Propagate(fmt.Errorf("unsupported collection: %s must be one of: %v", collection, d.collectionNames()), "")
+		return nil, stacktrace.Propagate(stacktrace.NewError("unsupported collection: %s must be one of: %v", collection, d.collectionNames()), "")
 	}
 	var (
 		document *Document
@@ -157,7 +157,7 @@ func (d *db) Get(ctx context.Context, collection, id string) (*Document, error) 
 
 func (d *db) GetAll(ctx context.Context, collection string, ids []string) ([]*Document, error) {
 	if _, ok := d.getInmemCollection(collection); !ok {
-		return nil, stacktrace.Propagate(fmt.Errorf("unsupported collection: %s must be one of: %v", collection, d.collectionNames()), "")
+		return nil, stacktrace.Propagate(stacktrace.NewError("unsupported collection: %s must be one of: %v", collection, d.collectionNames()), "")
 	}
 	var documents []*Document
 	if err := d.kv.View(func(txn *badger.Txn) error {

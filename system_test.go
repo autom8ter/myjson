@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/autom8ter/wolverine"
+	"github.com/autom8ter/wolverine/internal/testutil"
 )
 
 func TestSystem(t *testing.T) {
@@ -18,17 +19,17 @@ func TestSystem(t *testing.T) {
 			ReIndex: false,
 		})
 		assert.Nil(t, err)
-		for _, c := range defaultCollections {
+		for _, c := range testutil.AllCollections {
 			assert.Nil(t, db.SetCollection(context.Background(), c))
 		}
-		for _, c := range defaultCollections {
+		for _, c := range testutil.AllCollections {
 			cv, err := db.GetCollection(context.Background(), c.Collection())
 			assert.Nil(t, err)
 			assert.Equal(t, c.Collection(), cv.Collection())
 		}
 		results, err := db.GetCollections(context.Background())
 		assert.Nil(t, err)
-		assert.Equal(t, len(defaultCollections), len(results))
+		assert.Equal(t, len(testutil.AllCollections), len(results))
 	})
 	t.Run("set collections", func(t *testing.T) {
 		db, err := wolverine.New(context.Background(), wolverine.Config{
@@ -37,22 +38,22 @@ func TestSystem(t *testing.T) {
 			ReIndex: false,
 		})
 		assert.Nil(t, err)
-		assert.Nil(t, db.SetCollections(context.Background(), defaultCollections))
-		for _, c := range defaultCollections {
+		assert.Nil(t, db.SetCollections(context.Background(), testutil.AllCollections))
+		for _, c := range testutil.AllCollections {
 			cv, err := db.GetCollection(context.Background(), c.Collection())
 			assert.Nil(t, err)
 			assert.Equal(t, c.Collection(), cv.Collection())
 		}
 		results, err := db.GetCollections(context.Background())
 		assert.Nil(t, err)
-		assert.Equal(t, len(defaultCollections), len(results))
+		assert.Equal(t, len(testutil.AllCollections), len(results))
 	})
 	t.Run("backup restore", func(t *testing.T) {
-		assert.Nil(t, testDB(defaultCollections, func(ctx context.Context, db wolverine.DB) {
+		assert.Nil(t, testutil.TestDB(testutil.AllCollections, func(ctx context.Context, db wolverine.DB) {
 			buf := bytes.NewBuffer(nil)
 			var usrs []*wolverine.Document
 			for i := 0; i < 5; i++ {
-				u := newUserDoc()
+				u := testutil.NewUserDoc()
 				usrs = append(usrs, u)
 				assert.Nil(t, db.Set(ctx, "user", u))
 			}
@@ -78,17 +79,17 @@ func TestSystem(t *testing.T) {
 		}))
 	})
 	t.Run("incremental backup restore", func(t *testing.T) {
-		assert.Nil(t, testDB(defaultCollections, func(ctx context.Context, db wolverine.DB) {
+		assert.Nil(t, testutil.TestDB(testutil.AllCollections, func(ctx context.Context, db wolverine.DB) {
 			buf := bytes.NewBuffer(nil)
 			var usrs []*wolverine.Document
 			for i := 0; i < 5; i++ {
-				u := newUserDoc()
+				u := testutil.NewUserDoc()
 				usrs = append(usrs, u)
 				assert.Nil(t, db.Set(ctx, "user", u))
 			}
 			assert.Nil(t, db.IncrementalBackup(ctx, buf))
 			for i := 0; i < 5; i++ {
-				u := newUserDoc()
+				u := testutil.NewUserDoc()
 				usrs = append(usrs, u)
 				assert.Nil(t, db.Set(ctx, "user", u))
 			}
@@ -114,7 +115,7 @@ func TestSystem(t *testing.T) {
 		}))
 	})
 	t.Run("migrate backup restore", func(t *testing.T) {
-		assert.Nil(t, testDB(defaultCollections, func(ctx context.Context, db wolverine.DB) {
+		assert.Nil(t, testutil.TestDB(testutil.AllCollections, func(ctx context.Context, db wolverine.DB) {
 			buf := bytes.NewBuffer(nil)
 			var usrs []*wolverine.Document
 
@@ -123,7 +124,7 @@ func TestSystem(t *testing.T) {
 					Name: "batch set users",
 					Function: func(ctx context.Context, db wolverine.DB) error {
 						for i := 0; i < 5; i++ {
-							u := newUserDoc()
+							u := testutil.NewUserDoc()
 							usrs = append(usrs, u)
 						}
 						return db.BatchSet(ctx, "user", usrs)
@@ -136,7 +137,7 @@ func TestSystem(t *testing.T) {
 					Name: "batch set users",
 					Function: func(ctx context.Context, db wolverine.DB) error {
 						for i := 0; i < 5; i++ {
-							u := newUserDoc()
+							u := testutil.NewUserDoc()
 							usrs = append(usrs, u)
 						}
 						return db.BatchSet(ctx, "user", usrs)

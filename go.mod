@@ -3,10 +3,10 @@ module github.com/autom8ter/wolverine
 go 1.18
 
 require (
+	github.com/autom8ter/machine/v4 v4.0.0-20221003043928-593fc3a020bb
 	github.com/blevesearch/bleve v1.0.14
 	github.com/brianvoe/gofakeit/v6 v6.19.0
 	github.com/dgraph-io/badger/v3 v3.2103.2
-	github.com/gorilla/mux v1.8.0
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/nqd/flat v0.1.1
 	github.com/palantir/stacktrace v0.0.0-20161112013806-78658fd2d177
@@ -15,13 +15,12 @@ require (
 	github.com/stretchr/testify v1.8.0
 	github.com/tidwall/gjson v1.14.3
 	github.com/tidwall/sjson v1.2.5
-	go.uber.org/zap v1.23.0
+	github.com/xeipuuv/gojsonschema v1.2.0
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
 )
 
 require (
 	github.com/RoaringBitmap/roaring v1.2.1 // indirect
-	github.com/autom8ter/machine/v4 v4.0.0-20221003043928-593fc3a020bb // indirect
 	github.com/bits-and-blooms/bitset v1.3.3 // indirect
 	github.com/blevesearch/go-porterstemmer v1.0.3 // indirect
 	github.com/blevesearch/mmap-go v1.0.4 // indirect
@@ -50,18 +49,14 @@ require (
 	github.com/mschoch/smat v0.2.0 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
-	github.com/robfig/cron v1.2.0 // indirect
 	github.com/steveyen/gtreap v0.1.0 // indirect
 	github.com/tidwall/match v1.1.1 // indirect
 	github.com/tidwall/pretty v1.2.0 // indirect
 	github.com/willf/bitset v1.1.11 // indirect
 	github.com/xeipuuv/gojsonpointer v0.0.0-20180127040702-4e3ac2762d5f // indirect
 	github.com/xeipuuv/gojsonreference v0.0.0-20180127040603-bd5ef7bd5415 // indirect
-	github.com/xeipuuv/gojsonschema v1.2.0 // indirect
 	go.etcd.io/bbolt v1.3.6 // indirect
 	go.opencensus.io v0.22.5 // indirect
-	go.uber.org/atomic v1.10.0 // indirect
-	go.uber.org/multierr v1.8.0 // indirect
 	golang.org/x/exp v0.0.0-20220921164117-439092de6870 // indirect
 	golang.org/x/net v0.0.0-20211112202133-69e39bad7dc2 // indirect
 	golang.org/x/sys v0.0.0-20220919091848-fb04ddd9f9c8 // indirect

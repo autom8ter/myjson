@@ -2,10 +2,9 @@ package wolverine
 
 import (
 	"encoding/json"
-	"errors"
-	"fmt"
 
 	"github.com/nqd/flat"
+	"github.com/palantir/stacktrace"
 	"github.com/samber/lo"
 	"github.com/spf13/cast"
 	"github.com/tidwall/gjson"
@@ -27,7 +26,7 @@ func NewDocument() *Document {
 
 func NewDocumentFromBytes(json []byte) (*Document, error) {
 	if !gjson.ValidBytes(json) {
-		return nil, fmt.Errorf("invalid json: %s", string(json))
+		return nil, stacktrace.NewError("invalid json")
 	}
 	return &Document{
 		result: lo.ToPtr(gjson.ParseBytes(json)),
@@ -37,7 +36,7 @@ func NewDocumentFromBytes(json []byte) (*Document, error) {
 func NewDocumentFromMap(value map[string]interface{}) (*Document, error) {
 	value, err := flat.Unflatten(value, nil)
 	if err != nil {
-		return nil, err
+		return nil, stacktrace.Propagate(err, "failed to flatten map")
 	}
 	return NewDocumentFromAny(value)
 }
@@ -45,7 +44,7 @@ func NewDocumentFromMap(value map[string]interface{}) (*Document, error) {
 func NewDocumentFromAny(value any) (*Document, error) {
 	bits, err := json.Marshal(value)
 	if err != nil {
-		return nil, fmt.Errorf("failed to json encode value: %#v", value)
+		return nil, stacktrace.NewError("failed to json encode value: %#v", value)
 	}
 	d := &Document{
 		result: lo.ToPtr(gjson.ParseBytes(bits)),
@@ -96,7 +95,7 @@ func (d *Document) Select(fields []string) *Document {
 // Validate returns an error if the documents collection, id, or fields are empty
 func (d *Document) Validate() error {
 	if d.GetID() == "" {
-		return errors.New("document validation: empty _id")
+		return stacktrace.NewError("document validation: empty _id")
 	}
 	return nil
 }
@@ -203,7 +202,7 @@ func (d *Document) Where(wheres []Where) (bool, error) {
 				return false, nil
 			}
 		default:
-			return false, fmt.Errorf("invalid operator: %s", w.Op)
+			return false, stacktrace.NewError("invalid operator: %s", w.Op)
 		}
 	}
 	return true, nil
@@ -211,5 +210,5 @@ func (d *Document) Where(wheres []Where) (bool, error) {
 
 // ScanJSON scans the json document into the value
 func (d *Document) ScanJSON(value any) error {
-	return json.Unmarshal([]byte(d.String()), &value)
+	return stacktrace.Propagate(json.Unmarshal([]byte(d.String()), &value), "failed to scan document")
 }

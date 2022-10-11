@@ -1,9 +1,9 @@
 package wolverine
 
 import (
-	"fmt"
 	"strings"
 
+	"github.com/palantir/stacktrace"
 	"github.com/spf13/cast"
 	"github.com/tidwall/gjson"
 	"github.com/xeipuuv/gojsonschema"
@@ -16,26 +16,42 @@ func LoadCollection(jsonSchema string) (*Collection, error) {
 	c := &Collection{Schema: jsonSchema}
 	loadedSchema, err := gojsonschema.NewSchema(gojsonschema.NewStringLoader(c.Schema))
 	if err != nil {
-		return nil, err
+		return nil, stacktrace.PropagateWithCode(err, ErrSchemaLoad, "failed to load schema")
 	}
 	c.loadedSchema = loadedSchema
 	if c.Collection() == "" {
-		return nil, fmt.Errorf("empty collection property in jsonSchema")
+		return nil, stacktrace.NewErrorWithCode(ErrEmptySchemaCollection, "empty 'collection' property in jsonSchema")
 	}
 	return c, nil
 }
 
-// Collection is a collection of records of a given type
+// Collection is a collection of records of a given type. It is
 type Collection struct {
-	// Schema is a json schema used to validate documents stored in the collection
+	// Schema is an extended json schema used to validate documents stored in the collection.
+	// Custom properties include: collection, indexes, and full_text
 	Schema       string `json:"schema"`
 	loadedSchema *gojsonschema.Schema
 }
 
+// ParseSchema parses the collection's json schema
+func (c *Collection) ParseSchema() error {
+	var err error
+	c.loadedSchema, err = gojsonschema.NewSchema(gojsonschema.NewStringLoader(c.Schema))
+	if err != nil {
+		return stacktrace.PropagateWithCode(err, ErrSchemaLoad, "failed to load schema")
+	}
+	if c.Collection() == "" {
+		return stacktrace.NewErrorWithCode(ErrEmptySchemaCollection, "empty 'collection' property in jsonSchema")
+	}
+	return nil
+}
+
+// Collection returns the name of the collection based on the schema's 'collection' field on the collection's schema
 func (c *Collection) Collection() string {
 	return cast.ToString(gjson.Get(c.Schema, "collection").Value())
 }
 
+// Indexes returns the list of the indexes based on the schema's 'indexes' field on the collection's schema
 func (c *Collection) Indexes() []Index {
 	var is []Index
 	indexes := gjson.Get(c.Schema, "indexes").Array()
@@ -59,7 +75,7 @@ func (c *Collection) Validate(doc *Document) (bool, error) {
 	if c.loadedSchema == nil {
 		c.loadedSchema, err = gojsonschema.NewSchema(gojsonschema.NewStringLoader(c.Schema))
 		if err != nil {
-			return false, err
+			return false, stacktrace.PropagateWithCode(err, ErrSchemaLoad, "")
 		}
 	}
 	documentLoader := gojsonschema.NewBytesLoader(doc.Bytes())
@@ -72,11 +88,12 @@ func (c *Collection) Validate(doc *Document) (bool, error) {
 		for _, err := range result.Errors() {
 			errs = append(errs, err.String())
 		}
-		return false, fmt.Errorf("%s", strings.Join(errs, ","))
+		return false, stacktrace.NewErrorWithCode(ErrDocumentValidation, "%s", strings.Join(errs, ","))
 	}
 	return true, nil
 }
 
+// FullText returns true/false based on the 'full_text' field on the collection's schema
 func (c Collection) FullText() bool {
 	return gjson.Get(c.Schema, "full_text").Bool()
 }
