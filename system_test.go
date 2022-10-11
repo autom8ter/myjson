@@ -22,9 +22,9 @@ func TestSystem(t *testing.T) {
 			assert.Nil(t, db.SetCollection(context.Background(), c))
 		}
 		for _, c := range defaultCollections {
-			cv, err := db.GetCollection(context.Background(), c.Name)
+			cv, err := db.GetCollection(context.Background(), c.Collection())
 			assert.Nil(t, err)
-			assert.Equal(t, c.Name, cv.Name)
+			assert.Equal(t, c.Collection(), cv.Collection())
 		}
 		results, err := db.GetCollections(context.Background())
 		assert.Nil(t, err)
@@ -39,9 +39,9 @@ func TestSystem(t *testing.T) {
 		assert.Nil(t, err)
 		assert.Nil(t, db.SetCollections(context.Background(), defaultCollections))
 		for _, c := range defaultCollections {
-			cv, err := db.GetCollection(context.Background(), c.Name)
+			cv, err := db.GetCollection(context.Background(), c.Collection())
 			assert.Nil(t, err)
-			assert.Equal(t, c.Name, cv.Name)
+			assert.Equal(t, c.Collection(), cv.Collection())
 		}
 		results, err := db.GetCollections(context.Background())
 		assert.Nil(t, err)

@@ -1,0 +1,21 @@
+{
+  "$id": "https://wolverine.io/system.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "System",
+  "type": "object",
+  "collection": "system",
+  "required": [
+    "_id",
+    "properties"
+  ],
+  "properties": {
+    "_id": {
+      "type": "string",
+      "description": "The document's id."
+    },
+    "properties": {
+      "type": "object",
+      "description": "system properties"
+    }
+  }
+}

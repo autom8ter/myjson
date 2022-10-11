@@ -19,6 +19,7 @@ type db struct {
 	mu          sync.RWMutex
 	collections sync.Map
 	machine     machine.Machine
+	fullText    bleve.Index
 }
 
 func New(ctx context.Context, cfg Config) (DB, error) {
@@ -42,9 +43,27 @@ func New(ctx context.Context, cfg Config) (DB, error) {
 		collections: sync.Map{},
 		machine:     machine.New(),
 	}
-	d.collections.Store("system", &Collection{
-		Name: "system",
-	})
+	indexMapping := bleve.NewIndexMapping()
+	if config.Path == "inmem" {
+		i, err := bleve.NewMemOnly(indexMapping)
+		if err != nil {
+			return nil, d.wrapErr(err, "")
+		}
+		d.fullText = i
+	} else {
+		path := fmt.Sprintf("%s/search/index.db", d.config.Path)
+		i, err := bleve.Open(path)
+		if err == nil {
+			d.fullText = i
+		} else {
+			i, err = bleve.New(path, indexMapping)
+			if err != nil {
+				return nil, d.wrapErr(err, "")
+			}
+			d.fullText = i
+		}
+	}
+	d.collections.Store("system", systemCollection)
 	if err := d.loadCollections(ctx); err != nil {
 		return nil, err
 	}
@@ -67,30 +86,6 @@ func (d *db) loadCollections(ctx context.Context) error {
 		return d.wrapErr(err, "")
 	}
 	for _, collection := range collections {
-		for _, i := range collection.Indexes {
-			if collection.fullText == nil && i.FullText {
-				indexMapping := bleve.NewIndexMapping()
-				if d.config.Path == "inmem" {
-					i, err := bleve.NewMemOnly(indexMapping)
-					if err != nil {
-						return d.wrapErr(err, "")
-					}
-					collection.fullText = i
-				} else {
-					path := fmt.Sprintf("%s/search/%s.bleve", d.config.Path, collection.Name)
-					i, err := bleve.Open(path)
-					if err == nil {
-						collection.fullText = i
-					} else {
-						i, err = bleve.New(path, indexMapping)
-						if err != nil {
-							return d.wrapErr(err, "")
-						}
-						collection.fullText = i
-					}
-				}
-			}
-		}
 		if collection.JSONSchema != "" {
 			schema, err := gojsonschema.NewSchema(gojsonschema.NewStringLoader(collection.JSONSchema))
 			if err != nil {
@@ -98,7 +93,7 @@ func (d *db) loadCollections(ctx context.Context) error {
 			}
 			collection.loadedSchema = schema
 		}
-		d.collections.Store(collection.Name, collection)
+		d.collections.Store(collection.Collection(), collection)
 	}
 	return nil
 }
@@ -106,10 +101,9 @@ func (d *db) loadCollections(ctx context.Context) error {
 func chooseIndex(collection *Collection, queryFields []string) *prefix.PrefixIndexRef {
 	//sort.Strings(queryFields)
 	var targetIndex = Index{
-		Fields:   []string{"_id"},
-		FullText: false,
+		Fields: []string{"_id"},
 	}
-	for _, index := range collection.Indexes {
+	for _, index := range collection.Indexes() {
 		if len(index.Fields) != len(queryFields) {
 			continue
 		}
@@ -123,7 +117,7 @@ func chooseIndex(collection *Collection, queryFields []string) *prefix.PrefixInd
 			targetIndex = index
 		}
 	}
-	return targetIndex.prefix(collection.Name)
+	return targetIndex.prefix(collection.Collection())
 }
 
 func (d *db) getInmemCollection(collection string) (*Collection, bool) {

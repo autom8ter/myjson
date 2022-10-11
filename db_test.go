@@ -18,56 +18,46 @@ import (
 )
 
 func init() {
-	schema, err := os.Open("./testdata/schemas/user.json")
-	if err != nil {
-		panic(err)
-	}
-	defer schema.Close()
-	bits, err := ioutil.ReadAll(schema)
-	if err != nil {
-		panic(err)
-	}
-	for _, c := range defaultCollections {
-		if c.Name == "user" {
-			c.JSONSchema = string(bits)
+	{
+		schema, err := os.Open("./testdata/schemas/user.json")
+		if err != nil {
+			panic(err)
 		}
+		defer schema.Close()
+		bits, err := ioutil.ReadAll(schema)
+		if err != nil {
+			panic(err)
+		}
+		usr, err := wolverine.LoadCollection(string(bits))
+		if err != nil {
+			panic(err)
+		}
+		defaultCollections = append(defaultCollections, usr)
+	}
+	{
+		schema, err := os.Open("./testdata/schemas/task.json")
+		if err != nil {
+			panic(err)
+		}
+		defer schema.Close()
+		bits, err := ioutil.ReadAll(schema)
+		if err != nil {
+			panic(err)
+		}
+		task, err := wolverine.LoadCollection(string(bits))
+		if err != nil {
+			panic(err)
+		}
+		defaultCollections = append(defaultCollections, task)
 	}
 }
 
-var defaultCollections = []*wolverine.Collection{
-	{
-		Name: "user",
-		Indexes: []wolverine.Index{
-			{
-				Fields: []string{
-					"contact.email",
-				},
-			},
-			{
-				Fields: []string{
-					"age",
-				},
-				FullText: true,
-			},
-		},
-	},
-	{
-		Name: "task",
-		Indexes: []wolverine.Index{
-			{
-				Fields: []string{
-					"user",
-				},
-			},
-		},
-	},
-}
+var defaultCollections = []*wolverine.Collection{}
 
 func newUserDoc() *wolverine.Document {
 	doc, err := wolverine.NewDocumentFromMap(map[string]interface{}{
-		"_collection": "user",
-		"_id":         gofakeit.UUID(),
-		"name":        gofakeit.Name(),
+		"_id":  gofakeit.UUID(),
+		"name": gofakeit.Name(),
 		"contact": map[string]interface{}{
 			"email": gofakeit.Email(),
 		},
@@ -77,6 +67,7 @@ func newUserDoc() *wolverine.Document {
 		"favorite_number": gofakeit.Second(),
 		"gender":          gofakeit.Gender(),
 		"age":             gofakeit.IntRange(0, 100),
+		"timestamp":       gofakeit.DateRange(time.Now().Truncate(7200*time.Hour), time.Now()),
 		"annotations":     gofakeit.Map(),
 	})
 	if err != nil {
@@ -87,10 +78,9 @@ func newUserDoc() *wolverine.Document {
 
 func newTaskDoc(usrID string) *wolverine.Document {
 	doc, err := wolverine.NewDocumentFromMap(map[string]interface{}{
-		"_collection": "task",
-		"_id":         gofakeit.UUID(),
-		"user":        usrID,
-		"content":     gofakeit.LoremIpsumSentence(5),
+		"_id":     gofakeit.UUID(),
+		"user":    usrID,
+		"content": gofakeit.LoremIpsumSentence(5),
 	})
 	if err != nil {
 		panic(err)
@@ -98,8 +88,10 @@ func newTaskDoc(usrID string) *wolverine.Document {
 	return doc
 }
 
+const myEmail = "colemanword@gmail.com"
+
 func Test(t *testing.T) {
-	const myEmail = "colemanword@gmail.com"
+
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
@@ -226,12 +218,12 @@ func Test(t *testing.T) {
 					Where: []wolverine.SearchWhere{
 						{
 							Field: "account_id",
-							Op:    wolverine.Numeric,
+							Op:    wolverine.Basic,
 							Value: 1,
 						},
 						{
 							Field: "language",
-							Op:    wolverine.Match,
+							Op:    wolverine.Basic,
 							Value: "english",
 						},
 						{
@@ -304,7 +296,7 @@ func Test(t *testing.T) {
 					Where: []wolverine.SearchWhere{
 						{
 							Field: "contact.email",
-							Op:    wolverine.Term,
+							Op:    wolverine.Basic,
 							Value: "colemanword",
 						},
 					},

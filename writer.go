@@ -29,9 +29,8 @@ func (d *db) saveBatch(ctx context.Context, event *Event) error {
 	}
 	txn := d.kv.NewWriteBatch()
 	var batch *bleve.Batch
-	index := collect.fullText
-	if index != nil {
-		batch = index.NewBatch()
+	if collect.FullText() {
+		batch = d.fullText.NewBatch()
 	}
 	for _, document := range event.Documents {
 		current, _ := d.Get(ctx, event.Collection, document.GetID())
@@ -75,8 +74,8 @@ func (d *db) saveBatch(ctx context.Context, event *Event) error {
 			}); err != nil {
 				return d.wrapErr(err, "")
 			}
-			for _, index := range collect.Indexes {
-				pindex := index.prefix(event.Collection)
+			for _, idx := range collect.Indexes() {
+				pindex := idx.prefix(event.Collection)
 				if current != nil {
 					if err := txn.Delete([]byte(pindex.GetIndex(current.Value()))); err != nil {
 						return d.wrapErr(err, "")
@@ -96,7 +95,7 @@ func (d *db) saveBatch(ctx context.Context, event *Event) error {
 				}
 			}
 		case Delete:
-			for _, i := range collect.Indexes {
+			for _, i := range collect.Indexes() {
 				pindex := i.prefix(event.Collection)
 				if err := txn.Delete([]byte(pindex.GetIndex(current.Value()))); err != nil {
 					return d.wrapErr(err, "")
@@ -115,8 +114,8 @@ func (d *db) saveBatch(ctx context.Context, event *Event) error {
 			}
 		}
 	}
-	if index != nil {
-		if err := index.Batch(batch); err != nil {
+	if batch != nil {
+		if err := d.fullText.Batch(batch); err != nil {
 			return d.wrapErr(err, "")
 		}
 	}
@@ -187,7 +186,7 @@ func (d *db) saveDocument(ctx context.Context, event *Event) error {
 			}); err != nil {
 				return d.wrapErr(err, "")
 			}
-			for _, index := range collect.Indexes {
+			for _, index := range collect.Indexes() {
 				pindex := index.prefix(event.Collection)
 				if current != nil {
 					if err := txn.Delete([]byte(pindex.GetIndex(current.Value()))); err != nil {
@@ -202,13 +201,13 @@ func (d *db) saveDocument(ctx context.Context, event *Event) error {
 					return d.wrapErr(err, "")
 				}
 			}
-			if collect.fullText != nil {
-				if err := collect.fullText.Index(document.GetID(), document.Value()); err != nil {
+			if collect.FullText() {
+				if err := d.fullText.Index(document.GetID(), document.Value()); err != nil {
 					return d.wrapErr(err, "")
 				}
 			}
 		case Delete:
-			for _, index := range collect.Indexes {
+			for _, index := range collect.Indexes() {
 				pindex := index.prefix(event.Collection)
 				if err := txn.Delete([]byte(pindex.GetIndex(current.Value()))); err != nil {
 					return d.wrapErr(err, "")
@@ -217,8 +216,8 @@ func (d *db) saveDocument(ctx context.Context, event *Event) error {
 			if err := txn.Delete([]byte(prefix.PrimaryKey(event.Collection, current.GetID()))); err != nil {
 				return d.wrapErr(err, "")
 			}
-			if collect.fullText != nil {
-				if err := collect.fullText.Delete(document.GetID()); err != nil {
+			if collect.FullText() {
+				if err := d.fullText.Delete(document.GetID()); err != nil {
 					return d.wrapErr(err, "")
 				}
 			}

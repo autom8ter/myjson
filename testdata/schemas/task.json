@@ -1,0 +1,33 @@
+{
+  "$id": "https://example.com/task.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Task",
+  "collection": "task",
+  "type": "object",
+  "indexes": [
+    {
+      "fields": [
+        "user_id"
+      ]
+    }
+  ],
+  "required": [
+    "_id",
+    "user_id",
+    "content"
+  ],
+  "properties": {
+    "_id": {
+      "type": "string",
+      "description": "The user's id."
+    },
+    "user_id": {
+      "type": "string",
+      "description": "The id of the user who owns the task"
+    },
+    "content": {
+      "type": "string",
+      "description": "The content of the task"
+    }
+  }
+}

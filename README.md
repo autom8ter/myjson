@@ -17,11 +17,11 @@ Features:
     - [x] prefix
     - [x] basic
     - [x] regex
-    - [x] term
-    - [x] boolean
+    - [x] wildcard
     - [x] term range
     - [x] date range
-    - [x] numeric range
+    - [x] geo distance
+
 - [x] document storage engine
     - [ ] ttl support
     - [x] optional json schema based validation
@@ -52,6 +52,8 @@ Features:
 - [x] logger
 - [x] migrations
 - [x] 80% test coverage
+- [x] search boosting
+
 
 ## Road to Beta
 
@@ -60,7 +62,7 @@ Features:
 - [ ] examples
 - [ ] views
 - [ ] materialized views
-- [ ] search boostingc
+
 
 ## Beta+ Roadmap
 

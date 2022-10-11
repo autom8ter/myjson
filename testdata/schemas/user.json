@@ -2,7 +2,15 @@
   "$id": "https://example.com/user.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "User",
+  "collection": "user",
   "type": "object",
+  "indexes": [
+    {
+      "fields": [
+        "contact.email"
+      ]
+    }
+  ],
   "required": [
     "_id",
     "name",
@@ -49,6 +57,9 @@
         "male",
         "female"
       ]
+    },
+    "timestamp": {
+      "type": "string"
     },
     "annotations": {
       "type": "object"

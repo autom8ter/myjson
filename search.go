@@ -3,6 +3,8 @@ package wolverine
 import (
 	"context"
 	"fmt"
+	"strings"
+	"time"
 
 	"github.com/blevesearch/bleve"
 	"github.com/blevesearch/bleve/search/query"
@@ -20,17 +22,17 @@ const (
 	// Wildcard full text search type for finding records based on wildcard matching. full text search operators can only be used
 	// against collections that have full text search enabled
 	Wildcard SearchOp = "wildcard"
-	// Term full text search type for finding records based on term matching. full text search operators can only be used
-	// against collections that have full text search enabled
-	Term SearchOp = "term"
 	// Fuzzy full text search type for finding records based on a fuzzy search. full text search operators can only be used
 	// against collections that have full text search enabled
 	Fuzzy SearchOp = "fuzzy"
 	// Regex full text search type for finding records based on a regex matching. full text search operators can only be used
 	// against collections that have full text search enabled
-	Regex   SearchOp = "regex"
-	Match   SearchOp = "match"
-	Numeric SearchOp = "numeric"
+	Regex SearchOp = "regex"
+	// Basic is a basic matcher that checks for an exact match.
+	Basic       SearchOp = "basic"
+	TermRange   SearchOp = "term_range"
+	DateRange   SearchOp = "date_range"
+	GeoDistance SearchOp = "geo_distance"
 )
 
 // Where is field-level filter for database queries
@@ -50,18 +52,16 @@ type SearchQuery struct {
 	// Select is a list of fields to select from each record in the datbase(optional)
 	Select []string `json:"select"`
 	// Where is a list of where clauses used to filter records based on full text search (required)
-	Where   []SearchWhere `json:"where"`
-	StartAt string        `json:"start_at"`
+	Where []SearchWhere `json:"where"`
+	//
+	StartAt string `json:"start_at"`
 	// Limit limits the number of records returned by the query (optional)
 	Limit int `json:"limit"`
 }
 
 func (d *db) Search(ctx context.Context, collection string, q SearchQuery) ([]*Document, error) {
 	c, ok := d.getInmemCollection(collection)
-	if !ok {
-		return nil, fmt.Errorf("unsupported full text search collection: %s", collection)
-	}
-	if c.fullText == nil {
+	if !ok || !c.FullText() {
 		return nil, fmt.Errorf("unsupported full text search collection: %s", collection)
 	}
 	var (
@@ -70,29 +70,85 @@ func (d *db) Search(ctx context.Context, collection string, q SearchQuery) ([]*D
 	for _, w := range q.Where {
 		fields = append(fields, w.Field)
 	}
-
 	if len(q.Where) == 0 {
 		return nil, fmt.Errorf("%s search: invalid search query", collection)
 	}
 	var queries []query.Query
 	for _, where := range q.Where {
+		if where.Value == nil {
+			return nil, fmt.Errorf("empty where clause value")
+		}
 		switch where.Op {
-		case Numeric:
-			qry := bleve.NewNumericRangeQuery(lo.ToPtr(cast.ToFloat64(where.Value)), nil)
+		case Basic:
+			switch where.Value.(type) {
+			case bool:
+				qry := bleve.NewBoolFieldQuery(cast.ToBool(where.Value))
+				if where.Boost > 0 {
+					qry.SetBoost(where.Boost)
+				}
+				qry.SetField(where.Field)
+				queries = append(queries, qry)
+			case float64, int, int32, int64, float32, uint64, uint, uint8, uint16, uint32:
+				qry := bleve.NewNumericRangeQuery(lo.ToPtr(cast.ToFloat64(where.Value)), nil)
+				if where.Boost > 0 {
+					qry.SetBoost(where.Boost)
+				}
+				qry.SetField(where.Field)
+				queries = append(queries, qry)
+			default:
+				qry := bleve.NewMatchQuery(cast.ToString(where.Value))
+				if where.Boost > 0 {
+					qry.SetBoost(where.Boost)
+				}
+				qry.SetField(where.Field)
+				queries = append(queries, qry)
+			}
+		case DateRange:
+			var (
+				from time.Time
+				to   time.Time
+			)
+			split := strings.Split(cast.ToString(where.Value), ",")
+			from = cast.ToTime(split[0])
+			if len(split) == 2 {
+				to = cast.ToTime(split[1])
+			}
+			qry := bleve.NewDateRangeQuery(from, to)
 			if where.Boost > 0 {
 				qry.SetBoost(where.Boost)
 			}
 			qry.SetField(where.Field)
 			queries = append(queries, qry)
-		case Match:
-			qry := bleve.NewMatchQuery(cast.ToString(where.Value))
+		case TermRange:
+			var (
+				from string
+				to   string
+			)
+			split := strings.Split(cast.ToString(where.Value), ",")
+			from = split[0]
+			if len(split) == 2 {
+				to = split[1]
+			}
+			qry := bleve.NewTermRangeQuery(from, to)
 			if where.Boost > 0 {
 				qry.SetBoost(where.Boost)
 			}
 			qry.SetField(where.Field)
 			queries = append(queries, qry)
-		case Term:
-			qry := bleve.NewTermQuery(cast.ToString(where.Value))
+		case GeoDistance:
+			var (
+				from     float64
+				to       float64
+				distance string
+			)
+			split := strings.Split(cast.ToString(where.Value), ",")
+			if len(split) < 3 {
+				return nil, d.wrapErr(fmt.Errorf("geo distance where clause requires 3 comma separated values: lat(float), lng(float), distance(string)"), "")
+			}
+			from = cast.ToFloat64(split[0])
+			to = cast.ToFloat64(split[1])
+			distance = cast.ToString(split[2])
+			qry := bleve.NewGeoDistanceQuery(from, to, distance)
 			if where.Boost > 0 {
 				qry.SetBoost(where.Boost)
 			}
@@ -137,7 +193,7 @@ func (d *db) Search(ctx context.Context, collection string, q SearchQuery) ([]*D
 	} else {
 		searchRequest = bleve.NewSearchRequest(queries[0])
 	}
-	searchRequest.Fields = fields
+	searchRequest.Fields = []string{"*"}
 	searchRequest.Size = q.Limit
 	if searchRequest.Size == 0 {
 		searchRequest.Size = 100
@@ -145,7 +201,7 @@ func (d *db) Search(ctx context.Context, collection string, q SearchQuery) ([]*D
 	if q.StartAt != "" {
 		searchRequest.SearchAfter = []string{q.StartAt}
 	}
-	results, err := c.fullText.Search(searchRequest)
+	results, err := d.fullText.Search(searchRequest)
 	if err != nil {
 		return nil, d.wrapErr(err, "")
 	}

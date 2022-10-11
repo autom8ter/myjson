@@ -25,13 +25,13 @@ func (d *db) Close(ctx context.Context) error {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	err := d.machine.Wait()
-	d.collections.Range(func(key, value any) bool {
-		collection := value.(*Collection)
-		if collection.fullText != nil {
-			err = multierror.Append(err, collection.fullText.Close())
-		}
-		return true
-	})
+	//d.collections.Range(func(key, value any) bool {
+	//	collection := value.(*Collection)
+	//	if collection.fullText != nil {
+	//		err = multierror.Append(err, collection.fullText.Close())
+	//	}
+	//	return true
+	//})
 	err = multierror.Append(err, d.kv.Sync())
 	err = multierror.Append(err, d.kv.Close())
 	if err, ok := err.(*multierror.Error); ok && len(err.Errors) > 0 {
@@ -60,7 +60,7 @@ func (d *db) ReIndex(ctx context.Context) error {
 		egp.Go(func() error {
 			var startAt string
 			for {
-				results, err := d.Query(ctx, c.Name, Query{
+				results, err := d.Query(ctx, c.Collection(), Query{
 					Select:  nil,
 					Where:   nil,
 					StartAt: startAt,
@@ -74,13 +74,13 @@ func (d *db) ReIndex(ctx context.Context) error {
 					break
 				}
 				for _, r := range results {
-					result, _ := d.Get(ctx, c.Name, r.GetID())
+					result, _ := d.Get(ctx, c.Collection(), r.GetID())
 					if result != nil {
-						if err := d.Set(ctx, c.Name, result); err != nil {
+						if err := d.Set(ctx, c.Collection(), result); err != nil {
 							return err
 						}
 					} else {
-						_ = d.Delete(ctx, c.Name, r.GetID())
+						_ = d.Delete(ctx, c.Collection(), r.GetID())
 					}
 				}
 				startAt = results[len(results)-1].GetID()
@@ -242,7 +242,7 @@ func (d *db) SetCollection(ctx context.Context, collection *Collection) error {
 	if collection == nil {
 		return nil
 	}
-	id := fmt.Sprintf("collections.%s", collection.Name)
+	id := fmt.Sprintf("collections.%s", collection.Collection())
 	existing, _ := d.Get(ctx, systemCollection, id)
 	if existing == nil || existing.Empty() {
 		existing = NewDocument()
@@ -258,11 +258,11 @@ func (d *db) SetCollection(ctx context.Context, collection *Collection) error {
 	if err := d.Set(ctx, systemCollection, existing); err != nil {
 		return d.wrapErr(err, "")
 	}
-	d.collections.Store(collection.Name, collection)
+	d.collections.Store(collection.Collection(), collection)
 	if err := d.wrapErr(d.loadCollections(ctx), ""); err != nil {
 		return err
 	}
-	return d.ReIndexCollection(ctx, collection.Name)
+	return d.ReIndexCollection(ctx, collection.Collection())
 }
 
 func (d *db) SetCollections(ctx context.Context, collections []*Collection) error {
@@ -275,3 +275,26 @@ func (d *db) SetCollections(ctx context.Context, collections []*Collection) erro
 	}
 	return d.wrapErr(m.Wait(), "")
 }
+
+var systemCollectionSchema = `
+{
+  "$id": "https://wolverine.io/system.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "System",
+  "type": "object",
+  "required": [
+    "_id",
+    "properties"
+  ],
+  "properties": {
+    "_id": {
+      "type": "string",
+      "description": "The document's id."
+    },
+    "properties": {
+      "type": "object",
+      "description": "system properties"
+    }
+  }
+}
+`
