@@ -2,11 +2,9 @@ package wolverine
 
 import (
 	"context"
-	"sort"
 
 	"github.com/dgraph-io/badger/v3"
 	"github.com/palantir/stacktrace"
-	"github.com/tidwall/gjson"
 
 	"github.com/autom8ter/wolverine/internal/prefix"
 )
@@ -108,7 +106,7 @@ func (d *db) Query(ctx context.Context, collection string, query Query) (Results
 						return stacktrace.Propagate(err, "")
 					}
 					documents = append(documents, document)
-					documents = orderBy(query.OrderBy, query.Limit, documents)
+					documents = orderBy(query.OrderBy, documents)
 				}
 				return nil
 			})
@@ -121,7 +119,7 @@ func (d *db) Query(ctx context.Context, collection string, query Query) (Results
 	}); err != nil {
 		return Results{}, stacktrace.Propagate(err, "")
 	}
-	documents = orderBy(query.OrderBy, query.Limit, documents)
+	documents = orderBy(query.OrderBy, documents)
 	if len(query.Select) > 0 {
 		for _, r := range documents {
 			r.Select(query.Select)
@@ -188,35 +186,26 @@ func (d *db) GetAll(ctx context.Context, collection string, ids []string) ([]*Do
 	return documents, nil
 }
 
-func orderBy(orderBy OrderBy, limit int, documents []*Document) []*Document {
-	if orderBy.Field == "" {
-		return documents
-	}
-	if orderBy.Direction == DESC {
-		sort.Slice(documents, func(i, j int) bool {
-			return compareField(orderBy.Field, documents[i], documents[j])
+// QueryPaginate paginates through each page of the query until the handlePage function returns false or there are no more results
+func (d *db) QueryPaginate(ctx context.Context, collection string, query Query, handlePage PageHandler) error {
+	page := query.Page
+	for {
+		results, err := d.Query(ctx, collection, Query{
+			Select:  query.Select,
+			Where:   query.Where,
+			Page:    page,
+			Limit:   query.Limit,
+			OrderBy: query.OrderBy,
 		})
-	} else {
-		sort.Slice(documents, func(i, j int) bool {
-			return !compareField(orderBy.Field, documents[i], documents[j])
-		})
-	}
-	return documents
-}
-
-func compareField(field string, i, j *Document) bool {
-	iFieldVal := i.result.Get(field)
-	jFieldVal := j.result.Get(field)
-	switch i.result.Get(field).Type {
-	case gjson.Null:
-		return false
-	case gjson.False:
-		return iFieldVal.Bool() && !jFieldVal.Bool()
-	case gjson.Number:
-		return iFieldVal.Float() > jFieldVal.Float()
-	case gjson.String:
-		return iFieldVal.String() > jFieldVal.String()
-	default:
-		return iFieldVal.String() > jFieldVal.String()
+		if err != nil {
+			return stacktrace.Propagate(err, "failed to query collection: %s", collection)
+		}
+		if len(results.Documents) == 0 {
+			return nil
+		}
+		if !handlePage(results.Documents) {
+			return nil
+		}
+		page = results.NextPage
 	}
 }

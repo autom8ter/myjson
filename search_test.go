@@ -263,5 +263,34 @@ func TestSearch(t *testing.T) {
 			assert.Nil(t, err)
 			assert.Greater(t, len(results.Documents), 0)
 		})
+		t.Run("search paginate", func(t *testing.T) {
+			assert.Nil(t, testutil.TestDB(testutil.AllCollections, func(ctx context.Context, db wolverine.DB) {
+				var usrs []*wolverine.Document
+				for i := 0; i < 10; i++ {
+					u := testutil.NewUserDoc()
+					usrs = append(usrs, u)
+				}
+				assert.Nil(t, db.BatchSet(ctx, "user", usrs))
+				seen := map[string]struct{}{}
+				handler := func(documents []*wolverine.Document) bool {
+					for _, doc := range documents {
+						if _, ok := seen[doc.GetID()]; ok {
+							t.Fatal("duplicate doc", doc.GetID())
+						}
+						seen[doc.GetID()] = struct{}{}
+					}
+					return true
+				}
+
+				assert.Nil(t, db.SearchPaginate(ctx, "user", wolverine.SearchQuery{
+					Select: nil,
+					Page:   0,
+					Limit:  1,
+				}, handler))
+
+				assert.Equal(t, len(usrs), len(seen))
+			}))
+		})
+
 	}))
 }

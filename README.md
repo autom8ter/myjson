@@ -9,7 +9,7 @@ external dependencies for data persistance(just disc or memory)
 
 Built on top of BadgerDB and Bleve
 
-    go get github.com/autom8ter/wolverine
+    go get -u github.com/autom8ter/wolverine
 
 Features:
 
@@ -31,12 +31,18 @@ Features:
 - [x] json schema based validation & configuration
 - [x] field based querying
 - [x] change streams
-- [x] batch operations
+- [x] batch operations (set/get/update)
 - [x] write hooks
 - [x] multi-field indexing
 - [x] select fields
 - [x] order by
 - [x] aggregation (min,max,sum,avg,count)
+    - [x] min
+    - [x] max
+    - [x] count
+    - [x] avg
+    - [x] sum
+    - [x] group by
 - [x] query update
 - [x] query delete
 - [ ] multi-field order by

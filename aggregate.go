@@ -39,13 +39,14 @@ type AggregateQuery struct {
 	Aggregate []Aggregate `json:"aggregate"`
 	Where     []Where     `json:"where"`
 	OrderBy   OrderBy     `json:"order_by"`
+	Page      int         `json:"page"`
 	Limit     int         `json:"limit"`
 }
 
-func (d *db) Aggregate(ctx context.Context, collection string, query AggregateQuery) ([]*Document, error) {
+func (d *db) Aggregate(ctx context.Context, collection string, query AggregateQuery) (Results, error) {
 	_, ok := d.getInmemCollection(collection)
 	if !ok {
-		return nil, stacktrace.Propagate(stacktrace.NewError("unsupported collection: %s must be one of: %v", collection, d.collectionNames()), "")
+		return Results{}, stacktrace.Propagate(stacktrace.NewError("unsupported collection: %s must be one of: %v", collection, d.collectionNames()), "")
 	}
 	prefix, _ := d.getQueryPrefix(collection, query.Where)
 	var records []*Document
@@ -58,7 +59,13 @@ func (d *db) Aggregate(ctx context.Context, collection string, query AggregateQu
 		seek := prefix
 		it.Seek(seek)
 		defer it.Close()
+		skip := 0
 		for it.ValidForPrefix(prefix) {
+			if skip < query.Page*query.Limit {
+				skip++
+				it.Next()
+				continue
+			}
 			item := it.Item()
 			err := item.Value(func(bits []byte) error {
 				document, err := NewDocumentFromBytes(bits)
@@ -81,7 +88,7 @@ func (d *db) Aggregate(ctx context.Context, collection string, query AggregateQu
 		}
 		return nil
 	}); err != nil {
-		return nil, err
+		return Results{}, err
 	}
 	var groupDocuments = map[string]*Document{}
 	grouped := lo.GroupBy(records, func(t *Document) string {
@@ -95,7 +102,7 @@ func (d *db) Aggregate(ctx context.Context, collection string, query AggregateQu
 		for _, agg := range query.Aggregate {
 			document, err := getReducer(agg.Function)(agg.Field, group)
 			if err != nil {
-				return nil, err
+				return Results{}, err
 			}
 			for k, v := range document.result.Map() {
 				if groupDocuments[key] == nil || groupDocuments[key].Empty() {
@@ -112,11 +119,14 @@ func (d *db) Aggregate(ctx context.Context, collection string, query AggregateQu
 	for _, record := range groupDocuments {
 		aggDocuments = append(aggDocuments, record)
 	}
-	aggDocuments = orderBy(query.OrderBy, query.Limit, aggDocuments)
+	aggDocuments = orderBy(query.OrderBy, aggDocuments)
 	if query.Limit > 0 && len(aggDocuments) > query.Limit {
-		return aggDocuments[:query.Limit], nil
+		aggDocuments = aggDocuments[:query.Limit]
 	}
-	return aggDocuments, nil
+	return Results{
+		Documents: aggDocuments,
+		NextPage:  query.Page + 1,
+	}, nil
 }
 
 type reducer func(aggField string, records []*Document) (*Document, error)

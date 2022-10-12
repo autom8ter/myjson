@@ -357,8 +357,8 @@ func Test(t *testing.T) {
 			},
 		})
 		assert.Nil(t, err)
-		assert.Greater(t, len(results), 1)
-		for _, result := range results {
+		assert.Greater(t, len(results.Documents), 1)
+		for _, result := range results.Documents {
 			fmt.Println(result.String())
 		}
 	})

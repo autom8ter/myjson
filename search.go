@@ -228,3 +228,26 @@ func (d *db) Search(ctx context.Context, collection string, q SearchQuery) (Resu
 		NextPage:  q.Page + 1,
 	}, nil
 }
+
+// SearchPaginate paginates through each page of the query until the handlePage function returns false or there are no more results
+func (d *db) SearchPaginate(ctx context.Context, collection string, query SearchQuery, handlePage PageHandler) error {
+	page := query.Page
+	for {
+		results, err := d.Search(ctx, collection, SearchQuery{
+			Select: query.Select,
+			Where:  query.Where,
+			Page:   page,
+			Limit:  query.Limit,
+		})
+		if err != nil {
+			return stacktrace.Propagate(err, "failed to query collection: %s", collection)
+		}
+		if len(results.Documents) == 0 {
+			return nil
+		}
+		if !handlePage(results.Documents) {
+			return nil
+		}
+		page = results.NextPage
+	}
+}
