@@ -219,10 +219,10 @@ func (d *db) getInmemCollections() []*Collection {
 	return c
 }
 
-func (d *db) getQueryPrefix(collection string, where []Where, startAt string) ([]byte, []byte, bool) {
+func (d *db) getQueryPrefix(collection string, where []Where) ([]byte, bool) {
 	c, ok := d.getInmemCollection(collection)
 	if !ok {
-		return nil, nil, false
+		return nil, false
 	}
 	var whereFields []string
 	var whereValues = map[string]any{}
@@ -234,7 +234,7 @@ func (d *db) getQueryPrefix(collection string, where []Where, startAt string) ([
 		whereValues[w.Field] = w.Value
 	}
 	index, ok := chooseIndex(c, whereFields)
-	return []byte(index.GetIndex("", whereValues)), []byte(index.GetIndex(startAt, whereValues)), ok
+	return []byte(index.GetIndex("", whereValues)), ok
 }
 
 func (d *db) collectionNames() []string {

@@ -77,12 +77,13 @@ func (d *db) ReIndexCollection(ctx context.Context, collection string) error {
 		return stacktrace.Propagate(err, "failed to reindex collection: %s", collection)
 	}
 	egp, _ := errgroup.WithContext(ctx)
-	var startAt string
+	var page int
 	for {
+
 		results, err := d.Query(ctx, c.Collection(), Query{
 			Select:  nil,
 			Where:   nil,
-			StartAt: startAt,
+			Page:    page,
 			Limit:   1000,
 			OrderBy: OrderBy{},
 		})
@@ -113,7 +114,7 @@ func (d *db) ReIndexCollection(ctx context.Context, collection string) error {
 				return stacktrace.Propagate(d.BatchDelete(ctx, c.Collection(), toDelete), "")
 			})
 		}
-		startAt = results.NextPage
+		page = results.NextPage
 	}
 	if err := egp.Wait(); err != nil {
 		return stacktrace.Propagate(err, "failed to reindex collection: %s", collection)

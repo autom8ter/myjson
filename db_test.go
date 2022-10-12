@@ -313,10 +313,9 @@ func Test(t *testing.T) {
 	})
 	t.Run("order by", func(t *testing.T) {
 		users, err := db.Query(ctx, "user", wolverine.Query{
-			Select:  nil,
-			Where:   nil,
-			StartAt: "",
-			Limit:   10,
+			Select: nil,
+			Where:  nil,
+			Limit:  10,
 			OrderBy: wolverine.OrderBy{
 				Field:     "language",
 				Direction: wolverine.ASC,
@@ -447,7 +446,6 @@ func Benchmark(b *testing.B) {
 							Value: "colemanword@gmail.com",
 						},
 					},
-					StartAt: "",
 					Limit:   1000,
 					OrderBy: wolverine.OrderBy{},
 				})

@@ -13,7 +13,7 @@ import (
 
 type Results struct {
 	Documents []*Document
-	NextPage  string
+	NextPage  int
 }
 
 // Document is a database document with special attributes.

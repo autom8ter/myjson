@@ -2,7 +2,6 @@ package wolverine
 
 import (
 	"context"
-	"encoding/base64"
 	"sort"
 
 	"github.com/dgraph-io/badger/v3"
@@ -62,7 +61,7 @@ type Query struct {
 	Select []string `json:"select"`
 	// Where is a list of where clauses used to filter records
 	Where   []Where `json:"where"`
-	StartAt string  `json:"start_at"`
+	Page    int     `json:"page"`
 	Limit   int     `json:"limit"`
 	OrderBy OrderBy `json:"order_by"`
 }
@@ -73,8 +72,7 @@ func (d *db) Query(ctx context.Context, collection string, query Query) (Results
 			return Results{}, stacktrace.Propagate(stacktrace.NewError("unsupported collection: %s must be one of: %v", collection, d.collectionNames()), "")
 		}
 	}
-	decodedStartAt, _ := base64.StdEncoding.DecodeString(query.StartAt)
-	pfx, seek, _ := d.getQueryPrefix(collection, query.Where, string(decodedStartAt))
+	pfx, _ := d.getQueryPrefix(collection, query.Where)
 
 	var documents []*Document
 	if err := d.kv.View(func(txn *badger.Txn) error {
@@ -83,14 +81,11 @@ func (d *db) Query(ctx context.Context, collection string, query Query) (Results
 		opts.PrefetchSize = 10
 		opts.Prefix = pfx
 		it := txn.NewIterator(opts)
-		if seek != nil {
-			it.Seek(seek)
-		}
-
+		it.Seek(pfx)
 		defer it.Close()
 		skip := 0
 		for it.ValidForPrefix(pfx) {
-			if string(seek) != string(pfx) && skip < 1 {
+			if skip < query.Page*query.Limit {
 				skip++
 				it.Next()
 				continue
@@ -135,15 +130,9 @@ func (d *db) Query(ctx context.Context, collection string, query Query) (Results
 	if query.Limit > 0 && len(documents) > query.Limit {
 		documents = documents[:query.Limit]
 	}
-	if len(documents) == 0 {
-		return Results{
-			Documents: documents,
-			NextPage:  "",
-		}, nil
-	}
 	return Results{
 		Documents: documents,
-		NextPage:  base64.StdEncoding.EncodeToString([]byte(documents[len(documents)-1].GetID())),
+		NextPage:  query.Page + 1,
 	}, nil
 }
 

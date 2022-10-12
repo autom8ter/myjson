@@ -40,7 +40,7 @@ Features:
 - [x] query update
 - [x] query delete
 - [ ] multi-field order by
-- [ ] pagination
+- [x] pagination
 
 ## System/Admin Engine
 
@@ -52,12 +52,10 @@ Features:
 
 ## Road to Beta
 
-- [ ] pagination tests
 - [ ] order by tests
 - [ ] awesome readme
 - [ ] benchmarks
 - [ ] examples
-
 - [ ] better errors & error codes
 - [ ] 80% test coverage
 - [ ] extensive comments

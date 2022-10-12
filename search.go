@@ -54,7 +54,7 @@ type SearchQuery struct {
 	// Where is a list of where clauses used to filter records based on full text search (required)
 	Where []SearchWhere `json:"where"`
 	//
-	StartAt string `json:"start_at"`
+	Page int `json:"page"`
 	// Limit limits the number of records returned by the query (optional)
 	Limit int `json:"limit"`
 }
@@ -66,9 +66,13 @@ func (d *db) Search(ctx context.Context, collection string, q SearchQuery) (Resu
 	}
 	var (
 		fields []string
+		limit  = q.Limit
 	)
 	for _, w := range q.Where {
 		fields = append(fields, w.Field)
+	}
+	if limit == 0 {
+		limit = 1000
 	}
 	var queries []query.Query
 	for _, where := range q.Where {
@@ -186,18 +190,15 @@ func (d *db) Search(ctx context.Context, collection string, q SearchQuery) (Resu
 	}
 	var searchRequest *bleve.SearchRequest
 	if len(queries) > 1 {
-		searchRequest = bleve.NewSearchRequest(bleve.NewConjunctionQuery(queries...))
+		searchRequest = bleve.NewSearchRequestOptions(bleve.NewConjunctionQuery(queries...), q.Limit, q.Page*q.Limit, false)
 	} else {
-		searchRequest = bleve.NewSearchRequest(queries[0])
+		searchRequest = bleve.NewSearchRequestOptions(bleve.NewConjunctionQuery(queries[0]), q.Limit, q.Page*q.Limit, false)
 	}
 	searchRequest.Fields = []string{"*"}
-	searchRequest.Size = q.Limit
-	if searchRequest.Size == 0 {
-		searchRequest.Size = 100
-	}
-	if q.StartAt != "" {
-
-	}
+	//searchRequest.Size = q.Limit
+	//if searchRequest.Size == 0 {
+	//	searchRequest.Size = 100
+	//}
 	results, err := d.getFullText(collection).Search(searchRequest)
 	if err != nil {
 		return Results{}, stacktrace.Propagate(err, "failed to search index: %s", collection)
@@ -224,6 +225,6 @@ func (d *db) Search(ctx context.Context, collection string, q SearchQuery) (Resu
 	}
 	return Results{
 		Documents: data,
-		NextPage:  "",
+		NextPage:  q.Page + 1,
 	}, nil
 }

@@ -1,4 +1,4 @@
-package scripts_test
+package wolverine_test
 
 import (
 	"context"
@@ -8,7 +8,6 @@ import (
 
 	"github.com/autom8ter/wolverine"
 	"github.com/autom8ter/wolverine/internal/testutil"
-	"github.com/autom8ter/wolverine/scripts"
 )
 
 func TestPaginate(t *testing.T) {
@@ -30,9 +29,9 @@ func TestPaginate(t *testing.T) {
 				}
 				return true
 			}
-			assert.Nil(t, db.RunScript(ctx, scripts.QueryPaginate("user", wolverine.Query{
+			assert.Nil(t, db.RunScript(ctx, wolverine.PaginateQuery("user", wolverine.Query{
 				Select:  nil,
-				StartAt: "",
+				Page:    0,
 				Limit:   1,
 				OrderBy: wolverine.OrderBy{},
 			}, handler)))
@@ -58,10 +57,10 @@ func TestPaginate(t *testing.T) {
 				}
 				return true
 			}
-			assert.Nil(t, db.RunScript(ctx, scripts.PaginateSearch("user", wolverine.SearchQuery{
-				Select:  nil,
-				StartAt: "",
-				Limit:   1,
+			assert.Nil(t, db.RunScript(ctx, wolverine.PaginateSearch("user", wolverine.SearchQuery{
+				Select: nil,
+				Page:   0,
+				Limit:  1,
 			}, handler)))
 
 			assert.Equal(t, len(usrs), len(seen))
