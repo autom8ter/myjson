@@ -23,17 +23,13 @@ func NewPrefixedIndex(collection string, fields []string) *PrefixIndexRef {
 	}
 }
 
-func PrimaryIndex(collection string) *PrefixIndexRef {
-	return NewPrefixedIndex(collection, []string{"_id"})
-}
-
 func PrimaryKey(collection string, id string) string {
-	return NewPrefixedIndex(collection, []string{"_id"}).GetIndex(map[string]any{
+	return NewPrefixedIndex(collection, []string{"_id"}).GetIndex(id, map[string]any{
 		"_id": id,
 	})
 }
 
-func (d PrefixIndexRef) GetIndex(value any) string {
+func (d PrefixIndexRef) GetIndex(id string, value any) string {
 	fields := map[string]any{}
 	switch value := value.(type) {
 	case map[string]any:
@@ -54,7 +50,10 @@ func (d PrefixIndexRef) GetIndex(value any) string {
 			path = append(path, fmt.Sprintf("%s%s", toStringHash(k), ""))
 		}
 	}
-	return strings.Join(path, ".")
+	if id != "" {
+		path = append(path, toStringHash(id))
+	}
+	return strings.Join(path, "")
 }
 
 func toStringHash(value any) string {
@@ -70,9 +69,4 @@ func toStringHash(value any) string {
 	// s := sha1.New()
 	//s.Write(bits)
 	//return base64.StdEncoding.EncodeToString(s.Sum(nil))
-}
-
-// Cache
-func Cache(key string) []byte {
-	return []byte(fmt.Sprintf("cache.%s", key))
 }

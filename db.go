@@ -181,11 +181,8 @@ func (d *db) loadCollections(ctx context.Context) error {
 	return nil
 }
 
-func chooseIndex(collection *Collection, queryFields []string) *prefix.PrefixIndexRef {
+func chooseIndex(collection *Collection, queryFields []string) (*prefix.PrefixIndexRef, bool) {
 	//sort.Strings(queryFields)
-	var targetIndex = Index{
-		Fields: []string{"_id"},
-	}
 	for _, index := range collection.Indexes() {
 		if len(index.Fields) != len(queryFields) {
 			continue
@@ -197,10 +194,12 @@ func chooseIndex(collection *Collection, queryFields []string) *prefix.PrefixInd
 			}
 		}
 		if match {
-			targetIndex = index
+			return index.prefix(collection.Collection()), true
 		}
 	}
-	return targetIndex.prefix(collection.Collection())
+	return Index{
+		Fields: []string{"_id"},
+	}.prefix(collection.Collection()), false
 }
 
 func (d *db) getInmemCollection(collection string) (*Collection, bool) {
@@ -220,21 +219,22 @@ func (d *db) getInmemCollections() []*Collection {
 	return c
 }
 
-func (d *db) getQueryPrefix(collection string, where []Where) []byte {
+func (d *db) getQueryPrefix(collection string, where []Where, startAt string) ([]byte, []byte, bool) {
 	c, ok := d.getInmemCollection(collection)
 	if !ok {
-		return nil
+		return nil, nil, false
 	}
 	var whereFields []string
 	var whereValues = map[string]any{}
 	for _, w := range where {
-		if w.Op != "==" && w.Op != "eq" {
+		if w.Op != "==" && w.Op != Eq {
 			continue
 		}
 		whereFields = append(whereFields, w.Field)
 		whereValues[w.Field] = w.Value
 	}
-	return []byte(chooseIndex(c, whereFields).GetIndex(whereValues))
+	index, ok := chooseIndex(c, whereFields)
+	return []byte(index.GetIndex("", whereValues)), []byte(index.GetIndex(startAt, whereValues)), ok
 }
 
 func (d *db) collectionNames() []string {

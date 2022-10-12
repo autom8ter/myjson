@@ -69,8 +69,9 @@ func (d *db) saveBatch(ctx context.Context, event *Event) error {
 
 		switch event.Action {
 		case Set, Update:
+			pkey := prefix.PrimaryKey(event.Collection, document.GetID())
 			if err := txn.SetEntry(&badger.Entry{
-				Key:   []byte(prefix.PrimaryKey(event.Collection, document.GetID())),
+				Key:   []byte(pkey),
 				Value: bits,
 			}); err != nil {
 				return stacktrace.Propagate(err, "failed to batch save documents")
@@ -78,11 +79,11 @@ func (d *db) saveBatch(ctx context.Context, event *Event) error {
 			for _, idx := range collect.Indexes() {
 				pindex := idx.prefix(event.Collection)
 				if current != nil {
-					if err := txn.Delete([]byte(pindex.GetIndex(current.Value()))); err != nil {
+					if err := txn.Delete([]byte(pindex.GetIndex(current.GetID(), current.Value()))); err != nil {
 						return stacktrace.Propagate(err, "failed to batch save documents")
 					}
 				}
-				i := pindex.GetIndex(document.Value())
+				i := pindex.GetIndex(document.GetID(), document.Value())
 				if err := txn.SetEntry(&badger.Entry{
 					Key:   []byte(i),
 					Value: bits,
@@ -98,7 +99,7 @@ func (d *db) saveBatch(ctx context.Context, event *Event) error {
 		case Delete:
 			for _, i := range collect.Indexes() {
 				pindex := i.prefix(event.Collection)
-				if err := txn.Delete([]byte(pindex.GetIndex(current.Value()))); err != nil {
+				if err := txn.Delete([]byte(pindex.GetIndex(current.GetID(), current.Value()))); err != nil {
 					return stacktrace.Propagate(err, "failed to batch delete documents")
 				}
 			}
@@ -191,11 +192,11 @@ func (d *db) saveDocument(ctx context.Context, event *Event) error {
 			for _, index := range collect.Indexes() {
 				pindex := index.prefix(event.Collection)
 				if current != nil {
-					if err := txn.Delete([]byte(pindex.GetIndex(current.Value()))); err != nil {
+					if err := txn.Delete([]byte(pindex.GetIndex(current.GetID(), current.Value()))); err != nil {
 						return stacktrace.Propagate(err, "failed to save document")
 					}
 				}
-				i := pindex.GetIndex(document.Value())
+				i := pindex.GetIndex(document.GetID(), document.Value())
 				if err := txn.SetEntry(&badger.Entry{
 					Key:   []byte(i),
 					Value: bits,
@@ -211,7 +212,7 @@ func (d *db) saveDocument(ctx context.Context, event *Event) error {
 		case Delete:
 			for _, index := range collect.Indexes() {
 				pindex := index.prefix(event.Collection)
-				if err := txn.Delete([]byte(pindex.GetIndex(current.Value()))); err != nil {
+				if err := txn.Delete([]byte(pindex.GetIndex(current.GetID(), current.Value()))); err != nil {
 					return stacktrace.Propagate(err, "failed to delete document")
 				}
 			}
@@ -299,23 +300,23 @@ func (d *db) BatchDelete(ctx context.Context, collection string, ids []string) e
 }
 
 func (d *db) QueryUpdate(ctx context.Context, update *Document, collection string, query Query) error {
-	documents, err := d.Query(ctx, collection, query)
+	results, err := d.Query(ctx, collection, query)
 	if err != nil {
 		return stacktrace.Propagate(err, "")
 	}
-	for _, document := range documents {
+	for _, document := range results.Documents {
 		document.Merge(update)
 	}
-	return stacktrace.Propagate(d.BatchSet(ctx, collection, documents), "")
+	return stacktrace.Propagate(d.BatchSet(ctx, collection, results.Documents), "")
 }
 
 func (d *db) QueryDelete(ctx context.Context, collection string, query Query) error {
-	documents, err := d.Query(ctx, collection, query)
+	results, err := d.Query(ctx, collection, query)
 	if err != nil {
 		return stacktrace.Propagate(err, "")
 	}
 	var ids []string
-	for _, document := range documents {
+	for _, document := range results.Documents {
 		ids = append(ids, document.GetID())
 	}
 	return stacktrace.Propagate(d.BatchDelete(ctx, collection, ids), "")

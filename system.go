@@ -89,12 +89,12 @@ func (d *db) ReIndexCollection(ctx context.Context, collection string) error {
 		if err != nil {
 			return stacktrace.Propagate(err, "failed to reindex collection: %s", collection)
 		}
-		if len(results) == 0 {
+		if len(results.Documents) == 0 {
 			break
 		}
 		var toSet []*Document
 		var toDelete []string
-		for _, r := range results {
+		for _, r := range results.Documents {
 			result, _ := d.Get(ctx, c.Collection(), r.GetID())
 			if result != nil {
 				toSet = append(toSet, result)
@@ -113,7 +113,7 @@ func (d *db) ReIndexCollection(ctx context.Context, collection string) error {
 				return stacktrace.Propagate(d.BatchDelete(ctx, c.Collection(), toDelete), "")
 			})
 		}
-		startAt = results[len(results)-1].GetID()
+		startAt = results.NextPage
 	}
 	if err := egp.Wait(); err != nil {
 		return stacktrace.Propagate(err, "failed to reindex collection: %s", collection)
@@ -204,7 +204,7 @@ func (d *db) GetCollections(ctx context.Context) ([]*Collection, error) {
 	if err != nil {
 		return nil, stacktrace.Propagate(err, "failed to get collections")
 	}
-	for _, result := range results {
+	for _, result := range results.Documents {
 		if strings.HasPrefix(result.GetID(), "collections.") {
 			existing, err := d.Get(ctx, systemCollection, result.GetID())
 			if err != nil {

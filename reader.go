@@ -2,7 +2,7 @@ package wolverine
 
 import (
 	"context"
-	"fmt"
+	"encoding/base64"
 	"sort"
 
 	"github.com/dgraph-io/badger/v3"
@@ -67,28 +67,34 @@ type Query struct {
 	OrderBy OrderBy `json:"order_by"`
 }
 
-func (d *db) Query(ctx context.Context, collection string, query Query) ([]*Document, error) {
+func (d *db) Query(ctx context.Context, collection string, query Query) (Results, error) {
 	if collection != systemCollection {
 		if _, ok := d.getInmemCollection(collection); !ok {
-			return nil, stacktrace.Propagate(stacktrace.NewError("unsupported collection: %s must be one of: %v", collection, d.collectionNames()), "")
+			return Results{}, stacktrace.Propagate(stacktrace.NewError("unsupported collection: %s must be one of: %v", collection, d.collectionNames()), "")
 		}
 	}
-	prefix := d.getQueryPrefix(collection, query.Where)
+	decodedStartAt, _ := base64.StdEncoding.DecodeString(query.StartAt)
+	pfx, seek, _ := d.getQueryPrefix(collection, query.Where, string(decodedStartAt))
+
 	var documents []*Document
 	if err := d.kv.View(func(txn *badger.Txn) error {
 		opts := badger.DefaultIteratorOptions
 		opts.PrefetchValues = true
 		opts.PrefetchSize = 10
-		opts.Prefix = prefix
+		opts.Prefix = pfx
 		it := txn.NewIterator(opts)
-		seek := prefix
-		if query.StartAt != "" {
-			seek = []byte(fmt.Sprintf("%s.%s", string(prefix), query.StartAt))
+		if seek != nil {
+			it.Seek(seek)
 		}
 
-		it.Seek(seek)
 		defer it.Close()
-		for it.ValidForPrefix(prefix) {
+		skip := 0
+		for it.ValidForPrefix(pfx) {
+			if string(seek) != string(pfx) && skip < 1 {
+				skip++
+				it.Next()
+				continue
+			}
 			if query.OrderBy.Field == "" && query.Limit > 0 && len(documents) >= query.Limit {
 				return nil
 			}
@@ -118,7 +124,7 @@ func (d *db) Query(ctx context.Context, collection string, query Query) ([]*Docu
 		}
 		return nil
 	}); err != nil {
-		return nil, err
+		return Results{}, stacktrace.Propagate(err, "")
 	}
 	documents = orderBy(query.OrderBy, query.Limit, documents)
 	if len(query.Select) > 0 {
@@ -127,9 +133,18 @@ func (d *db) Query(ctx context.Context, collection string, query Query) ([]*Docu
 		}
 	}
 	if query.Limit > 0 && len(documents) > query.Limit {
-		return documents[:query.Limit], nil
+		documents = documents[:query.Limit]
 	}
-	return documents, nil
+	if len(documents) == 0 {
+		return Results{
+			Documents: documents,
+			NextPage:  "",
+		}, nil
+	}
+	return Results{
+		Documents: documents,
+		NextPage:  base64.StdEncoding.EncodeToString([]byte(documents[len(documents)-1].GetID())),
+	}, nil
 }
 
 func (d *db) Get(ctx context.Context, collection, id string) (*Document, error) {
@@ -196,9 +211,6 @@ func orderBy(orderBy OrderBy, limit int, documents []*Document) []*Document {
 		sort.Slice(documents, func(i, j int) bool {
 			return !compareField(orderBy.Field, documents[i], documents[j])
 		})
-	}
-	if limit > 0 && len(documents) > limit {
-		return documents[:limit]
 	}
 	return documents
 }

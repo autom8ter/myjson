@@ -33,13 +33,14 @@ Features:
 - [x] change streams
 - [x] batch operations
 - [x] write hooks
-- [x] field based indexes
+- [x] multi-field indexing
 - [x] select fields
 - [x] order by
 - [x] aggregation (min,max,sum,avg,count)
 - [x] query update
 - [x] query delete
 - [ ] multi-field order by
+- [ ] pagination
 
 ## System/Admin Engine
 
@@ -51,10 +52,12 @@ Features:
 
 ## Road to Beta
 
+- [ ] pagination tests
+- [ ] order by tests
 - [ ] awesome readme
 - [ ] benchmarks
 - [ ] examples
-- [ ] pagination tests
+
 - [ ] better errors & error codes
 - [ ] 80% test coverage
 - [ ] extensive comments

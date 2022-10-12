@@ -67,7 +67,7 @@ func Test(t *testing.T) {
 		}
 		results, err := db.Query(ctx, "user", *query)
 		assert.Nil(t, err)
-		assert.Equal(t, 1, len(results))
+		assert.Equal(t, 1, len(results.Documents))
 		assert.Equal(t, testutil.MyEmail, result.Get("contact.email"))
 		update := wolverine.NewDocument()
 		newEmail := gofakeit.Email()
@@ -160,8 +160,8 @@ func Test(t *testing.T) {
 					Limit: 100,
 				})
 				assert.Nil(t, err)
-				assert.Equal(t, 1, len(results))
-				//assert.EqualValues(t, testutil.MyEmail, results[0].Get("contact.email"))
+				assert.Equal(t, 1, len(results.Documents))
+				//assert.EqualValues(t, testutil.MyEmail, results.Documents[0].Get("contact.email"))
 			}
 
 			{
@@ -182,7 +182,7 @@ func Test(t *testing.T) {
 					Limit: 100,
 				})
 				assert.Nil(t, err)
-				assert.Equal(t, 0, len(results))
+				assert.Equal(t, 0, len(results.Documents))
 			}
 			{
 				results, err := db.Search(ctx, "user", wolverine.SearchQuery{
@@ -197,7 +197,7 @@ func Test(t *testing.T) {
 					Limit: 100,
 				})
 				assert.Nil(t, err)
-				assert.Equal(t, 0, len(results))
+				assert.Equal(t, 0, len(results.Documents))
 			}
 			{
 				results, err := db.Search(ctx, "user", wolverine.SearchQuery{
@@ -212,8 +212,8 @@ func Test(t *testing.T) {
 					Limit: 100,
 				})
 				assert.Nil(t, err)
-				assert.Equal(t, 1, len(results))
-				assert.EqualValues(t, testutil.MyEmail, results[0].Get("contact.email"))
+				assert.Equal(t, 1, len(results.Documents))
+				assert.EqualValues(t, testutil.MyEmail, results.Documents[0].Get("contact.email"))
 			}
 			{
 				results, err := db.Search(ctx, "user", wolverine.SearchQuery{
@@ -228,8 +228,8 @@ func Test(t *testing.T) {
 					Limit: 100,
 				})
 				assert.Nil(t, err)
-				assert.Equal(t, 1, len(results))
-				assert.EqualValues(t, testutil.MyEmail, results[0].Get("contact.email"))
+				assert.Equal(t, 1, len(results.Documents))
+				assert.EqualValues(t, testutil.MyEmail, results.Documents[0].Get("contact.email"))
 			}
 			{
 				results, err := db.Search(ctx, "user", wolverine.SearchQuery{
@@ -244,8 +244,8 @@ func Test(t *testing.T) {
 					Limit: 100,
 				})
 				assert.Nil(t, err)
-				assert.Equal(t, 1, len(results))
-				assert.EqualValues(t, testutil.MyEmail, results[0].Get("contact.email"))
+				assert.Equal(t, 1, len(results.Documents))
+				assert.EqualValues(t, testutil.MyEmail, results.Documents[0].Get("contact.email"))
 			}
 		}))
 	})
@@ -308,7 +308,7 @@ func Test(t *testing.T) {
 			assert.NotNil(t, err)
 			results, err := db.Query(ctx, "test", wolverine.Query{})
 			assert.NotNil(t, err)
-			assert.Nil(t, results)
+			assert.Nil(t, results.Documents)
 		}))
 	})
 	t.Run("order by", func(t *testing.T) {
@@ -323,9 +323,9 @@ func Test(t *testing.T) {
 			},
 		})
 		assert.Nil(t, err)
-		assert.Equal(t, 10, len(users))
+		assert.Equal(t, 10, len(users.Documents))
 		var previous string
-		for _, usr := range users {
+		for _, usr := range users.Documents {
 			lang := usr.Get("language")
 			name := usr.Get("name")
 			fmt.Println(lang, name)
@@ -454,8 +454,8 @@ func Benchmark(b *testing.B) {
 				if err != nil {
 					b.Fatal(err)
 				}
-				if len(results) != 1 {
-					b.Fatal("failed to query email", len(results))
+				if len(results.Documents) != 1 {
+					b.Fatal("failed to query email", len(results.Documents))
 				}
 			}
 		}))
@@ -490,8 +490,8 @@ func Benchmark(b *testing.B) {
 				if err != nil {
 					b.Fatal(err)
 				}
-				if len(results) != 1 {
-					b.Fatal("failed to search email", len(results))
+				if len(results.Documents) != 1 {
+					b.Fatal("failed to search email", len(results.Documents))
 				}
 			}
 		}))

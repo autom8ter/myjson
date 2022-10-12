@@ -47,7 +47,7 @@ func (d *db) Aggregate(ctx context.Context, collection string, query AggregateQu
 	if !ok {
 		return nil, stacktrace.Propagate(stacktrace.NewError("unsupported collection: %s must be one of: %v", collection, d.collectionNames()), "")
 	}
-	prefix := d.getQueryPrefix(collection, query.Where)
+	prefix, _, _ := d.getQueryPrefix(collection, query.Where, "")
 	var records []*Document
 	if err := d.kv.View(func(txn *badger.Txn) error {
 		opts := badger.DefaultIteratorOptions

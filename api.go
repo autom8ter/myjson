@@ -17,6 +17,8 @@ type DB interface {
 	Streamer
 	// Aggregator is a database aggregator
 	Aggregator
+	// Scripter is a database scripter
+	Scripter
 }
 
 // System performs internal/system operations against the database
@@ -48,9 +50,9 @@ type System interface {
 // Reader performs read operations against the database
 type Reader interface {
 	// Search executes a full text search query against the database
-	Search(ctx context.Context, collection string, q SearchQuery) ([]*Document, error)
+	Search(ctx context.Context, collection string, q SearchQuery) (Results, error)
 	// Query queries the database for a list of documents
-	Query(ctx context.Context, collection string, query Query) ([]*Document, error)
+	Query(ctx context.Context, collection string, query Query) (Results, error)
 	// Get gets a single record from the database
 	Get(ctx context.Context, collection, id string) (*Document, error)
 	// GetAll gets a list of documents from the database by id
@@ -90,4 +92,9 @@ type Streamer interface {
 type Aggregator interface {
 	// Aggregate
 	Aggregate(ctx context.Context, collection string, query AggregateQuery) ([]*Document, error)
+}
+
+// Scripter runs scripts
+type Scripter interface {
+	RunScript(ctx context.Context, script Script) error
 }

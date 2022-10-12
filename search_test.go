@@ -45,8 +45,8 @@ func TestSearch(t *testing.T) {
 				Limit: 100,
 			})
 			assert.Nil(t, err)
-			assert.Equal(t, 1, len(results))
-			assert.EqualValues(t, testutil.MyEmail, results[0].Get("contact.email"))
+			assert.Equal(t, 1, len(results.Documents))
+			assert.EqualValues(t, testutil.MyEmail, results.Documents[0].Get("contact.email"))
 
 			results, err = db.Search(ctx, "user", wolverine.SearchQuery{
 				Select: []string{"name", "contact.email"},
@@ -65,7 +65,7 @@ func TestSearch(t *testing.T) {
 				Limit: 100,
 			})
 			assert.Nil(t, err)
-			assert.Equal(t, 0, len(results))
+			assert.Equal(t, 0, len(results.Documents))
 
 			results, err = db.Search(ctx, "user", wolverine.SearchQuery{
 				Select: []string{"name", "contact.email"},
@@ -79,7 +79,7 @@ func TestSearch(t *testing.T) {
 				Limit: 100,
 			})
 			assert.Nil(t, err)
-			assert.Greater(t, len(results), 0)
+			assert.Greater(t, len(results.Documents), 0)
 		})
 
 		t.Run("prefix", func(t *testing.T) {
@@ -105,8 +105,8 @@ func TestSearch(t *testing.T) {
 				Limit: 100,
 			})
 			assert.Nil(t, err)
-			assert.Equal(t, 1, len(results))
-			assert.EqualValues(t, testutil.MyEmail, results[0].Get("contact.email"))
+			assert.Equal(t, 1, len(results.Documents))
+			assert.EqualValues(t, testutil.MyEmail, results.Documents[0].Get("contact.email"))
 
 			results, err = db.Search(ctx, "user", wolverine.SearchQuery{
 				Select: []string{"name", "contact.email"},
@@ -120,7 +120,7 @@ func TestSearch(t *testing.T) {
 				Limit: 100,
 			})
 			assert.Nil(t, err)
-			assert.Equal(t, 0, len(results))
+			assert.Equal(t, 0, len(results.Documents))
 
 			results, err = db.Search(ctx, "user", wolverine.SearchQuery{
 				Select: []string{"name", "contact.email"},
@@ -134,7 +134,7 @@ func TestSearch(t *testing.T) {
 				Limit: 100,
 			})
 			assert.Nil(t, err)
-			assert.Greater(t, len(results), 0)
+			assert.Greater(t, len(results.Documents), 0)
 		})
 
 		t.Run("wildcard", func(t *testing.T) {
@@ -160,8 +160,8 @@ func TestSearch(t *testing.T) {
 				Limit: 100,
 			})
 			assert.Nil(t, err)
-			assert.Equal(t, 1, len(results))
-			assert.EqualValues(t, testutil.MyEmail, results[0].Get("contact.email"))
+			assert.Equal(t, 1, len(results.Documents))
+			assert.EqualValues(t, testutil.MyEmail, results.Documents[0].Get("contact.email"))
 
 			results, err = db.Search(ctx, "user", wolverine.SearchQuery{
 				Select: []string{"name", "contact.email"},
@@ -175,7 +175,7 @@ func TestSearch(t *testing.T) {
 				Limit: 100,
 			})
 			assert.Nil(t, err)
-			assert.Equal(t, 0, len(results))
+			assert.Equal(t, 0, len(results.Documents))
 
 			results, err = db.Search(ctx, "user", wolverine.SearchQuery{
 				Select: []string{"name", "contact.email"},
@@ -189,7 +189,7 @@ func TestSearch(t *testing.T) {
 				Limit: 100,
 			})
 			assert.Nil(t, err)
-			assert.Greater(t, len(results), 0)
+			assert.Greater(t, len(results.Documents), 0)
 		})
 
 		t.Run("date range", func(t *testing.T) {
@@ -205,7 +205,7 @@ func TestSearch(t *testing.T) {
 				Limit: 100,
 			})
 			assert.Nil(t, err)
-			assert.Greater(t, len(results), 0)
+			assert.Greater(t, len(results.Documents), 0)
 
 		})
 
@@ -232,8 +232,8 @@ func TestSearch(t *testing.T) {
 				Limit: 100,
 			})
 			assert.Nil(t, err)
-			assert.Equal(t, 1, len(results))
-			assert.EqualValues(t, testutil.MyEmail, results[0].Get("contact.email"))
+			assert.Equal(t, 1, len(results.Documents))
+			assert.EqualValues(t, testutil.MyEmail, results.Documents[0].Get("contact.email"))
 
 			results, err = db.Search(ctx, "user", wolverine.SearchQuery{
 				Select: []string{"name", "contact.email"},
@@ -247,7 +247,7 @@ func TestSearch(t *testing.T) {
 				Limit: 100,
 			})
 			assert.Nil(t, err)
-			assert.Equal(t, 0, len(results))
+			assert.Equal(t, 0, len(results.Documents))
 
 			results, err = db.Search(ctx, "user", wolverine.SearchQuery{
 				Select: []string{"name", "contact.email"},
@@ -261,7 +261,7 @@ func TestSearch(t *testing.T) {
 				Limit: 100,
 			})
 			assert.Nil(t, err)
-			assert.Greater(t, len(results), 0)
+			assert.Greater(t, len(results.Documents), 0)
 		})
 	}))
 }
