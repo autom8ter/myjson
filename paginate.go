@@ -8,12 +8,6 @@ import (
 
 type PageHandler func(document []*Document) bool
 
-type Paginator struct {
-	limit   int
-	current []*Document
-	page    int
-}
-
 // PaginateQuery paginates through each page of the query until the handlePage function returns false or there are no more results
 func PaginateQuery(collection string, query Query, handlePage PageHandler) Script {
 	return func(ctx context.Context, db DB) error {
