@@ -117,7 +117,7 @@ func (d *db) Aggregate(ctx context.Context, collection string, query AggregateQu
 	}
 	aggDocuments = orderBy(query.OrderBy, aggDocuments)
 
-	prunePage(query.Page, query.Limit, aggDocuments)
+	aggDocuments, _ = prunePage(query.Page, query.Limit, aggDocuments)
 	return Page{
 		Documents: aggDocuments,
 		NextPage:  query.Page + 1,

@@ -100,9 +100,6 @@ func (d *db) Query(ctx context.Context, collection string, query Query) (Page, e
 					}
 					documents = append(documents, document)
 					documents = orderBy(query.OrderBy, documents)
-					if prunePage(query.Page, query.Limit, documents) {
-						return nil
-					}
 				}
 				return nil
 			})
@@ -116,12 +113,12 @@ func (d *db) Query(ctx context.Context, collection string, query Query) (Page, e
 		return Page{}, stacktrace.Propagate(err, "")
 	}
 	documents = orderBy(query.OrderBy, documents)
+	documents, _ = prunePage(query.Page, query.Limit, documents)
 	if len(query.Select) > 0 {
 		for _, r := range documents {
 			r.Select(query.Select)
 		}
 	}
-	prunePage(query.Page, query.Limit, documents)
 	return Page{
 		Documents: documents,
 		NextPage:  query.Page + 1,
