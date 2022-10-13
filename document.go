@@ -2,7 +2,10 @@ package wolverine
 
 import (
 	"encoding/json"
+	"io"
+	"time"
 
+	"github.com/gogo/protobuf/proto"
 	"github.com/nqd/flat"
 	"github.com/palantir/stacktrace"
 	"github.com/samber/lo"
@@ -11,9 +14,16 @@ import (
 	"github.com/tidwall/sjson"
 )
 
-type Results struct {
-	Documents []*Document
-	NextPage  int
+type Stats struct {
+	ExecutionTime time.Duration `json:"execution_time"`
+}
+
+// Page is a page of documents
+type Page struct {
+	Documents []*Document `json:"documents"`
+	NextPage  int         `json:"next_page"`
+	Count     int         `json:"count"`
+	Stats     Stats       `json:"stats"`
 }
 
 // Document is a database document with special attributes.
@@ -22,6 +32,19 @@ type Document struct {
 	result *gjson.Result
 }
 
+// UnmarshalJSON satisfies the json Unmarshaler interface
+func (d *Document) UnmarshalJSON(bytes []byte) error {
+	parsed := gjson.ParseBytes(bytes)
+	d.result = &parsed
+	return d.Validate()
+}
+
+// MarshalJSON satisfies the json Marshaler interface
+func (d *Document) MarshalJSON() ([]byte, error) {
+	return d.Bytes(), nil
+}
+
+// NewDocument creates a new json document
 func NewDocument() *Document {
 	parsed := gjson.Parse("{}")
 	return &Document{
@@ -57,6 +80,7 @@ func NewDocumentFromAny(value any) (*Document, error) {
 	return d, nil
 }
 
+// Empty returns whether the document is empty
 func (d *Document) Empty() bool {
 	return d.result == nil || d.result.Raw == ""
 }
@@ -71,7 +95,7 @@ func (d *Document) Bytes() []byte {
 	return []byte(d.result.Raw)
 }
 
-// Value returns the document
+// Value returns the document as a map
 func (d *Document) Value() map[string]any {
 	return d.result.Value().(map[string]interface{})
 }
@@ -215,5 +239,19 @@ func (d *Document) Where(wheres []Where) (bool, error) {
 
 // ScanJSON scans the json document into the value
 func (d *Document) ScanJSON(value any) error {
-	return stacktrace.Propagate(json.Unmarshal([]byte(d.String()), &value), "failed to scan document")
+	switch value.(type) {
+	case proto.Message:
+		return stacktrace.Propagate(json.Unmarshal([]byte(d.String()), &value), "failed to scan document")
+	default:
+		return stacktrace.Propagate(json.Unmarshal([]byte(d.String()), &value), "failed to scan document")
+	}
+}
+
+// Encode encodes the json document to the io writer
+func (d *Document) Encode(w io.Writer) error {
+	_, err := w.Write(d.Bytes())
+	if err != nil {
+		return stacktrace.Propagate(err, "failed to encode document")
+	}
+	return nil
 }

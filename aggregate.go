@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/dgraph-io/badger/v3"
 	"github.com/palantir/stacktrace"
@@ -43,10 +44,11 @@ type AggregateQuery struct {
 	Limit     int         `json:"limit"`
 }
 
-func (d *db) Aggregate(ctx context.Context, collection string, query AggregateQuery) (Results, error) {
+func (d *db) Aggregate(ctx context.Context, collection string, query AggregateQuery) (Page, error) {
+	now := time.Now()
 	_, ok := d.getInmemCollection(collection)
 	if !ok {
-		return Results{}, stacktrace.Propagate(stacktrace.NewError("unsupported collection: %s must be one of: %v", collection, d.collectionNames()), "")
+		return Page{}, stacktrace.Propagate(stacktrace.NewError("unsupported collection: %s must be one of: %v", collection, d.collectionNames()), "")
 	}
 	prefix, _ := d.getQueryPrefix(collection, query.Where)
 	var records []*Document
@@ -59,13 +61,7 @@ func (d *db) Aggregate(ctx context.Context, collection string, query AggregateQu
 		seek := prefix
 		it.Seek(seek)
 		defer it.Close()
-		skip := 0
 		for it.ValidForPrefix(prefix) {
-			if skip < query.Page*query.Limit {
-				skip++
-				it.Next()
-				continue
-			}
 			item := it.Item()
 			err := item.Value(func(bits []byte) error {
 				document, err := NewDocumentFromBytes(bits)
@@ -88,7 +84,7 @@ func (d *db) Aggregate(ctx context.Context, collection string, query AggregateQu
 		}
 		return nil
 	}); err != nil {
-		return Results{}, err
+		return Page{}, err
 	}
 	var groupDocuments = map[string]*Document{}
 	grouped := lo.GroupBy(records, func(t *Document) string {
@@ -102,7 +98,7 @@ func (d *db) Aggregate(ctx context.Context, collection string, query AggregateQu
 		for _, agg := range query.Aggregate {
 			document, err := getReducer(agg.Function)(agg.Field, group)
 			if err != nil {
-				return Results{}, err
+				return Page{}, err
 			}
 			for k, v := range document.result.Map() {
 				if groupDocuments[key] == nil || groupDocuments[key].Empty() {
@@ -120,12 +116,13 @@ func (d *db) Aggregate(ctx context.Context, collection string, query AggregateQu
 		aggDocuments = append(aggDocuments, record)
 	}
 	aggDocuments = orderBy(query.OrderBy, aggDocuments)
-	if query.Limit > 0 && len(aggDocuments) > query.Limit {
-		aggDocuments = aggDocuments[:query.Limit]
-	}
-	return Results{
+
+	prunePage(query.Page, query.Limit, aggDocuments)
+	return Page{
 		Documents: aggDocuments,
 		NextPage:  query.Page + 1,
+		Count:     len(aggDocuments),
+		Stats:     Stats{ExecutionTime: time.Since(now)},
 	}, nil
 }
 

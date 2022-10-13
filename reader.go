@@ -2,6 +2,7 @@ package wolverine
 
 import (
 	"context"
+	"time"
 
 	"github.com/dgraph-io/badger/v3"
 	"github.com/palantir/stacktrace"
@@ -64,10 +65,11 @@ type Query struct {
 	OrderBy OrderBy `json:"order_by"`
 }
 
-func (d *db) Query(ctx context.Context, collection string, query Query) (Results, error) {
+func (d *db) Query(ctx context.Context, collection string, query Query) (Page, error) {
+	now := time.Now()
 	if collection != systemCollection {
 		if _, ok := d.getInmemCollection(collection); !ok {
-			return Results{}, stacktrace.Propagate(stacktrace.NewError("unsupported collection: %s must be one of: %v", collection, d.collectionNames()), "")
+			return Page{}, stacktrace.Propagate(stacktrace.NewError("unsupported collection: %s must be one of: %v", collection, d.collectionNames()), "")
 		}
 	}
 	pfx, _ := d.getQueryPrefix(collection, query.Where)
@@ -81,16 +83,7 @@ func (d *db) Query(ctx context.Context, collection string, query Query) (Results
 		it := txn.NewIterator(opts)
 		it.Seek(pfx)
 		defer it.Close()
-		skip := 0
 		for it.ValidForPrefix(pfx) {
-			if skip < query.Page*query.Limit {
-				skip++
-				it.Next()
-				continue
-			}
-			if query.OrderBy.Field == "" && query.Limit > 0 && len(documents) >= query.Limit {
-				return nil
-			}
 			item := it.Item()
 			err := item.Value(func(bits []byte) error {
 				document, err := NewDocumentFromBytes(bits)
@@ -107,6 +100,9 @@ func (d *db) Query(ctx context.Context, collection string, query Query) (Results
 					}
 					documents = append(documents, document)
 					documents = orderBy(query.OrderBy, documents)
+					if prunePage(query.Page, query.Limit, documents) {
+						return nil
+					}
 				}
 				return nil
 			})
@@ -117,7 +113,7 @@ func (d *db) Query(ctx context.Context, collection string, query Query) (Results
 		}
 		return nil
 	}); err != nil {
-		return Results{}, stacktrace.Propagate(err, "")
+		return Page{}, stacktrace.Propagate(err, "")
 	}
 	documents = orderBy(query.OrderBy, documents)
 	if len(query.Select) > 0 {
@@ -125,12 +121,14 @@ func (d *db) Query(ctx context.Context, collection string, query Query) (Results
 			r.Select(query.Select)
 		}
 	}
-	if query.Limit > 0 && len(documents) > query.Limit {
-		documents = documents[:query.Limit]
-	}
-	return Results{
+	prunePage(query.Page, query.Limit, documents)
+	return Page{
 		Documents: documents,
 		NextPage:  query.Page + 1,
+		Count:     len(documents),
+		Stats: Stats{
+			ExecutionTime: time.Since(now),
+		},
 	}, nil
 }
 
@@ -203,7 +201,7 @@ func (d *db) QueryPaginate(ctx context.Context, collection string, query Query, 
 		if len(results.Documents) == 0 {
 			return nil
 		}
-		if !handlePage(results.Documents) {
+		if !handlePage(results) {
 			return nil
 		}
 		page = results.NextPage

@@ -6,7 +6,7 @@ import (
 )
 
 // PageHandler handles a page of documents during pagination. If the handler returns false, pagination will discontinue
-type PageHandler func(document []*Document) bool
+type PageHandler func(page Page) bool
 
 // DB is an embedded NOSQL database supporting a number of useful features including full text search, indexing, and streaming
 type DB interface {
@@ -51,11 +51,11 @@ type System interface {
 // Reader performs read operations against the database
 type Reader interface {
 	// Search executes a full text search query against the database
-	Search(ctx context.Context, collection string, q SearchQuery) (Results, error)
+	Search(ctx context.Context, collection string, q SearchQuery) (Page, error)
 	// SearchPaginate paginates through each page of the query until the handlePage function returns false or there are no more results
 	SearchPaginate(ctx context.Context, collection string, query SearchQuery, handlePage PageHandler) error
 	// Query queries the database for a list of documents
-	Query(ctx context.Context, collection string, query Query) (Results, error)
+	Query(ctx context.Context, collection string, query Query) (Page, error)
 	// QueryPaginate paginates through each page of the query until the handlePage function returns false or there are no more results
 	QueryPaginate(ctx context.Context, collection string, query Query, handlePage PageHandler) error
 	// Get gets a single record from the database
@@ -96,5 +96,5 @@ type Streamer interface {
 // Aggregator aggregates data
 type Aggregator interface {
 	// Aggregate
-	Aggregate(ctx context.Context, collection string, query AggregateQuery) (Results, error)
+	Aggregate(ctx context.Context, collection string, query AggregateQuery) (Page, error)
 }

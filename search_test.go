@@ -272,8 +272,8 @@ func TestSearch(t *testing.T) {
 				}
 				assert.Nil(t, db.BatchSet(ctx, "user", usrs))
 				seen := map[string]struct{}{}
-				handler := func(documents []*wolverine.Document) bool {
-					for _, doc := range documents {
+				handler := func(page wolverine.Page) bool {
+					for _, doc := range page.Documents {
 						if _, ok := seen[doc.GetID()]; ok {
 							t.Fatal("duplicate doc", doc.GetID())
 						}

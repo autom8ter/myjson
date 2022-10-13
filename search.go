@@ -59,10 +59,11 @@ type SearchQuery struct {
 	Limit int `json:"limit"`
 }
 
-func (d *db) Search(ctx context.Context, collection string, q SearchQuery) (Results, error) {
+func (d *db) Search(ctx context.Context, collection string, q SearchQuery) (Page, error) {
+	now := time.Now()
 	c, ok := d.getInmemCollection(collection)
 	if !ok || !c.FullText() {
-		return Results{}, stacktrace.NewError("unsupported full text search collection: %s must be one of: %v", collection, d.collectionNames())
+		return Page{}, stacktrace.NewError("unsupported full text search collection: %s must be one of: %v", collection, d.collectionNames())
 	}
 	var (
 		fields []string
@@ -77,7 +78,7 @@ func (d *db) Search(ctx context.Context, collection string, q SearchQuery) (Resu
 	var queries []query.Query
 	for _, where := range q.Where {
 		if where.Value == nil {
-			return Results{}, stacktrace.NewError("empty where clause value")
+			return Page{}, stacktrace.NewError("empty where clause value")
 		}
 		switch where.Op {
 		case Basic:
@@ -144,7 +145,7 @@ func (d *db) Search(ctx context.Context, collection string, q SearchQuery) (Resu
 			)
 			split := strings.Split(cast.ToString(where.Value), ",")
 			if len(split) < 3 {
-				return Results{}, stacktrace.NewError("geo distance where clause requires 3 comma separated values: lat(float), lng(float), distance(string)")
+				return Page{}, stacktrace.NewError("geo distance where clause requires 3 comma separated values: lat(float), lng(float), distance(string)")
 			}
 			from = cast.ToFloat64(split[0])
 			to = cast.ToFloat64(split[1])
@@ -201,7 +202,7 @@ func (d *db) Search(ctx context.Context, collection string, q SearchQuery) (Resu
 	//}
 	results, err := d.getFullText(collection).Search(searchRequest)
 	if err != nil {
-		return Results{}, stacktrace.Propagate(err, "failed to search index: %s", collection)
+		return Page{}, stacktrace.Propagate(err, "failed to search index: %s", collection)
 	}
 
 	var data []*Document
@@ -211,7 +212,7 @@ func (d *db) Search(ctx context.Context, collection string, q SearchQuery) (Resu
 		}
 		record, err := NewDocumentFromMap(h.Fields)
 		if err != nil {
-			return Results{}, stacktrace.Propagate(err, "failed to search index: %s", collection)
+			return Page{}, stacktrace.Propagate(err, "failed to search index: %s", collection)
 		}
 		data = append(data, record)
 	}
@@ -220,12 +221,11 @@ func (d *db) Search(ctx context.Context, collection string, q SearchQuery) (Resu
 			r.Select(q.Select)
 		}
 	}
-	if q.Limit > 0 && len(data) > q.Limit {
-		data = data[:q.Limit]
-	}
-	return Results{
+	return Page{
 		Documents: data,
 		NextPage:  q.Page + 1,
+		Count:     len(data),
+		Stats:     Stats{ExecutionTime: time.Since(now)},
 	}, nil
 }
 
@@ -245,7 +245,7 @@ func (d *db) SearchPaginate(ctx context.Context, collection string, query Search
 		if len(results.Documents) == 0 {
 			return nil
 		}
-		if !handlePage(results.Documents) {
+		if !handlePage(results) {
 			return nil
 		}
 		page = results.NextPage

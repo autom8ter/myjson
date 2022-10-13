@@ -1,12 +1,14 @@
 package wolverine_test
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/brianvoe/gofakeit/v6"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/autom8ter/wolverine"
+	"github.com/autom8ter/wolverine/internal/testutil"
 )
 
 func TestDocument(t *testing.T) {
@@ -242,5 +244,19 @@ func TestDocument(t *testing.T) {
 		})
 		assert.NotNil(t, err)
 		assert.False(t, pass)
+	})
+	t.Run("results", func(t *testing.T) {
+		var docs = []*wolverine.Document{
+			testutil.NewUserDoc(),
+			testutil.NewUserDoc(),
+			testutil.NewUserDoc(),
+		}
+		result := wolverine.Page{
+			Documents: docs,
+			NextPage:  0,
+		}
+		bits, err := json.Marshal(result)
+		assert.Nil(t, err)
+		t.Log(string(bits))
 	})
 }
