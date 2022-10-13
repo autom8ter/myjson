@@ -15,20 +15,32 @@ func TestUtil(t *testing.T) {
 			docs = append(docs, newUserDoc())
 		}
 		{
-			pruned, done := prunePage(0, 3, docs)
+			pruned, hasNext := prunePage(0, 3, docs)
 			assert.Equal(t, 3, len(pruned))
 			assert.EqualValues(t, docs[0], pruned[0])
 			assert.EqualValues(t, docs[1], pruned[1])
 			assert.EqualValues(t, docs[2], pruned[2])
-			assert.Equal(t, true, done)
+			assert.Equal(t, true, hasNext)
 		}
 		{
-			pruned, done := prunePage(1, 3, docs)
+			pruned, hasNext := prunePage(1, 3, docs)
 			assert.Equal(t, 3, len(pruned))
 			assert.EqualValues(t, docs[3], pruned[0])
 			assert.EqualValues(t, docs[4], pruned[1])
 			assert.EqualValues(t, docs[5], pruned[2])
-			assert.Equal(t, true, done)
+			assert.Equal(t, true, hasNext)
+		}
+		{
+			pruned, hasNext := prunePage(0, 1, docs)
+			assert.Equal(t, 1, len(pruned))
+			assert.EqualValues(t, docs[0], pruned[0])
+			assert.Equal(t, true, hasNext)
+		}
+		{
+			pruned, hasNext := prunePage(1, 1, docs)
+			assert.Equal(t, 1, len(pruned))
+			assert.EqualValues(t, docs[1], pruned[0])
+			assert.Equal(t, true, hasNext)
 		}
 		assert.Equal(t, 100, len(docs))
 

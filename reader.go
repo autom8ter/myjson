@@ -201,6 +201,6 @@ func (d *db) QueryPaginate(ctx context.Context, collection string, query Query, 
 		if !handlePage(results) {
 			return nil
 		}
-		page = results.NextPage
+		page++
 	}
 }

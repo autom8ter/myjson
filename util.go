@@ -40,12 +40,17 @@ func compareField(field string, i, j *Document) bool {
 }
 
 func prunePage(page, limit int, documents []*Document) ([]*Document, bool) {
-	if page > 0 && len(documents) > page*limit {
-		documents = documents[page*limit:]
+	if limit == 0 {
+		return documents, false
 	}
-	if limit > 0 && len(documents) > limit {
-		documents = documents[:limit]
-		return documents, true
+	startPage := (page * limit)
+
+	if len(documents) <= startPage {
+		return nil, false
 	}
-	return documents, false
+	if len(documents) <= startPage+limit {
+		return documents[page*limit:], false
+	} else {
+		return documents[page*limit : startPage+limit], true
+	}
 }

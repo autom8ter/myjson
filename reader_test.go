@@ -25,6 +25,7 @@ func TestQueryPaginate(t *testing.T) {
 					if _, ok := seen[doc.GetID()]; ok {
 						t.Fatal("duplicate doc", doc.GetID())
 					}
+					t.Log(doc.GetID())
 					seen[doc.GetID()] = struct{}{}
 				}
 				return true
