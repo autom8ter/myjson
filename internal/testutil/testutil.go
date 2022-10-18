@@ -33,6 +33,16 @@ var (
       "fields": [
         "contact.email"
       ]
+    },
+	{
+      "fields": [
+        "account_id"
+      ]
+    },
+	{
+      "fields": [
+        "language"
+      ]
     }
   ],
   "required": [

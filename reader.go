@@ -4,8 +4,10 @@ import (
 	"context"
 	"time"
 
+	"github.com/autom8ter/machine/v4"
 	"github.com/dgraph-io/badger/v3"
 	"github.com/palantir/stacktrace"
+	"github.com/reactivex/rxgo/v2"
 
 	"github.com/autom8ter/wolverine/internal/prefix"
 )
@@ -66,63 +68,86 @@ type Query struct {
 }
 
 func (d *db) Query(ctx context.Context, collection string, query Query) (Page, error) {
+	limit := 1000
+	if query.Limit > 0 {
+		limit = query.Limit
+	}
+	qmachine := machine.New()
 	now := time.Now()
 	if collection != systemCollection {
 		if _, ok := d.getInmemCollection(collection); !ok {
-			return Page{}, stacktrace.Propagate(stacktrace.NewError("unsupported collection: %s must be one of: %v", collection, d.collectionNames()), "")
+			return Page{}, stacktrace.NewErrorWithCode(ErrUnsuportedCollection, "unsupported collection: %s must be one of: %v", collection, d.collectionNames())
 		}
 	}
-	pfx, _ := d.getQueryPrefix(collection, query.Where)
-
-	var documents []*Document
-	if err := d.kv.View(func(txn *badger.Txn) error {
-		opts := badger.DefaultIteratorOptions
-		opts.PrefetchValues = true
-		opts.PrefetchSize = 10
-		opts.Prefix = pfx
-		it := txn.NewIterator(opts)
-		it.Seek(pfx)
-		defer it.Close()
-		for it.ValidForPrefix(pfx) {
-			item := it.Item()
-			err := item.Value(func(bits []byte) error {
-				document, err := NewDocumentFromBytes(bits)
-				if err != nil {
-					return stacktrace.Propagate(err, "")
-				}
-				pass, err := document.Where(query.Where)
-				if err != nil {
-					return stacktrace.Propagate(err, "")
-				}
-				if pass {
-					if err := document.Validate(); err != nil {
-						return stacktrace.Propagate(err, "")
-					}
-					documents = append(documents, document)
-					documents = orderBy(query.OrderBy, documents)
-				}
-				return nil
-			})
-			if err != nil {
-				return stacktrace.Propagate(err, "")
-			}
-			it.Next()
-		}
-		return nil
-	}); err != nil {
+	pfx, _, err := d.getQueryPrefix(collection, query.Where, query.OrderBy)
+	if err != nil {
 		return Page{}, stacktrace.Propagate(err, "")
 	}
-	documents = orderBy(query.OrderBy, documents)
-	documents, _ = prunePage(query.Page, query.Limit, documents)
-	if len(query.Select) > 0 {
-		for _, r := range documents {
-			r.Select(query.Select)
+	var (
+		input = make(chan rxgo.Item, 1)
+	)
+	qmachine.Go(ctx, func(ctx context.Context) error {
+		if err := d.kv.View(func(txn *badger.Txn) error {
+			opts := badger.DefaultIteratorOptions
+			opts.PrefetchValues = true
+			opts.PrefetchSize = 10
+			opts.Prefix = pfx
+			if query.OrderBy.Direction == DESC {
+				opts.Reverse = true
+			}
+			it := txn.NewIterator(opts)
+			it.Seek(pfx)
+			defer it.Close()
+			for it.ValidForPrefix(pfx) {
+				item := it.Item()
+				err := item.Value(func(bits []byte) error {
+					document, err := NewDocumentFromBytes(bits)
+					if err != nil {
+						return stacktrace.Propagate(err, "")
+					}
+					input <- rxgo.Of(document)
+					return nil
+				})
+				if err != nil {
+					return stacktrace.Propagate(err, "")
+				}
+				it.Next()
+			}
+			return nil
+		}); err != nil {
+			close(input)
+			return stacktrace.Propagate(err, "")
 		}
+		close(input)
+		return nil
+	})
+	observable := rxgo.FromChannel(input, rxgo.WithContext(ctx)).
+		Filter(func(i interface{}) bool {
+			pass, err := i.(*Document).Where(query.Where)
+			if err != nil {
+				return false
+			}
+			return pass
+		}).
+		Skip(uint(query.Page * limit)).
+		Take(uint(limit)).
+		Map(func(ctx context.Context, i interface{}) (interface{}, error) {
+			if len(query.Select) > 0 {
+				i.(*Document).Select(query.Select)
+			}
+			return i, nil
+		})
+
+	var results []*Document
+
+	for result := range observable.Observe() {
+		results = append(results, result.V.(*Document))
 	}
+
 	return Page{
-		Documents: documents,
+		Documents: results,
 		NextPage:  query.Page + 1,
-		Count:     len(documents),
+		Count:     len(results),
 		Stats: Stats{
 			ExecutionTime: time.Since(now),
 		},

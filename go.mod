@@ -31,12 +31,14 @@ require (
 	github.com/blevesearch/zap/v13 v13.0.6 // indirect
 	github.com/blevesearch/zap/v14 v14.0.5 // indirect
 	github.com/blevesearch/zap/v15 v15.0.3 // indirect
+	github.com/cenkalti/backoff/v4 v4.1.3 // indirect
 	github.com/cespare/xxhash v1.1.0 // indirect
 	github.com/cespare/xxhash/v2 v2.1.1 // indirect
 	github.com/couchbase/vellum v1.0.2 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/dgraph-io/ristretto v0.1.0 // indirect
 	github.com/dustin/go-humanize v1.0.0 // indirect
+	github.com/emirpasic/gods v1.18.1 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang/glog v0.0.0-20160126235308-23def4e6c14b // indirect
 	github.com/golang/groupcache v0.0.0-20190702054246-869f871628b6 // indirect
@@ -49,7 +51,10 @@ require (
 	github.com/mschoch/smat v0.2.0 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
+	github.com/reactivex/rxgo/v2 v2.5.0 // indirect
 	github.com/steveyen/gtreap v0.1.0 // indirect
+	github.com/stretchr/objx v0.5.0 // indirect
+	github.com/teivah/onecontext v1.3.0 // indirect
 	github.com/tidwall/match v1.1.1 // indirect
 	github.com/tidwall/pretty v1.2.0 // indirect
 	github.com/willf/bitset v1.1.11 // indirect

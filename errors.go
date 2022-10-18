@@ -6,6 +6,8 @@ const (
 	ErrEmptySchemaCollection stacktrace.ErrorCode = 4000
 	ErrDocumentValidation    stacktrace.ErrorCode = 4001
 	ErrSchemaLoad            stacktrace.ErrorCode = 4002
+	ErrIndexRequired         stacktrace.ErrorCode = 4003
+	ErrUnsuportedCollection  stacktrace.ErrorCode = 4004
 )
 
 // GetErrorCode returns the error code from the error

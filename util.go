@@ -55,22 +55,26 @@ func prunePage(page, limit int, documents []*Document) ([]*Document, bool) {
 	}
 }
 
-func pipelineQuery(page, limit int, order OrderBy, input chan *Document, ordered bool, results *[]*Document) error {
+func pipelineQuery(page, limit int, order OrderBy, input, output chan *Document, ordered bool) error {
 	if ordered {
-		return orderedPipeline(page, limit, input, results)
-	}
-	for doc := range input {
-		*results = append(*results, doc)
+		return orderedPipeline(page, limit, input, output)
 	}
 	// if unordered, we must read full table of documents before sorting them
+	var fullScan []*Document
+	for doc := range input {
+		fullScan = append(fullScan, doc)
+	}
 	if !ordered {
-		*results = orderBy(order, *results)
-		*results, _ = prunePage(page, limit, *results)
+		fullScan = orderBy(order, fullScan)
+		fullScan, _ = prunePage(page, limit, fullScan)
+	}
+	for _, doc := range fullScan {
+		output <- doc
 	}
 	return nil
 }
 
-func orderedPipeline(page, limit int, input chan *Document, results *[]*Document) error {
+func orderedPipeline(page, limit int, input, output chan *Document) error {
 	startOffset := page * limit
 	endOffset := startOffset + limit
 	received := 0
@@ -78,15 +82,15 @@ func orderedPipeline(page, limit int, input chan *Document, results *[]*Document
 		received++
 		switch {
 		case limit <= 0:
-			*results = append(*results, doc)
+			output <- doc
 		case limit >= 0:
 			if received <= startOffset {
 				continue
 			}
-			*results = append(*results, doc)
-			if len(*results) >= limit {
-				return nil
-			}
+			output <- doc
+			//if len(*results) >= limit {
+			//	return nil
+			//}
 			if received >= endOffset {
 				return nil
 			}

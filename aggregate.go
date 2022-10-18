@@ -48,15 +48,21 @@ func (d *db) Aggregate(ctx context.Context, collection string, query AggregateQu
 	now := time.Now()
 	_, ok := d.getInmemCollection(collection)
 	if !ok {
-		return Page{}, stacktrace.Propagate(stacktrace.NewError("unsupported collection: %s must be one of: %v", collection, d.collectionNames()), "")
+		return Page{}, stacktrace.NewErrorWithCode(ErrUnsuportedCollection, "unsupported collection: %s must be one of: %v", collection, d.collectionNames())
 	}
-	prefix, _ := d.getQueryPrefix(collection, query.Where)
+	prefix, _, err := d.getQueryPrefix(collection, query.Where, query.OrderBy)
+	if err != nil {
+		return Page{}, stacktrace.Propagate(err, "")
+	}
 	var records []*Document
 	if err := d.kv.View(func(txn *badger.Txn) error {
 		opts := badger.DefaultIteratorOptions
 		opts.PrefetchValues = true
 		opts.PrefetchSize = 10
 		opts.Prefix = prefix
+		if query.OrderBy.Direction == DESC {
+			opts.Reverse = true
+		}
 		it := txn.NewIterator(opts)
 		seek := prefix
 		it.Seek(seek)
