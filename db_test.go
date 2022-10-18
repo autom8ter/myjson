@@ -334,7 +334,7 @@ func Test(t *testing.T) {
 			previous = cast.ToString(lang)
 		}
 	})
-	t.Run("mapreduce sum", func(t *testing.T) {
+	t.Run("aggregate", func(t *testing.T) {
 		results, err := db.Aggregate(ctx, "user", wolverine.AggregateQuery{
 			GroupBy: []string{"account_id"},
 			Aggregate: []wolverine.Aggregate{

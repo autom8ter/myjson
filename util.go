@@ -54,3 +54,43 @@ func prunePage(page, limit int, documents []*Document) ([]*Document, bool) {
 		return documents[page*limit : startPage+limit], true
 	}
 }
+
+func pipelineQuery(page, limit int, order OrderBy, input chan *Document, ordered bool, results *[]*Document) error {
+	if ordered {
+		return orderedPipeline(page, limit, input, results)
+	}
+	for doc := range input {
+		*results = append(*results, doc)
+	}
+	// if unordered, we must read full table of documents before sorting them
+	if !ordered {
+		*results = orderBy(order, *results)
+		*results, _ = prunePage(page, limit, *results)
+	}
+	return nil
+}
+
+func orderedPipeline(page, limit int, input chan *Document, results *[]*Document) error {
+	startOffset := page * limit
+	endOffset := startOffset + limit
+	received := 0
+	for doc := range input {
+		received++
+		switch {
+		case limit <= 0:
+			*results = append(*results, doc)
+		case limit >= 0:
+			if received <= startOffset {
+				continue
+			}
+			*results = append(*results, doc)
+			if len(*results) >= limit {
+				return nil
+			}
+			if received >= endOffset {
+				return nil
+			}
+		}
+	}
+	return nil
+}
