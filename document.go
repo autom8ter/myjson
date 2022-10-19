@@ -14,16 +14,21 @@ import (
 	"github.com/tidwall/sjson"
 )
 
+// Stats are statistics collected at runtime
 type Stats struct {
 	ExecutionTime time.Duration `json:"execution_time"`
 }
 
 // Page is a page of documents
 type Page struct {
+	// Documents are the documents that make up the page
 	Documents []*Document `json:"documents"`
-	NextPage  int         `json:"next_page"`
-	Count     int         `json:"count"`
-	Stats     Stats       `json:"stats"`
+	// Next page
+	NextPage int `json:"next_page"`
+	// Document count
+	Count int `json:"count"`
+	// Stats collected at runtime
+	Stats Stats `json:"stats"`
 }
 
 // Document is a database document with special attributes.

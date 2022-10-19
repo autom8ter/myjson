@@ -18,8 +18,6 @@ type DB interface {
 	Writer
 	// Streamer is a datbase streamer
 	Streamer
-	// Aggregator is a database aggregator
-	Aggregator
 }
 
 // System performs internal/system operations against the database
@@ -91,10 +89,4 @@ type ChangeStreamHandler func(ctx context.Context, event *Event) error
 type Streamer interface {
 	// ChangeStream streams changes to documents to the given function until the context is cancelled or the function returns an error
 	ChangeStream(ctx context.Context, collections []string, fn ChangeStreamHandler) error
-}
-
-// Aggregator aggregates data
-type Aggregator interface {
-	// Aggregate
-	Aggregate(ctx context.Context, collection string, query AggregateQuery) (Page, error)
 }

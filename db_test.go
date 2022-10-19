@@ -334,34 +334,6 @@ func Test(t *testing.T) {
 			previous = cast.ToString(lang)
 		}
 	})
-	t.Run("aggregate", func(t *testing.T) {
-		results, err := db.Aggregate(ctx, "user", wolverine.AggregateQuery{
-			GroupBy: []string{"account_id"},
-			Aggregate: []wolverine.Aggregate{
-				{
-					Function: wolverine.AggregateCount,
-					Field:    "gender",
-				},
-				{
-					Function: wolverine.AggregateCount,
-					Field:    "language",
-				},
-				{
-					Function: wolverine.AggregateAvg,
-					Field:    "age",
-				},
-			},
-			OrderBy: wolverine.OrderBy{
-				Field:     "account_id",
-				Direction: wolverine.ASC,
-			},
-		})
-		assert.Nil(t, err)
-		assert.Greater(t, len(results.Documents), 1)
-		for _, result := range results.Documents {
-			fmt.Println(result.String())
-		}
-	})
 	//t.Run("drop collections", func(t *testing.T) {
 	//	assert.Nil(t, db.DropAll(ctx, []string{"user", "task"}))
 	//})
