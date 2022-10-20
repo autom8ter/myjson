@@ -3,6 +3,7 @@ package wolverine_test
 import (
 	"bytes"
 	"context"
+	"encoding/binary"
 	"fmt"
 	"sync"
 	"testing"
@@ -67,6 +68,7 @@ func Test(t *testing.T) {
 		}
 		results, err := db.Query(ctx, "user", *query)
 		assert.Nil(t, err)
+		assert.GreaterOrEqual(t, 1, len(results.Stats.IndexedFields))
 		assert.Equal(t, 1, len(results.Documents))
 		assert.Equal(t, testutil.MyEmail, result.Get("contact.email"))
 		update := wolverine.NewDocument()
@@ -311,7 +313,37 @@ func Test(t *testing.T) {
 			assert.Nil(t, results.Documents)
 		}))
 	})
-	t.Run("order by", func(t *testing.T) {
+	t.Run("order by - no index", func(t *testing.T) {
+
+		users, err := db.Query(ctx, "user", wolverine.Query{
+			Select: nil,
+			Where:  nil,
+			Limit:  10,
+			OrderBy: wolverine.OrderBy{
+				Field:     "age",
+				Direction: wolverine.ASC,
+			},
+		})
+		assert.Nil(t, err)
+		assert.Equal(t, 10, len(users.Documents))
+		assert.GreaterOrEqual(t, 1, len(users.Stats.IndexedFields))
+		assert.False(t, users.Stats.OrderedIndex)
+		var before []byte
+		for _, usr := range users.Documents {
+			age := usr.GetFloat("age")
+			name := usr.Get("name")
+			fmt.Println(age, name)
+			if before != nil {
+				var after []byte
+				binary.BigEndian.PutUint64(after, uint64(age))
+
+				assert.LessOrEqual(t, bytes.Compare(before, after), 0)
+			}
+			binary.BigEndian.PutUint64(before, uint64(age))
+		}
+	})
+	t.Run("order by - indexed", func(t *testing.T) {
+
 		users, err := db.Query(ctx, "user", wolverine.Query{
 			Select: nil,
 			Where:  nil,
@@ -323,6 +355,8 @@ func Test(t *testing.T) {
 		})
 		assert.Nil(t, err)
 		assert.Equal(t, 10, len(users.Documents))
+		assert.GreaterOrEqual(t, 1, len(users.Stats.IndexedFields))
+		assert.True(t, users.Stats.OrderedIndex)
 		var previous string
 		for _, usr := range users.Documents {
 			lang := usr.Get("language")
@@ -396,7 +430,7 @@ func Benchmark(b *testing.B) {
 	b.Run("query.1000", func(b *testing.B) {
 		assert.Nil(b, testutil.TestDB([]*wolverine.Collection{testutil.UserCollection, testutil.TaskCollection}, func(ctx context.Context, db wolverine.DB) {
 			doc := testutil.NewUserDoc()
-			doc.Set("contact.email", "colemanword@gmail.com")
+			doc.Set("contact.email", testutil.MyEmail)
 			if err := db.Set(ctx, "user", doc); err != nil {
 				b.Fatal(err)
 			}
@@ -409,13 +443,14 @@ func Benchmark(b *testing.B) {
 			}
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
+				b.Log(i)
 				results, err := db.Query(ctx, "user", wolverine.Query{
 					Select: nil,
 					Where: []wolverine.Where{
 						{
 							Field: "contact.email",
 							Op:    wolverine.Eq,
-							Value: "colemanword@gmail.com",
+							Value: testutil.MyEmail,
 						},
 					},
 					Limit:   1000,

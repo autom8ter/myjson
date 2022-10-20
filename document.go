@@ -17,6 +17,8 @@ import (
 // Stats are statistics collected at runtime
 type Stats struct {
 	ExecutionTime time.Duration `json:"execution_time"`
+	IndexedFields []string      `json:"indexed_fields"`
+	OrderedIndex  bool          `json:"ordered_index"`
 }
 
 // Page is a page of documents

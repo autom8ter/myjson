@@ -12,12 +12,16 @@ type PageHandler func(page Page) bool
 type DB interface {
 	// System is a database system manager
 	System
-	// Reader is a database reader
+	// Searcher is the database document search engine
+	Searcher
+	// Reader is a database document reader
 	Reader
-	// Writer is a database writer
+	// Writer is a database document writer
 	Writer
-	// Streamer is a datbase streamer
+	// Streamer is a database document streamer
 	Streamer
+	// Aggregator is a database document aggregator
+	Aggregator
 }
 
 // System performs internal/system operations against the database
@@ -46,12 +50,15 @@ type System interface {
 	Close(ctx context.Context) error
 }
 
-// Reader performs read operations against the database
-type Reader interface {
+type Searcher interface {
 	// Search executes a full text search query against the database
 	Search(ctx context.Context, collection string, q SearchQuery) (Page, error)
 	// SearchPaginate paginates through each page of the query until the handlePage function returns false or there are no more results
 	SearchPaginate(ctx context.Context, collection string, query SearchQuery, handlePage PageHandler) error
+}
+
+// Reader performs read operations against the database
+type Reader interface {
 	// Query queries the database for a list of documents
 	Query(ctx context.Context, collection string, query Query) (Page, error)
 	// QueryPaginate paginates through each page of the query until the handlePage function returns false or there are no more results
@@ -89,4 +96,9 @@ type ChangeStreamHandler func(ctx context.Context, event *Event) error
 type Streamer interface {
 	// ChangeStream streams changes to documents to the given function until the context is cancelled or the function returns an error
 	ChangeStream(ctx context.Context, collections []string, fn ChangeStreamHandler) error
+}
+
+// Aggregator aggregates documents
+type Aggregator interface {
+	Aggregate(ctx context.Context, collection string, query AggregateQuery) (Page, error)
 }

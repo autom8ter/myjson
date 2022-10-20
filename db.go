@@ -181,33 +181,40 @@ func (d *db) loadCollections(ctx context.Context) error {
 	return nil
 }
 
-func chooseIndex(collection *Collection, whereFields []string, orderBy string) (*prefix.PrefixIndexRef, bool, error) {
+func chooseIndex(collection *Collection, whereFields []string, orderBy string) (*prefix.PrefixIndexRef, []string, bool, error) {
 	//sort.Strings(queryFields)
-	if orderBy != "" {
-		for _, index := range collection.Indexes() {
-			if index.Fields[0] == orderBy {
-				return index.prefix(collection.Collection()), true, nil
-			}
-		}
-		return nil, false, stacktrace.NewErrorWithCode(ErrIndexRequired, "an index is required on %s/%s when used in order by", collection.Collection(), orderBy)
-	}
+	//if orderBy != "" {
+	//	for _, index := range collection.Indexes() {
+	//		if index.Fields[0] == orderBy {
+	//			return index.prefix(collection.Collection()), true, nil
+	//		}
+	//	}
+	//	return nil, false, stacktrace.NewErrorWithCode(ErrIndexRequired, "an index is required on %s/%s when used in order by", collection.Collection(), orderBy)
+	//}
+	var (
+		target  Index
+		matched int
+		ordered bool
+	)
 	for _, index := range collection.Indexes() {
-		if len(index.Fields) != len(whereFields) {
-			continue
-		}
-		match := true
+		isOrdered := index.Fields[0] == orderBy
+		var totalMatched int
 		for i, f := range whereFields {
-			if index.Fields[i] != f {
-				match = false
+			if index.Fields[i] == f {
+				totalMatched++
 			}
 		}
-		if match {
-			return index.prefix(collection.Collection()), true, nil
+		if totalMatched > matched || (!ordered && isOrdered) {
+			target = index
+			ordered = isOrdered
 		}
+	}
+	if len(target.Fields) > 0 {
+		return target.prefix(collection.Collection()), target.Fields, ordered, nil
 	}
 	return Index{
 		Fields: []string{"_id"},
-	}.prefix(collection.Collection()), false, nil
+	}.prefix(collection.Collection()), []string{"_id"}, orderBy == "_id", nil
 }
 
 func (d *db) getInmemCollection(collection string) (*Collection, bool) {
@@ -227,10 +234,10 @@ func (d *db) getInmemCollections() []*Collection {
 	return c
 }
 
-func (d *db) getQueryPrefix(collection string, where []Where, order OrderBy) ([]byte, bool, error) {
+func (d *db) getQueryPrefix(collection string, where []Where, order OrderBy) ([]byte, []string, bool, error) {
 	c, ok := d.getInmemCollection(collection)
 	if !ok {
-		return nil, false, nil
+		return nil, nil, false, nil
 	}
 	var whereFields []string
 	var whereValues = map[string]any{}
@@ -241,11 +248,11 @@ func (d *db) getQueryPrefix(collection string, where []Where, order OrderBy) ([]
 		whereFields = append(whereFields, w.Field)
 		whereValues[w.Field] = w.Value
 	}
-	index, ok, err := chooseIndex(c, whereFields, order.Field)
+	index, indexedFields, ordered, err := chooseIndex(c, whereFields, order.Field)
 	if err != nil {
-		return nil, ok, stacktrace.Propagate(err, "")
+		return nil, indexedFields, ordered, stacktrace.Propagate(err, "")
 	}
-	return []byte(index.GetIndex("", whereValues)), ok, nil
+	return []byte(index.GetIndex("", whereValues)), indexedFields, ordered, nil
 }
 
 func (d *db) collectionNames() []string {

@@ -51,8 +51,11 @@ const (
 )
 
 // OrderBy orders the result set by a given field in a given direction
+// OrderBy requires an index on the field that the query is sorting on.
 type OrderBy struct {
-	Field     string           `json:"field"`
+	// Field is the field to sort on
+	Field string `json:"field"`
+	// Direction is the sort direction
 	Direction OrderByDirection `json:"direction"`
 }
 
@@ -61,30 +64,56 @@ type Query struct {
 	// Select is a list of fields to select from each record in the datbase(optional)
 	Select []string `json:"select"`
 	// Where is a list of where clauses used to filter records
-	Where   []Where `json:"where"`
-	Page    int     `json:"page"`
-	Limit   int     `json:"limit"`
+	Where []Where `json:"where"`
+	// Page is page index of the result set
+	Page int `json:"page"`
+	// Limit is the page size
+	Limit int `json:"limit"`
+	// Order by is the order to return results in. OrderBy requires an index on the field that the query is sorting on.
 	OrderBy OrderBy `json:"order_by"`
 }
 
-func (d *db) Query(ctx context.Context, collection string, query Query) (Page, error) {
-	limit := 1000
+func (query Query) pipe(ctx context.Context, input chan rxgo.Item, fullScan bool) rxgo.Observable {
+	limit := 1000000
 	if query.Limit > 0 {
 		limit = query.Limit
 	}
-	qmachine := machine.New()
+	if fullScan {
+		return query.pipe(ctx, pipeFullScan(ctx, input, query.Where, query.OrderBy), false)
+	}
+	return rxgo.FromEventSource(input, rxgo.WithContext(ctx)).
+		Filter(func(i interface{}) bool {
+			pass, err := i.(*Document).Where(query.Where)
+			if err != nil {
+				return false
+			}
+			return pass
+		}).
+		Skip(uint(query.Page * limit)).
+		Take(uint(limit)).
+		Map(func(ctx context.Context, i interface{}) (interface{}, error) {
+			if len(query.Select) > 0 {
+				i.(*Document).Select(query.Select)
+			}
+			return i, nil
+		})
+}
+
+func (d *db) Query(ctx context.Context, collection string, query Query) (Page, error) {
 	now := time.Now()
+	qmachine := machine.New()
 	if collection != systemCollection {
 		if _, ok := d.getInmemCollection(collection); !ok {
 			return Page{}, stacktrace.NewErrorWithCode(ErrUnsuportedCollection, "unsupported collection: %s must be one of: %v", collection, d.collectionNames())
 		}
 	}
-	pfx, _, err := d.getQueryPrefix(collection, query.Where, query.OrderBy)
+	pfx, indexedFields, ordered, err := d.getQueryPrefix(collection, query.Where, query.OrderBy)
 	if err != nil {
 		return Page{}, stacktrace.Propagate(err, "")
 	}
+	fullScan := query.OrderBy.Field != "" && !ordered
 	var (
-		input = make(chan rxgo.Item, 1)
+		input = make(chan rxgo.Item)
 	)
 	qmachine.Go(ctx, func(ctx context.Context) error {
 		if err := d.kv.View(func(txn *badger.Txn) error {
@@ -99,6 +128,9 @@ func (d *db) Query(ctx context.Context, collection string, query Query) (Page, e
 			it.Seek(pfx)
 			defer it.Close()
 			for it.ValidForPrefix(pfx) {
+				if ctx.Err() != nil {
+					return nil
+				}
 				item := it.Item()
 				err := item.Value(func(bits []byte) error {
 					document, err := NewDocumentFromBytes(bits)
@@ -121,35 +153,25 @@ func (d *db) Query(ctx context.Context, collection string, query Query) (Page, e
 		close(input)
 		return nil
 	})
-	observable := rxgo.FromChannel(input, rxgo.WithContext(ctx)).
-		Filter(func(i interface{}) bool {
-			pass, err := i.(*Document).Where(query.Where)
-			if err != nil {
-				return false
-			}
-			return pass
-		}).
-		Skip(uint(query.Page * limit)).
-		Take(uint(limit)).
-		Map(func(ctx context.Context, i interface{}) (interface{}, error) {
-			if len(query.Select) > 0 {
-				i.(*Document).Select(query.Select)
-			}
-			return i, nil
-		})
-
 	var results []*Document
-
-	for result := range observable.Observe() {
-		results = append(results, result.V.(*Document))
+	for result := range query.pipe(ctx, input, fullScan).Observe() {
+		doc, ok := result.V.(*Document)
+		if !ok {
+			return Page{}, stacktrace.NewError("expected type: %T got: %#v", &Document{}, result.V)
+		}
+		results = append(results, doc)
 	}
-
+	//if err := qmachine.Wait(); err != nil {
+	//	return Page{}, stacktrace.Propagate(err, "")
+	//}
 	return Page{
 		Documents: results,
 		NextPage:  query.Page + 1,
 		Count:     len(results),
 		Stats: Stats{
 			ExecutionTime: time.Since(now),
+			IndexedFields: indexedFields,
+			OrderedIndex:  ordered,
 		},
 	}, nil
 }
