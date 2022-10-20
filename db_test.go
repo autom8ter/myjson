@@ -326,14 +326,14 @@ func Test(t *testing.T) {
 		assert.Nil(t, err)
 		assert.Equal(t, 10, len(users.Documents))
 		assert.False(t, users.Stats.OrderedIndex)
-		var before []byte
+		var previous []byte
 		for _, usr := range users.Documents {
-			name := usr.GetString("name")
-			fmt.Println("no index asc:", name)
-			if before != nil {
-				assert.LessOrEqual(t, bytes.Compare(before, []byte(name)), 0)
+			next := usr.GetString("name")
+			fmt.Println("no index asc:", next)
+			if previous != nil {
+				assert.LessOrEqual(t, bytes.Compare(previous, []byte(next)), 0)
 			}
-			before = []byte(name)
+			previous = []byte(next)
 		}
 	})
 	t.Run("order by - no index desc", func(t *testing.T) {
@@ -350,14 +350,14 @@ func Test(t *testing.T) {
 		assert.Nil(t, err)
 		assert.Equal(t, 10, len(users.Documents))
 		assert.False(t, users.Stats.OrderedIndex)
-		var before []byte
+		var previous []byte
 		for _, usr := range users.Documents {
-			name := usr.GetString("name")
-			fmt.Println("no index desc:", name)
-			if before != nil {
-				assert.GreaterOrEqual(t, 0, bytes.Compare([]byte(before), []byte(cast.ToString(name))))
+			next := usr.GetString("name")
+			fmt.Println("no index desc:", next)
+			if previous != nil {
+				assert.GreaterOrEqual(t, bytes.Compare([]byte(previous), []byte(cast.ToString(next))), 0)
 			}
-			before = []byte(name)
+			previous = []byte(next)
 		}
 	})
 	t.Run("order by - indexed asc", func(t *testing.T) {
@@ -375,15 +375,15 @@ func Test(t *testing.T) {
 		assert.Equal(t, 10, len(users.Documents))
 		assert.Equal(t, "language", users.Stats.IndexedFields[0])
 		assert.True(t, users.Stats.OrderedIndex)
-		var previous string
+		var previous []byte
 		for _, usr := range users.Documents {
-			lang := usr.Get("language")
+			next := usr.GetString("language")
 			name := usr.Get("name")
-			fmt.Println(lang, name)
-			if previous != "" {
-				assert.LessOrEqual(t, bytes.Compare([]byte(previous), []byte(cast.ToString(lang))), 0)
+			fmt.Println(next, name)
+			if previous != nil {
+				assert.LessOrEqual(t, bytes.Compare(previous, []byte(next)), 0)
 			}
-			previous = cast.ToString(lang)
+			previous = []byte(next)
 		}
 	})
 	t.Run("order by - indexed desc", func(t *testing.T) {
@@ -403,13 +403,13 @@ func Test(t *testing.T) {
 		assert.True(t, users.Stats.OrderedIndex)
 		var previous string
 		for _, usr := range users.Documents {
-			lang := usr.Get("language")
+			next := usr.Get("language")
 			name := usr.Get("name")
-			fmt.Println(lang, name)
+			fmt.Println(next, name)
 			if previous != "" {
-				assert.GreaterOrEqual(t, 0, bytes.Compare([]byte(previous), []byte(cast.ToString(lang))))
+				assert.GreaterOrEqual(t, bytes.Compare([]byte(previous), []byte(cast.ToString(next))), 0)
 			}
-			previous = cast.ToString(lang)
+			previous = cast.ToString(next)
 		}
 	})
 	//t.Run("drop collections", func(t *testing.T) {
