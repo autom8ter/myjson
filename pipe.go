@@ -20,7 +20,7 @@ func pipeFullScan(ctx context.Context, input chan rxgo.Item, where []Where, orde
 	documents = orderBy(order, documents)
 	var sorted = make(chan rxgo.Item)
 	go func() {
-		for doc := range documents {
+		for _, doc := range documents {
 			sorted <- rxgo.Of(doc)
 		}
 		close(sorted)

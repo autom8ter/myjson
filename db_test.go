@@ -3,7 +3,6 @@ package wolverine_test
 import (
 	"bytes"
 	"context"
-	"encoding/binary"
 	"fmt"
 	"sync"
 	"testing"
@@ -313,36 +312,55 @@ func Test(t *testing.T) {
 			assert.Nil(t, results.Documents)
 		}))
 	})
-	t.Run("order by - no index", func(t *testing.T) {
+	t.Run("order by - no index asc", func(t *testing.T) {
 
 		users, err := db.Query(ctx, "user", wolverine.Query{
 			Select: nil,
 			Where:  nil,
 			Limit:  10,
 			OrderBy: wolverine.OrderBy{
-				Field:     "age",
+				Field:     "name",
 				Direction: wolverine.ASC,
 			},
 		})
 		assert.Nil(t, err)
 		assert.Equal(t, 10, len(users.Documents))
-		assert.GreaterOrEqual(t, 1, len(users.Stats.IndexedFields))
 		assert.False(t, users.Stats.OrderedIndex)
 		var before []byte
 		for _, usr := range users.Documents {
-			age := usr.GetFloat("age")
-			name := usr.Get("name")
-			fmt.Println(age, name)
+			name := usr.GetString("name")
+			fmt.Println(name)
 			if before != nil {
-				var after []byte
-				binary.BigEndian.PutUint64(after, uint64(age))
-
-				assert.LessOrEqual(t, bytes.Compare(before, after), 0)
+				assert.LessOrEqual(t, bytes.Compare(before, []byte(name)), 0)
 			}
-			binary.BigEndian.PutUint64(before, uint64(age))
+			before = []byte(name)
 		}
 	})
-	t.Run("order by - indexed", func(t *testing.T) {
+	t.Run("order by - no index desc", func(t *testing.T) {
+
+		users, err := db.Query(ctx, "user", wolverine.Query{
+			Select: nil,
+			Where:  nil,
+			Limit:  10,
+			OrderBy: wolverine.OrderBy{
+				Field:     "name",
+				Direction: wolverine.DESC,
+			},
+		})
+		assert.Nil(t, err)
+		assert.Equal(t, 10, len(users.Documents))
+		assert.False(t, users.Stats.OrderedIndex)
+		var before []byte
+		for _, usr := range users.Documents {
+			name := usr.GetString("name")
+			fmt.Println(name)
+			if before != nil {
+				assert.Equal(t, bytes.Compare(before, []byte(name)), 1)
+			}
+			before = []byte(name)
+		}
+	})
+	t.Run("order by - indexed asc", func(t *testing.T) {
 
 		users, err := db.Query(ctx, "user", wolverine.Query{
 			Select: nil,
@@ -355,7 +373,7 @@ func Test(t *testing.T) {
 		})
 		assert.Nil(t, err)
 		assert.Equal(t, 10, len(users.Documents))
-		assert.GreaterOrEqual(t, 1, len(users.Stats.IndexedFields))
+		assert.Equal(t, "language", users.Stats.IndexedFields[0])
 		assert.True(t, users.Stats.OrderedIndex)
 		var previous string
 		for _, usr := range users.Documents {
@@ -364,6 +382,32 @@ func Test(t *testing.T) {
 			fmt.Println(lang, name)
 			if previous != "" {
 				assert.LessOrEqual(t, bytes.Compare([]byte(previous), []byte(cast.ToString(lang))), 0)
+			}
+			previous = cast.ToString(lang)
+		}
+	})
+	t.Run("order by - indexed desc", func(t *testing.T) {
+
+		users, err := db.Query(ctx, "user", wolverine.Query{
+			Select: nil,
+			Where:  nil,
+			Limit:  10,
+			OrderBy: wolverine.OrderBy{
+				Field:     "language",
+				Direction: wolverine.DESC,
+			},
+		})
+		assert.Nil(t, err)
+		assert.Equal(t, 10, len(users.Documents))
+		assert.Equal(t, "language", users.Stats.IndexedFields[0])
+		assert.True(t, users.Stats.OrderedIndex)
+		var previous string
+		for _, usr := range users.Documents {
+			lang := usr.Get("language")
+			name := usr.Get("name")
+			fmt.Println(lang, name)
+			if previous != "" {
+				assert.Equal(t, bytes.Compare([]byte(previous), []byte(cast.ToString(lang))), 1)
 			}
 			previous = cast.ToString(lang)
 		}
