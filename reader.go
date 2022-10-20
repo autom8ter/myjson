@@ -121,9 +121,6 @@ func (d *db) Query(ctx context.Context, collection string, query Query) (Page, e
 			opts.PrefetchValues = true
 			opts.PrefetchSize = 10
 			opts.Prefix = pfx
-			if query.OrderBy.Direction == DESC {
-				opts.Reverse = true
-			}
 			it := txn.NewIterator(opts)
 			it.Seek(pfx)
 			defer it.Close()

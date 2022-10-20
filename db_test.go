@@ -329,7 +329,7 @@ func Test(t *testing.T) {
 		var before []byte
 		for _, usr := range users.Documents {
 			name := usr.GetString("name")
-			fmt.Println(name)
+			fmt.Println("no index asc:", name)
 			if before != nil {
 				assert.LessOrEqual(t, bytes.Compare(before, []byte(name)), 0)
 			}
@@ -353,7 +353,7 @@ func Test(t *testing.T) {
 		var before []byte
 		for _, usr := range users.Documents {
 			name := usr.GetString("name")
-			fmt.Println(name)
+			fmt.Println("no index desc:", name)
 			if before != nil {
 				assert.Equal(t, bytes.Compare(before, []byte(name)), 1)
 			}
@@ -407,7 +407,7 @@ func Test(t *testing.T) {
 			name := usr.Get("name")
 			fmt.Println(lang, name)
 			if previous != "" {
-				assert.Equal(t, bytes.Compare([]byte(previous), []byte(cast.ToString(lang))), 1)
+				assert.Equal(t, -1, bytes.Compare([]byte(previous), []byte(cast.ToString(lang))))
 			}
 			previous = cast.ToString(lang)
 		}
