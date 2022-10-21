@@ -7,7 +7,7 @@ import (
 
 func pipeFullScan(ctx context.Context, input chan rxgo.Item, where []Where, order OrderBy) chan rxgo.Item {
 	var documents []*Document
-	for doc := range rxgo.FromEventSource(input, rxgo.WithContext(ctx)).
+	for doc := range rxgo.FromEventSource(input, rxgo.WithContext(ctx), rxgo.WithObservationStrategy(rxgo.Eager)).
 		Filter(func(i interface{}) bool {
 			pass, err := i.(*Document).Where(where)
 			if err != nil {

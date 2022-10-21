@@ -2,7 +2,6 @@ package wolverine
 
 import (
 	"context"
-	"fmt"
 	"github.com/autom8ter/machine/v4"
 	"github.com/dgraph-io/badger/v3"
 	"github.com/palantir/stacktrace"
@@ -89,7 +88,7 @@ func (query AggregateQuery) pipe(ctx context.Context, input chan rxgo.Item, full
 	if fullScan {
 		return query.pipe(ctx, pipeFullScan(ctx, input, query.Where, query.OrderBy), false)
 	}
-	rxgo.FromChannel(input, rxgo.WithContext(ctx), rxgo.WithCPUPool()).
+	rxgo.FromEventSource(input, rxgo.WithContext(ctx), rxgo.WithCPUPool(), rxgo.WithObservationStrategy(rxgo.Eager)).
 		Filter(func(i interface{}) bool {
 			pass, err := i.(*Document).Where(query.Where)
 			if err != nil {
@@ -111,12 +110,12 @@ func (query AggregateQuery) pipe(ctx context.Context, input chan rxgo.Item, full
 			grouped <- reduced
 		}()
 	}, func(err error) {
-		fmt.Println(err)
+		panic(err)
 	}, func() {
 		wg.Wait()
 		close(grouped)
 	})
-	return rxgo.FromChannel(grouped, rxgo.WithContext(ctx), rxgo.WithCPUPool()).
+	return rxgo.FromChannel(grouped, rxgo.WithContext(ctx), rxgo.WithCPUPool(), rxgo.WithObservationStrategy(rxgo.Eager)).
 		Skip(uint(query.Page * limit)).
 		Take(uint(limit)).
 		Map(func(ctx context.Context, i interface{}) (interface{}, error) {

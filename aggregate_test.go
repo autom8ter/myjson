@@ -11,7 +11,8 @@ import (
 
 func TestAggregate(t *testing.T) {
 	t.Run("pipe", func(t *testing.T) {
-		channel := make(chan rxgo.Item, 100000)
+		totalRecords := 100000
+		channel := make(chan rxgo.Item, totalRecords)
 		go func() {
 			for i := 0; i < 100000; i++ {
 				channel <- rxgo.Of(newUserDoc())
@@ -21,18 +22,18 @@ func TestAggregate(t *testing.T) {
 		}()
 
 		a := AggregateQuery{
-			GroupBy: []string{"account_id", "gender"},
+			GroupBy: []string{"account_id"},
 			Aggregates: []Aggregate{
 				{
 					Field:    "age",
 					Function: "max",
 					Alias:    "max_age",
 				},
-				{
-					Field:    "age",
-					Function: "min",
-					Alias:    "min_age",
-				},
+				//{
+				//	Field:    "age",
+				//	Function: "min",
+				//	Alias:    "min_age",
+				//},
 			},
 			Where: []Where{
 				{
@@ -41,18 +42,23 @@ func TestAggregate(t *testing.T) {
 					Value: 50,
 				},
 			},
-			OrderBy: OrderBy{},
+			OrderBy: OrderBy{
+				Field:     "account_id",
+				Direction: DESC,
+			},
 		}
 		now := time.Now()
-		observable, err := a.pipe(context.Background(), channel, false)
+		observable, err := a.pipe(context.Background(), channel, true)
 		assert.Nil(t, err)
-		<-observable.ForEach(func(i interface{}) {
-			t.Log(i.(*Document).String())
+		i := 0
+		<-observable.ForEach(func(o interface{}) {
+			i++
+			// t.Log(i.(*Document).String())
 		}, func(err error) {
 			t.Fatal(err)
 		}, func() {
 
 		})
-		t.Log(time.Since(now).Milliseconds())
+		t.Log(i, float64(time.Since(now).Milliseconds())/float64(totalRecords))
 	})
 }

@@ -1,10 +1,10 @@
 package prefix
 
 import (
+	"bytes"
+	"encoding/binary"
+	"encoding/hex"
 	"encoding/json"
-	"fmt"
-	"strings"
-
 	"github.com/nqd/flat"
 	"github.com/spf13/cast"
 )
@@ -41,32 +41,44 @@ func (d PrefixIndexRef) GetIndex(id string, value any) string {
 		}
 	}
 	fields, _ = flat.Flatten(fields, nil)
-	var path []string
-	path = append(path, d.initialPrefix...)
+	var path [][]byte
+	for _, i := range d.initialPrefix {
+		path = append(path, []byte(i))
+	}
 	for _, k := range d.fields {
 		if v, ok := fields[k]; ok {
-			path = append(path, fmt.Sprintf("%s%s", toStringHash(k), toStringHash(v)))
+			path = append(path, encodeValue(k), encodeValue(v))
 		} else {
-			path = append(path, fmt.Sprintf("%s%s", toStringHash(k), ""))
+			path = append(path, encodeValue(k), encodeValue(v))
 		}
 	}
 	if id != "" {
-		path = append(path, toStringHash(id))
+		path = append(path, encodeValue(id))
 	}
-	return strings.Join(path, "")
+	return hex.EncodeToString(bytes.Join(path, []byte(".")))
 }
 
-func toStringHash(value any) string {
-
+func encodeValue(value any) []byte {
 	if value == nil {
-		return ""
+		return []byte("")
 	}
-	bits, _ := json.Marshal(value)
-	if len(bits) == 0 {
-		bits = []byte(cast.ToString(value))
+	switch value := value.(type) {
+	case bool:
+		return encodeValue(cast.ToString(value))
+	case string:
+		return []byte(value)
+	case int, int64, int32, float64, float32, uint64, uint32, uint16:
+		buf := make([]byte, 8)
+		binary.BigEndian.PutUint64(buf, cast.ToUint64(value))
+		return buf
+	default:
+		if value == nil {
+			return []byte("null")
+		}
+		bits, _ := json.Marshal(value)
+		if len(bits) == 0 {
+			bits = []byte(cast.ToString(value))
+		}
+		return bits
 	}
-	return string(bits)
-	// s := sha1.New()
-	//s.Write(bits)
-	//return base64.StdEncoding.EncodeToString(s.Sum(nil))
 }
