@@ -121,8 +121,14 @@ func (d *db) Query(ctx context.Context, collection string, query Query) (Page, e
 			opts.PrefetchValues = true
 			opts.PrefetchSize = 10
 			opts.Prefix = pfx
+			seek := pfx
+
+			if query.OrderBy.Direction == DESC {
+				opts.Reverse = true
+				seek = prefix.PrefixNextKey(pfx)
+			}
 			it := txn.NewIterator(opts)
-			it.Seek(pfx)
+			it.Seek(seek)
 			defer it.Close()
 			for it.ValidForPrefix(pfx) {
 				if ctx.Err() != nil {
@@ -182,7 +188,7 @@ func (d *db) Get(ctx context.Context, collection, id string) (*Document, error) 
 	)
 
 	if err := d.kv.View(func(txn *badger.Txn) error {
-		item, err := txn.Get([]byte(prefix.PrimaryKey(collection, id)))
+		item, err := txn.Get(prefix.PrimaryKey(collection, id))
 		if err != nil {
 			return stacktrace.Propagate(err, "")
 		}

@@ -3,7 +3,6 @@ package prefix
 import (
 	"bytes"
 	"encoding/binary"
-	"encoding/hex"
 	"encoding/json"
 	"github.com/nqd/flat"
 	"github.com/spf13/cast"
@@ -23,13 +22,13 @@ func NewPrefixedIndex(collection string, fields []string) *PrefixIndexRef {
 	}
 }
 
-func PrimaryKey(collection string, id string) string {
+func PrimaryKey(collection string, id string) []byte {
 	return NewPrefixedIndex(collection, []string{"_id"}).GetIndex(id, map[string]any{
 		"_id": id,
 	})
 }
 
-func (d PrefixIndexRef) GetIndex(id string, value any) string {
+func (d PrefixIndexRef) GetIndex(id string, value any) []byte {
 	fields := map[string]any{}
 	switch value := value.(type) {
 	case map[string]any:
@@ -55,7 +54,7 @@ func (d PrefixIndexRef) GetIndex(id string, value any) string {
 	if id != "" {
 		path = append(path, encodeValue(id))
 	}
-	return hex.EncodeToString(bytes.Join(path, []byte(".")))
+	return bytes.Join(path, []byte("."))
 }
 
 func encodeValue(value any) []byte {
@@ -81,4 +80,22 @@ func encodeValue(value any) []byte {
 		}
 		return bits
 	}
+}
+
+func PrefixNextKey(k []byte) []byte {
+	buf := make([]byte, len(k))
+	copy(buf, k)
+	var i int
+	for i = len(k) - 1; i >= 0; i-- {
+		buf[i]++
+		if buf[i] != 0 {
+			break
+		}
+	}
+	if i == -1 {
+		// Unlike TiDB, for the specific key 0xFF
+		// we return empty slice instead of {0xFF, 0x0}
+		buf = make([]byte, 0)
+	}
+	return buf
 }
