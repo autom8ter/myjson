@@ -2,11 +2,12 @@ package wolverine
 
 import (
 	"context"
-	"github.com/autom8ter/machine/v4"
+	"encoding/json"
 	"github.com/dgraph-io/badger/v3"
 	"github.com/palantir/stacktrace"
 	"github.com/reactivex/rxgo/v2"
 	"github.com/spf13/cast"
+	"reflect"
 	"strings"
 	"sync"
 	"time"
@@ -44,6 +45,11 @@ type AggregateQuery struct {
 	OrderBy OrderBy `json:"order_by"`
 }
 
+func (a AggregateQuery) String() string {
+	bits, _ := json.Marshal(&a)
+	return string(bits)
+}
+
 func (a AggregateQuery) reducer() func(ctx context.Context, i interface{}, i2 interface{}) (interface{}, error) {
 	return func(ctx context.Context, i interface{}, i2 interface{}) (interface{}, error) {
 		if i == nil {
@@ -76,6 +82,16 @@ func (a AggregateQuery) reducer() func(ctx context.Context, i interface{}, i2 in
 		}
 		return aggregated, nil
 	}
+}
+
+func (query AggregateQuery) pipeIndex(ctx context.Context, input chan rxgo.Item) (rxgo.Observable, error) {
+	limit := 1000000
+	if query.Limit > 0 {
+		limit = query.Limit
+	}
+	return rxgo.FromChannel(input, rxgo.WithContext(ctx), rxgo.WithCPUPool(), rxgo.WithObservationStrategy(rxgo.Eager)).
+		Skip(uint(query.Page * limit)).
+		Take(uint(limit)), nil
 }
 
 func (query AggregateQuery) pipe(ctx context.Context, input chan rxgo.Item, fullScan bool) (rxgo.Observable, error) {
@@ -128,23 +144,64 @@ func (query AggregateQuery) pipe(ctx context.Context, input chan rxgo.Item, full
 		}), nil
 }
 
-func (d *db) Aggregate(ctx context.Context, collection string, query AggregateQuery) (Page, error) {
+func (d *db) aggregateIndex(ctx context.Context, i *aggIndex, query AggregateQuery) (Page, error) {
 	now := time.Now()
-	qmachine := machine.New()
+	input := make(chan rxgo.Item)
+	go func() {
+		results := i.Aggregates(query.Aggregates...)
+		results = orderBy(query.OrderBy, results)
+		for _, result := range results {
+			input <- rxgo.Of(result)
+		}
+		close(input)
+	}()
+	pipe, err := query.pipeIndex(ctx, input)
+	if err != nil {
+		return Page{}, stacktrace.Propagate(err, "")
+	}
+	var results []*Document
+	for result := range pipe.Observe() {
+		doc, ok := result.V.(*Document)
+		if !ok {
+			return Page{}, stacktrace.NewError("expected type: %T got: %#v", &Document{}, result.V)
+		}
+		results = append(results, doc)
+	}
+
+	return Page{
+		Documents: results,
+		NextPage:  query.Page + 1,
+		Count:     len(results),
+		Stats: Stats{
+			ExecutionTime: time.Since(now),
+			IndexedFields: i.groupBy,
+		},
+	}, nil
+}
+
+func (d *db) Aggregate(ctx context.Context, collection string, query AggregateQuery) (Page, error) {
 	if collection != systemCollection {
 		if _, ok := d.getInmemCollection(collection); !ok {
 			return Page{}, stacktrace.NewErrorWithCode(ErrUnsuportedCollection, "unsupported collection: %s must be one of: %v", collection, d.collectionNames())
 		}
 	}
+
+	for _, i := range d.aggIndexes {
+		if i.matches(query) {
+			return d.aggregateIndex(ctx, i, query)
+		}
+	}
+	now := time.Now()
+	var (
+		input = make(chan rxgo.Item)
+	)
 	pfx, indexedFields, ordered, err := d.getQueryPrefix(collection, query.Where, query.OrderBy)
 	if err != nil {
 		return Page{}, stacktrace.Propagate(err, "")
 	}
 	fullScan := query.OrderBy.Field != "" && !ordered
-	var (
-		input = make(chan rxgo.Item)
-	)
-	qmachine.Go(ctx, func(ctx context.Context) error {
+
+	go func() {
 		if err := d.kv.View(func(txn *badger.Txn) error {
 			opts := badger.DefaultIteratorOptions
 			opts.PrefetchValues = true
@@ -174,16 +231,16 @@ func (d *db) Aggregate(ctx context.Context, collection string, query AggregateQu
 			return nil
 		}); err != nil {
 			close(input)
-			return stacktrace.Propagate(err, "")
+			panic(err)
 		}
 		close(input)
-		return nil
-	})
-	var results []*Document
+	}()
+
 	pipe, err := query.pipe(ctx, input, fullScan)
 	if err != nil {
 		return Page{}, stacktrace.Propagate(err, "")
 	}
+	var results []*Document
 	for result := range pipe.Observe() {
 		doc, ok := result.V.(*Document)
 		if !ok {
@@ -191,9 +248,6 @@ func (d *db) Aggregate(ctx context.Context, collection string, query AggregateQu
 		}
 		results = append(results, doc)
 	}
-	//if err := qmachine.Wait(); err != nil {
-	//	return Page{}, stacktrace.Propagate(err, "")
-	//}
 	return Page{
 		Documents: results,
 		NextPage:  query.Page + 1,
@@ -204,4 +258,124 @@ func (d *db) Aggregate(ctx context.Context, collection string, query AggregateQu
 			OrderedIndex:  ordered,
 		},
 	}, nil
+}
+
+type aggIndex struct {
+	mu         sync.RWMutex
+	groupBy    []string
+	aggregates []Aggregate
+	metrics    map[string]map[Aggregate][]float64
+}
+
+func (a *aggIndex) matches(query AggregateQuery) bool {
+	if strings.Join(query.GroupBy, ",") != strings.Join(a.groupBy, ",") {
+		return false
+	}
+	for _, agg := range query.Aggregates {
+		hasMatch := false
+		for _, agg2 := range a.aggregates {
+			if reflect.DeepEqual(agg, agg2) {
+				hasMatch = true
+			}
+		}
+		if !hasMatch {
+			return false
+		}
+	}
+	return true
+}
+
+func (a *aggIndex) Aggregates(aggregates ...Aggregate) []*Document {
+	a.mu.RLocker()
+	defer a.mu.RUnlock()
+	var documents []*Document
+	for k, aggs := range a.metrics {
+		d := NewDocument()
+		splitValues := strings.Split(k, ".")
+		for i, group := range a.groupBy {
+			d.Set(group, splitValues[i])
+		}
+		for agg, metric := range aggs {
+			for _, aggregate := range aggregates {
+				if reflect.DeepEqual(agg, aggregate) {
+					d.Set(agg.Alias, metric)
+				}
+			}
+		}
+		documents = append(documents, d)
+	}
+	return documents
+}
+
+func (a *aggIndex) Trigger() Trigger {
+	return func(ctx context.Context, action Action, timing Timing, before, after *Document) error {
+		a.mu.Lock()
+		defer a.mu.Unlock()
+		switch action {
+		case Delete:
+			var groupValues []string
+			for _, g := range a.groupBy {
+				groupValues = append(groupValues, cast.ToString(before.Get(g)))
+			}
+			groupKey := strings.Join(groupValues, ".")
+			for _, agg := range a.aggregates {
+				switch agg.Function {
+				case SUM:
+					current := a.metrics[groupKey][agg]
+					value := after.GetFloat(agg.Field)
+					a.metrics[groupKey][agg][0] = current[0] - value
+				case COUNT:
+					a.metrics[groupKey][agg][0] -= 1
+					// TODO: fix max/min
+				case MAX:
+					current := a.metrics[groupKey][agg]
+					value := after.GetFloat(agg.Field)
+					if value > current[0] {
+						a.metrics[groupKey][agg][0] = value
+					}
+				case MIN:
+					current := a.metrics[groupKey][agg]
+					value := after.GetFloat(agg.Field)
+					if value < current[0] {
+						a.metrics[groupKey][agg][0] = value
+					}
+
+				default:
+					return stacktrace.NewError("unsupported aggregate function: %s", agg.Function)
+				}
+			}
+		default:
+			var groupValues []string
+			for _, g := range a.groupBy {
+				groupValues = append(groupValues, cast.ToString(after.Get(g)))
+			}
+			groupKey := strings.Join(groupValues, ".")
+			for _, agg := range a.aggregates {
+				switch agg.Function {
+				case SUM:
+					current := a.metrics[groupKey][agg]
+					value := after.GetFloat(agg.Field)
+					a.metrics[groupKey][agg][0] = current[0] + value
+				case COUNT:
+					a.metrics[groupKey][agg][0] += 1
+				case MAX:
+					current := a.metrics[groupKey][agg]
+					value := after.GetFloat(agg.Field)
+					if value > current[0] {
+						a.metrics[groupKey][agg][0] = value
+					}
+				case MIN:
+					current := a.metrics[groupKey][agg]
+					value := after.GetFloat(agg.Field)
+					if value < current[0] {
+						a.metrics[groupKey][agg][0] = value
+					}
+
+				default:
+					return stacktrace.NewError("unsupported aggregate function: %s", agg.Function)
+				}
+			}
+		}
+		return nil
+	}
 }

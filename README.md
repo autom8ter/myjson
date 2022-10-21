@@ -58,13 +58,13 @@ Features:
 
 ## Road to Beta
 
-- [ ] order by tests
 - [ ] awesome readme
 - [ ] benchmarks
 - [ ] examples
 - [ ] better errors & error codes
 - [ ] 80% test coverage
 - [ ] extensive comments
+- [ ] aggregate indexes
 
 ## Beta+ Roadmap
 

@@ -25,6 +25,7 @@ type db struct {
 	collections sync.Map
 	machine     machine.Machine
 	fullText    sync.Map
+	aggIndexes  []*aggIndex
 }
 
 func New(ctx context.Context, cfg Config) (DB, error) {
