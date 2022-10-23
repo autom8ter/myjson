@@ -51,7 +51,7 @@ func (d *db) aggregateIndex(ctx context.Context, i *schema.AggregateIndex, query
 func (d *db) Aggregate(ctx context.Context, collection string, query schema.AggregateQuery) (schema.Page, error) {
 	c, ok := d.getInmemCollection(collection)
 	if !ok {
-		return schema.Page{}, stacktrace.NewErrorWithCode(errors.ErrUnsuportedCollection, "unsupported collection: %s must be one of: %v", collection, d.collectionNames())
+		return schema.Page{}, stacktrace.NewErrorWithCode(errors.ErrUnsuportedCollection, "unsupported collection: %s must be one of: %v", collection, d.schema.CollectionNames())
 	}
 	indexes, ok := d.aggIndexes.Load(collection)
 	if ok {

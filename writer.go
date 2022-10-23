@@ -21,7 +21,7 @@ func (d *db) saveBatch(ctx context.Context, event *schema.Event) error {
 	}
 	collect, ok := d.getInmemCollection(event.Collection)
 	if !ok {
-		return stacktrace.Propagate(stacktrace.NewError("unsupported collection: %s must be one of: %v", event.Collection, d.collectionNames()), "")
+		return stacktrace.Propagate(stacktrace.NewError("unsupported collection: %s must be one of: %v", event.Collection, d.schema.CollectionNames()), "")
 	}
 	for _, document := range event.Documents {
 		document.Set("_collection", event.Collection)
@@ -140,7 +140,7 @@ func (d *db) saveBatch(ctx context.Context, event *schema.Event) error {
 func (d *db) saveDocument(ctx context.Context, event *schema.Event) error {
 	collect, ok := d.getInmemCollection(event.Collection)
 	if !ok {
-		return stacktrace.Propagate(stacktrace.NewError("unsupported collection: %s must be one of: %v", event.Collection, d.collectionNames()), "")
+		return stacktrace.Propagate(stacktrace.NewError("unsupported collection: %s must be one of: %v", event.Collection, d.schema.CollectionNames()), "")
 	}
 	if len(event.Documents) == 0 {
 		return nil

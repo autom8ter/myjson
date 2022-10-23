@@ -2,8 +2,11 @@ package schema
 
 // SearchIndex
 type SearchIndex struct {
-	// Fields is a list of fields that are indexed
-	Fields []string `json:"fields"`
+	fields []string
+}
+
+func NewSearchIndex(fields []string) *SearchIndex {
+	return &SearchIndex{fields: fields}
 }
 
 // SearchOp is an operator used within a where clause in a full text search query

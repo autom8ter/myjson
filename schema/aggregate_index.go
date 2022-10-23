@@ -12,18 +12,27 @@ import (
 
 type AggregateIndex struct {
 	mu         *sync.RWMutex
-	GroupBy    []string    `json:"group_by"`
-	Aggregates []Aggregate `json:"aggregates"`
+	groupBy    []string
+	aggregates []Aggregate
 	metrics    map[string]map[Aggregate]*list.List
 }
 
+func NewAggregateIndex(groupBy []string, aggregates []Aggregate) *AggregateIndex {
+	return &AggregateIndex{
+		mu:         &sync.RWMutex{},
+		groupBy:    groupBy,
+		aggregates: aggregates,
+		metrics:    map[string]map[Aggregate]*list.List{},
+	}
+}
+
 func (a *AggregateIndex) Matches(query AggregateQuery) bool {
-	if strings.Join(query.GroupBy, ",") != strings.Join(a.GroupBy, ",") {
+	if strings.Join(query.GroupBy, ",") != strings.Join(a.groupBy, ",") {
 		return false
 	}
 	for _, agg := range query.Aggregates {
 		hasMatch := false
-		for _, agg2 := range a.Aggregates {
+		for _, agg2 := range a.aggregates {
 			if reflect.DeepEqual(agg, agg2) {
 				hasMatch = true
 			}
@@ -42,7 +51,7 @@ func (a *AggregateIndex) Aggregate(aggregates ...Aggregate) []*Document {
 	for k, aggs := range a.metrics {
 		d := NewDocument()
 		splitValues := strings.Split(k, ".")
-		for i, group := range a.GroupBy {
+		for i, group := range a.groupBy {
 			d.Set(group, splitValues[i])
 		}
 		for agg, metric := range aggs {
@@ -64,12 +73,12 @@ func (a *AggregateIndex) Trigger() Trigger {
 		switch action {
 		case Delete:
 			var groupValues []string
-			for _, g := range a.GroupBy {
+			for _, g := range a.groupBy {
 				groupValues = append(groupValues, cast.ToString(before.Get(g)))
 			}
 			groupKey := strings.Join(groupValues, ".")
 			group := a.metrics[groupKey]
-			for _, agg := range a.Aggregates {
+			for _, agg := range a.aggregates {
 				if group[agg] == nil {
 					group[agg] = list.New()
 				}
@@ -85,12 +94,12 @@ func (a *AggregateIndex) Trigger() Trigger {
 			}
 		default:
 			var groupValues []string
-			for _, g := range a.GroupBy {
+			for _, g := range a.groupBy {
 				groupValues = append(groupValues, cast.ToString(after.Get(g)))
 			}
 			groupKey := strings.Join(groupValues, ".")
 			group := a.metrics[groupKey]
-			for _, agg := range a.Aggregates {
+			for _, agg := range a.aggregates {
 				current := cast.ToFloat64(group[agg].Front().Value)
 				switch agg.Function {
 				case SUM:

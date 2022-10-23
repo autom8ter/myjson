@@ -17,13 +17,13 @@ import (
 )
 
 type db struct {
-	config      Config
-	kv          *badger.DB
-	mu          sync.RWMutex
-	collections sync.Map
-	machine     machine.Machine
-	fullText    sync.Map
-	aggIndexes  sync.Map
+	config     Config
+	kv         *badger.DB
+	mu         sync.RWMutex
+	schema     *schema.Schema
+	machine    machine.Machine
+	fullText   sync.Map
+	aggIndexes sync.Map
 }
 
 func New(ctx context.Context, cfg Config) (DB, error) {
@@ -41,13 +41,14 @@ func New(ctx context.Context, cfg Config) (DB, error) {
 	}
 
 	d := &db{
-		config:      *config,
-		kv:          kv,
-		mu:          sync.RWMutex{},
-		collections: sync.Map{},
-		machine:     machine.New(),
-		aggIndexes:  sync.Map{},
+		config:     *config,
+		kv:         kv,
+		mu:         sync.RWMutex{},
+		schema:     schema.NewSchema(nil),
+		machine:    machine.New(),
+		aggIndexes: sync.Map{},
 	}
+
 	if err := d.loadCollections(ctx); err != nil {
 		return nil, stacktrace.Propagate(err, "")
 	}
@@ -169,33 +170,20 @@ func (d *db) loadCollections(ctx context.Context) error {
 	}
 	collections = append(collections, sysCollection)
 	for _, collection := range collections {
-		d.collections.Store(collection.Collection(), collection)
+		d.schema.Set(collection)
 	}
 	return nil
 }
 
 func (d *db) getInmemCollection(collection string) (*schema.Collection, bool) {
-	c, ok := d.collections.Load(collection)
-	if !ok {
-		return nil, ok
-	}
-	return c.(*schema.Collection), ok
+	c := d.schema.Get(collection)
+	return c, c != nil
 }
 
 func (d *db) getInmemCollections() []*schema.Collection {
 	var c []*schema.Collection
-	d.collections.Range(func(key, value any) bool {
-		c = append(c, value.(*schema.Collection))
-		return true
-	})
-	return c
-}
-
-func (d *db) collectionNames() []string {
-	var names []string
-	collections := d.getInmemCollections()
-	for _, c := range collections {
-		names = append(names, c.Collection())
+	for _, name := range d.schema.CollectionNames() {
+		c = append(c, d.schema.Get(name))
 	}
-	return names
+	return c
 }

@@ -19,7 +19,7 @@ func (d *db) Query(ctx context.Context, collection string, query schema.Query) (
 	qmachine := machine.New()
 	c, ok := d.getInmemCollection(collection)
 	if !ok {
-		return schema.Page{}, stacktrace.NewErrorWithCode(errors.ErrUnsuportedCollection, "unsupported collection: %s must be one of: %v", collection, d.collectionNames())
+		return schema.Page{}, stacktrace.NewErrorWithCode(errors.ErrUnsuportedCollection, "unsupported collection: %s must be one of: %v", collection, d.schema.CollectionNames())
 	}
 	index, err := c.OptimizeQueryIndex(query.Where, query.OrderBy)
 	if err != nil {
@@ -90,7 +90,7 @@ func (d *db) Query(ctx context.Context, collection string, query schema.Query) (
 
 func (d *db) Get(ctx context.Context, collection, id string) (*schema.Document, error) {
 	if _, ok := d.getInmemCollection(collection); !ok {
-		return nil, stacktrace.Propagate(stacktrace.NewError("unsupported collection: %s must be one of: %v", collection, d.collectionNames()), "")
+		return nil, stacktrace.Propagate(stacktrace.NewError("unsupported collection: %s must be one of: %v", collection, d.schema.CollectionNames()), "")
 	}
 	var (
 		document *schema.Document
@@ -113,7 +113,7 @@ func (d *db) Get(ctx context.Context, collection, id string) (*schema.Document, 
 
 func (d *db) GetAll(ctx context.Context, collection string, ids []string) ([]*schema.Document, error) {
 	if _, ok := d.getInmemCollection(collection); !ok {
-		return nil, stacktrace.Propagate(stacktrace.NewError("unsupported collection: %s must be one of: %v", collection, d.collectionNames()), "")
+		return nil, stacktrace.Propagate(stacktrace.NewError("unsupported collection: %s must be one of: %v", collection, d.schema.CollectionNames()), "")
 	}
 	var documents []*schema.Document
 	if err := d.kv.View(func(txn *badger.Txn) error {

@@ -239,7 +239,7 @@ func (d *db) SetCollection(ctx context.Context, collection *schema.Collection) e
 	if err := d.Set(ctx, systemCollection, existing); err != nil {
 		return stacktrace.Propagate(err, "")
 	}
-	d.collections.Store(collection.Collection(), collection)
+	d.schema.Set(collection)
 	if err := d.loadCollections(ctx); err != nil {
 		return stacktrace.Propagate(err, "failed to set collection")
 	}
