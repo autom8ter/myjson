@@ -1,6 +1,7 @@
 package wolverine
 
 import (
+	"container/list"
 	"context"
 	"encoding/json"
 	"github.com/dgraph-io/badger/v3"
@@ -264,7 +265,7 @@ type aggIndex struct {
 	mu         sync.RWMutex
 	groupBy    []string
 	aggregates []Aggregate
-	metrics    map[string]map[Aggregate][]float64
+	metrics    map[string]map[Aggregate]*list.List
 }
 
 func (a *aggIndex) matches(query AggregateQuery) bool {
@@ -298,7 +299,7 @@ func (a *aggIndex) Aggregates(aggregates ...Aggregate) []*Document {
 		for agg, metric := range aggs {
 			for _, aggregate := range aggregates {
 				if reflect.DeepEqual(agg, aggregate) {
-					d.Set(agg.Alias, metric)
+					d.Set(agg.Alias, cast.ToFloat64(metric.Front().Value))
 				}
 			}
 		}
@@ -318,30 +319,19 @@ func (a *aggIndex) Trigger() Trigger {
 				groupValues = append(groupValues, cast.ToString(before.Get(g)))
 			}
 			groupKey := strings.Join(groupValues, ".")
+			group := a.metrics[groupKey]
 			for _, agg := range a.aggregates {
-				switch agg.Function {
-				case SUM:
-					current := a.metrics[groupKey][agg]
-					value := after.GetFloat(agg.Field)
-					a.metrics[groupKey][agg][0] = current[0] - value
-				case COUNT:
-					a.metrics[groupKey][agg][0] -= 1
-					// TODO: fix max/min
-				case MAX:
-					current := a.metrics[groupKey][agg]
-					value := after.GetFloat(agg.Field)
-					if value > current[0] {
-						a.metrics[groupKey][agg][0] = value
+				if group[agg] == nil {
+					group[agg] = list.New()
+				}
+				group[agg].MoveToBack(group[agg].Front())
+				if group[agg].Len() > 2 {
+					for i := 0; i < group[agg].Len(); i++ {
+						element := group[agg].Front().Next()
+						if element != nil && i > 2 {
+							group[agg].Remove(element)
+						}
 					}
-				case MIN:
-					current := a.metrics[groupKey][agg]
-					value := after.GetFloat(agg.Field)
-					if value < current[0] {
-						a.metrics[groupKey][agg][0] = value
-					}
-
-				default:
-					return stacktrace.NewError("unsupported aggregate function: %s", agg.Function)
 				}
 			}
 		default:
@@ -350,27 +340,25 @@ func (a *aggIndex) Trigger() Trigger {
 				groupValues = append(groupValues, cast.ToString(after.Get(g)))
 			}
 			groupKey := strings.Join(groupValues, ".")
+			group := a.metrics[groupKey]
 			for _, agg := range a.aggregates {
+				current := cast.ToFloat64(group[agg].Front().Value)
 				switch agg.Function {
 				case SUM:
-					current := a.metrics[groupKey][agg]
 					value := after.GetFloat(agg.Field)
-					a.metrics[groupKey][agg][0] = current[0] + value
+					group[agg].PushFront(current + value)
 				case COUNT:
-					a.metrics[groupKey][agg][0] += 1
+					group[agg].PushFront(current + 1)
 				case MAX:
-					current := a.metrics[groupKey][agg]
 					value := after.GetFloat(agg.Field)
-					if value > current[0] {
-						a.metrics[groupKey][agg][0] = value
+					if value > current {
+						group[agg].PushFront(value)
 					}
 				case MIN:
-					current := a.metrics[groupKey][agg]
 					value := after.GetFloat(agg.Field)
-					if value < current[0] {
-						a.metrics[groupKey][agg][0] = value
+					if value < current {
+						group[agg].PushFront(value)
 					}
-
 				default:
 					return stacktrace.NewError("unsupported aggregate function: %s", agg.Function)
 				}

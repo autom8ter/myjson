@@ -60,7 +60,7 @@ func New(ctx context.Context, cfg Config) (DB, error) {
 
 	if config.ReIndex {
 		if err := d.ReIndex(ctx); err != nil {
-
+			return nil, stacktrace.Propagate(err, "failed to reindex")
 		}
 	}
 	if config.Migrate {
