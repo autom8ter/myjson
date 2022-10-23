@@ -3,6 +3,7 @@ package wolverine_test
 import (
 	"context"
 	"fmt"
+	"github.com/autom8ter/wolverine/internal/testutil"
 	"github.com/autom8ter/wolverine/schema"
 	"testing"
 	"time"
@@ -10,7 +11,6 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/autom8ter/wolverine"
-	"github.com/autom8ter/wolverine/internal/testutil"
 )
 
 func TestSearch(t *testing.T) {
@@ -24,22 +24,22 @@ func TestSearch(t *testing.T) {
 			assert.Nil(t, db.Set(ctx, "user", testutil.NewUserDoc()))
 		}
 		t.Run("basic", func(t *testing.T) {
-			results, err := db.Search(ctx, "user", wolverine.SearchQuery{
+			results, err := db.Search(ctx, "user", schema.SearchQuery{
 				Select: []string{"name", "contact.email"},
-				Where: []wolverine.SearchWhere{
+				Where: []schema.SearchWhere{
 					{
 						Field: "account_id",
-						Op:    wolverine.Basic,
+						Op:    schema.Basic,
 						Value: 1,
 					},
 					{
 						Field: "language",
-						Op:    wolverine.Basic,
+						Op:    schema.Basic,
 						Value: "english",
 					},
 					{
 						Field: "contact.email",
-						Op:    wolverine.Basic,
+						Op:    schema.Basic,
 						Value: testutil.MyEmail,
 					},
 				},
@@ -49,17 +49,17 @@ func TestSearch(t *testing.T) {
 			assert.Equal(t, 1, len(results.Documents))
 			assert.EqualValues(t, testutil.MyEmail, results.Documents[0].Get("contact.email"))
 
-			results, err = db.Search(ctx, "user", wolverine.SearchQuery{
+			results, err = db.Search(ctx, "user", schema.SearchQuery{
 				Select: []string{"name", "contact.email"},
-				Where: []wolverine.SearchWhere{
+				Where: []schema.SearchWhere{
 					{
 						Field: "account_id",
-						Op:    wolverine.Basic,
+						Op:    schema.Basic,
 						Value: 2,
 					},
 					{
 						Field: "language",
-						Op:    wolverine.Basic,
+						Op:    schema.Basic,
 						Value: "englis",
 					},
 				},
@@ -68,12 +68,12 @@ func TestSearch(t *testing.T) {
 			assert.Nil(t, err)
 			assert.Equal(t, 0, len(results.Documents))
 
-			results, err = db.Search(ctx, "user", wolverine.SearchQuery{
+			results, err = db.Search(ctx, "user", schema.SearchQuery{
 				Select: []string{"name", "contact.email"},
-				Where: []wolverine.SearchWhere{
+				Where: []schema.SearchWhere{
 					{
 						Field: "account_id",
-						Op:    wolverine.Basic,
+						Op:    schema.Basic,
 						Value: 1,
 					},
 				},
@@ -84,22 +84,22 @@ func TestSearch(t *testing.T) {
 		})
 
 		t.Run("prefix", func(t *testing.T) {
-			results, err := db.Search(ctx, "user", wolverine.SearchQuery{
+			results, err := db.Search(ctx, "user", schema.SearchQuery{
 				Select: []string{"name", "contact.email"},
-				Where: []wolverine.SearchWhere{
+				Where: []schema.SearchWhere{
 					{
 						Field: "account_id",
-						Op:    wolverine.Basic,
+						Op:    schema.Basic,
 						Value: 1,
 					},
 					{
 						Field: "language",
-						Op:    wolverine.Basic,
+						Op:    schema.Basic,
 						Value: "english",
 					},
 					{
 						Field: "contact.email",
-						Op:    wolverine.Prefix,
+						Op:    schema.Prefix,
 						Value: "colemanword",
 					},
 				},
@@ -109,12 +109,12 @@ func TestSearch(t *testing.T) {
 			assert.Equal(t, 1, len(results.Documents))
 			assert.EqualValues(t, testutil.MyEmail, results.Documents[0].Get("contact.email"))
 
-			results, err = db.Search(ctx, "user", wolverine.SearchQuery{
+			results, err = db.Search(ctx, "user", schema.SearchQuery{
 				Select: []string{"name", "contact.email"},
-				Where: []wolverine.SearchWhere{
+				Where: []schema.SearchWhere{
 					{
 						Field: "contact.email",
-						Op:    wolverine.Prefix,
+						Op:    schema.Prefix,
 						Value: "colemanworz",
 					},
 				},
@@ -123,12 +123,12 @@ func TestSearch(t *testing.T) {
 			assert.Nil(t, err)
 			assert.Equal(t, 0, len(results.Documents))
 
-			results, err = db.Search(ctx, "user", wolverine.SearchQuery{
+			results, err = db.Search(ctx, "user", schema.SearchQuery{
 				Select: []string{"name", "contact.email"},
-				Where: []wolverine.SearchWhere{
+				Where: []schema.SearchWhere{
 					{
 						Field: "contact.email",
-						Op:    wolverine.Prefix,
+						Op:    schema.Prefix,
 						Value: "c",
 					},
 				},
@@ -139,22 +139,22 @@ func TestSearch(t *testing.T) {
 		})
 
 		t.Run("wildcard", func(t *testing.T) {
-			results, err := db.Search(ctx, "user", wolverine.SearchQuery{
+			results, err := db.Search(ctx, "user", schema.SearchQuery{
 				Select: []string{"name", "contact.email"},
-				Where: []wolverine.SearchWhere{
+				Where: []schema.SearchWhere{
 					{
 						Field: "account_id",
-						Op:    wolverine.Basic,
+						Op:    schema.Basic,
 						Value: 1,
 					},
 					{
 						Field: "language",
-						Op:    wolverine.Basic,
+						Op:    schema.Basic,
 						Value: "english",
 					},
 					{
 						Field: "contact.email",
-						Op:    wolverine.Wildcard,
+						Op:    schema.Wildcard,
 						Value: "colemanword*",
 					},
 				},
@@ -164,12 +164,12 @@ func TestSearch(t *testing.T) {
 			assert.Equal(t, 1, len(results.Documents))
 			assert.EqualValues(t, testutil.MyEmail, results.Documents[0].Get("contact.email"))
 
-			results, err = db.Search(ctx, "user", wolverine.SearchQuery{
+			results, err = db.Search(ctx, "user", schema.SearchQuery{
 				Select: []string{"name", "contact.email"},
-				Where: []wolverine.SearchWhere{
+				Where: []schema.SearchWhere{
 					{
 						Field: "contact.email",
-						Op:    wolverine.Wildcard,
+						Op:    schema.Wildcard,
 						Value: "colemanworz*",
 					},
 				},
@@ -178,12 +178,12 @@ func TestSearch(t *testing.T) {
 			assert.Nil(t, err)
 			assert.Equal(t, 0, len(results.Documents))
 
-			results, err = db.Search(ctx, "user", wolverine.SearchQuery{
+			results, err = db.Search(ctx, "user", schema.SearchQuery{
 				Select: []string{"name", "contact.email"},
-				Where: []wolverine.SearchWhere{
+				Where: []schema.SearchWhere{
 					{
 						Field: "contact.email",
-						Op:    wolverine.Wildcard,
+						Op:    schema.Wildcard,
 						Value: "c*",
 					},
 				},
@@ -194,12 +194,12 @@ func TestSearch(t *testing.T) {
 		})
 
 		t.Run("date range", func(t *testing.T) {
-			results, err := db.Search(ctx, "user", wolverine.SearchQuery{
+			results, err := db.Search(ctx, "user", schema.SearchQuery{
 				Select: []string{"name", "contact.email"},
-				Where: []wolverine.SearchWhere{
+				Where: []schema.SearchWhere{
 					{
 						Field: "timestamp",
-						Op:    wolverine.DateRange,
+						Op:    schema.DateRange,
 						Value: fmt.Sprintf("%s,%s", time.Time{}, time.Now()),
 					},
 				},
@@ -211,22 +211,22 @@ func TestSearch(t *testing.T) {
 		})
 
 		t.Run("term range", func(t *testing.T) {
-			results, err := db.Search(ctx, "user", wolverine.SearchQuery{
+			results, err := db.Search(ctx, "user", schema.SearchQuery{
 				Select: []string{"name", "contact.email"},
-				Where: []wolverine.SearchWhere{
+				Where: []schema.SearchWhere{
 					{
 						Field: "account_id",
-						Op:    wolverine.Basic,
+						Op:    schema.Basic,
 						Value: 1,
 					},
 					{
 						Field: "language",
-						Op:    wolverine.Basic,
+						Op:    schema.Basic,
 						Value: "english",
 					},
 					{
 						Field: "contact.email",
-						Op:    wolverine.TermRange,
+						Op:    schema.TermRange,
 						Value: "colemanword,colemanword@gmail.comz",
 					},
 				},
@@ -236,12 +236,12 @@ func TestSearch(t *testing.T) {
 			assert.Equal(t, 1, len(results.Documents))
 			assert.EqualValues(t, testutil.MyEmail, results.Documents[0].Get("contact.email"))
 
-			results, err = db.Search(ctx, "user", wolverine.SearchQuery{
+			results, err = db.Search(ctx, "user", schema.SearchQuery{
 				Select: []string{"name", "contact.email"},
-				Where: []wolverine.SearchWhere{
+				Where: []schema.SearchWhere{
 					{
 						Field: "contact.email",
-						Op:    wolverine.TermRange,
+						Op:    schema.TermRange,
 						Value: "zzzzz,zzzzzzz",
 					},
 				},
@@ -250,12 +250,12 @@ func TestSearch(t *testing.T) {
 			assert.Nil(t, err)
 			assert.Equal(t, 0, len(results.Documents))
 
-			results, err = db.Search(ctx, "user", wolverine.SearchQuery{
+			results, err = db.Search(ctx, "user", schema.SearchQuery{
 				Select: []string{"name", "contact.email"},
-				Where: []wolverine.SearchWhere{
+				Where: []schema.SearchWhere{
 					{
 						Field: "contact.email",
-						Op:    wolverine.TermRange,
+						Op:    schema.TermRange,
 						Value: "colemanword",
 					},
 				},
@@ -283,7 +283,7 @@ func TestSearch(t *testing.T) {
 					return true
 				}
 
-				assert.Nil(t, db.SearchPaginate(ctx, "user", wolverine.SearchQuery{
+				assert.Nil(t, db.SearchPaginate(ctx, "user", schema.SearchQuery{
 					Select: nil,
 					Page:   0,
 					Limit:  1,

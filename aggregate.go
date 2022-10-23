@@ -21,10 +21,13 @@ func (d *db) aggregateIndex(ctx context.Context, i *schema.AggregateIndex, query
 		}
 		close(input)
 	}()
-	pipe, err := query.pipeIndex(ctx, input)
-	if err != nil {
-		return schema.Page{}, stacktrace.Propagate(err, "")
+	limit := 1000000
+	if query.Limit > 0 {
+		limit = query.Limit
 	}
+	pipe := rxgo.FromChannel(input, rxgo.WithContext(ctx), rxgo.WithCPUPool(), rxgo.WithObservationStrategy(rxgo.Eager)).
+		Skip(uint(query.Page * limit)).
+		Take(uint(limit))
 	var results []*schema.Document
 	for result := range pipe.Observe() {
 		doc, ok := result.V.(*schema.Document)

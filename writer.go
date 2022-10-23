@@ -116,6 +116,11 @@ func (d *db) saveBatch(ctx context.Context, event *schema.Event) error {
 				return stacktrace.Propagate(err, "trigger failure")
 			}
 		}
+		for _, agg := range collect.Indexing().Aggregate {
+			if err := agg.Trigger()(ctx, event.Action, schema.After, current, document); err != nil {
+				return stacktrace.Propagate(err, "trigger failure")
+			}
+		}
 	}
 	if batch != nil {
 		if err := d.getFullText(collect.Collection()).Batch(batch); err != nil {
@@ -228,6 +233,11 @@ func (d *db) saveDocument(ctx context.Context, event *schema.Event) error {
 		}
 		for _, t := range d.config.Triggers {
 			if err := t(ctx, event.Action, schema.After, current, document); err != nil {
+				return stacktrace.Propagate(err, "trigger failure")
+			}
+		}
+		for _, agg := range collect.Indexing().Aggregate {
+			if err := agg.Trigger()(ctx, event.Action, schema.After, current, document); err != nil {
 				return stacktrace.Propagate(err, "trigger failure")
 			}
 		}

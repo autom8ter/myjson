@@ -2,13 +2,13 @@ package wolverine_test
 
 import (
 	"context"
+	"github.com/autom8ter/wolverine/internal/testutil"
 	"github.com/autom8ter/wolverine/schema"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 
 	"github.com/autom8ter/wolverine"
-	"github.com/autom8ter/wolverine/internal/testutil"
 )
 
 func TestQueryPaginate(t *testing.T) {
@@ -31,11 +31,11 @@ func TestQueryPaginate(t *testing.T) {
 				}
 				return true
 			}
-			assert.Nil(t, db.QueryPaginate(ctx, "user", wolverine.Query{
+			assert.Nil(t, db.QueryPaginate(ctx, "user", schema.Query{
 				Select:  nil,
 				Page:    0,
 				Limit:   1,
-				OrderBy: wolverine.OrderBy{},
+				OrderBy: schema.OrderBy{},
 			}, handler))
 
 			assert.Equal(t, len(usrs), len(seen))

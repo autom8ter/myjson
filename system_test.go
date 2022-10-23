@@ -3,13 +3,13 @@ package wolverine_test
 import (
 	"bytes"
 	"context"
+	"github.com/autom8ter/wolverine/internal/testutil"
 	"github.com/autom8ter/wolverine/schema"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 
 	"github.com/autom8ter/wolverine"
-	"github.com/autom8ter/wolverine/internal/testutil"
 )
 
 func TestSystem(t *testing.T) {

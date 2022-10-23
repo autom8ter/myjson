@@ -1,11 +1,10 @@
 package schema_test
 
 import (
+	"github.com/autom8ter/wolverine/internal/testutil"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-
-	"github.com/autom8ter/wolverine/internal/testutil"
 )
 
 func TestCollection(t *testing.T) {

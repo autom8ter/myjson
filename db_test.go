@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/autom8ter/wolverine"
+	"github.com/autom8ter/wolverine/internal/testutil"
 	"github.com/autom8ter/wolverine/schema"
 	"sync"
 	"testing"
@@ -12,9 +14,6 @@ import (
 	"github.com/brianvoe/gofakeit/v6"
 	"github.com/spf13/cast"
 	"github.com/stretchr/testify/assert"
-
-	"github.com/autom8ter/wolverine"
-	"github.com/autom8ter/wolverine/internal/testutil"
 )
 
 func Test(t *testing.T) {
@@ -54,21 +53,21 @@ func Test(t *testing.T) {
 		result, err := db.Get(ctx, "user", usr.GetID())
 		assert.Nil(t, err)
 		assert.Equal(t, testutil.MyEmail, result.Get("contact.email"))
-		query := &wolverine.Query{
+		query := &schema.Query{
 			//Fields:  []string{"email"},
-			Where: []wolverine.Where{
+			Where: []schema.Where{
 				{
 					Field: "contact.email",
-					Op:    wolverine.Eq,
+					Op:    schema.Eq,
 					Value: testutil.MyEmail,
 				},
 			},
 			Limit:   1,
-			OrderBy: wolverine.OrderBy{},
+			OrderBy: schema.OrderBy{},
 		}
 		results, err := db.Query(ctx, "user", *query)
 		assert.Nil(t, err)
-		assert.GreaterOrEqual(t, 1, len(results.Stats.IndexedFields))
+		assert.GreaterOrEqual(t, 1, len(results.Stats.IndexMatch.Fields))
 		assert.Equal(t, 1, len(results.Documents))
 		assert.Equal(t, testutil.MyEmail, result.Get("contact.email"))
 		update := schema.NewDocument()
@@ -140,22 +139,22 @@ func Test(t *testing.T) {
 				assert.Nil(t, db.Set(ctx, "user", testutil.NewUserDoc()))
 			}
 			{
-				results, err := db.Search(ctx, "user", wolverine.SearchQuery{
+				results, err := db.Search(ctx, "user", schema.SearchQuery{
 					Select: []string{"name", "contact.email"},
-					Where: []wolverine.SearchWhere{
+					Where: []schema.SearchWhere{
 						{
 							Field: "account_id",
-							Op:    wolverine.Basic,
+							Op:    schema.Basic,
 							Value: 1,
 						},
 						{
 							Field: "language",
-							Op:    wolverine.Basic,
+							Op:    schema.Basic,
 							Value: "english",
 						},
 						{
 							Field: "contact.email",
-							Op:    wolverine.Prefix,
+							Op:    schema.Prefix,
 							Value: "colemanword",
 						},
 					},
@@ -167,17 +166,17 @@ func Test(t *testing.T) {
 			}
 
 			{
-				results, err := db.Search(ctx, "user", wolverine.SearchQuery{
+				results, err := db.Search(ctx, "user", schema.SearchQuery{
 					Select: []string{"name", "contact.email"},
-					Where: []wolverine.SearchWhere{
+					Where: []schema.SearchWhere{
 						{
 							Field: "contact.email",
-							Op:    wolverine.Wildcard,
+							Op:    schema.Wildcard,
 							Value: "colemanword*",
 						},
 						{
 							Field: "name",
-							Op:    wolverine.Wildcard,
+							Op:    schema.Wildcard,
 							Value: "colemanword*",
 						},
 					},
@@ -187,12 +186,12 @@ func Test(t *testing.T) {
 				assert.Equal(t, 0, len(results.Documents))
 			}
 			{
-				results, err := db.Search(ctx, "user", wolverine.SearchQuery{
+				results, err := db.Search(ctx, "user", schema.SearchQuery{
 					Select: []string{"name", "contact.email"},
-					Where: []wolverine.SearchWhere{
+					Where: []schema.SearchWhere{
 						{
 							Field: "search(age)",
-							Op:    wolverine.Wildcard,
+							Op:    schema.Wildcard,
 							Value: "colemanword*",
 						},
 					},
@@ -202,12 +201,12 @@ func Test(t *testing.T) {
 				assert.Equal(t, 0, len(results.Documents))
 			}
 			{
-				results, err := db.Search(ctx, "user", wolverine.SearchQuery{
+				results, err := db.Search(ctx, "user", schema.SearchQuery{
 					Select: []string{"name", "contact.email"},
-					Where: []wolverine.SearchWhere{
+					Where: []schema.SearchWhere{
 						{
 							Field: "contact.email",
-							Op:    wolverine.Fuzzy,
+							Op:    schema.Fuzzy,
 							Value: "colemanword",
 						},
 					},
@@ -218,12 +217,12 @@ func Test(t *testing.T) {
 				assert.EqualValues(t, testutil.MyEmail, results.Documents[0].Get("contact.email"))
 			}
 			{
-				results, err := db.Search(ctx, "user", wolverine.SearchQuery{
+				results, err := db.Search(ctx, "user", schema.SearchQuery{
 					Select: []string{"name", "contact.email"},
-					Where: []wolverine.SearchWhere{
+					Where: []schema.SearchWhere{
 						{
 							Field: "contact.email",
-							Op:    wolverine.Basic,
+							Op:    schema.Basic,
 							Value: "colemanword",
 						},
 					},
@@ -234,12 +233,12 @@ func Test(t *testing.T) {
 				assert.EqualValues(t, testutil.MyEmail, results.Documents[0].Get("contact.email"))
 			}
 			{
-				results, err := db.Search(ctx, "user", wolverine.SearchQuery{
+				results, err := db.Search(ctx, "user", schema.SearchQuery{
 					Select: []string{"name", "contact.email"},
-					Where: []wolverine.SearchWhere{
+					Where: []schema.SearchWhere{
 						{
 							Field: "contact.email",
-							Op:    wolverine.Regex,
+							Op:    schema.Regex,
 							Value: "colemanword*",
 						},
 					},
@@ -308,25 +307,25 @@ func Test(t *testing.T) {
 			assert.NotNil(t, err)
 			err = db.Delete(ctx, "use", "isdf")
 			assert.NotNil(t, err)
-			results, err := db.Query(ctx, "test", wolverine.Query{})
+			results, err := db.Query(ctx, "test", schema.Query{})
 			assert.NotNil(t, err)
 			assert.Nil(t, results.Documents)
 		}))
 	})
 	t.Run("order by - no index asc", func(t *testing.T) {
 
-		users, err := db.Query(ctx, "user", wolverine.Query{
+		users, err := db.Query(ctx, "user", schema.Query{
 			Select: nil,
 			Where:  nil,
 			Limit:  10,
-			OrderBy: wolverine.OrderBy{
+			OrderBy: schema.OrderBy{
 				Field:     "name",
-				Direction: wolverine.ASC,
+				Direction: schema.ASC,
 			},
 		})
 		assert.Nil(t, err)
 		assert.Equal(t, 10, len(users.Documents))
-		assert.False(t, users.Stats.OrderedIndex)
+		assert.False(t, users.Stats.IndexMatch.Ordered)
 		var previous []byte
 		for _, usr := range users.Documents {
 			next := usr.GetString("name")
@@ -339,18 +338,18 @@ func Test(t *testing.T) {
 	})
 	t.Run("order by - no index desc", func(t *testing.T) {
 
-		users, err := db.Query(ctx, "user", wolverine.Query{
+		users, err := db.Query(ctx, "user", schema.Query{
 			Select: nil,
 			Where:  nil,
 			Limit:  10,
-			OrderBy: wolverine.OrderBy{
+			OrderBy: schema.OrderBy{
 				Field:     "name",
-				Direction: wolverine.DESC,
+				Direction: schema.DESC,
 			},
 		})
 		assert.Nil(t, err)
 		assert.Equal(t, 10, len(users.Documents))
-		assert.False(t, users.Stats.OrderedIndex)
+		assert.False(t, users.Stats.IndexMatch.Ordered)
 		var previous []byte
 		for _, usr := range users.Documents {
 			next := usr.GetString("name")
@@ -363,19 +362,19 @@ func Test(t *testing.T) {
 	})
 	t.Run("order by - indexed asc", func(t *testing.T) {
 
-		users, err := db.Query(ctx, "user", wolverine.Query{
+		users, err := db.Query(ctx, "user", schema.Query{
 			Select: nil,
 			Where:  nil,
 			Limit:  10,
-			OrderBy: wolverine.OrderBy{
+			OrderBy: schema.OrderBy{
 				Field:     "language",
-				Direction: wolverine.ASC,
+				Direction: schema.ASC,
 			},
 		})
 		assert.Nil(t, err)
 		assert.Equal(t, 10, len(users.Documents))
-		assert.Equal(t, "language", users.Stats.IndexedFields[0])
-		assert.True(t, users.Stats.OrderedIndex)
+		assert.Equal(t, "language", users.Stats.IndexMatch.Fields[0])
+		assert.True(t, users.Stats.IndexMatch.Ordered)
 		var previous []byte
 		for _, usr := range users.Documents {
 			next := usr.GetString("language")
@@ -389,19 +388,19 @@ func Test(t *testing.T) {
 	})
 	t.Run("order by - indexed desc", func(t *testing.T) {
 
-		users, err := db.Query(ctx, "user", wolverine.Query{
+		users, err := db.Query(ctx, "user", schema.Query{
 			Select: nil,
 			Where:  nil,
 			Limit:  10,
-			OrderBy: wolverine.OrderBy{
+			OrderBy: schema.OrderBy{
 				Field:     "language",
-				Direction: wolverine.DESC,
+				Direction: schema.DESC,
 			},
 		})
 		assert.Nil(t, err)
 		assert.Equal(t, 10, len(users.Documents))
-		assert.Equal(t, "language", users.Stats.IndexedFields[0])
-		assert.True(t, users.Stats.OrderedIndex)
+		assert.Equal(t, "language", users.Stats.IndexMatch.Fields[0])
+		assert.True(t, users.Stats.IndexMatch.Ordered)
 		var previous string
 		for _, usr := range users.Documents {
 			next := usr.Get("language")
@@ -489,17 +488,17 @@ func Benchmark(b *testing.B) {
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
 				b.Log(i)
-				results, err := db.Query(ctx, "user", wolverine.Query{
+				results, err := db.Query(ctx, "user", schema.Query{
 					Select: nil,
-					Where: []wolverine.Where{
+					Where: []schema.Where{
 						{
 							Field: "contact.email",
-							Op:    wolverine.Eq,
+							Op:    schema.Eq,
 							Value: testutil.MyEmail,
 						},
 					},
 					Limit:   1000,
-					OrderBy: wolverine.OrderBy{},
+					OrderBy: schema.OrderBy{},
 				})
 				if err != nil {
 					b.Fatal(err)
@@ -526,12 +525,12 @@ func Benchmark(b *testing.B) {
 			}
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				results, err := db.Search(ctx, "user", wolverine.SearchQuery{
+				results, err := db.Search(ctx, "user", schema.SearchQuery{
 					Select: nil,
-					Where: []wolverine.SearchWhere{
+					Where: []schema.SearchWhere{
 						{
 							Field: "contact.email",
-							Op:    wolverine.Basic,
+							Op:    schema.Basic,
 							Value: testutil.MyEmail,
 						},
 					},

@@ -11,7 +11,7 @@ import (
 )
 
 type AggregateIndex struct {
-	mu         sync.RWMutex
+	mu         *sync.RWMutex
 	GroupBy    []string    `json:"group_by"`
 	Aggregates []Aggregate `json:"aggregates"`
 	metrics    map[string]map[Aggregate]*list.List

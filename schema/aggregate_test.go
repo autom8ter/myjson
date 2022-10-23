@@ -1,9 +1,10 @@
-package schema
+package schema_test
 
 import (
 	"context"
 	"fmt"
 	"github.com/autom8ter/wolverine/internal/testutil"
+	"github.com/autom8ter/wolverine/schema"
 	"github.com/reactivex/rxgo/v2"
 	"github.com/stretchr/testify/assert"
 	"testing"
@@ -22,9 +23,9 @@ func TestAggregate(t *testing.T) {
 			fmt.Println("input channel closed")
 		}()
 
-		a := AggregateQuery{
+		a := schema.AggregateQuery{
 			GroupBy: []string{"account_id"},
-			Aggregates: []Aggregate{
+			Aggregates: []schema.Aggregate{
 				{
 					Field:    "age",
 					Function: "max",
@@ -36,16 +37,16 @@ func TestAggregate(t *testing.T) {
 				//	Alias:    "min_age",
 				//},
 			},
-			Where: []Where{
+			Where: []schema.Where{
 				{
 					Field: "account_id",
-					Op:    Gt,
+					Op:    schema.Gt,
 					Value: 50,
 				},
 			},
-			OrderBy: OrderBy{
+			OrderBy: schema.OrderBy{
 				Field:     "account_id",
-				Direction: DESC,
+				Direction: schema.DESC,
 			},
 		}
 		now := time.Now()

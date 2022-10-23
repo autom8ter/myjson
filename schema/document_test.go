@@ -2,13 +2,12 @@ package schema_test
 
 import (
 	"encoding/json"
+	"github.com/autom8ter/wolverine/internal/testutil"
 	"github.com/autom8ter/wolverine/schema"
 	"testing"
 
 	"github.com/brianvoe/gofakeit/v6"
 	"github.com/stretchr/testify/assert"
-
-	"github.com/autom8ter/wolverine/internal/testutil"
 )
 
 func TestDocument(t *testing.T) {
