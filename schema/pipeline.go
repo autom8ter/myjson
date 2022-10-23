@@ -1,4 +1,4 @@
-package wolverine
+package schema
 
 import (
 	"context"
@@ -17,7 +17,7 @@ func pipeFullScan(ctx context.Context, input chan rxgo.Item, where []Where, orde
 		}).Observe() {
 		documents = append(documents, doc.V.(*Document))
 	}
-	documents = orderBy(order, documents)
+	documents = SortOrder(order, documents)
 	var sorted = make(chan rxgo.Item)
 	go func() {
 		for _, doc := range documents {

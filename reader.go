@@ -2,6 +2,8 @@ package wolverine
 
 import (
 	"context"
+	"github.com/autom8ter/wolverine/errors"
+	"github.com/autom8ter/wolverine/schema"
 	"time"
 
 	"github.com/autom8ter/machine/v4"
@@ -12,106 +14,17 @@ import (
 	"github.com/autom8ter/wolverine/internal/prefix"
 )
 
-// WhereOp is an operator used to compare a value to a records field value in a where clause
-type WhereOp string
-
-const (
-	// Eq matches on equality
-	Eq WhereOp = "eq"
-	// Neq matches on inequality
-	Neq WhereOp = "neq"
-	// Gt matches on greater than
-	Gt WhereOp = "gt"
-	// Gte matches on greater than or equal to
-	Gte WhereOp = "gte"
-	// Lt matches on less than
-	Lt WhereOp = "lt"
-	// Lte matches on greater than or equal to
-	Lte WhereOp = "lte"
-)
-
-// Where is field-level filter for database queries
-type Where struct {
-	// Field is a field to compare against records field. For full text search, wrap the field in search(field1,field2,field3) and use a search operator
-	Field string `json:"field"`
-	// Op is an operator used to compare the field against the value.
-	Op WhereOp `json:"op"`
-	// Value is a value to compare against a records field value
-	Value interface{} `json:"value"`
-}
-
-// OrderByDirection indicates whether results should be sorted in ascending or descending order
-type OrderByDirection string
-
-const (
-	// ASC indicates ascending order
-	ASC OrderByDirection = "ASC"
-	// DESC indicates descending order
-	DESC OrderByDirection = "DESC"
-)
-
-// OrderBy orders the result set by a given field in a given direction
-// OrderBy requires an index on the field that the query is sorting on.
-type OrderBy struct {
-	// Field is the field to sort on
-	Field string `json:"field"`
-	// Direction is the sort direction
-	Direction OrderByDirection `json:"direction"`
-}
-
-// Query is a query against the NOSQL database - it does not support full text search
-type Query struct {
-	// Select is a list of fields to select from each record in the datbase(optional)
-	Select []string `json:"select"`
-	// Where is a list of where clauses used to filter records
-	Where []Where `json:"where"`
-	// Page is page index of the result set
-	Page int `json:"page"`
-	// Limit is the page size
-	Limit int `json:"limit"`
-	// Order by is the order to return results in. OrderBy requires an index on the field that the query is sorting on.
-	OrderBy OrderBy `json:"order_by"`
-}
-
-func (query Query) pipe(ctx context.Context, input chan rxgo.Item, fullScan bool) rxgo.Observable {
-	limit := 1000000
-	if query.Limit > 0 {
-		limit = query.Limit
-	}
-	if fullScan {
-		return query.pipe(ctx, pipeFullScan(ctx, input, query.Where, query.OrderBy), false)
-	}
-	return rxgo.FromEventSource(input, rxgo.WithContext(ctx)).
-		Filter(func(i interface{}) bool {
-			pass, err := i.(*Document).Where(query.Where)
-			if err != nil {
-				return false
-			}
-			return pass
-		}).
-		Skip(uint(query.Page * limit)).
-		Take(uint(limit)).
-		Map(func(ctx context.Context, i interface{}) (interface{}, error) {
-			if len(query.Select) > 0 {
-				i.(*Document).Select(query.Select)
-			}
-			return i, nil
-		})
-}
-
-func (d *db) Query(ctx context.Context, collection string, query Query) (Page, error) {
+func (d *db) Query(ctx context.Context, collection string, query schema.Query) (schema.Page, error) {
 	now := time.Now()
 	qmachine := machine.New()
-	if collection != systemCollection {
-		if _, ok := d.getInmemCollection(collection); !ok {
-			return Page{}, stacktrace.NewErrorWithCode(ErrUnsuportedCollection, "unsupported collection: %s must be one of: %v", collection, d.collectionNames())
-		}
+	c, ok := d.getInmemCollection(collection)
+	if !ok {
+		return schema.Page{}, stacktrace.NewErrorWithCode(errors.ErrUnsuportedCollection, "unsupported collection: %s must be one of: %v", collection, d.collectionNames())
 	}
-	pfx, indexedFields, ordered, err := d.getQueryPrefix(collection, query.Where, query.OrderBy)
+	index, err := c.OptimizeQueryIndex(query.Where, query.OrderBy)
 	if err != nil {
-		return Page{}, stacktrace.Propagate(err, "")
+		return schema.Page{}, stacktrace.Propagate(err, "")
 	}
-	fullScan := query.OrderBy.Field != "" && !ordered
 	var (
 		input = make(chan rxgo.Item)
 	)
@@ -120,23 +33,23 @@ func (d *db) Query(ctx context.Context, collection string, query Query) (Page, e
 			opts := badger.DefaultIteratorOptions
 			opts.PrefetchValues = true
 			opts.PrefetchSize = 10
-			opts.Prefix = pfx
-			seek := pfx
+			opts.Prefix = index.Ref.GetPrefix(schema.IndexableFields(query.Where, query.OrderBy), "")
+			seek := opts.Prefix
 
-			if query.OrderBy.Direction == DESC {
+			if query.OrderBy.Direction == schema.DESC {
 				opts.Reverse = true
-				seek = prefix.PrefixNextKey(pfx)
+				seek = prefix.PrefixNextKey(opts.Prefix)
 			}
 			it := txn.NewIterator(opts)
 			it.Seek(seek)
 			defer it.Close()
-			for it.ValidForPrefix(pfx) {
+			for it.ValidForPrefix(opts.Prefix) {
 				if ctx.Err() != nil {
 					return nil
 				}
 				item := it.Item()
 				err := item.Value(func(bits []byte) error {
-					document, err := NewDocumentFromBytes(bits)
+					document, err := schema.NewDocumentFromBytes(bits)
 					if err != nil {
 						return stacktrace.Propagate(err, "")
 					}
@@ -156,35 +69,31 @@ func (d *db) Query(ctx context.Context, collection string, query Query) (Page, e
 		close(input)
 		return nil
 	})
-	var results []*Document
-	for result := range query.pipe(ctx, input, fullScan).Observe() {
-		doc, ok := result.V.(*Document)
+	var results []*schema.Document
+	for result := range query.Observe(ctx, input, index.FullScan()).Observe() {
+		doc, ok := result.V.(*schema.Document)
 		if !ok {
-			return Page{}, stacktrace.NewError("expected type: %T got: %#v", &Document{}, result.V)
+			return schema.Page{}, stacktrace.NewError("expected type: %T got: %#v", &schema.Document{}, result.V)
 		}
 		results = append(results, doc)
 	}
-	//if err := qmachine.Wait(); err != nil {
-	//	return Page{}, stacktrace.Propagate(err, "")
-	//}
-	return Page{
+	return schema.Page{
 		Documents: results,
 		NextPage:  query.Page + 1,
 		Count:     len(results),
-		Stats: Stats{
+		Stats: schema.PageStats{
 			ExecutionTime: time.Since(now),
-			IndexedFields: indexedFields,
-			OrderedIndex:  ordered,
+			IndexMatch:    index,
 		},
 	}, nil
 }
 
-func (d *db) Get(ctx context.Context, collection, id string) (*Document, error) {
+func (d *db) Get(ctx context.Context, collection, id string) (*schema.Document, error) {
 	if _, ok := d.getInmemCollection(collection); !ok {
 		return nil, stacktrace.Propagate(stacktrace.NewError("unsupported collection: %s must be one of: %v", collection, d.collectionNames()), "")
 	}
 	var (
-		document *Document
+		document *schema.Document
 	)
 
 	if err := d.kv.View(func(txn *badger.Txn) error {
@@ -193,7 +102,7 @@ func (d *db) Get(ctx context.Context, collection, id string) (*Document, error) 
 			return stacktrace.Propagate(err, "")
 		}
 		return item.Value(func(val []byte) error {
-			document, err = NewDocumentFromBytes(val)
+			document, err = schema.NewDocumentFromBytes(val)
 			return stacktrace.Propagate(err, "")
 		})
 	}); err != nil {
@@ -202,11 +111,11 @@ func (d *db) Get(ctx context.Context, collection, id string) (*Document, error) 
 	return document, nil
 }
 
-func (d *db) GetAll(ctx context.Context, collection string, ids []string) ([]*Document, error) {
+func (d *db) GetAll(ctx context.Context, collection string, ids []string) ([]*schema.Document, error) {
 	if _, ok := d.getInmemCollection(collection); !ok {
 		return nil, stacktrace.Propagate(stacktrace.NewError("unsupported collection: %s must be one of: %v", collection, d.collectionNames()), "")
 	}
-	var documents []*Document
+	var documents []*schema.Document
 	if err := d.kv.View(func(txn *badger.Txn) error {
 		for _, id := range ids {
 			item, err := txn.Get([]byte(prefix.PrimaryKey(collection, id)))
@@ -214,7 +123,7 @@ func (d *db) GetAll(ctx context.Context, collection string, ids []string) ([]*Do
 				return stacktrace.Propagate(err, "")
 			}
 			if err := item.Value(func(val []byte) error {
-				document, err := NewDocumentFromBytes(val)
+				document, err := schema.NewDocumentFromBytes(val)
 				if err != nil {
 					return stacktrace.Propagate(err, "")
 				}
@@ -232,10 +141,10 @@ func (d *db) GetAll(ctx context.Context, collection string, ids []string) ([]*Do
 }
 
 // QueryPaginate paginates through each page of the query until the handlePage function returns false or there are no more results
-func (d *db) QueryPaginate(ctx context.Context, collection string, query Query, handlePage PageHandler) error {
+func (d *db) QueryPaginate(ctx context.Context, collection string, query schema.Query, handlePage schema.PageHandler) error {
 	page := query.Page
 	for {
-		results, err := d.Query(ctx, collection, Query{
+		results, err := d.Query(ctx, collection, schema.Query{
 			Select:  query.Select,
 			Where:   query.Where,
 			Page:    page,

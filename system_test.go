@@ -3,6 +3,7 @@ package wolverine_test
 import (
 	"bytes"
 	"context"
+	"github.com/autom8ter/wolverine/schema"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -51,7 +52,7 @@ func TestSystem(t *testing.T) {
 	t.Run("backup restore", func(t *testing.T) {
 		assert.Nil(t, testutil.TestDB(testutil.AllCollections, func(ctx context.Context, db wolverine.DB) {
 			buf := bytes.NewBuffer(nil)
-			var usrs []*wolverine.Document
+			var usrs []*schema.Document
 			for i := 0; i < 5; i++ {
 				u := testutil.NewUserDoc()
 				usrs = append(usrs, u)
@@ -81,7 +82,7 @@ func TestSystem(t *testing.T) {
 	t.Run("incremental backup restore", func(t *testing.T) {
 		assert.Nil(t, testutil.TestDB(testutil.AllCollections, func(ctx context.Context, db wolverine.DB) {
 			buf := bytes.NewBuffer(nil)
-			var usrs []*wolverine.Document
+			var usrs []*schema.Document
 			for i := 0; i < 5; i++ {
 				u := testutil.NewUserDoc()
 				usrs = append(usrs, u)
@@ -117,7 +118,7 @@ func TestSystem(t *testing.T) {
 	t.Run("migrate backup restore", func(t *testing.T) {
 		assert.Nil(t, testutil.TestDB(testutil.AllCollections, func(ctx context.Context, db wolverine.DB) {
 			buf := bytes.NewBuffer(nil)
-			var usrs []*wolverine.Document
+			var usrs []*schema.Document
 
 			err := db.Migrate(ctx, []wolverine.Migration{
 				{

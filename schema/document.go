@@ -1,10 +1,7 @@
-package wolverine
+package schema
 
 import (
 	"encoding/json"
-	"io"
-	"time"
-
 	"github.com/gogo/protobuf/proto"
 	"github.com/nqd/flat"
 	"github.com/palantir/stacktrace"
@@ -12,26 +9,8 @@ import (
 	"github.com/spf13/cast"
 	"github.com/tidwall/gjson"
 	"github.com/tidwall/sjson"
+	"io"
 )
-
-// Stats are statistics collected at runtime
-type Stats struct {
-	ExecutionTime time.Duration `json:"execution_time"`
-	IndexedFields []string      `json:"indexed_fields"`
-	OrderedIndex  bool          `json:"ordered_index"`
-}
-
-// Page is a page of documents
-type Page struct {
-	// Documents are the documents that make up the page
-	Documents []*Document `json:"documents"`
-	// Next page
-	NextPage int `json:"next_page"`
-	// Document count
-	Count int `json:"count"`
-	// Stats collected at runtime
-	Stats Stats `json:"stats"`
-}
 
 // Document is a database document with special attributes.
 // required attributes: _id(string), _collection(string)

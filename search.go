@@ -2,6 +2,7 @@ package wolverine
 
 import (
 	"context"
+	"github.com/autom8ter/wolverine/schema"
 	"strings"
 	"time"
 
@@ -12,58 +13,11 @@ import (
 	"github.com/spf13/cast"
 )
 
-// SearchOp is an operator used within a where clause in a full text search query
-type SearchOp string
-
-const (
-	// Prefix is a full text search type for finding records based on prefix matching. full text search operators can only be used
-	// against collections that have full text search enabled
-	Prefix SearchOp = "prefix"
-	// Wildcard full text search type for finding records based on wildcard matching. full text search operators can only be used
-	// against collections that have full text search enabled
-	Wildcard SearchOp = "wildcard"
-	// Fuzzy full text search type for finding records based on a fuzzy search. full text search operators can only be used
-	// against collections that have full text search enabled
-	Fuzzy SearchOp = "fuzzy"
-	// Regex full text search type for finding records based on a regex matching. full text search operators can only be used
-	// against collections that have full text search enabled
-	Regex SearchOp = "regex"
-	// Basic is a basic matcher that checks for an exact match.
-	Basic       SearchOp = "basic"
-	TermRange   SearchOp = "term_range"
-	DateRange   SearchOp = "date_range"
-	GeoDistance SearchOp = "geo_distance"
-)
-
-// Where is field-level filter for database queries
-type SearchWhere struct {
-	// Field is a field to compare against records field. For full text search, wrap the field in search(field1,field2,field3) and use a search operator
-	Field string `json:"field"`
-	// Op is an operator used to compare the field against the value.
-	Op SearchOp `json:"op"`
-	// Value is a value to compare against a records field value
-	Value interface{} `json:"value"`
-	// Boost boosts the score of records matching the where clause
-	Boost float64 `json:"boost"`
-}
-
-// SearchQuery is a full text search query against the database
-type SearchQuery struct {
-	// Select is a list of fields to select from each record in the datbase(optional)
-	Select []string `json:"select"`
-	// Where is a list of where clauses used to filter records based on full text search (required)
-	Where []SearchWhere `json:"where"`
-	//
-	Page int `json:"page"`
-	// Limit limits the number of records returned by the query (optional)
-	Limit int `json:"limit"`
-}
-
-func (d *db) Search(ctx context.Context, collection string, q SearchQuery) (Page, error) {
+func (d *db) Search(ctx context.Context, collection string, q schema.SearchQuery) (schema.Page, error) {
 	now := time.Now()
 	c, ok := d.getInmemCollection(collection)
-	if !ok || !c.FullText() {
-		return Page{}, stacktrace.NewError("unsupported full text search collection: %s must be one of: %v", collection, d.collectionNames())
+	if !ok || !c.Indexing().HasSearchIndex() {
+		return schema.Page{}, stacktrace.NewError("unsupported full text search collection: %s must be one of: %v", collection, d.collectionNames())
 	}
 	var (
 		fields []string
@@ -78,10 +32,10 @@ func (d *db) Search(ctx context.Context, collection string, q SearchQuery) (Page
 	var queries []query.Query
 	for _, where := range q.Where {
 		if where.Value == nil {
-			return Page{}, stacktrace.NewError("empty where clause value")
+			return schema.Page{}, stacktrace.NewError("empty where clause value")
 		}
 		switch where.Op {
-		case Basic:
+		case schema.Basic:
 			switch where.Value.(type) {
 			case bool:
 				qry := bleve.NewBoolFieldQuery(cast.ToBool(where.Value))
@@ -105,7 +59,7 @@ func (d *db) Search(ctx context.Context, collection string, q SearchQuery) (Page
 				qry.SetField(where.Field)
 				queries = append(queries, qry)
 			}
-		case DateRange:
+		case schema.DateRange:
 			var (
 				from time.Time
 				to   time.Time
@@ -121,7 +75,7 @@ func (d *db) Search(ctx context.Context, collection string, q SearchQuery) (Page
 			}
 			qry.SetField(where.Field)
 			queries = append(queries, qry)
-		case TermRange:
+		case schema.TermRange:
 			var (
 				from string
 				to   string
@@ -137,7 +91,7 @@ func (d *db) Search(ctx context.Context, collection string, q SearchQuery) (Page
 			}
 			qry.SetField(where.Field)
 			queries = append(queries, qry)
-		case GeoDistance:
+		case schema.GeoDistance:
 			var (
 				from     float64
 				to       float64
@@ -145,7 +99,7 @@ func (d *db) Search(ctx context.Context, collection string, q SearchQuery) (Page
 			)
 			split := strings.Split(cast.ToString(where.Value), ",")
 			if len(split) < 3 {
-				return Page{}, stacktrace.NewError("geo distance where clause requires 3 comma separated values: lat(float), lng(float), distance(string)")
+				return schema.Page{}, stacktrace.NewError("geo distance where clause requires 3 comma separated values: lat(float), lng(float), distance(string)")
 			}
 			from = cast.ToFloat64(split[0])
 			to = cast.ToFloat64(split[1])
@@ -156,28 +110,28 @@ func (d *db) Search(ctx context.Context, collection string, q SearchQuery) (Page
 			}
 			qry.SetField(where.Field)
 			queries = append(queries, qry)
-		case Prefix:
+		case schema.Prefix:
 			qry := bleve.NewPrefixQuery(cast.ToString(where.Value))
 			if where.Boost > 0 {
 				qry.SetBoost(where.Boost)
 			}
 			qry.SetField(where.Field)
 			queries = append(queries, qry)
-		case Fuzzy:
+		case schema.Fuzzy:
 			qry := bleve.NewFuzzyQuery(cast.ToString(where.Value))
 			if where.Boost > 0 {
 				qry.SetBoost(where.Boost)
 			}
 			qry.SetField(where.Field)
 			queries = append(queries, qry)
-		case Regex:
+		case schema.Regex:
 			qry := bleve.NewRegexpQuery(cast.ToString(where.Value))
 			if where.Boost > 0 {
 				qry.SetBoost(where.Boost)
 			}
 			qry.SetField(where.Field)
 			queries = append(queries, qry)
-		case Wildcard:
+		case schema.Wildcard:
 			qry := bleve.NewWildcardQuery(cast.ToString(where.Value))
 			if where.Boost > 0 {
 				qry.SetBoost(where.Boost)
@@ -196,23 +150,19 @@ func (d *db) Search(ctx context.Context, collection string, q SearchQuery) (Page
 		searchRequest = bleve.NewSearchRequestOptions(bleve.NewConjunctionQuery(queries[0]), q.Limit, q.Page*q.Limit, false)
 	}
 	searchRequest.Fields = []string{"*"}
-	//searchRequest.Size = q.Limit
-	//if searchRequest.Size == 0 {
-	//	searchRequest.Size = 100
-	//}
 	results, err := d.getFullText(collection).Search(searchRequest)
 	if err != nil {
-		return Page{}, stacktrace.Propagate(err, "failed to search index: %s", collection)
+		return schema.Page{}, stacktrace.Propagate(err, "failed to search index: %s", collection)
 	}
 
-	var data []*Document
+	var data []*schema.Document
 	for _, h := range results.Hits {
 		if len(h.Fields) == 0 {
 			continue
 		}
-		record, err := NewDocumentFromMap(h.Fields)
+		record, err := schema.NewDocumentFromMap(h.Fields)
 		if err != nil {
-			return Page{}, stacktrace.Propagate(err, "failed to search index: %s", collection)
+			return schema.Page{}, stacktrace.Propagate(err, "failed to search index: %s", collection)
 		}
 		data = append(data, record)
 	}
@@ -221,19 +171,21 @@ func (d *db) Search(ctx context.Context, collection string, q SearchQuery) (Page
 			r.Select(q.Select)
 		}
 	}
-	return Page{
+	return schema.Page{
 		Documents: data,
 		NextPage:  q.Page + 1,
 		Count:     len(data),
-		Stats:     Stats{ExecutionTime: time.Since(now)},
+		Stats: schema.PageStats{
+			ExecutionTime: time.Since(now),
+		},
 	}, nil
 }
 
 // SearchPaginate paginates through each page of the query until the handlePage function returns false or there are no more results
-func (d *db) SearchPaginate(ctx context.Context, collection string, query SearchQuery, handlePage PageHandler) error {
+func (d *db) SearchPaginate(ctx context.Context, collection string, query schema.SearchQuery, handlePage schema.PageHandler) error {
 	page := query.Page
 	for {
-		results, err := d.Search(ctx, collection, SearchQuery{
+		results, err := d.Search(ctx, collection, schema.SearchQuery{
 			Select: query.Select,
 			Where:  query.Where,
 			Page:   page,

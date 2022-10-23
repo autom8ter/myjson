@@ -1,4 +1,4 @@
-package wolverine
+package errors
 
 import "github.com/palantir/stacktrace"
 
@@ -8,6 +8,7 @@ const (
 	ErrSchemaLoad            stacktrace.ErrorCode = 4002
 	ErrIndexRequired         stacktrace.ErrorCode = 4003
 	ErrUnsuportedCollection  stacktrace.ErrorCode = 4004
+	ErrTODO                                       = 9000
 )
 
 // GetErrorCode returns the error code from the error

@@ -23,22 +23,12 @@ func NewPrefixedIndex(collection string, fields []string) *PrefixIndexRef {
 }
 
 func PrimaryKey(collection string, id string) []byte {
-	return NewPrefixedIndex(collection, []string{"_id"}).GetIndex(id, map[string]any{
+	return NewPrefixedIndex(collection, []string{"_id"}).GetPrefix(map[string]any{
 		"_id": id,
-	})
+	}, id)
 }
 
-func (d PrefixIndexRef) GetIndex(id string, value any) []byte {
-	fields := map[string]any{}
-	switch value := value.(type) {
-	case map[string]any:
-		fields = value
-	default:
-		bits, _ := json.Marshal(value)
-		if err := json.Unmarshal(bits, &fields); err != nil {
-			panic(err)
-		}
-	}
+func (d PrefixIndexRef) GetPrefix(fields map[string]any, documentID string) []byte {
 	fields, _ = flat.Flatten(fields, nil)
 	var path [][]byte
 	for _, i := range d.initialPrefix {
@@ -51,8 +41,8 @@ func (d PrefixIndexRef) GetIndex(id string, value any) []byte {
 			path = append(path, encodeValue(k), encodeValue(v))
 		}
 	}
-	if id != "" {
-		path = append(path, encodeValue(id))
+	if documentID != "" {
+		path = append(path, encodeValue(documentID))
 	}
 	return bytes.Join(path, []byte("."))
 }
@@ -93,8 +83,6 @@ func PrefixNextKey(k []byte) []byte {
 		}
 	}
 	if i == -1 {
-		// Unlike TiDB, for the specific key 0xFF
-		// we return empty slice instead of {0xFF, 0x0}
 		buf = make([]byte, 0)
 	}
 	return buf

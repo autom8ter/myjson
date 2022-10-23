@@ -2,6 +2,7 @@ package wolverine_test
 
 import (
 	"context"
+	"github.com/autom8ter/wolverine/schema"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -13,14 +14,14 @@ import (
 func TestQueryPaginate(t *testing.T) {
 	t.Run("query paginate", func(t *testing.T) {
 		assert.Nil(t, testutil.TestDB(testutil.AllCollections, func(ctx context.Context, db wolverine.DB) {
-			var usrs []*wolverine.Document
+			var usrs []*schema.Document
 			for i := 0; i < 10; i++ {
 				u := testutil.NewUserDoc()
 				usrs = append(usrs, u)
 			}
 			assert.Nil(t, db.BatchSet(ctx, "user", usrs))
 			seen := map[string]struct{}{}
-			handler := func(page wolverine.Page) bool {
+			handler := func(page schema.Page) bool {
 				for _, doc := range page.Documents {
 					if _, ok := seen[doc.GetID()]; ok {
 						t.Fatal("duplicate doc", doc.GetID())

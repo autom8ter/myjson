@@ -1,4 +1,4 @@
-package wolverine
+package schema
 
 type Action string
 

@@ -1,6 +1,8 @@
-package wolverine
+package schema
 
-import "context"
+import (
+	"context"
+)
 
 type Timing string
 

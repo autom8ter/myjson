@@ -1,13 +1,13 @@
-package wolverine_test
+package schema_test
 
 import (
 	"encoding/json"
+	"github.com/autom8ter/wolverine/schema"
 	"testing"
 
 	"github.com/brianvoe/gofakeit/v6"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/autom8ter/wolverine"
 	"github.com/autom8ter/wolverine/internal/testutil"
 )
 
@@ -33,7 +33,7 @@ func TestDocument(t *testing.T) {
 		Name: "john smith",
 		Age:  50,
 	}
-	r, err := wolverine.NewDocumentFromAny(&usr)
+	r, err := schema.NewDocumentFromAny(&usr)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -66,7 +66,7 @@ func TestDocument(t *testing.T) {
 	})
 	t.Run("merge", func(t *testing.T) {
 		usr2 := user{ID: usr.ID, Contact: contact{Email: gofakeit.Email()}, Name: "john smith"}
-		r2, err := wolverine.NewDocumentFromAny(&usr2)
+		r2, err := schema.NewDocumentFromAny(&usr2)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -76,7 +76,7 @@ func TestDocument(t *testing.T) {
 		assert.Equal(t, usr.Contact.Phone, r.GetString("contact.phone"))
 	})
 	t.Run("empty", func(t *testing.T) {
-		r := wolverine.NewDocument()
+		r := schema.NewDocument()
 		assert.Equal(t, false, r.Empty())
 	})
 	t.Run("clone", func(t *testing.T) {
@@ -100,7 +100,7 @@ func TestDocument(t *testing.T) {
 		assert.Equal(t, r.String(), string(r.Bytes()))
 	})
 	t.Run("new from bytes", func(t *testing.T) {
-		n, err := wolverine.NewDocumentFromBytes(r.Bytes())
+		n, err := schema.NewDocumentFromBytes(r.Bytes())
 		assert.Nil(t, err)
 		assert.Equal(t, r.String(), string(n.Bytes()))
 	})
@@ -120,12 +120,12 @@ func TestDocument(t *testing.T) {
 	})
 
 	t.Run("where", func(t *testing.T) {
-		r, err = wolverine.NewDocumentFromAny(&usr)
+		r, err = schema.NewDocumentFromAny(&usr)
 		if err != nil {
 			t.Fatal(err)
 		}
 		r.SetID(usr.ID)
-		pass, err := r.Where([]wolverine.Where{
+		pass, err := r.Where([]schema.Where{
 			{
 				Field: "contact.email",
 				Op:    "==",
@@ -135,7 +135,7 @@ func TestDocument(t *testing.T) {
 		assert.Nil(t, err)
 		assert.True(t, pass)
 
-		pass, err = r.Where([]wolverine.Where{
+		pass, err = r.Where([]schema.Where{
 			{
 				Field: "contact.email",
 				Op:    "==",
@@ -145,7 +145,7 @@ func TestDocument(t *testing.T) {
 		assert.Nil(t, err)
 		assert.False(t, pass)
 
-		pass, err = r.Where([]wolverine.Where{
+		pass, err = r.Where([]schema.Where{
 			{
 				Field: "contact.email",
 				Op:    "!=",
@@ -155,7 +155,7 @@ func TestDocument(t *testing.T) {
 		assert.Nil(t, err)
 		assert.True(t, pass)
 
-		pass, err = r.Where([]wolverine.Where{
+		pass, err = r.Where([]schema.Where{
 			{
 				Field: "age",
 				Op:    ">",
@@ -165,7 +165,7 @@ func TestDocument(t *testing.T) {
 		assert.Nil(t, err)
 		assert.True(t, pass)
 
-		pass, err = r.Where([]wolverine.Where{
+		pass, err = r.Where([]schema.Where{
 			{
 				Field: "age",
 				Op:    ">=",
@@ -175,7 +175,7 @@ func TestDocument(t *testing.T) {
 		assert.Nil(t, err)
 		assert.True(t, pass)
 
-		pass, err = r.Where([]wolverine.Where{
+		pass, err = r.Where([]schema.Where{
 			{
 				Field: "age",
 				Op:    ">=",
@@ -185,7 +185,7 @@ func TestDocument(t *testing.T) {
 		assert.Nil(t, err)
 		assert.False(t, pass)
 
-		pass, err = r.Where([]wolverine.Where{
+		pass, err = r.Where([]schema.Where{
 			{
 				Field: "age",
 				Op:    "<",
@@ -195,7 +195,7 @@ func TestDocument(t *testing.T) {
 		assert.Nil(t, err)
 		assert.True(t, pass)
 
-		pass, err = r.Where([]wolverine.Where{
+		pass, err = r.Where([]schema.Where{
 			{
 				Field: "age",
 				Op:    "<=",
@@ -205,7 +205,7 @@ func TestDocument(t *testing.T) {
 		assert.Nil(t, err)
 		assert.True(t, pass)
 
-		pass, err = r.Where([]wolverine.Where{
+		pass, err = r.Where([]schema.Where{
 			{
 				Field: "age",
 				Op:    "<=",
@@ -215,7 +215,7 @@ func TestDocument(t *testing.T) {
 		assert.Nil(t, err)
 		assert.True(t, pass)
 
-		pass, err = r.Where([]wolverine.Where{
+		pass, err = r.Where([]schema.Where{
 			{
 				Field: "age",
 				Op:    ">=",
@@ -225,7 +225,7 @@ func TestDocument(t *testing.T) {
 		assert.Nil(t, err)
 		assert.True(t, pass)
 
-		pass, err = r.Where([]wolverine.Where{
+		pass, err = r.Where([]schema.Where{
 			{
 				Field: "age",
 				Op:    "<",
@@ -235,7 +235,7 @@ func TestDocument(t *testing.T) {
 		assert.Nil(t, err)
 		assert.False(t, pass)
 
-		pass, err = r.Where([]wolverine.Where{
+		pass, err = r.Where([]schema.Where{
 			{
 				Field: "age",
 				Op:    "8",
@@ -246,12 +246,12 @@ func TestDocument(t *testing.T) {
 		assert.False(t, pass)
 	})
 	t.Run("results", func(t *testing.T) {
-		var docs = []*wolverine.Document{
+		var docs = []*schema.Document{
 			testutil.NewUserDoc(),
 			testutil.NewUserDoc(),
 			testutil.NewUserDoc(),
 		}
-		result := wolverine.Page{
+		result := schema.Page{
 			Documents: docs,
 			NextPage:  0,
 		}

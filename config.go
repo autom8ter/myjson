@@ -1,5 +1,7 @@
 package wolverine
 
+import "github.com/autom8ter/wolverine/schema"
+
 // Config configures a database instance
 type Config struct {
 	// Path is the path to database storage. Use 'inmem' to operate the database in memory only.
@@ -13,5 +15,5 @@ type Config struct {
 	// Migrations are atomic database migrations to run on startup
 	Migrations []Migration
 	// Triggers are functions executed on documents before/after they change. They can be used to extend the functionality of the database.
-	Triggers []Trigger
+	Triggers []schema.Trigger
 }

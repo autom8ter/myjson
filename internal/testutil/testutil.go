@@ -2,6 +2,7 @@ package testutil
 
 import (
 	"context"
+	"github.com/autom8ter/wolverine/schema"
 	"time"
 
 	"github.com/brianvoe/gofakeit/v6"
@@ -19,7 +20,7 @@ func init() {
 }
 
 var (
-	UserCollection = &wolverine.Collection{
+	UserCollection = &schema.Collection{
 		Schema: `
 {
   "$id": "https://example.com/user.schema.json",
@@ -101,7 +102,7 @@ var (
   }
 }
 `}
-	TaskCollection = &wolverine.Collection{
+	TaskCollection = &schema.Collection{
 		Schema: `
 {
   "$id": "https://example.com/task.schema.json",
@@ -137,11 +138,11 @@ var (
   }
 }
 `}
-	AllCollections = []*wolverine.Collection{UserCollection, TaskCollection}
+	AllCollections = []*schema.Collection{UserCollection, TaskCollection}
 )
 
-func NewUserDoc() *wolverine.Document {
-	doc, err := wolverine.NewDocumentFromMap(map[string]interface{}{
+func NewUserDoc() *schema.Document {
+	doc, err := schema.NewDocumentFromMap(map[string]interface{}{
 		"_id":  gofakeit.UUID(),
 		"name": gofakeit.Name(),
 		"contact": map[string]interface{}{
@@ -162,8 +163,8 @@ func NewUserDoc() *wolverine.Document {
 	return doc
 }
 
-func NewTaskDoc(usrID string) *wolverine.Document {
-	doc, err := wolverine.NewDocumentFromMap(map[string]interface{}{
+func NewTaskDoc(usrID string) *schema.Document {
+	doc, err := schema.NewDocumentFromMap(map[string]interface{}{
 		"_id":     gofakeit.UUID(),
 		"user":    usrID,
 		"content": gofakeit.LoremIpsumSentence(5),
@@ -176,7 +177,7 @@ func NewTaskDoc(usrID string) *wolverine.Document {
 
 const MyEmail = "colemanword@gmail.com"
 
-func TestDB(collections []*wolverine.Collection, fn func(ctx context.Context, db wolverine.DB)) error {
+func TestDB(collections []*schema.Collection, fn func(ctx context.Context, db wolverine.DB)) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 

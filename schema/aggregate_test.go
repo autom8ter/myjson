@@ -1,8 +1,9 @@
-package wolverine
+package schema
 
 import (
 	"context"
 	"fmt"
+	"github.com/autom8ter/wolverine/internal/testutil"
 	"github.com/reactivex/rxgo/v2"
 	"github.com/stretchr/testify/assert"
 	"testing"
@@ -15,7 +16,7 @@ func TestAggregate(t *testing.T) {
 		channel := make(chan rxgo.Item, totalRecords)
 		go func() {
 			for i := 0; i < 100000; i++ {
-				channel <- rxgo.Of(newUserDoc())
+				channel <- rxgo.Of(testutil.NewUserDoc())
 			}
 			close(channel)
 			fmt.Println("input channel closed")
@@ -48,7 +49,7 @@ func TestAggregate(t *testing.T) {
 			},
 		}
 		now := time.Now()
-		observable, err := a.pipe(context.Background(), channel, true)
+		observable, err := a.Observe(context.Background(), channel, true)
 		assert.Nil(t, err)
 		i := 0
 		<-observable.ForEach(func(o interface{}) {

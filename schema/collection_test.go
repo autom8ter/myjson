@@ -1,4 +1,4 @@
-package wolverine_test
+package schema_test
 
 import (
 	"testing"
@@ -13,11 +13,11 @@ func TestCollection(t *testing.T) {
 	t.Run("validate", func(t *testing.T) {
 		assert.Nil(t, testutil.UserCollection.ParseSchema())
 		assert.NotNil(t, testutil.UserCollection.Collection())
-		assert.NotNil(t, testutil.UserCollection.Indexes())
-		assert.True(t, testutil.UserCollection.FullText())
+		assert.NotNil(t, testutil.UserCollection.Indexing())
+		assert.True(t, testutil.UserCollection.Indexing().HasSearchIndex())
 		assert.NotNil(t, testutil.TaskCollection.Collection())
-		assert.NotNil(t, testutil.TaskCollection.Indexes())
-		assert.False(t, testutil.TaskCollection.FullText())
+		assert.NotNil(t, testutil.TaskCollection.Indexing())
+		assert.False(t, testutil.TaskCollection.Indexing().HasSearchIndex())
 		valid, err := testutil.UserCollection.Validate(usr)
 		assert.Nil(t, err)
 		assert.True(t, valid)

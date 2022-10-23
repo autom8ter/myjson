@@ -3,6 +3,7 @@ package wolverine
 import (
 	"context"
 	"fmt"
+	"github.com/autom8ter/wolverine/schema"
 	"io"
 	"strings"
 	"time"
@@ -80,12 +81,12 @@ func (d *db) ReIndexCollection(ctx context.Context, collection string) error {
 	var page int
 	for {
 
-		results, err := d.Query(ctx, c.Collection(), Query{
+		results, err := d.Query(ctx, c.Collection(), schema.Query{
 			Select:  nil,
 			Where:   nil,
 			Page:    page,
 			Limit:   1000,
-			OrderBy: OrderBy{},
+			OrderBy: schema.OrderBy{},
 		})
 		if err != nil {
 			return stacktrace.Propagate(err, "failed to reindex collection: %s", collection)
@@ -93,7 +94,7 @@ func (d *db) ReIndexCollection(ctx context.Context, collection string) error {
 		if len(results.Documents) == 0 {
 			break
 		}
-		var toSet []*Document
+		var toSet []*schema.Document
 		var toDelete []string
 		for _, r := range results.Documents {
 			result, _ := d.Get(ctx, c.Collection(), r.GetID())
@@ -141,7 +142,7 @@ func (d *db) IncrementalBackup(ctx context.Context, w io.Writer) error {
 		if err != nil {
 			return stacktrace.Propagate(err, "failed incremental backup")
 		}
-		record = NewDocument()
+		record = schema.NewDocument()
 		record.SetID(lastBackupID)
 	} else {
 		next, err = d.kv.Backup(w, cast.ToUint64(record.Get("properties.version")))
@@ -163,7 +164,7 @@ func (d *db) Restore(ctx context.Context, r io.Reader) error {
 func (d *db) Migrate(ctx context.Context, migrations []Migration) error {
 	existing, _ := d.Get(ctx, systemCollection, lastMigrationID)
 	if existing == nil || existing.Empty() {
-		existing = NewDocument()
+		existing = schema.NewDocument()
 		existing.SetID(lastMigrationID)
 	}
 
@@ -186,22 +187,22 @@ func (d *db) Migrate(ctx context.Context, migrations []Migration) error {
 	return nil
 }
 
-func (d *db) GetCollection(ctx context.Context, collection string) (*Collection, error) {
+func (d *db) GetCollection(ctx context.Context, collection string) (*schema.Collection, error) {
 	id := fmt.Sprintf("collections.%s", collection)
 	existing, err := d.Get(ctx, systemCollection, id)
 	if err != nil {
 		return nil, stacktrace.Propagate(err, "failed to get collection: %s", collection)
 	}
-	c, err := LoadCollection(cast.ToString(existing.Get("properties.schema")))
+	c, err := schema.LoadCollection(cast.ToString(existing.Get("properties.schema")))
 	if err != nil {
 		return nil, stacktrace.Propagate(err, "failed to get collection: %s", collection)
 	}
 	return c, nil
 }
 
-func (d *db) GetCollections(ctx context.Context) ([]*Collection, error) {
-	var collections []*Collection
-	results, err := d.Query(ctx, systemCollection, Query{Limit: 1000})
+func (d *db) GetCollections(ctx context.Context) ([]*schema.Collection, error) {
+	var collections []*schema.Collection
+	results, err := d.Query(ctx, systemCollection, schema.Query{Limit: 1000})
 	if err != nil {
 		return nil, stacktrace.Propagate(err, "failed to get collections")
 	}
@@ -211,7 +212,7 @@ func (d *db) GetCollections(ctx context.Context) ([]*Collection, error) {
 			if err != nil {
 				return nil, stacktrace.Propagate(err, "failed to get collections")
 			}
-			c, err := LoadCollection(cast.ToString(existing.Get("properties.schema")))
+			c, err := schema.LoadCollection(cast.ToString(existing.Get("properties.schema")))
 			if err != nil {
 				return nil, stacktrace.Propagate(err, "failed to get collections")
 			}
@@ -221,14 +222,14 @@ func (d *db) GetCollections(ctx context.Context) ([]*Collection, error) {
 	return collections, nil
 }
 
-func (d *db) SetCollection(ctx context.Context, collection *Collection) error {
+func (d *db) SetCollection(ctx context.Context, collection *schema.Collection) error {
 	if collection == nil {
 		return nil
 	}
 	id := fmt.Sprintf("collections.%s", collection.Collection())
 	existing, _ := d.Get(ctx, systemCollection, id)
 	if existing == nil || existing.Empty() {
-		existing = NewDocument()
+		existing = schema.NewDocument()
 		existing.SetID(id)
 	}
 	existing.Set("properties", map[string]interface{}{
@@ -245,7 +246,7 @@ func (d *db) SetCollection(ctx context.Context, collection *Collection) error {
 	return stacktrace.Propagate(d.ReIndexCollection(ctx, collection.Collection()), "failed to set collection")
 }
 
-func (d *db) SetCollections(ctx context.Context, collections []*Collection) error {
+func (d *db) SetCollections(ctx context.Context, collections []*schema.Collection) error {
 	m := machine.New()
 	for _, c := range collections {
 		c := c

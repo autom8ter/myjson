@@ -3,6 +3,7 @@ package wolverine
 import (
 	"context"
 	"fmt"
+	"github.com/autom8ter/wolverine/schema"
 	"io/fs"
 	"os"
 	"sort"
@@ -13,9 +14,6 @@ import (
 	"github.com/blevesearch/bleve"
 	"github.com/dgraph-io/badger/v3"
 	"github.com/palantir/stacktrace"
-	"github.com/xeipuuv/gojsonschema"
-
-	"github.com/autom8ter/wolverine/internal/prefix"
 )
 
 type db struct {
@@ -25,7 +23,7 @@ type db struct {
 	collections sync.Map
 	machine     machine.Machine
 	fullText    sync.Map
-	aggIndexes  []*aggIndex
+	aggIndexes  sync.Map
 }
 
 func New(ctx context.Context, cfg Config) (DB, error) {
@@ -48,6 +46,7 @@ func New(ctx context.Context, cfg Config) (DB, error) {
 		mu:          sync.RWMutex{},
 		collections: sync.Map{},
 		machine:     machine.New(),
+		aggIndexes:  sync.Map{},
 	}
 	if err := d.loadCollections(ctx); err != nil {
 		return nil, stacktrace.Propagate(err, "")
@@ -101,7 +100,7 @@ func (d *db) setFullText(collection string, index bleve.Index) {
 	d.fullText.Store(collection, indexes)
 }
 
-func (d *db) loadFullText(collection *Collection, reindex bool) error {
+func (d *db) loadFullText(collection *schema.Collection, reindex bool) error {
 	indexMapping := bleve.NewIndexMapping()
 	indexMapping.TypeField = "_collection"
 	newPath := fmt.Sprintf("%s/search/%s/index_%v.db", d.config.Path, collection.Collection(), time.Now().Unix())
@@ -140,7 +139,7 @@ func (d *db) loadFullText(collection *Collection, reindex bool) error {
 	return nil
 }
 
-func (d *db) getLastPath(collection *Collection) string {
+func (d *db) getLastPath(collection *schema.Collection) string {
 	fileSystem := os.DirFS(fmt.Sprintf("%s/search/%s", d.config.Path, collection.Collection()))
 	var paths []string
 	if err := fs.WalkDir(fileSystem, ".", func(path string, d fs.DirEntry, err error) error {
@@ -164,96 +163,32 @@ func (d *db) loadCollections(ctx context.Context) error {
 	if err != nil {
 		return stacktrace.Propagate(err, "")
 	}
-	sysCollection, err := LoadCollection(systemCollectionSchema)
+	sysCollection, err := schema.LoadCollection(systemCollectionSchema)
 	if err != nil {
 		return stacktrace.Propagate(err, "")
 	}
 	collections = append(collections, sysCollection)
 	for _, collection := range collections {
-		if collection.Schema != "" {
-			schema, err := gojsonschema.NewSchema(gojsonschema.NewStringLoader(collection.Schema))
-			if err != nil {
-				return stacktrace.Propagate(err, "")
-			}
-			collection.loadedSchema = schema
-		}
 		d.collections.Store(collection.Collection(), collection)
 	}
 	return nil
 }
 
-func chooseIndex(collection *Collection, whereFields []string, orderBy string) (*prefix.PrefixIndexRef, []string, bool, error) {
-	//sort.Strings(queryFields)
-	//if orderBy != "" {
-	//	for _, index := range collection.Indexes() {
-	//		if index.Fields[0] == orderBy {
-	//			return index.prefix(collection.Collection()), true, nil
-	//		}
-	//	}
-	//	return nil, false, stacktrace.NewErrorWithCode(ErrIndexRequired, "an index is required on %s/%s when used in order by", collection.Collection(), orderBy)
-	//}
-	var (
-		target  Index
-		matched int
-		ordered bool
-	)
-	for _, index := range collection.Indexes() {
-		isOrdered := index.Fields[0] == orderBy
-		var totalMatched int
-		for i, f := range whereFields {
-			if index.Fields[i] == f {
-				totalMatched++
-			}
-		}
-		if totalMatched > matched || (!ordered && isOrdered) {
-			target = index
-			ordered = isOrdered
-		}
-	}
-	if len(target.Fields) > 0 {
-		return target.prefix(collection.Collection()), target.Fields, ordered, nil
-	}
-	return Index{
-		Fields: []string{"_id"},
-	}.prefix(collection.Collection()), []string{"_id"}, orderBy == "_id", nil
-}
-
-func (d *db) getInmemCollection(collection string) (*Collection, bool) {
+func (d *db) getInmemCollection(collection string) (*schema.Collection, bool) {
 	c, ok := d.collections.Load(collection)
 	if !ok {
 		return nil, ok
 	}
-	return c.(*Collection), ok
+	return c.(*schema.Collection), ok
 }
 
-func (d *db) getInmemCollections() []*Collection {
-	var c []*Collection
+func (d *db) getInmemCollections() []*schema.Collection {
+	var c []*schema.Collection
 	d.collections.Range(func(key, value any) bool {
-		c = append(c, value.(*Collection))
+		c = append(c, value.(*schema.Collection))
 		return true
 	})
 	return c
-}
-
-func (d *db) getQueryPrefix(collection string, where []Where, order OrderBy) ([]byte, []string, bool, error) {
-	c, ok := d.getInmemCollection(collection)
-	if !ok {
-		return nil, nil, false, nil
-	}
-	var whereFields []string
-	var whereValues = map[string]any{}
-	for _, w := range where {
-		if w.Op != "==" && w.Op != Eq {
-			continue
-		}
-		whereFields = append(whereFields, w.Field)
-		whereValues[w.Field] = w.Value
-	}
-	index, indexedFields, ordered, err := chooseIndex(c, whereFields, order.Field)
-	if err != nil {
-		return nil, indexedFields, ordered, stacktrace.Propagate(err, "")
-	}
-	return []byte(index.GetIndex("", whereValues)), indexedFields, ordered, nil
 }
 
 func (d *db) collectionNames() []string {
