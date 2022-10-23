@@ -2,11 +2,7 @@ package schema
 
 // SearchIndex
 type SearchIndex struct {
-	fields []string
-}
-
-func NewSearchIndex(fields []string) *SearchIndex {
-	return &SearchIndex{fields: fields}
+	Fields []string `json:"fields"`
 }
 
 // SearchOp is an operator used within a where clause in a full text search query
@@ -46,7 +42,7 @@ type SearchWhere struct {
 
 // SearchQuery is a full text search query against the database
 type SearchQuery struct {
-	// Select is a list of fields to select from each record in the datbase(optional)
+	// Select is a list of Fields to select from each record in the datbase(optional)
 	Select []string `json:"select"`
 	// Where is a list of where clauses used to filter records based on full text search (required)
 	Where []SearchWhere `json:"where"`

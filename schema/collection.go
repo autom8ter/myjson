@@ -42,10 +42,12 @@ func (c *Collection) ParseSchema() error {
 		return stacktrace.NewErrorWithCode(errors.ErrEmptySchemaCollection, "empty 'collection' schema property")
 	}
 	var indexing Indexing
-	if value := gjson.Get(c.Schema, "indexing").Value(); value != nil {
-		if err := util.Decode(value, &indexing); err != nil {
-			return stacktrace.NewErrorWithCode(errors.ErrTODO, "failed to decode 'indexing' schema property")
-		}
+	if gjson.Get(c.Schema, "indexing").Value() == nil {
+		return stacktrace.NewErrorWithCode(errors.ErrTODO, "empty 'indexing' schema property: %s", c.collection)
+	}
+
+	if err := util.Decode(gjson.Get(c.Schema, "indexing").Value(), &indexing); err != nil {
+		return stacktrace.PropagateWithCode(err, errors.ErrTODO, "failed to decode 'indexing' schema property: %s", c.collection)
 	}
 
 	c.indexing = &indexing

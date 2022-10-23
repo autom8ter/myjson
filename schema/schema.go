@@ -19,6 +19,8 @@ func NewSchema(collections []*Collection) *Schema {
 }
 
 func (s *Schema) Get(collection string) *Collection {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 	return s.collections[collection]
 }
 
@@ -35,8 +37,8 @@ func (s *Schema) Del(collection string) {
 }
 
 func (s *Schema) CollectionNames() []string {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 	var names []string
 	for k, _ := range s.collections {
 		names = append(names, k)

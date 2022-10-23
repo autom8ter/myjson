@@ -2,8 +2,13 @@
   "$id": "https://wolverine.io/system.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "System",
-  "type": "object",
   "collection": "system",
+  "indexing": {
+    "search": [],
+    "aggregate": [],
+    "query": []
+  },
+  "type": "object",
   "required": [
     "_id",
     "properties"

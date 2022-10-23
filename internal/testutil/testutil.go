@@ -7,6 +7,7 @@ import (
 
 	"github.com/brianvoe/gofakeit/v6"
 
+	_ "embed"
 	"github.com/autom8ter/wolverine"
 )
 
@@ -20,124 +21,12 @@ func init() {
 }
 
 var (
-	UserCollection = &schema.Collection{
-		Schema: `
-{
-  "$id": "https://example.com/user.schema.json",
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "User",
-  "collection": "user",
-  "type": "object",
-  "full_text": true,
-  "indexes": [
-    {
-      "fields": [
-        "contact.email"
-      ]
-    },
-	{
-      "fields": [
-        "account_id"
-      ]
-    },
-	{
-      "fields": [
-        "language"
-      ]
-    }
-  ],
-  "required": [
-    "_id",
-    "name",
-    "age",
-    "contact",
-    "gender",
-    "account_id"
-  ],
-  "properties": {
-    "_id": {
-      "type": "string",
-      "description": "The user's id."
-    },
-    "name": {
-      "type": "string",
-      "description": "The user's name."
-    },
-    "contact": {
-      "type": "object",
-      "properties": {
-        "email": {
-          "type": "string",
-          "description": "The user's email."
-        }
-      }
-    },
-    "age": {
-      "description": "Age in years which must be equal to or greater than zero.",
-      "type": "integer",
-      "minimum": 0
-    },
-    "account_id": {
-      "type": "integer",
-      "minimum": 0
-    },
-    "language": {
-      "type": "string",
-      "description": "The user's first language."
-    },
-    "gender": {
-      "type": "string",
-      "description": "The user's gender.",
-      "enum": [
-        "male",
-        "female"
-      ]
-    },
-    "timestamp": {
-      "type": "string"
-    },
-    "annotations": {
-      "type": "object"
-    }
-  }
-}
-`}
-	TaskCollection = &schema.Collection{
-		Schema: `
-{
-  "$id": "https://example.com/task.schema.json",
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "Task",
-  "collection": "task",
-  "type": "object",
-  "indexes": [
-    {
-      "fields": [
-        "user"
-      ]
-    }
-  ],
-  "required": [
-    "_id",
-    "user",
-    "content"
-  ],
-  "properties": {
-    "_id": {
-      "type": "string",
-      "description": "The user's id."
-    },
-    "user": {
-      "type": "string",
-      "description": "The id of the user who owns the task"
-    },
-    "content": {
-      "type": "string",
-      "description": "The content of the task"
-    }
-  }
-}
-`}
+	//go:embed user.json
+	userSchema string
+	//go:embed task.json
+	taskSchema     string
+	UserCollection = &schema.Collection{Schema: userSchema}
+	TaskCollection = &schema.Collection{Schema: taskSchema}
 	AllCollections = []*schema.Collection{UserCollection, TaskCollection}
 )
 

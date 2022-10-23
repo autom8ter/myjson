@@ -2,6 +2,7 @@ package wolverine
 
 import (
 	"context"
+	_ "embed"
 	"fmt"
 	"github.com/autom8ter/wolverine/schema"
 	"io"
@@ -72,7 +73,7 @@ func (d *db) ReIndex(ctx context.Context) error {
 func (d *db) ReIndexCollection(ctx context.Context, collection string) error {
 	c, ok := d.getInmemCollection(collection)
 	if !ok {
-		return stacktrace.NewError("unsupported collection: %s", collection)
+		return nil
 	}
 	if err := d.loadFullText(c, true); err != nil {
 		return stacktrace.Propagate(err, "failed to reindex collection: %s", collection)
@@ -257,26 +258,5 @@ func (d *db) SetCollections(ctx context.Context, collections []*schema.Collectio
 	return stacktrace.Propagate(m.Wait(), "failed to set collections")
 }
 
-var systemCollectionSchema = `
-{
-  "$id": "https://wolverine.io/system.schema.json",
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "System",
-  "collection": "system",
-  "type": "object",
-  "required": [
-    "_id",
-    "properties"
-  ],
-  "properties": {
-    "_id": {
-      "type": "string",
-      "description": "The document's id."
-    },
-    "properties": {
-      "type": "object",
-      "description": "system properties"
-    }
-  }
-}
-`
+//go:embed system.json
+var systemCollectionSchema string

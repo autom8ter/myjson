@@ -4,17 +4,17 @@ package schema
 type Indexing struct {
 	Query     []*QueryIndex     `json:"query"`
 	Aggregate []*AggregateIndex `json:"aggregate"`
-	Search    *SearchIndex      `json:"search"`
+	Search    []*SearchIndex    `json:"search"`
 }
 
 func (i Indexing) HasQueryIndex() bool {
-	return len(i.Query) > 0
+	return i.Query != nil && len(i.Query) > 0
 }
 
 func (i Indexing) HasSearchIndex() bool {
-	return len(i.Search.fields) > 0
+	return i.Search != nil && len(i.Search) > 0
 }
 
 func (i Indexing) HasAggregateIndex() bool {
-	return len(i.Aggregate) > 0
+	return i.Aggregate != nil && len(i.Aggregate) > 0
 }

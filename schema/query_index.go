@@ -4,20 +4,16 @@ import "github.com/autom8ter/wolverine/internal/prefix"
 
 // QueryIndex is a database index used for quickly finding records with specific field values
 type QueryIndex struct {
-	fields []string
-}
-
-func NewQueryIndex(fields []string) *QueryIndex {
-	return &QueryIndex{fields: fields}
+	Fields []string `json:"fields"`
 }
 
 func (i QueryIndex) Prefix(collection string) *prefix.PrefixIndexRef {
-	return prefix.NewPrefixedIndex(collection, i.fields)
+	return prefix.NewPrefixedIndex(collection, i.Fields)
 }
 
 func PrimaryQueryIndex(collection string) *prefix.PrefixIndexRef {
 	return QueryIndex{
-		fields: []string{"_id"},
+		Fields: []string{"_id"},
 	}.Prefix(collection)
 }
 
@@ -48,10 +44,10 @@ func (i Indexing) GetQueryIndex(collection *Collection, whereFields []string, or
 		}, nil
 	}
 	for _, index := range indexing.Query {
-		isOrdered := index.fields[0] == orderBy
+		isOrdered := index.Fields[0] == orderBy
 		var totalMatched int
 		for i, f := range whereFields {
-			if index.fields[i] == f {
+			if index.Fields[i] == f {
 				totalMatched++
 			}
 		}
@@ -60,10 +56,10 @@ func (i Indexing) GetQueryIndex(collection *Collection, whereFields []string, or
 			ordered = isOrdered
 		}
 	}
-	if len(target.fields) > 0 {
+	if target != nil && len(target.Fields) > 0 {
 		return QueryIndexMatch{
 			Ref:     target.Prefix(collection.Collection()),
-			Fields:  target.fields,
+			Fields:  target.Fields,
 			Ordered: ordered,
 		}, nil
 	}

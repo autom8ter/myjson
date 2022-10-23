@@ -2,7 +2,6 @@ package wolverine
 
 import (
 	"context"
-	"github.com/autom8ter/wolverine/errors"
 	"github.com/autom8ter/wolverine/schema"
 	"github.com/dgraph-io/badger/v3"
 	"github.com/palantir/stacktrace"
@@ -51,7 +50,7 @@ func (d *db) aggregateIndex(ctx context.Context, i *schema.AggregateIndex, query
 func (d *db) Aggregate(ctx context.Context, collection string, query schema.AggregateQuery) (schema.Page, error) {
 	c, ok := d.getInmemCollection(collection)
 	if !ok {
-		return schema.Page{}, stacktrace.NewErrorWithCode(errors.ErrUnsuportedCollection, "unsupported collection: %s must be one of: %v", collection, d.schema.CollectionNames())
+		return schema.Page{}, nil
 	}
 	indexes, ok := d.aggIndexes.Load(collection)
 	if ok {
@@ -114,7 +113,7 @@ func (d *db) Aggregate(ctx context.Context, collection string, query schema.Aggr
 	for result := range pipe.Observe() {
 		doc, ok := result.V.(*schema.Document)
 		if !ok {
-			return schema.Page{}, stacktrace.NewError("expected type: %T got: %#v", &schema.Document{}, result.V)
+			return schema.Page{}, nil
 		}
 		results = append(results, doc)
 	}

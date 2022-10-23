@@ -2,7 +2,6 @@ package wolverine
 
 import (
 	"context"
-	"github.com/autom8ter/wolverine/errors"
 	"github.com/autom8ter/wolverine/schema"
 	"time"
 
@@ -19,7 +18,7 @@ func (d *db) Query(ctx context.Context, collection string, query schema.Query) (
 	qmachine := machine.New()
 	c, ok := d.getInmemCollection(collection)
 	if !ok {
-		return schema.Page{}, stacktrace.NewErrorWithCode(errors.ErrUnsuportedCollection, "unsupported collection: %s must be one of: %v", collection, d.schema.CollectionNames())
+		return schema.Page{}, nil
 	}
 	index, err := c.OptimizeQueryIndex(query.Where, query.OrderBy)
 	if err != nil {

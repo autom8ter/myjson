@@ -3,6 +3,8 @@ package schema
 import (
 	"container/list"
 	"context"
+	"encoding/json"
+	"github.com/autom8ter/wolverine/errors"
 	"github.com/palantir/stacktrace"
 	"github.com/spf13/cast"
 	"reflect"
@@ -12,27 +14,26 @@ import (
 
 type AggregateIndex struct {
 	mu         *sync.RWMutex
-	groupBy    []string
-	aggregates []Aggregate
+	GroupBy    []string    `json:"groupBy"`
+	Aggregates []Aggregate `json:"aggregates"`
 	metrics    map[string]map[Aggregate]*list.List
 }
 
-func NewAggregateIndex(groupBy []string, aggregates []Aggregate) *AggregateIndex {
-	return &AggregateIndex{
-		mu:         &sync.RWMutex{},
-		groupBy:    groupBy,
-		aggregates: aggregates,
-		metrics:    map[string]map[Aggregate]*list.List{},
-	}
+func (a *AggregateIndex) UnmarshalJSON(bytes []byte) error {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.metrics = map[string]map[Aggregate]*list.List{}
+	return stacktrace.PropagateWithCode(json.Unmarshal(bytes, a), errors.ErrTODO, "")
+
 }
 
 func (a *AggregateIndex) Matches(query AggregateQuery) bool {
-	if strings.Join(query.GroupBy, ",") != strings.Join(a.groupBy, ",") {
+	if strings.Join(query.GroupBy, ",") != strings.Join(a.GroupBy, ",") {
 		return false
 	}
 	for _, agg := range query.Aggregates {
 		hasMatch := false
-		for _, agg2 := range a.aggregates {
+		for _, agg2 := range a.Aggregates {
 			if reflect.DeepEqual(agg, agg2) {
 				hasMatch = true
 			}
@@ -44,18 +45,18 @@ func (a *AggregateIndex) Matches(query AggregateQuery) bool {
 	return true
 }
 
-func (a *AggregateIndex) Aggregate(aggregates ...Aggregate) []*Document {
+func (a *AggregateIndex) Aggregate(Aggregates ...Aggregate) []*Document {
 	a.mu.RLocker()
 	defer a.mu.RUnlock()
 	var documents []*Document
 	for k, aggs := range a.metrics {
 		d := NewDocument()
 		splitValues := strings.Split(k, ".")
-		for i, group := range a.groupBy {
+		for i, group := range a.GroupBy {
 			d.Set(group, splitValues[i])
 		}
 		for agg, metric := range aggs {
-			for _, aggregate := range aggregates {
+			for _, aggregate := range Aggregates {
 				if reflect.DeepEqual(agg, aggregate) {
 					d.Set(agg.Alias, cast.ToFloat64(metric.Front().Value))
 				}
@@ -73,12 +74,12 @@ func (a *AggregateIndex) Trigger() Trigger {
 		switch action {
 		case Delete:
 			var groupValues []string
-			for _, g := range a.groupBy {
+			for _, g := range a.GroupBy {
 				groupValues = append(groupValues, cast.ToString(before.Get(g)))
 			}
 			groupKey := strings.Join(groupValues, ".")
 			group := a.metrics[groupKey]
-			for _, agg := range a.aggregates {
+			for _, agg := range a.Aggregates {
 				if group[agg] == nil {
 					group[agg] = list.New()
 				}
@@ -94,12 +95,12 @@ func (a *AggregateIndex) Trigger() Trigger {
 			}
 		default:
 			var groupValues []string
-			for _, g := range a.groupBy {
+			for _, g := range a.GroupBy {
 				groupValues = append(groupValues, cast.ToString(after.Get(g)))
 			}
 			groupKey := strings.Join(groupValues, ".")
 			group := a.metrics[groupKey]
-			for _, agg := range a.aggregates {
+			for _, agg := range a.Aggregates {
 				current := cast.ToFloat64(group[agg].Front().Value)
 				switch agg.Function {
 				case SUM:
