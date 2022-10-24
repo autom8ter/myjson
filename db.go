@@ -5,6 +5,7 @@ import (
 	_ "embed"
 	"fmt"
 	"github.com/autom8ter/machine/v4"
+	"github.com/autom8ter/wolverine/errors"
 	"github.com/autom8ter/wolverine/schema"
 	"github.com/blevesearch/bleve"
 	"github.com/dgraph-io/badger/v3"
@@ -20,15 +21,11 @@ import (
 
 // Config configures a database instance
 type Config struct {
-	// Path is the path to database storage. Use 'inmem' to operate the database in memory only.
-	Path string
-	// Debug sets the database to debug level
-	Debug bool
-	// Migrate, if a true, has the database run any migrations that have not already run(idempotent).
-	Migrate bool
-	// ReIndex reindexes the database
-	ReIndex     bool
-	Collections []*schema.Collection
+	// StoragePath is the path to database storage.
+	// Leave empty to operate the database in memory only.
+	StoragePath string `json:"storagePath"`
+	// Collections are the json document collections supported by the DB - At least one is required.
+	Collections []*schema.Collection `json:"collections"`
 }
 
 type DB struct {
@@ -41,9 +38,12 @@ type DB struct {
 }
 
 func New(ctx context.Context, cfg Config) (*DB, error) {
+	if len(cfg.Collections) == 0 {
+		return nil, stacktrace.NewErrorWithCode(errors.ErrTODO, "zero collections configured")
+	}
 	config := &cfg
-	opts := badger.DefaultOptions(config.Path)
-	if config.Path == "inmem" {
+	opts := badger.DefaultOptions(config.StoragePath)
+	if config.StoragePath == "" {
 		opts.InMemory = true
 		opts.Dir = ""
 		opts.ValueDir = ""
@@ -79,7 +79,7 @@ func New(ctx context.Context, cfg Config) (*DB, error) {
 		if err != nil {
 			return nil, stacktrace.Propagate(err, "")
 		}
-		ft, err := openFullTextIndex(*config, systemCollection.Collection(), config.ReIndex)
+		ft, err := openFullTextIndex(*config, systemCollection.Collection(), false)
 		if err != nil {
 			return nil, stacktrace.Propagate(err, "")
 		}
@@ -92,10 +92,8 @@ func New(ctx context.Context, cfg Config) (*DB, error) {
 		})
 	}
 
-	if config.ReIndex {
-		if err := d.ReIndex(ctx); err != nil {
-			return nil, stacktrace.Propagate(err, "failed to reindex")
-		}
+	if err := d.ReIndex(ctx); err != nil {
+		return nil, stacktrace.Propagate(err, "failed to reindex")
 	}
 	return d, nil
 }
@@ -159,21 +157,21 @@ var systemCollectionSchema string
 
 func openFullTextIndex(config Config, collection string, reindex bool) (bleve.Index, error) {
 	indexMapping := bleve.NewIndexMapping()
-	newPath := fmt.Sprintf("%s/search/%s/index_%v.db", config.Path, collection, time.Now().Unix())
+	newPath := fmt.Sprintf("%s/search/%s/index_%v.db", config.StoragePath, collection, time.Now().Unix())
 	switch {
-	case config.Path == "inmem" && !reindex:
+	case config.StoragePath == "" && !reindex:
 		i, err := bleve.NewMemOnly(indexMapping)
 		if err != nil {
 			return nil, stacktrace.Propagate(err, "failed to create %s search index", collection)
 		}
 		return i, nil
-	case config.Path == "inmem" && reindex:
+	case config.StoragePath == "" && reindex:
 		i, err := bleve.NewMemOnly(indexMapping)
 		if err != nil {
 			return nil, stacktrace.Propagate(err, "failed to create %s search index", collection)
 		}
 		return i, nil
-	case reindex && config.Path != "inmem":
+	case reindex && config.StoragePath != "":
 		lastPath := getLastFullTextIndexPath(config, collection)
 		i, err := bleve.New(newPath, indexMapping)
 		if err != nil {
@@ -199,7 +197,7 @@ func openFullTextIndex(config Config, collection string, reindex bool) (bleve.In
 }
 
 func getLastFullTextIndexPath(config Config, collection string) string {
-	fileSystem := os.DirFS(fmt.Sprintf("%s/search/%s", config.Path, collection))
+	fileSystem := os.DirFS(fmt.Sprintf("%s/search/%s", config.StoragePath, collection))
 	var paths []string
 	if err := fs.WalkDir(fileSystem, ".", func(path string, d fs.DirEntry, err error) error {
 		if d.IsDir() {

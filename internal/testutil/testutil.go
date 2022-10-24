@@ -71,8 +71,6 @@ func TestDB(collections []*schema.Collection, fn func(ctx context.Context, db *w
 	defer cancel()
 
 	db, err := wolverine.New(ctx, wolverine.Config{
-		Path:        "inmem",
-		Debug:       true,
 		Collections: collections,
 	})
 	if err != nil {
