@@ -13,3 +13,9 @@ type Event struct {
 	Action     Action      `json:"action,omitempty"`
 	Documents  []*Document `json:"documents,omitempty"`
 }
+
+type Command struct {
+	Collection string      `json:"collection"`
+	Action     Action      `json:"action,omitempty"`
+	Documents  []*Document `json:"documents,omitempty"`
+}

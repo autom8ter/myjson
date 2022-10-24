@@ -2,6 +2,7 @@ package schema
 
 import (
 	"container/list"
+	"fmt"
 	"github.com/autom8ter/wolverine/errors"
 	"github.com/autom8ter/wolverine/internal/prefix"
 	"github.com/autom8ter/wolverine/internal/util"
@@ -55,6 +56,10 @@ func (c *Collection) ParseSchema() error {
 	if indexing.PrimaryKey == "" {
 		return stacktrace.PropagateWithCode(err, errors.ErrTODO, "missing 'primaryKey' from 'indexing' schema property: %s", c.collection)
 	}
+	if !gjson.Get(c.Schema, fmt.Sprintf("properties.%s", indexing.PrimaryKey)).Exists() {
+		return stacktrace.PropagateWithCode(err, errors.ErrTODO, "primary key does not exist in properties: %s", c.collection)
+	}
+
 	for _, i := range indexing.Aggregate {
 		i.mu = &sync.RWMutex{}
 		i.metrics = map[string]map[Aggregate]*list.List{}
