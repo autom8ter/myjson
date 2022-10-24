@@ -51,124 +51,123 @@ func (c *Collection) persistEvent(ctx context.Context, event *schema.Event) erro
 	if c.schema.Indexing().HasSearchIndex() {
 		batch = c.fullText.NewBatch()
 	}
-	for _, document := range event.Documents {
-		current, _ := c.Get(ctx, c.schema.GetDocumentID(document))
-		if current == nil {
-			current = schema.NewDocument()
-		}
-		for _, c := range c.triggers {
-			if err := c(ctx, event.Action, schema.Before, current, document); err != nil {
-				return stacktrace.Propagate(err, "trigger failure")
-			}
-		}
-		var bits []byte
+	for _, after := range event.Documents {
+		docId := c.schema.GetDocumentID(after)
+		before, _ := c.Get(ctx, docId)
 		switch event.Action {
-		case schema.Set:
-			valid, err := c.schema.Validate(document)
-			if err != nil {
-				return stacktrace.Propagate(err, "")
-			}
-			if !valid {
-				return stacktrace.NewError("%s/%s document has invalid schema", c.schema.Collection(), c.schema.GetDocumentID(document))
-			}
-			bits = document.Bytes()
 		case schema.Update:
-			currentClone := current.Clone()
-			currentClone.Merge(document)
-			valid, err := c.schema.Validate(currentClone)
-			if err != nil {
-				return stacktrace.Propagate(err, "")
-			}
-			if !valid {
-				return stacktrace.NewError("%s/%s document has invalid schema", c.schema.Collection(), c.schema.GetDocumentID(currentClone))
-			}
-			bits = currentClone.Bytes()
+			clone := before.Clone()
+			clone.Merge(after)
+			*after = *clone
 		}
-
-		switch event.Action {
-		case schema.Set, schema.Update:
-			pkey := prefix.PrimaryKey(c.schema.Collection(), c.schema.GetDocumentID(document))
-			if err := txn.SetEntry(&badger.Entry{
-				Key:   pkey,
-				Value: bits,
-			}); err != nil {
-				return stacktrace.PropagateWithCode(err, errors.ErrTODO, "failed to save document %s/%s to primary index", c.schema.Collection(), c.schema.GetDocumentID(document))
-			}
-			for _, idx := range c.schema.Indexing().Query {
-				pindex := c.schema.QueryIndexPrefix(*idx)
-				if current != nil {
-					if err := txn.Delete(pindex.GetPrefix(current.Value(), c.schema.GetDocumentID(current))); err != nil {
-						return stacktrace.PropagateWithCode(
-							err,
-							errors.ErrTODO,
-							"failed to delete document %s/%s index references",
-							c.schema.Collection(),
-							c.schema.GetDocumentID(document),
-						)
-					}
-				}
-				i := pindex.GetPrefix(document.Value(), c.schema.GetDocumentID(document))
-				if err := txn.SetEntry(&badger.Entry{
-					Key:   i,
-					Value: bits,
-				}); err != nil {
-					return stacktrace.PropagateWithCode(
-						err,
-						errors.ErrTODO,
-						"failed to set document %s/%s index references",
-						c.schema.Collection(),
-						c.schema.GetDocumentID(document),
-					)
-				}
-			}
-			if batch != nil {
-				if err := batch.Index(c.schema.GetDocumentID(document), document.Value()); err != nil {
-					return stacktrace.PropagateWithCode(
-						err,
-						errors.ErrTODO,
-						"failed to set document %s/%s search index references",
-						c.schema.Collection(),
-						c.schema.GetDocumentID(document),
-					)
-				}
-			}
-		case schema.Delete:
-			for _, i := range c.schema.Indexing().Query {
-				pindex := c.schema.QueryIndexPrefix(*i)
-				if err := txn.Delete(pindex.GetPrefix(current.Value(), c.schema.GetDocumentID(current))); err != nil {
-					return stacktrace.Propagate(err, "failed to batch delete documents")
-				}
-			}
-			if err := txn.Delete(prefix.PrimaryKey(c.schema.Collection(), c.schema.GetDocumentID(current))); err != nil {
-				return stacktrace.Propagate(err, "failed to batch delete documents")
-			}
-			if batch != nil {
-				batch.Delete(c.schema.GetDocumentID(document))
-			}
-		}
-		for _, t := range c.triggers {
-			if err := t(ctx, event.Action, schema.After, current, document); err != nil {
-				return stacktrace.Propagate(err, "trigger failure")
-			}
-		}
-		for _, agg := range c.schema.Indexing().Aggregate {
-			if err := agg.Trigger()(ctx, event.Action, schema.After, current, document); err != nil {
-				return stacktrace.Propagate(err, "trigger failure")
-			}
+		if err := c.indexDocument(ctx, txn, batch, event.Action, docId, before, after); err != nil {
+			return stacktrace.Propagate(err, "")
 		}
 	}
 	if batch != nil {
 		if err := c.fullText.Batch(batch); err != nil {
-			return stacktrace.Propagate(err, "failed to batch documents")
+			return stacktrace.PropagateWithCode(err, errors.ErrTODO, "failed to batch documents")
 		}
 	}
 	if err := txn.Flush(); err != nil {
-		return stacktrace.Propagate(err, "failed to batch documents")
+		return stacktrace.Propagate(err, "failed to batch collection documents")
 	}
 	c.machine.Publish(ctx, machine.Message{
 		Channel: event.Collection,
 		Body:    event,
 	})
+	return nil
+}
+
+func (c *Collection) indexDocument(ctx context.Context, txn *badger.WriteBatch, batch *bleve.Batch, action schema.Action, docId string, before, after *schema.Document) error {
+	if docId == "" {
+		return stacktrace.NewErrorWithCode(errors.ErrTODO, "empty document id")
+	}
+	pkey, err := c.schema.GetPrimaryKeyRef(docId)
+	if err != nil {
+		return stacktrace.PropagateWithCode(err, errors.ErrTODO, "failed to get document %s/%s primary key ref", c.schema.Collection(), docId)
+	}
+	for _, c := range c.triggers {
+		if err := c(ctx, action, schema.Before, before, after); err != nil {
+			return stacktrace.Propagate(err, "trigger failure")
+		}
+	}
+	switch action {
+	case schema.Delete:
+		if before == nil {
+			return stacktrace.NewErrorWithCode(errors.ErrTODO, "failed to batch delete documents: missing before value")
+		}
+		for _, i := range c.schema.Indexing().Query {
+			pindex := c.schema.QueryIndexPrefix(*i)
+			if err := txn.Delete(pindex.GetPrefix(before.Value(), docId)); err != nil {
+				return stacktrace.Propagate(err, "failed to batch delete documents")
+			}
+		}
+		if err := txn.Delete(pkey); err != nil {
+			return stacktrace.Propagate(err, "failed to batch delete documents")
+		}
+		if batch != nil {
+			batch.Delete(docId)
+		}
+	case schema.Set, schema.Update:
+		if after != nil && c.Schema().GetDocumentID(after) != docId {
+			return stacktrace.NewErrorWithCode(errors.ErrTODO, "document id is immutable: %v -> %v", c.Schema().GetDocumentID(after), docId)
+		}
+		valid, err := c.schema.Validate(after)
+		if err != nil {
+			return stacktrace.Propagate(err, "")
+		}
+		if !valid {
+			return stacktrace.NewError("%s/%s document has invalid schema", c.schema.Collection(), docId)
+		}
+		for _, idx := range c.schema.Indexing().Query {
+			pindex := c.schema.QueryIndexPrefix(*idx)
+			if before != nil {
+				if err := txn.Delete(pindex.GetPrefix(before.Value(), docId)); err != nil {
+					return stacktrace.PropagateWithCode(
+						err,
+						errors.ErrTODO,
+						"failed to delete document %s/%s index references",
+						c.schema.Collection(),
+						docId,
+					)
+				}
+			}
+			i := pindex.GetPrefix(after.Value(), docId)
+			if err := txn.SetEntry(&badger.Entry{
+				Key:   i,
+				Value: after.Bytes(),
+			}); err != nil {
+				return stacktrace.PropagateWithCode(
+					err,
+					errors.ErrTODO,
+					"failed to set document %s/%s index references",
+					c.schema.Collection(),
+					docId,
+				)
+			}
+		}
+		if err := txn.Set(pkey, after.Bytes()); err != nil {
+			return stacktrace.PropagateWithCode(err, errors.ErrTODO, "failed to batch set documents to primary index")
+		}
+		if batch != nil {
+			if err := batch.Index(docId, after.Value()); err != nil {
+				return stacktrace.PropagateWithCode(err, errors.ErrTODO, "failed to batch set documents to search index")
+			}
+		}
+	}
+	for _, t := range c.triggers {
+		if err := t(ctx, action, schema.After, before, after); err != nil {
+			return stacktrace.Propagate(err, "trigger failure")
+		}
+	}
+	if c.schema.Indexing().Aggregate != nil {
+		for _, agg := range c.schema.Indexing().Aggregate {
+			if err := agg.Trigger()(ctx, action, schema.After, before, after); err != nil {
+				return stacktrace.Propagate(err, "aggregate trigger failure")
+			}
+		}
+	}
 	return nil
 }
 
@@ -247,9 +246,13 @@ func (c *Collection) Get(ctx context.Context, id string) (*schema.Document, erro
 	var (
 		document *schema.Document
 	)
-
+	pkey, err := c.schema.GetPrimaryKeyRef(id)
+	if err != nil {
+		return nil, stacktrace.PropagateWithCode(err, errors.ErrTODO, "failed to get document %s/%s primary key ref", c.schema.Collection(), id)
+	}
 	if err := c.kv.View(func(txn *badger.Txn) error {
-		item, err := txn.Get(prefix.PrimaryKey(c.schema.Collection(), id))
+
+		item, err := txn.Get(pkey)
 		if err != nil {
 			return stacktrace.Propagate(err, "")
 		}
@@ -267,7 +270,11 @@ func (c *Collection) GetAll(ctx context.Context, ids []string) ([]*schema.Docume
 	var documents []*schema.Document
 	if err := c.kv.View(func(txn *badger.Txn) error {
 		for _, id := range ids {
-			item, err := txn.Get([]byte(prefix.PrimaryKey(c.schema.Collection(), id)))
+			pkey, err := c.schema.GetPrimaryKeyRef(id)
+			if err != nil {
+				return stacktrace.PropagateWithCode(err, errors.ErrTODO, "failed to get document %s/%s primary key ref", c.schema.Collection(), id)
+			}
+			item, err := txn.Get(pkey)
 			if err != nil {
 				return stacktrace.Propagate(err, "")
 			}
@@ -446,7 +453,11 @@ func (c *Collection) aggregateIndex(ctx context.Context, i *schema.AggregateInde
 		Count:     len(results),
 		Stats: schema.PageStats{
 			ExecutionTime: time.Since(now),
-			IndexMatch:    schema.QueryIndexMatch{},
+			IndexMatch: schema.QueryIndexMatch{
+				Ref:     nil,
+				Fields:  i.GroupBy,
+				Ordered: false,
+			},
 		},
 	}, nil
 }

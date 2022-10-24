@@ -131,6 +131,17 @@ func (c *Collection) PrimaryQueryIndex() *prefix.PrefixIndexRef {
 	})
 }
 
+func (c *Collection) GetPrimaryKeyRef(documentID string) ([]byte, error) {
+	if documentID == "" {
+		return nil, stacktrace.NewErrorWithCode(errors.ErrTODO, "empty document id for property: %s", c.indexing.PrimaryKey)
+	}
+	return c.QueryIndexPrefix(QueryIndex{
+		Fields: []string{c.indexing.PrimaryKey},
+	}).GetPrefix(map[string]any{
+		c.indexing.PrimaryKey: documentID,
+	}, documentID), nil
+}
+
 func (c *Collection) QueryIndexPrefix(i QueryIndex) *prefix.PrefixIndexRef {
 	return prefix.NewPrefixedIndex(c.collection, i.Fields)
 }

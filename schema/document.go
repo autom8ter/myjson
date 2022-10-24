@@ -77,11 +77,7 @@ func (d *Document) Bytes() []byte {
 
 // Value returns the document as a map
 func (d *Document) Value() map[string]any {
-	val, ok := d.result.Value().(map[string]interface{})
-	if !ok {
-		return map[string]any{}
-	}
-	return val
+	return d.result.Value().(map[string]interface{})
 }
 
 // Clone allocates a new document with identical values

@@ -22,12 +22,6 @@ func NewPrefixedIndex(collection string, fields []string) *PrefixIndexRef {
 	}
 }
 
-func PrimaryKey(collection string, id string) []byte {
-	return NewPrefixedIndex(collection, []string{"_id"}).GetPrefix(map[string]any{
-		"_id": id,
-	}, id)
-}
-
 func (d PrefixIndexRef) GetPrefix(fields map[string]any, documentID string) []byte {
 	fields, _ = flat.Flatten(fields, nil)
 	var path [][]byte
@@ -49,7 +43,7 @@ func (d PrefixIndexRef) GetPrefix(fields map[string]any, documentID string) []by
 
 func encodeValue(value any) []byte {
 	if value == nil {
-		return []byte("")
+		return []byte("null")
 	}
 	switch value := value.(type) {
 	case bool:

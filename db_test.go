@@ -5,6 +5,7 @@ import (
 	"github.com/autom8ter/wolverine"
 	"github.com/autom8ter/wolverine/internal/testutil"
 	"github.com/autom8ter/wolverine/schema"
+	"github.com/brianvoe/gofakeit/v6"
 	"github.com/stretchr/testify/assert"
 	"strings"
 	"testing"
@@ -124,6 +125,7 @@ func Test(t *testing.T) {
 				for _, doc := range results.Documents {
 					t.Logf("aggregate: %s", doc.String())
 				}
+				assert.EqualValues(t, []string{"account_id", "gender"}, results.Stats.IndexMatch.Fields)
 				t.Logf("found %v aggregates in %s", results.Count, results.Stats.ExecutionTime)
 			})
 			t.Run("search wildcard name", func(t *testing.T) {
@@ -218,6 +220,18 @@ func Test(t *testing.T) {
 				}
 				assert.GreaterOrEqual(t, results.Count, 1)
 				t.Logf("found %v regex search results in %s", results.Count, results.Stats.ExecutionTime)
+			})
+			t.Run("update contact.email", func(t *testing.T) {
+				for _, u := range usrs {
+					edit := u.Clone()
+					email := gofakeit.Email()
+					edit.Set("contact.email", email)
+					assert.Nil(t, collection.Update(ctx, edit))
+					doc, err := collection.Get(ctx, collection.Schema().GetDocumentID(edit))
+					assert.Nil(t, err)
+					assert.Equal(t, email, doc.GetString("contact.email"))
+					assert.Equal(t, u.GetString("name"), doc.GetString("name"))
+				}
 			})
 			t.Run("delete first 50", func(t *testing.T) {
 				for _, id := range ids[:50] {
