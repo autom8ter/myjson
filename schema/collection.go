@@ -28,7 +28,6 @@ type Collection struct {
 	Schema       string `json:"schema"`
 	indexing     *Indexing
 	collection   string
-	primaryKey   string
 	loadedSchema *gojsonschema.Schema
 }
 
@@ -49,7 +48,6 @@ func (c *Collection) ParseSchema() error {
 	if gjson.Get(c.Schema, "indexing").Value() == nil {
 		return stacktrace.NewErrorWithCode(errors.ErrTODO, "empty 'indexing' schema property: %s", c.collection)
 	}
-
 	if err := util.Decode(gjson.Get(c.Schema, "indexing").Value(), &indexing); err != nil {
 		return stacktrace.PropagateWithCode(err, errors.ErrTODO, "failed to decode 'indexing' schema property: %s", c.collection)
 	}
@@ -126,7 +124,7 @@ func (c *Collection) OptimizeQueryIndex(where []Where, order OrderBy) (QueryInde
 
 func (c *Collection) PrimaryQueryIndex() *prefix.PrefixIndexRef {
 	return c.QueryIndexPrefix(QueryIndex{
-		Fields: []string{c.primaryKey},
+		Fields: []string{c.indexing.PrimaryKey},
 	})
 }
 
@@ -144,8 +142,8 @@ func (c *Collection) GetQueryIndex(whereFields []string, orderBy string) (QueryI
 	if !indexing.HasQueryIndex() {
 		return QueryIndexMatch{
 			Ref:     c.PrimaryQueryIndex(),
-			Fields:  []string{c.primaryKey},
-			Ordered: orderBy == c.primaryKey || orderBy == "",
+			Fields:  []string{c.indexing.PrimaryKey},
+			Ordered: orderBy == c.indexing.PrimaryKey || orderBy == "",
 		}, nil
 	}
 	for _, index := range indexing.Query {
@@ -170,11 +168,11 @@ func (c *Collection) GetQueryIndex(whereFields []string, orderBy string) (QueryI
 	}
 	return QueryIndexMatch{
 		Ref:     c.PrimaryQueryIndex(),
-		Fields:  []string{c.primaryKey},
-		Ordered: orderBy == c.primaryKey || orderBy == "",
+		Fields:  []string{c.indexing.PrimaryKey},
+		Ordered: orderBy == c.indexing.PrimaryKey || orderBy == "",
 	}, nil
 }
 
 func (c *Collection) GetDocumentID(d *Document) string {
-	return cast.ToString(d.Get(c.primaryKey))
+	return cast.ToString(d.Get(c.indexing.PrimaryKey))
 }

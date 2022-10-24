@@ -4,8 +4,8 @@
   "title": "User",
   "collection": "user",
   "type": "object",
-  "full_text": true,
   "indexing": {
+    "primaryKey": "_id",
     "query": [
       {
         "fields": [

@@ -36,13 +36,18 @@ func (c *Collection) persistEvent(ctx context.Context, event *schema.Event) erro
 		return nil
 	}
 	for _, document := range event.Documents {
-		document.Set("_collection", event.Collection)
 		if !document.Valid() {
 			return stacktrace.NewErrorWithCode(errors.ErrTODO, "invalid json document")
+		}
+		if id := c.schema.GetDocumentID(document); id == "" {
+			return stacktrace.NewErrorWithCode(errors.ErrTODO, "document missing primary key %s", c.schema.Indexing().PrimaryKey)
 		}
 	}
 	txn := c.kv.NewWriteBatch()
 	var batch *bleve.Batch
+	if c.schema == nil {
+		return stacktrace.NewErrorWithCode(errors.ErrTODO, "null collection schema")
+	}
 	if c.schema.Indexing().HasSearchIndex() {
 		batch = c.fullText.NewBatch()
 	}
@@ -87,13 +92,19 @@ func (c *Collection) persistEvent(ctx context.Context, event *schema.Event) erro
 				Key:   pkey,
 				Value: bits,
 			}); err != nil {
-				return stacktrace.Propagate(err, "failed to batch save documents")
+				return stacktrace.PropagateWithCode(err, errors.ErrTODO, "failed to save document %s/%s to primary index", c.schema.Collection(), c.schema.GetDocumentID(document))
 			}
 			for _, idx := range c.schema.Indexing().Query {
 				pindex := c.schema.QueryIndexPrefix(*idx)
 				if current != nil {
 					if err := txn.Delete(pindex.GetPrefix(current.Value(), c.schema.GetDocumentID(current))); err != nil {
-						return stacktrace.Propagate(err, "failed to batch save documents")
+						return stacktrace.PropagateWithCode(
+							err,
+							errors.ErrTODO,
+							"failed to delete document %s/%s index references",
+							c.schema.Collection(),
+							c.schema.GetDocumentID(document),
+						)
 					}
 				}
 				i := pindex.GetPrefix(document.Value(), c.schema.GetDocumentID(document))
@@ -101,22 +112,34 @@ func (c *Collection) persistEvent(ctx context.Context, event *schema.Event) erro
 					Key:   i,
 					Value: bits,
 				}); err != nil {
-					return stacktrace.Propagate(err, "failed to batch save documents")
+					return stacktrace.PropagateWithCode(
+						err,
+						errors.ErrTODO,
+						"failed to set document %s/%s index references",
+						c.schema.Collection(),
+						c.schema.GetDocumentID(document),
+					)
 				}
 			}
 			if batch != nil {
 				if err := batch.Index(c.schema.GetDocumentID(document), document.Value()); err != nil {
-					return stacktrace.Propagate(err, "failed to batch save documents")
+					return stacktrace.PropagateWithCode(
+						err,
+						errors.ErrTODO,
+						"failed to set document %s/%s search index references",
+						c.schema.Collection(),
+						c.schema.GetDocumentID(document),
+					)
 				}
 			}
 		case schema.Delete:
 			for _, i := range c.schema.Indexing().Query {
 				pindex := c.schema.QueryIndexPrefix(*i)
-				if err := txn.Delete([]byte(pindex.GetPrefix(current.Value(), c.schema.GetDocumentID(current)))); err != nil {
+				if err := txn.Delete(pindex.GetPrefix(current.Value(), c.schema.GetDocumentID(current))); err != nil {
 					return stacktrace.Propagate(err, "failed to batch delete documents")
 				}
 			}
-			if err := txn.Delete([]byte(prefix.PrimaryKey(c.schema.Collection(), c.schema.GetDocumentID(current)))); err != nil {
+			if err := txn.Delete(prefix.PrimaryKey(c.schema.Collection(), c.schema.GetDocumentID(current))); err != nil {
 				return stacktrace.Propagate(err, "failed to batch delete documents")
 			}
 			if batch != nil {
@@ -507,6 +530,14 @@ func (c *Collection) Aggregate(ctx context.Context, query schema.AggregateQuery)
 }
 
 func (c *Collection) Search(ctx context.Context, q schema.SearchQuery) (schema.Page, error) {
+	if !c.schema.Indexing().HasSearchIndex() {
+		return schema.Page{}, stacktrace.NewErrorWithCode(
+			errors.ErrTODO,
+			"%s does not have a search index",
+			c.schema.Collection(),
+		)
+	}
+
 	now := time.Now()
 	var (
 		fields []string
@@ -634,9 +665,9 @@ func (c *Collection) Search(ctx context.Context, q schema.SearchQuery) (schema.P
 	}
 	var searchRequest *bleve.SearchRequest
 	if len(queries) > 1 {
-		searchRequest = bleve.NewSearchRequestOptions(bleve.NewConjunctionQuery(queries...), q.Limit, q.Page*q.Limit, false)
+		searchRequest = bleve.NewSearchRequestOptions(bleve.NewConjunctionQuery(queries...), limit, q.Page*limit, false)
 	} else {
-		searchRequest = bleve.NewSearchRequestOptions(bleve.NewConjunctionQuery(queries[0]), q.Limit, q.Page*q.Limit, false)
+		searchRequest = bleve.NewSearchRequestOptions(bleve.NewConjunctionQuery(queries[0]), limit, q.Page*limit, false)
 	}
 	searchRequest.Fields = []string{"*"}
 	results, err := c.fullText.Search(searchRequest)
@@ -645,6 +676,9 @@ func (c *Collection) Search(ctx context.Context, q schema.SearchQuery) (schema.P
 	}
 
 	var data []*schema.Document
+	if len(results.Hits) == 0 {
+		return schema.Page{}, stacktrace.NewError("zero results")
+	}
 	for _, h := range results.Hits {
 		if len(h.Fields) == 0 {
 			continue

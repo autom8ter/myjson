@@ -39,9 +39,9 @@ type QueryIndex struct {
 }
 
 type QueryIndexMatch struct {
-	Ref           *prefix.PrefixIndexRef
-	Fields        []string
-	Ordered       bool
+	Ref           *prefix.PrefixIndexRef `json:"ref"`
+	Fields        []string               `json:"fields"`
+	Ordered       bool                   `json:"ordered"`
 	targetFields  []string
 	targetOrderBy string
 }
@@ -211,4 +211,8 @@ func (a *AggregateIndex) Trigger() Trigger {
 		}
 		return nil
 	}
+}
+
+type Item[T any] struct {
+	V T
 }

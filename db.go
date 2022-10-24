@@ -159,7 +159,6 @@ var systemCollectionSchema string
 
 func openFullTextIndex(config Config, collection string, reindex bool) (bleve.Index, error) {
 	indexMapping := bleve.NewIndexMapping()
-	indexMapping.TypeField = "_collection"
 	newPath := fmt.Sprintf("%s/search/%s/index_%v.db", config.Path, collection, time.Now().Unix())
 	switch {
 	case config.Path == "inmem" && !reindex:

@@ -5,6 +5,7 @@
   "collection": "task",
   "type": "object",
   "indexing": {
+    "primaryKey": "_id",
     "query": [
       {
         "fields": [
