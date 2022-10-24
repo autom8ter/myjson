@@ -37,16 +37,3 @@ func compareField(field string, i, j *Document) bool {
 		return iFieldVal.String() > jFieldVal.String()
 	}
 }
-
-func IndexableFields(where []Where, by OrderBy) map[string]any {
-	var whereFields []string
-	var whereValues = map[string]any{}
-	for _, w := range where {
-		if w.Op != "==" && w.Op != Eq {
-			continue
-		}
-		whereFields = append(whereFields, w.Field)
-		whereValues[w.Field] = w.Value
-	}
-	return whereValues
-}

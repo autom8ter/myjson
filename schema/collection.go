@@ -3,6 +3,7 @@ package schema
 import (
 	"container/list"
 	"github.com/autom8ter/wolverine/errors"
+	"github.com/autom8ter/wolverine/internal/prefix"
 	"github.com/autom8ter/wolverine/internal/util"
 	"github.com/palantir/stacktrace"
 	"github.com/spf13/cast"
@@ -26,6 +27,7 @@ type Collection struct {
 	Schema       string `json:"schema"`
 	indexing     *Indexing
 	collection   string
+	primaryKey   string
 	loadedSchema *gojsonschema.Schema
 }
 
@@ -49,6 +51,9 @@ func (c *Collection) ParseSchema() error {
 
 	if err := util.Decode(gjson.Get(c.Schema, "indexing").Value(), &indexing); err != nil {
 		return stacktrace.PropagateWithCode(err, errors.ErrTODO, "failed to decode 'indexing' schema property: %s", c.collection)
+	}
+	if indexing.PrimaryKey == "" {
+		return stacktrace.PropagateWithCode(err, errors.ErrTODO, "missing 'primaryKey' from 'indexing' schema property: %s", c.collection)
 	}
 	for _, i := range indexing.Aggregate {
 		i.mu = &sync.RWMutex{}
@@ -107,9 +112,64 @@ func (c *Collection) OptimizeQueryIndex(where []Where, order OrderBy) (QueryInde
 		whereFields = append(whereFields, w.Field)
 		whereValues[w.Field] = w.Value
 	}
-	index, err := c.Indexing().GetQueryIndex(c, whereFields, order.Field)
+	index, err := c.GetQueryIndex(whereFields, order.Field)
 	if err != nil {
 		return QueryIndexMatch{}, stacktrace.Propagate(err, "")
 	}
 	return index, nil
+}
+
+func (c *Collection) PrimaryQueryIndex() *prefix.PrefixIndexRef {
+	return c.QueryIndexPrefix(QueryIndex{
+		Fields: []string{c.primaryKey},
+	})
+}
+
+func (c *Collection) QueryIndexPrefix(i QueryIndex) *prefix.PrefixIndexRef {
+	return prefix.NewPrefixedIndex(c.collection, i.Fields)
+}
+
+func (c *Collection) GetQueryIndex(whereFields []string, orderBy string) (QueryIndexMatch, error) {
+	var (
+		target  *QueryIndex
+		matched int
+		ordered bool
+	)
+	indexing := c.Indexing()
+	if !indexing.HasQueryIndex() {
+		return QueryIndexMatch{
+			Ref:     c.PrimaryQueryIndex(),
+			Fields:  []string{c.primaryKey},
+			Ordered: orderBy == c.primaryKey || orderBy == "",
+		}, nil
+	}
+	for _, index := range indexing.Query {
+		isOrdered := index.Fields[0] == orderBy
+		var totalMatched int
+		for i, f := range whereFields {
+			if index.Fields[i] == f {
+				totalMatched++
+			}
+		}
+		if totalMatched > matched || (!ordered && isOrdered) {
+			target = index
+			ordered = isOrdered
+		}
+	}
+	if target != nil && len(target.Fields) > 0 {
+		return QueryIndexMatch{
+			Ref:     c.QueryIndexPrefix(*target),
+			Fields:  target.Fields,
+			Ordered: ordered,
+		}, nil
+	}
+	return QueryIndexMatch{
+		Ref:     c.PrimaryQueryIndex(),
+		Fields:  []string{c.primaryKey},
+		Ordered: orderBy == c.primaryKey || orderBy == "",
+	}, nil
+}
+
+func (c *Collection) GetDocumentID(d *Document) string {
+	return cast.ToString(d.Get(c.primaryKey))
 }

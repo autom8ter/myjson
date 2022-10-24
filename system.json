@@ -4,6 +4,7 @@
   "title": "System",
   "collection": "system",
   "indexing": {
+    "primaryKey": "_id",
     "search": [],
     "aggregate": [],
     "query": []

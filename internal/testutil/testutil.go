@@ -31,7 +31,7 @@ var (
 )
 
 func NewUserDoc() *schema.Document {
-	doc, err := schema.NewDocumentFromMap(map[string]interface{}{
+	doc, err := schema.NewDocumentFrom(map[string]interface{}{
 		"_id":  gofakeit.UUID(),
 		"name": gofakeit.Name(),
 		"contact": map[string]interface{}{
@@ -53,7 +53,7 @@ func NewUserDoc() *schema.Document {
 }
 
 func NewTaskDoc(usrID string) *schema.Document {
-	doc, err := schema.NewDocumentFromMap(map[string]interface{}{
+	doc, err := schema.NewDocumentFrom(map[string]interface{}{
 		"_id":     gofakeit.UUID(),
 		"user":    usrID,
 		"content": gofakeit.LoremIpsumSentence(5),

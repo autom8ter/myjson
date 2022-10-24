@@ -1,10 +1,5 @@
 package schema
 
-// SearchIndex
-type SearchIndex struct {
-	Fields []string `json:"fields"`
-}
-
 // SearchOp is an operator used within a where clause in a full text search query
 type SearchOp string
 

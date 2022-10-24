@@ -28,7 +28,7 @@ func Test(t *testing.T) {
 				var ids []string
 				for i := 0; i < 1000; i++ {
 					usr := testutil.NewUserDoc()
-					ids = append(ids, usr.GetID())
+					ids = append(ids, collection.Schema().GetDocumentID(usr))
 					usrs = append(usrs, usr)
 				}
 				assert.Nil(t, collection.BatchSet(ctx, usrs))
@@ -42,7 +42,7 @@ func Test(t *testing.T) {
 				}
 				{
 					for _, u := range usrs {
-						usr, err := collection.Get(ctx, u.GetID())
+						usr, err := collection.Get(ctx, collection.Schema().GetDocumentID(u))
 						if err != nil {
 							return stacktrace.Propagate(err, "")
 						}
@@ -125,6 +125,25 @@ func Test(t *testing.T) {
 						t.Logf("aggregate: %s", doc.String())
 					}
 					t.Logf("found %v aggregates in %s", results.Count, results.Stats.ExecutionTime)
+				}
+				{
+					results, err := collection.Search(ctx, schema.SearchQuery{
+						Select: nil,
+						Where: []schema.SearchWhere{
+							{
+								Field: "contact.email",
+								Op:    schema.Basic,
+								Value: usrs[0].GetString("contact.email"),
+								Boost: 0,
+							},
+						},
+						Page:  0,
+						Limit: 0,
+					})
+					if err != nil {
+						t.Fatal(err)
+					}
+					assert.Greater(t, results.Count, 0)
 				}
 				{
 					for _, id := range ids[:50] {

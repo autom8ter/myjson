@@ -67,11 +67,11 @@ func New(ctx context.Context, cfg Config) (*DB, error) {
 			return nil, stacktrace.Propagate(err, "")
 		}
 		d.collections = append(d.collections, &Collection{
-			collection: collection,
-			kv:         d.kv,
-			fullText:   ft,
-			triggers:   nil,
-			machine:    d.machine,
+			schema:   collection,
+			kv:       d.kv,
+			fullText: ft,
+			triggers: nil,
+			machine:  d.machine,
 		})
 	}
 	{
@@ -84,11 +84,11 @@ func New(ctx context.Context, cfg Config) (*DB, error) {
 			return nil, stacktrace.Propagate(err, "")
 		}
 		d.collections = append(d.collections, &Collection{
-			collection: systemCollection,
-			kv:         d.kv,
-			fullText:   ft,
-			triggers:   nil,
-			machine:    d.machine,
+			schema:   systemCollection,
+			kv:       d.kv,
+			fullText: ft,
+			triggers: nil,
+			machine:  d.machine,
 		})
 	}
 
@@ -135,7 +135,7 @@ func (d *DB) ReIndex(ctx context.Context) error {
 	for _, c := range d.collections {
 		c := c
 		egp.Go(func() error {
-			return d.Collection(ctx, c.collection.Collection(), func(c *Collection) error {
+			return d.Collection(ctx, c.schema.Collection(), func(c *Collection) error {
 				return c.Reindex(ctx)
 			})
 		})
@@ -147,7 +147,7 @@ func (d *DB) Collection(ctx context.Context, collection string, fn func(collecti
 	d.mu.RLock()
 	defer d.mu.RUnlock()
 	for _, c := range d.collections {
-		if c.collection.Collection() == collection {
+		if c.schema.Collection() == collection {
 			return fn(c)
 		}
 	}

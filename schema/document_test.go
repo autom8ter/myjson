@@ -45,7 +45,7 @@ func TestDocument(t *testing.T) {
 	})
 	t.Run("scan json", func(t *testing.T) {
 		var u user
-		assert.Nil(t, r.ScanJSON(&u))
+		assert.Nil(t, r.Scan(&u))
 		assert.EqualValues(t, u, usr)
 	})
 	t.Run("get id", func(t *testing.T) {

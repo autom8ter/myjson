@@ -3,6 +3,7 @@ package wolverine
 import (
 	"context"
 	"github.com/autom8ter/machine/v4"
+	"github.com/autom8ter/wolverine/errors"
 	"github.com/autom8ter/wolverine/internal/prefix"
 	"github.com/autom8ter/wolverine/schema"
 	"github.com/blevesearch/bleve"
@@ -19,33 +20,34 @@ import (
 )
 
 type Collection struct {
-	collection *schema.Collection
-	kv         *badger.DB
-	fullText   bleve.Index
-	triggers   []schema.Trigger
-	machine    machine.Machine
+	schema   *schema.Collection
+	kv       *badger.DB
+	fullText bleve.Index
+	triggers []schema.Trigger
+	machine  machine.Machine
+}
+
+func (c *Collection) Schema() *schema.Collection {
+	return c.schema
 }
 
 func (c *Collection) persistEvent(ctx context.Context, event *schema.Event) error {
 	if len(event.Documents) == 0 {
 		return nil
 	}
-	if len(event.Documents) == 1 {
-		return c.saveDocument(ctx, event)
-	}
 	for _, document := range event.Documents {
 		document.Set("_collection", event.Collection)
-		if err := document.Validate(); err != nil {
-			return stacktrace.Propagate(err, "")
+		if !document.Valid() {
+			return stacktrace.NewErrorWithCode(errors.ErrTODO, "invalid json document")
 		}
 	}
 	txn := c.kv.NewWriteBatch()
 	var batch *bleve.Batch
-	if c.collection.Indexing().HasSearchIndex() {
+	if c.schema.Indexing().HasSearchIndex() {
 		batch = c.fullText.NewBatch()
 	}
 	for _, document := range event.Documents {
-		current, _ := c.Get(ctx, document.GetID())
+		current, _ := c.Get(ctx, c.schema.GetDocumentID(document))
 		if current == nil {
 			current = schema.NewDocument()
 		}
@@ -57,44 +59,44 @@ func (c *Collection) persistEvent(ctx context.Context, event *schema.Event) erro
 		var bits []byte
 		switch event.Action {
 		case schema.Set:
-			valid, err := c.collection.Validate(document)
+			valid, err := c.schema.Validate(document)
 			if err != nil {
 				return stacktrace.Propagate(err, "")
 			}
 			if !valid {
-				return stacktrace.NewError("%s/%s document has invalid schema", c.collection.Collection(), document.GetID())
+				return stacktrace.NewError("%s/%s document has invalid schema", c.schema.Collection(), c.schema.GetDocumentID(document))
 			}
 			bits = document.Bytes()
 		case schema.Update:
 			currentClone := current.Clone()
 			currentClone.Merge(document)
-			valid, err := c.collection.Validate(currentClone)
+			valid, err := c.schema.Validate(currentClone)
 			if err != nil {
 				return stacktrace.Propagate(err, "")
 			}
 			if !valid {
-				return stacktrace.NewError("%s/%s document has invalid schema", c.collection.Collection(), currentClone.GetID())
+				return stacktrace.NewError("%s/%s document has invalid schema", c.schema.Collection(), c.schema.GetDocumentID(currentClone))
 			}
 			bits = currentClone.Bytes()
 		}
 
 		switch event.Action {
 		case schema.Set, schema.Update:
-			pkey := prefix.PrimaryKey(c.collection.Collection(), document.GetID())
+			pkey := prefix.PrimaryKey(c.schema.Collection(), c.schema.GetDocumentID(document))
 			if err := txn.SetEntry(&badger.Entry{
 				Key:   pkey,
 				Value: bits,
 			}); err != nil {
 				return stacktrace.Propagate(err, "failed to batch save documents")
 			}
-			for _, idx := range c.collection.Indexing().Query {
-				pindex := idx.Prefix(event.Collection)
+			for _, idx := range c.schema.Indexing().Query {
+				pindex := c.schema.QueryIndexPrefix(*idx)
 				if current != nil {
-					if err := txn.Delete(pindex.GetPrefix(current.Value(), current.GetID())); err != nil {
+					if err := txn.Delete(pindex.GetPrefix(current.Value(), c.schema.GetDocumentID(current))); err != nil {
 						return stacktrace.Propagate(err, "failed to batch save documents")
 					}
 				}
-				i := pindex.GetPrefix(document.Value(), document.GetID())
+				i := pindex.GetPrefix(document.Value(), c.schema.GetDocumentID(document))
 				if err := txn.SetEntry(&badger.Entry{
 					Key:   i,
 					Value: bits,
@@ -103,22 +105,22 @@ func (c *Collection) persistEvent(ctx context.Context, event *schema.Event) erro
 				}
 			}
 			if batch != nil {
-				if err := batch.Index(document.GetID(), document.Value()); err != nil {
+				if err := batch.Index(c.schema.GetDocumentID(document), document.Value()); err != nil {
 					return stacktrace.Propagate(err, "failed to batch save documents")
 				}
 			}
 		case schema.Delete:
-			for _, i := range c.collection.Indexing().Query {
-				pindex := i.Prefix(event.Collection)
-				if err := txn.Delete([]byte(pindex.GetPrefix(current.Value(), current.GetID()))); err != nil {
+			for _, i := range c.schema.Indexing().Query {
+				pindex := c.schema.QueryIndexPrefix(*i)
+				if err := txn.Delete([]byte(pindex.GetPrefix(current.Value(), c.schema.GetDocumentID(current)))); err != nil {
 					return stacktrace.Propagate(err, "failed to batch delete documents")
 				}
 			}
-			if err := txn.Delete([]byte(prefix.PrimaryKey(c.collection.Collection(), current.GetID()))); err != nil {
+			if err := txn.Delete([]byte(prefix.PrimaryKey(c.schema.Collection(), c.schema.GetDocumentID(current)))); err != nil {
 				return stacktrace.Propagate(err, "failed to batch delete documents")
 			}
 			if batch != nil {
-				batch.Delete(document.GetID())
+				batch.Delete(c.schema.GetDocumentID(document))
 			}
 		}
 		for _, t := range c.triggers {
@@ -126,7 +128,7 @@ func (c *Collection) persistEvent(ctx context.Context, event *schema.Event) erro
 				return stacktrace.Propagate(err, "trigger failure")
 			}
 		}
-		for _, agg := range c.collection.Indexing().Aggregate {
+		for _, agg := range c.schema.Indexing().Aggregate {
 			if err := agg.Trigger()(ctx, event.Action, schema.After, current, document); err != nil {
 				return stacktrace.Propagate(err, "trigger failure")
 			}
@@ -147,118 +149,10 @@ func (c *Collection) persistEvent(ctx context.Context, event *schema.Event) erro
 	return nil
 }
 
-func (c *Collection) saveDocument(ctx context.Context, event *schema.Event) error {
-	if len(event.Documents) == 0 {
-		return nil
-	}
-	if len(event.Documents) > 1 {
-		return c.persistEvent(ctx, event)
-	}
-	document := event.Documents[0]
-	if err := document.Validate(); err != nil {
-		return stacktrace.Propagate(err, "")
-	}
-	document.Set("_collection", event.Collection)
-	current, _ := c.Get(ctx, document.GetID())
-	if current == nil {
-		current = schema.NewDocument()
-	}
-	for _, t := range c.triggers {
-		if err := t(ctx, event.Action, schema.Before, current, document); err != nil {
-			return stacktrace.Propagate(err, "trigger failure")
-		}
-	}
-	var bits []byte
-	switch event.Action {
-	case schema.Set:
-		valid, err := c.collection.Validate(document)
-		if err != nil {
-			return stacktrace.Propagate(err, "")
-		}
-		if !valid {
-			return stacktrace.NewError("%s/%s document has invalid schema", c.collection.Collection(), document.GetID())
-		}
-		bits = document.Bytes()
-	case schema.Update:
-		currentClone := current.Clone()
-		currentClone.Merge(document)
-		valid, err := c.collection.Validate(currentClone)
-		if err != nil {
-			return stacktrace.Propagate(err, "")
-		}
-		if !valid {
-			return stacktrace.NewError("%s/%s document has invalid schema", c.collection.Collection(), document.GetID())
-		}
-		bits = currentClone.Bytes()
-	}
-
-	return c.kv.Update(func(txn *badger.Txn) error {
-		switch event.Action {
-		case schema.Set, schema.Update:
-			if err := txn.SetEntry(&badger.Entry{
-				Key:   []byte(prefix.PrimaryKey(c.collection.Collection(), document.GetID())),
-				Value: bits,
-			}); err != nil {
-				return stacktrace.Propagate(err, "failed to save document")
-			}
-			for _, index := range c.collection.Indexing().Query {
-				pindex := index.Prefix(event.Collection)
-				if current != nil {
-					if err := txn.Delete([]byte(pindex.GetPrefix(current.Value(), current.GetID()))); err != nil {
-						return stacktrace.Propagate(err, "failed to save document")
-					}
-				}
-				i := pindex.GetPrefix(document.Value(), document.GetID())
-				if err := txn.SetEntry(&badger.Entry{
-					Key:   []byte(i),
-					Value: bits,
-				}); err != nil {
-					return stacktrace.Propagate(err, "failed to save document")
-				}
-			}
-			if c.collection.Indexing().HasSearchIndex() {
-				if err := c.fullText.Index(document.GetID(), document.Value()); err != nil {
-					return stacktrace.Propagate(err, "failed to save document")
-				}
-			}
-		case schema.Delete:
-			for _, index := range c.collection.Indexing().Query {
-				pindex := index.Prefix(event.Collection)
-				if err := txn.Delete([]byte(pindex.GetPrefix(current.Value(), current.GetID()))); err != nil {
-					return stacktrace.Propagate(err, "failed to delete document")
-				}
-			}
-			if err := txn.Delete(prefix.PrimaryKey(c.collection.Collection(), current.GetID())); err != nil {
-				return stacktrace.Propagate(err, "failed to delete document")
-			}
-			if c.collection.Indexing().HasSearchIndex() {
-				if err := c.fullText.Delete(document.GetID()); err != nil {
-					return stacktrace.Propagate(err, "failed to delete document")
-				}
-			}
-		}
-		for _, t := range c.triggers {
-			if err := t(ctx, event.Action, schema.After, current, document); err != nil {
-				return stacktrace.Propagate(err, "trigger failure")
-			}
-		}
-		for _, agg := range c.collection.Indexing().Aggregate {
-			if err := agg.Trigger()(ctx, event.Action, schema.After, current, document); err != nil {
-				return stacktrace.Propagate(err, "trigger failure")
-			}
-		}
-		c.machine.Publish(ctx, machine.Message{
-			Channel: event.Collection,
-			Body:    event,
-		})
-		return nil
-	})
-}
-
 func (c *Collection) Query(ctx context.Context, query schema.Query) (schema.Page, error) {
 	now := time.Now()
 	qmachine := machine.New()
-	index, err := c.collection.OptimizeQueryIndex(query.Where, query.OrderBy)
+	index, err := c.schema.OptimizeQueryIndex(query.Where, query.OrderBy)
 	if err != nil {
 		return schema.Page{}, stacktrace.Propagate(err, "")
 	}
@@ -332,7 +226,7 @@ func (c *Collection) Get(ctx context.Context, id string) (*schema.Document, erro
 	)
 
 	if err := c.kv.View(func(txn *badger.Txn) error {
-		item, err := txn.Get(prefix.PrimaryKey(c.collection.Collection(), id))
+		item, err := txn.Get(prefix.PrimaryKey(c.schema.Collection(), id))
 		if err != nil {
 			return stacktrace.Propagate(err, "")
 		}
@@ -350,7 +244,7 @@ func (c *Collection) GetAll(ctx context.Context, ids []string) ([]*schema.Docume
 	var documents []*schema.Document
 	if err := c.kv.View(func(txn *badger.Txn) error {
 		for _, id := range ids {
-			item, err := txn.Get([]byte(prefix.PrimaryKey(c.collection.Collection(), id)))
+			item, err := txn.Get([]byte(prefix.PrimaryKey(c.schema.Collection(), id)))
 			if err != nil {
 				return stacktrace.Propagate(err, "")
 			}
@@ -384,7 +278,7 @@ func (c *Collection) QueryPaginate(ctx context.Context, query schema.Query, hand
 			OrderBy: query.OrderBy,
 		})
 		if err != nil {
-			return stacktrace.Propagate(err, "failed to query collection: %s", c.collection.Collection())
+			return stacktrace.Propagate(err, "failed to query collection: %s", c.schema.Collection())
 		}
 		if len(results.Documents) == 0 {
 			return nil
@@ -397,7 +291,7 @@ func (c *Collection) QueryPaginate(ctx context.Context, query schema.Query, hand
 }
 
 func (c *Collection) ChangeStream(ctx context.Context, fn schema.ChangeStreamHandler) error {
-	return c.machine.Subscribe(ctx, c.collection.Collection(), func(ctx context.Context, msg machine.Message) (bool, error) {
+	return c.machine.Subscribe(ctx, c.schema.Collection(), func(ctx context.Context, msg machine.Message) (bool, error) {
 		switch event := msg.Body.(type) {
 		case *schema.Event:
 			if err := fn(ctx, event); err != nil {
@@ -413,8 +307,8 @@ func (c *Collection) ChangeStream(ctx context.Context, fn schema.ChangeStreamHan
 }
 
 func (c *Collection) Set(ctx context.Context, document *schema.Document) error {
-	return stacktrace.Propagate(c.saveDocument(ctx, &schema.Event{
-		Collection: c.collection.Collection(),
+	return stacktrace.Propagate(c.persistEvent(ctx, &schema.Event{
+		Collection: c.schema.Collection(),
 		Action:     schema.Set,
 		Documents:  []*schema.Document{document},
 	}), "")
@@ -422,15 +316,15 @@ func (c *Collection) Set(ctx context.Context, document *schema.Document) error {
 
 func (c *Collection) BatchSet(ctx context.Context, batch []*schema.Document) error {
 	return stacktrace.Propagate(c.persistEvent(ctx, &schema.Event{
-		Collection: c.collection.Collection(),
+		Collection: c.schema.Collection(),
 		Action:     schema.Set,
 		Documents:  batch,
 	}), "")
 }
 
 func (c *Collection) Update(ctx context.Context, document *schema.Document) error {
-	return stacktrace.Propagate(c.saveDocument(ctx, &schema.Event{
-		Collection: c.collection.Collection(),
+	return stacktrace.Propagate(c.persistEvent(ctx, &schema.Event{
+		Collection: c.schema.Collection(),
 		Action:     schema.Update,
 		Documents:  []*schema.Document{document},
 	}), "")
@@ -438,7 +332,7 @@ func (c *Collection) Update(ctx context.Context, document *schema.Document) erro
 
 func (c *Collection) BatchUpdate(ctx context.Context, batch []*schema.Document) error {
 	return c.persistEvent(ctx, &schema.Event{
-		Collection: c.collection.Collection(),
+		Collection: c.schema.Collection(),
 		Action:     schema.Update,
 		Documents:  batch,
 	})
@@ -447,10 +341,10 @@ func (c *Collection) BatchUpdate(ctx context.Context, batch []*schema.Document) 
 func (c *Collection) Delete(ctx context.Context, id string) error {
 	doc, err := c.Get(ctx, id)
 	if err != nil {
-		return stacktrace.Propagate(err, "failed to delete %s/%s", c.collection.Collection(), id)
+		return stacktrace.Propagate(err, "failed to delete %s/%s", c.schema.Collection(), id)
 	}
-	return c.saveDocument(ctx, &schema.Event{
-		Collection: c.collection.Collection(),
+	return c.persistEvent(ctx, &schema.Event{
+		Collection: c.schema.Collection(),
 		Action:     schema.Delete,
 		Documents:  []*schema.Document{doc},
 	})
@@ -461,13 +355,13 @@ func (c *Collection) BatchDelete(ctx context.Context, ids []string) error {
 	for _, id := range ids {
 		doc, err := c.Get(ctx, id)
 		if err != nil {
-			return stacktrace.Propagate(err, "failed to batch delete %s/%s", c.collection.Collection(), id)
+			return stacktrace.Propagate(err, "failed to batch delete %s/%s", c.schema.Collection(), id)
 		}
 		documents = append(documents, doc)
 	}
 
 	return c.persistEvent(ctx, &schema.Event{
-		Collection: c.collection.Collection(),
+		Collection: c.schema.Collection(),
 		Action:     schema.Delete,
 		Documents:  documents,
 	})
@@ -491,7 +385,7 @@ func (c *Collection) QueryDelete(ctx context.Context, query schema.Query) error 
 	}
 	var ids []string
 	for _, document := range results.Documents {
-		ids = append(ids, document.GetID())
+		ids = append(ids, c.schema.GetDocumentID(document))
 	}
 	return stacktrace.Propagate(c.BatchDelete(ctx, ids), "")
 }
@@ -535,7 +429,7 @@ func (c *Collection) aggregateIndex(ctx context.Context, i *schema.AggregateInde
 }
 
 func (c *Collection) Aggregate(ctx context.Context, query schema.AggregateQuery) (schema.Page, error) {
-	indexes := c.collection.Indexing()
+	indexes := c.schema.Indexing()
 	if indexes.Aggregate != nil {
 		for _, i := range indexes.Aggregate {
 			if i.Matches(query) {
@@ -548,7 +442,7 @@ func (c *Collection) Aggregate(ctx context.Context, query schema.AggregateQuery)
 	var (
 		input = make(chan rxgo.Item)
 	)
-	index, err := c.collection.OptimizeQueryIndex(query.Where, query.OrderBy)
+	index, err := c.schema.OptimizeQueryIndex(query.Where, query.OrderBy)
 	if err != nil {
 		return schema.Page{}, stacktrace.Propagate(err, "")
 	}
@@ -747,7 +641,7 @@ func (c *Collection) Search(ctx context.Context, q schema.SearchQuery) (schema.P
 	searchRequest.Fields = []string{"*"}
 	results, err := c.fullText.Search(searchRequest)
 	if err != nil {
-		return schema.Page{}, stacktrace.Propagate(err, "failed to search index: %s", c.collection.Collection())
+		return schema.Page{}, stacktrace.Propagate(err, "failed to search index: %s", c.schema.Collection())
 	}
 
 	var data []*schema.Document
@@ -755,9 +649,9 @@ func (c *Collection) Search(ctx context.Context, q schema.SearchQuery) (schema.P
 		if len(h.Fields) == 0 {
 			continue
 		}
-		record, err := schema.NewDocumentFromMap(h.Fields)
+		record, err := schema.NewDocumentFrom(h.Fields)
 		if err != nil {
-			return schema.Page{}, stacktrace.Propagate(err, "failed to search index: %s", c.collection.Collection())
+			return schema.Page{}, stacktrace.Propagate(err, "failed to search index: %s", c.schema.Collection())
 		}
 		data = append(data, record)
 	}
@@ -787,7 +681,7 @@ func (c *Collection) SearchPaginate(ctx context.Context, query schema.SearchQuer
 			Limit:  query.Limit,
 		})
 		if err != nil {
-			return stacktrace.Propagate(err, "failed to query collection: %s", c.collection.Collection())
+			return stacktrace.Propagate(err, "failed to query collection: %s", c.schema.Collection())
 		}
 		if len(results.Documents) == 0 {
 			return nil
@@ -813,7 +707,7 @@ func (c *Collection) Reindex(ctx context.Context) error {
 			OrderBy: schema.OrderBy{},
 		})
 		if err != nil {
-			return stacktrace.Propagate(err, "failed to reindex collection: %s", c.collection.Collection())
+			return stacktrace.Propagate(err, "failed to reindex collection: %s", c.schema.Collection())
 		}
 		if len(results.Documents) == 0 {
 			break
@@ -821,12 +715,12 @@ func (c *Collection) Reindex(ctx context.Context) error {
 		var toSet []*schema.Document
 		var toDelete []string
 		for _, r := range results.Documents {
-			result, _ := c.Get(ctx, r.GetID())
+			result, _ := c.Get(ctx, c.schema.GetDocumentID(r))
 			if result != nil {
 				toSet = append(toSet, result)
 			} else {
-				toDelete = append(toDelete, r.GetID())
-				_ = c.Delete(ctx, r.GetID())
+				toDelete = append(toDelete, c.schema.GetDocumentID(r))
+				_ = c.Delete(ctx, c.schema.GetDocumentID(r))
 			}
 		}
 		if len(toSet) > 0 {
@@ -842,7 +736,7 @@ func (c *Collection) Reindex(ctx context.Context) error {
 		page = results.NextPage
 	}
 	if err := egp.Wait(); err != nil {
-		return stacktrace.Propagate(err, "failed to reindex collection: %s", c.collection.Collection())
+		return stacktrace.Propagate(err, "failed to reindex collection: %s", c.schema.Collection())
 	}
 	return nil
 }
