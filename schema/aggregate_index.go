@@ -22,6 +22,9 @@ type AggregateIndex struct {
 func (a *AggregateIndex) UnmarshalJSON(bytes []byte) error {
 	a.mu.Lock()
 	defer a.mu.Unlock()
+	if a.mu == nil {
+		a.mu = &sync.RWMutex{}
+	}
 	a.metrics = map[string]map[Aggregate]*list.List{}
 	return stacktrace.PropagateWithCode(json.Unmarshal(bytes, a), errors.ErrTODO, "")
 
@@ -46,7 +49,7 @@ func (a *AggregateIndex) Matches(query AggregateQuery) bool {
 }
 
 func (a *AggregateIndex) Aggregate(Aggregates ...Aggregate) []*Document {
-	a.mu.RLocker()
+	a.mu.RLock()
 	defer a.mu.RUnlock()
 	var documents []*Document
 	for k, aggs := range a.metrics {
@@ -78,6 +81,9 @@ func (a *AggregateIndex) Trigger() Trigger {
 				groupValues = append(groupValues, cast.ToString(before.Get(g)))
 			}
 			groupKey := strings.Join(groupValues, ".")
+			if a.metrics[groupKey] == nil {
+				a.metrics[groupKey] = map[Aggregate]*list.List{}
+			}
 			group := a.metrics[groupKey]
 			for _, agg := range a.Aggregates {
 				if group[agg] == nil {
@@ -99,24 +105,48 @@ func (a *AggregateIndex) Trigger() Trigger {
 				groupValues = append(groupValues, cast.ToString(after.Get(g)))
 			}
 			groupKey := strings.Join(groupValues, ".")
+			if a.metrics[groupKey] == nil {
+				a.metrics[groupKey] = map[Aggregate]*list.List{}
+			}
 			group := a.metrics[groupKey]
 			for _, agg := range a.Aggregates {
-				current := cast.ToFloat64(group[agg].Front().Value)
+				if group[agg] == nil {
+					group[agg] = list.New()
+				}
+				current := group[agg].Front()
+
 				switch agg.Function {
 				case SUM:
 					value := after.GetFloat(agg.Field)
-					group[agg].PushFront(current + value)
+					if current == nil {
+						group[agg].PushFront(value)
+					} else {
+						group[agg].PushFront(cast.ToFloat64(current.Value) + value)
+					}
+
 				case COUNT:
-					group[agg].PushFront(current + 1)
+					if current == nil {
+						group[agg].PushFront(1)
+					} else {
+						group[agg].PushFront(cast.ToFloat64(current.Value) + 1)
+					}
 				case MAX:
 					value := after.GetFloat(agg.Field)
-					if value > current {
+					if current == nil {
 						group[agg].PushFront(value)
+					} else {
+						if value > cast.ToFloat64(current.Value) {
+							group[agg].PushFront(value)
+						}
 					}
 				case MIN:
 					value := after.GetFloat(agg.Field)
-					if value < current {
+					if current == nil {
 						group[agg].PushFront(value)
+					} else {
+						if value < cast.ToFloat64(current.Value) {
+							group[agg].PushFront(value)
+						}
 					}
 				default:
 					return stacktrace.NewError("unsupported aggregate function: %s", agg.Function)

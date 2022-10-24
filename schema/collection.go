@@ -1,6 +1,7 @@
 package schema
 
 import (
+	"container/list"
 	"github.com/autom8ter/wolverine/errors"
 	"github.com/autom8ter/wolverine/internal/util"
 	"github.com/palantir/stacktrace"
@@ -48,6 +49,10 @@ func (c *Collection) ParseSchema() error {
 
 	if err := util.Decode(gjson.Get(c.Schema, "indexing").Value(), &indexing); err != nil {
 		return stacktrace.PropagateWithCode(err, errors.ErrTODO, "failed to decode 'indexing' schema property: %s", c.collection)
+	}
+	for _, i := range indexing.Aggregate {
+		i.mu = &sync.RWMutex{}
+		i.metrics = map[string]map[Aggregate]*list.List{}
 	}
 
 	c.indexing = &indexing

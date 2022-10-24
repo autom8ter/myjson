@@ -26,7 +26,7 @@ type Collection struct {
 	machine    machine.Machine
 }
 
-func (c *Collection) saveBatch(ctx context.Context, event *schema.Event) error {
+func (c *Collection) persistEvent(ctx context.Context, event *schema.Event) error {
 	if len(event.Documents) == 0 {
 		return nil
 	}
@@ -152,7 +152,7 @@ func (c *Collection) saveDocument(ctx context.Context, event *schema.Event) erro
 		return nil
 	}
 	if len(event.Documents) > 1 {
-		return c.saveBatch(ctx, event)
+		return c.persistEvent(ctx, event)
 	}
 	document := event.Documents[0]
 	if err := document.Validate(); err != nil {
@@ -314,6 +314,7 @@ func (c *Collection) Query(ctx context.Context, query schema.Query) (schema.Page
 		}
 		results = append(results, doc)
 	}
+	results = schema.SortOrder(query.OrderBy, results)
 	return schema.Page{
 		Documents: results,
 		NextPage:  query.Page + 1,
@@ -420,7 +421,7 @@ func (c *Collection) Set(ctx context.Context, document *schema.Document) error {
 }
 
 func (c *Collection) BatchSet(ctx context.Context, batch []*schema.Document) error {
-	return stacktrace.Propagate(c.saveBatch(ctx, &schema.Event{
+	return stacktrace.Propagate(c.persistEvent(ctx, &schema.Event{
 		Collection: c.collection.Collection(),
 		Action:     schema.Set,
 		Documents:  batch,
@@ -436,7 +437,7 @@ func (c *Collection) Update(ctx context.Context, document *schema.Document) erro
 }
 
 func (c *Collection) BatchUpdate(ctx context.Context, batch []*schema.Document) error {
-	return c.saveBatch(ctx, &schema.Event{
+	return c.persistEvent(ctx, &schema.Event{
 		Collection: c.collection.Collection(),
 		Action:     schema.Update,
 		Documents:  batch,
@@ -465,7 +466,7 @@ func (c *Collection) BatchDelete(ctx context.Context, ids []string) error {
 		documents = append(documents, doc)
 	}
 
-	return c.saveBatch(ctx, &schema.Event{
+	return c.persistEvent(ctx, &schema.Event{
 		Collection: c.collection.Collection(),
 		Action:     schema.Delete,
 		Documents:  documents,
@@ -599,6 +600,7 @@ func (c *Collection) Aggregate(ctx context.Context, query schema.AggregateQuery)
 		}
 		results = append(results, doc)
 	}
+	results = schema.SortOrder(query.OrderBy, results)
 	return schema.Page{
 		Documents: results,
 		NextPage:  query.Page + 1,

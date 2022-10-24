@@ -30,7 +30,19 @@
         ]
       }
     ],
-    "aggregate": []
+    "aggregate": [
+      {
+        "groupBy": [
+          "account_id",
+          "gender"
+        ],
+        "aggregates": {
+          "field": "gender",
+          "function": "count",
+          "alias": "gender_count"
+        }
+      }
+    ]
   },
   "required": [
     "_id",
