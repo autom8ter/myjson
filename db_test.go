@@ -6,6 +6,7 @@ import (
 	"github.com/autom8ter/wolverine/internal/testutil"
 	"github.com/autom8ter/wolverine/schema"
 	"github.com/stretchr/testify/assert"
+	"strings"
 	"testing"
 )
 
@@ -134,13 +135,89 @@ func Test(t *testing.T) {
 							Op:    schema.Wildcard,
 							Value: "*",
 						},
+						{
+							Field: "account_id",
+							Op:    schema.Basic,
+							Value: 50,
+						},
 					},
 				})
 				if err != nil {
 					t.Fatal(err)
 				}
-				assert.Greater(t, results.Count, 0)
-				t.Logf("found %v search results in %s", results.Count, results.Stats.ExecutionTime)
+				assert.GreaterOrEqual(t, results.Count, 1)
+				t.Logf("found %v wildcard search results in %s", results.Count, results.Stats.ExecutionTime)
+			})
+			t.Run("search basic contact.email ", func(t *testing.T) {
+				results, err := collection.Search(ctx, schema.SearchQuery{
+					Select: []string{"*"},
+					Where: []schema.SearchWhere{
+						{
+							Field: "contact.email",
+							Op:    schema.Basic,
+							Value: usrs[0].GetString("contact.email"),
+						},
+					},
+				})
+				if err != nil {
+					t.Fatal(err)
+				}
+				assert.GreaterOrEqual(t, results.Count, 1)
+				t.Logf("found %v basic search results in %s", results.Count, results.Stats.ExecutionTime)
+			})
+			t.Run("search prefix contact.email", func(t *testing.T) {
+				var prefix = strings.Split(usrs[0].GetString("contact.email"), "@")[0]
+				results, err := collection.Search(ctx, schema.SearchQuery{
+					Select: []string{"*"},
+					Where: []schema.SearchWhere{
+						{
+							Field: "contact.email",
+							Op:    schema.Prefix,
+							Value: prefix,
+						},
+					},
+				})
+				if err != nil {
+					t.Fatal(err)
+				}
+				assert.GreaterOrEqual(t, results.Count, 1)
+				t.Logf("found %v prefix search results in %s", results.Count, results.Stats.ExecutionTime)
+			})
+			t.Run("search fuzzy contact.email", func(t *testing.T) {
+				var prefix = strings.Split(usrs[0].GetString("contact.email"), "@")[0]
+				results, err := collection.Search(ctx, schema.SearchQuery{
+					Select: []string{"*"},
+					Where: []schema.SearchWhere{
+						{
+							Field: "contact.email",
+							Op:    schema.Fuzzy,
+							Value: prefix,
+						},
+					},
+				})
+				if err != nil {
+					t.Fatal(err)
+				}
+				assert.GreaterOrEqual(t, results.Count, 1)
+				t.Logf("found %v fuzzy search results in %s", results.Count, results.Stats.ExecutionTime)
+			})
+			t.Run("search regex contact.email", func(t *testing.T) {
+				var prefix = strings.Split(usrs[0].GetString("contact.email"), "@")[0]
+				results, err := collection.Search(ctx, schema.SearchQuery{
+					Select: []string{"*"},
+					Where: []schema.SearchWhere{
+						{
+							Field: "contact.email",
+							Op:    schema.Regex,
+							Value: "^" + prefix,
+						},
+					},
+				})
+				if err != nil {
+					t.Fatal(err)
+				}
+				assert.GreaterOrEqual(t, results.Count, 1)
+				t.Logf("found %v regex search results in %s", results.Count, results.Stats.ExecutionTime)
 			})
 			t.Run("delete first 50", func(t *testing.T) {
 				for _, id := range ids[:50] {
