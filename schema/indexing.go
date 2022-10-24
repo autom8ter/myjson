@@ -39,7 +39,7 @@ type QueryIndex struct {
 }
 
 type QueryIndexMatch struct {
-	Ref           *prefix.PrefixIndexRef `json:"ref"`
+	Ref           *prefix.PrefixIndexRef `json:"-"`
 	Fields        []string               `json:"fields"`
 	Ordered       bool                   `json:"ordered"`
 	targetFields  []string

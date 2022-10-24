@@ -54,6 +54,9 @@ func (c *Collection) ParseSchema() error {
 	if indexing.PrimaryKey == "" {
 		return stacktrace.PropagateWithCode(err, errors.ErrTODO, "missing 'primaryKey' from 'indexing' schema property: %s", c.collection)
 	}
+	if len(indexing.Search) > 1 {
+		return stacktrace.PropagateWithCode(err, errors.ErrTODO, "up to a single search index is supported 'indexing.search': %s", c.collection)
+	}
 	if !gjson.Get(c.Schema, fmt.Sprintf("properties.%s", indexing.PrimaryKey)).Exists() {
 		return stacktrace.PropagateWithCode(err, errors.ErrTODO, "primary key does not exist in properties: %s", c.collection)
 	}
