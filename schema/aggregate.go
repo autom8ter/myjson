@@ -97,6 +97,7 @@ func (query AggregateQuery) Observe(ctx context.Context, input chan rxgo.Item, f
 		limit = query.Limit
 	}
 	wg := sync.WaitGroup{}
+	mu := sync.RWMutex{}
 	grouped := make(chan rxgo.Item)
 	var grouping []*Document
 	if fullScan {
@@ -124,7 +125,9 @@ func (query AggregateQuery) Observe(ctx context.Context, input chan rxgo.Item, f
 			go func() {
 				defer wg.Done()
 				reduced := <-o.Reduce(query.reducer()).Observe()
+				mu.Lock()
 				grouping = append(grouping, reduced.V.(*Document))
+				mu.Unlock()
 			}()
 		}
 	}()

@@ -43,7 +43,7 @@ func (d PrefixIndexRef) GetPrefix(fields map[string]any, documentID string) []by
 
 func encodeValue(value any) []byte {
 	if value == nil {
-		return []byte("null")
+		return []byte("")
 	}
 	switch value := value.(type) {
 	case bool:
@@ -55,9 +55,6 @@ func encodeValue(value any) []byte {
 		binary.BigEndian.PutUint64(buf, cast.ToUint64(value))
 		return buf
 	default:
-		if value == nil {
-			return []byte("null")
-		}
 		bits, _ := json.Marshal(value)
 		if len(bits) == 0 {
 			bits = []byte(cast.ToString(value))

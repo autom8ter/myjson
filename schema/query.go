@@ -2,6 +2,7 @@ package schema
 
 import (
 	"context"
+	"fmt"
 	"github.com/reactivex/rxgo/v2"
 )
 
@@ -25,6 +26,7 @@ func (query Query) Observe(ctx context.Context, input chan rxgo.Item, fullScan b
 		limit = query.Limit
 	}
 	if fullScan {
+		fmt.Println("HERE")
 		return query.Observe(ctx, pipeFullScan(ctx, input, query.Where, query.OrderBy), false)
 	}
 	return rxgo.FromEventSource(input, rxgo.WithContext(ctx)).

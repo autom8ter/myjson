@@ -2,6 +2,7 @@ package schema_test
 
 import (
 	"github.com/autom8ter/wolverine/internal/testutil"
+	"github.com/autom8ter/wolverine/schema"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -20,5 +21,19 @@ func TestCollection(t *testing.T) {
 		valid, err := testutil.UserCollection.Validate(usr)
 		assert.Nil(t, err)
 		assert.True(t, valid)
+	})
+	t.Run("primary index", func(t *testing.T) {
+		assert.Equal(t, "_id", testutil.UserCollection.Indexing().PrimaryKey)
+		assert.Equal(t, true, testutil.UserCollection.Indexing().HasSearchIndex())
+		assert.Equal(t, true, testutil.UserCollection.Indexing().HasQueryIndex())
+		assert.Equal(t, true, testutil.UserCollection.Indexing().HasAggregateIndex())
+		assert.Equal(t, "user", testutil.UserCollection.Collection())
+		valid, err := testutil.UserCollection.Validate(testutil.NewUserDoc())
+		assert.Nil(t, err)
+		assert.True(t, valid)
+		valid, err = testutil.UserCollection.Validate(schema.NewDocument())
+		assert.NotNil(t, err)
+		assert.False(t, valid)
+		testutil.UserCollection.PrimaryQueryIndex()
 	})
 }
