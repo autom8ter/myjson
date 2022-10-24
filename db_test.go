@@ -127,13 +127,22 @@ func Test(t *testing.T) {
 					t.Logf("found %v aggregates in %s", results.Count, results.Stats.ExecutionTime)
 				}
 				{
-
-				}
-				{
-					for _, id := range ids {
+					for _, id := range ids[:50] {
 						assert.Nil(t, collection.Delete(ctx, id))
 					}
-					for _, id := range ids {
+					for _, id := range ids[:50] {
+						_, err := collection.Get(ctx, id)
+						assert.NotNil(t, err)
+					}
+				}
+				{
+					assert.Nil(t, collection.QueryDelete(ctx, schema.Query{
+						Select:  nil,
+						Page:    0,
+						Limit:   0,
+						OrderBy: schema.OrderBy{},
+					}))
+					for _, id := range ids[50:] {
 						_, err := collection.Get(ctx, id)
 						assert.NotNil(t, err)
 					}

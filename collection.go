@@ -82,7 +82,7 @@ func (c *Collection) persistEvent(ctx context.Context, event *schema.Event) erro
 		case schema.Set, schema.Update:
 			pkey := prefix.PrimaryKey(c.collection.Collection(), document.GetID())
 			if err := txn.SetEntry(&badger.Entry{
-				Key:   []byte(pkey),
+				Key:   pkey,
 				Value: bits,
 			}); err != nil {
 				return stacktrace.Propagate(err, "failed to batch save documents")
@@ -90,13 +90,13 @@ func (c *Collection) persistEvent(ctx context.Context, event *schema.Event) erro
 			for _, idx := range c.collection.Indexing().Query {
 				pindex := idx.Prefix(event.Collection)
 				if current != nil {
-					if err := txn.Delete([]byte(pindex.GetPrefix(current.Value(), current.GetID()))); err != nil {
+					if err := txn.Delete(pindex.GetPrefix(current.Value(), current.GetID())); err != nil {
 						return stacktrace.Propagate(err, "failed to batch save documents")
 					}
 				}
 				i := pindex.GetPrefix(document.Value(), document.GetID())
 				if err := txn.SetEntry(&badger.Entry{
-					Key:   []byte(i),
+					Key:   i,
 					Value: bits,
 				}); err != nil {
 					return stacktrace.Propagate(err, "failed to batch save documents")
