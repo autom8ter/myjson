@@ -22,27 +22,37 @@ func Test(t *testing.T) {
 	defer cancel()
 
 	db, err := wolverine.New(ctx, wolverine.Config{
-		Path:  "inmem",
-		Debug: true,
+		Path:        "inmem",
+		Debug:       true,
+		Collections: testutil.AllCollections,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	assert.Nil(t, db.SetCollection(ctx, testutil.UserCollection))
-	assert.Nil(t, db.SetCollection(ctx, testutil.TaskCollection))
 	defer db.Close(ctx)
 	t.Run("seed_users_tasks", func(t *testing.T) {
 		for i := 0; i < 100; i++ {
 			usr := testutil.NewUserDoc()
-			assert.Nil(t, db.Set(ctx, "user", usr))
-			assert.Nil(t, db.Set(ctx, "task", testutil.NewTaskDoc(usr.GetID())))
-			assert.Nil(t, db.Set(ctx, "task", testutil.NewTaskDoc(usr.GetID())))
-			result, err := db.Get(ctx, "user", usr.GetID())
-			assert.Nil(t, err)
-			assert.Equal(t, usr.GetID(), result.GetID())
-			assert.Nil(t, err)
-			assert.Equal(t, usr.Get("name"), result.Get("name"))
-			assert.Equal(t, usr.Get("language"), result.Get("language"))
+			if err := db.Collection(ctx, "user", func(users *wolverine.Collection) error {
+				assert.Nil(t, users.Set(ctx, usr))
+				if err := db.Collection(ctx, "task", func(tasks *wolverine.Collection) error {
+					assert.Nil(t, tasks.Set(ctx, testutil.NewTaskDoc(usr.GetID())))
+					assert.Nil(t, tasks.Set(ctx, testutil.NewTaskDoc(usr.GetID())))
+					return nil
+				}); err != nil {
+					t.Fatal(err)
+				}
+				result, err := users.Get(ctx, usr.GetID())
+				assert.Nil(t, err)
+				assert.Equal(t, usr.GetID(), result.GetID())
+				assert.Nil(t, err)
+				assert.Equal(t, usr.Get("name"), result.Get("name"))
+				assert.Equal(t, usr.Get("language"), result.Get("language"))
+				return nil
+			}); err != nil {
+				t.Fatal(err)
+			}
+
 		}
 	})
 	assert.Nil(t, db.SetCollections(ctx, []*schema.Collection{testutil.UserCollection, testutil.TaskCollection}))

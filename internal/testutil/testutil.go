@@ -66,18 +66,16 @@ func NewTaskDoc(usrID string) *schema.Document {
 
 const MyEmail = "colemanword@gmail.com"
 
-func TestDB(collections []*schema.Collection, fn func(ctx context.Context, db wolverine.DB)) error {
+func TestDB(collections []*schema.Collection, fn func(ctx context.Context, db *wolverine.DB)) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
 	db, err := wolverine.New(ctx, wolverine.Config{
-		Path:  "inmem",
-		Debug: true,
+		Path:        "inmem",
+		Debug:       true,
+		Collections: collections,
 	})
 	if err != nil {
-		return err
-	}
-	if err := db.SetCollections(ctx, collections); err != nil {
 		return err
 	}
 	defer db.Close(ctx)
