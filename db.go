@@ -143,7 +143,7 @@ func (d *DB) ReIndex(ctx context.Context) error {
 	return stacktrace.Propagate(egp.Wait(), "")
 }
 
-func (d *DB) Collection(ctx context.Context, collection string, fn func(c *Collection) error) error {
+func (d *DB) Collection(ctx context.Context, collection string, fn func(collection *Collection) error) error {
 	d.mu.RLock()
 	defer d.mu.RUnlock()
 	for _, c := range d.collections {
@@ -175,9 +175,13 @@ func openFullTextIndex(config Config, collection string, reindex bool) (bleve.In
 		}
 		return i, nil
 	case reindex && config.Path != "inmem":
+		lastPath := getLastFullTextIndexPath(config, collection)
 		i, err := bleve.New(newPath, indexMapping)
 		if err != nil {
 			return nil, stacktrace.Propagate(err, "failed to create %s search index at path: %s", collection, newPath)
+		}
+		if lastPath != "" {
+			os.RemoveAll(lastPath)
 		}
 		return i, nil
 	default:
