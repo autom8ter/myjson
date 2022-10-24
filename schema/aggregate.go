@@ -98,36 +98,43 @@ func (query AggregateQuery) Observe(ctx context.Context, input chan rxgo.Item, f
 	}
 	wg := sync.WaitGroup{}
 	grouped := make(chan rxgo.Item)
+	var grouping []*Document
 	if fullScan {
 		return query.Observe(ctx, pipeFullScan(ctx, input, query.Where, query.OrderBy), false)
 	}
-	rxgo.FromEventSource(input, rxgo.WithContext(ctx), rxgo.WithCPUPool(), rxgo.WithObservationStrategy(rxgo.Eager)).
-		Filter(func(i interface{}) bool {
-			pass, err := i.(*Document).Where(query.Where)
-			if err != nil {
-				return false
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for doc := range rxgo.FromEventSource(input, rxgo.WithContext(ctx), rxgo.WithCPUPool(), rxgo.WithObservationStrategy(rxgo.Eager)).
+			Filter(func(i interface{}) bool {
+				pass, err := i.(*Document).Where(query.Where)
+				if err != nil {
+					return false
+				}
+				return pass
+			}).GroupByDynamic(func(item rxgo.Item) string {
+			var values []string
+			for _, g := range query.GroupBy {
+				values = append(values, cast.ToString(item.V.(*Document).Get(g)))
 			}
-			return pass
-		}).GroupByDynamic(func(item rxgo.Item) string {
-		var values []string
-		for _, g := range query.GroupBy {
-			values = append(values, cast.ToString(item.V.(*Document).Get(g)))
+			return strings.Join(values, ".")
+		}).Observe() {
+			o := doc.V.(rxgo.GroupedObservable)
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				reduced := <-o.Reduce(query.reducer()).Observe()
+				grouping = append(grouping, reduced.V.(*Document))
+			}()
 		}
-		return strings.Join(values, ".")
-	}).ForEach(func(i interface{}) {
-		o := i.(rxgo.GroupedObservable)
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			reduced := <-o.Reduce(query.reducer()).Observe()
-			grouped <- reduced
-		}()
-	}, func(err error) {
-		panic(err)
-	}, func() {
+	}()
+	go func() {
 		wg.Wait()
+		for _, doc := range SortOrder(query.OrderBy, grouping) {
+			grouped <- rxgo.Of(doc)
+		}
 		close(grouped)
-	})
+	}()
 	return rxgo.FromChannel(grouped, rxgo.WithContext(ctx), rxgo.WithCPUPool(), rxgo.WithObservationStrategy(rxgo.Eager)).
 		Skip(uint(query.Page * limit)).
 		Take(uint(limit)).

@@ -32,24 +32,14 @@ func TestDocument(t *testing.T) {
 		Name: "john smith",
 		Age:  50,
 	}
-	r, err := schema.NewDocumentFromAny(&usr)
+	r, err := schema.NewDocumentFrom(&usr)
 	if err != nil {
 		t.Fatal(err)
 	}
-	r.SetID(usr.ID)
-	t.Run("validate", func(t *testing.T) {
-		assert.Nil(t, r.Validate())
-		c := r.Clone()
-		c.Del("_id")
-		assert.NotNil(t, c.Validate())
-	})
 	t.Run("scan json", func(t *testing.T) {
 		var u user
 		assert.Nil(t, r.Scan(&u))
 		assert.EqualValues(t, u, usr)
-	})
-	t.Run("get id", func(t *testing.T) {
-		assert.Equal(t, usr.ID, r.GetID())
 	})
 	t.Run("get email", func(t *testing.T) {
 		assert.Equal(t, usr.Contact.Email, r.Get("contact.email"))
@@ -65,18 +55,17 @@ func TestDocument(t *testing.T) {
 	})
 	t.Run("merge", func(t *testing.T) {
 		usr2 := user{ID: usr.ID, Contact: contact{Email: gofakeit.Email()}, Name: "john smith"}
-		r2, err := schema.NewDocumentFromAny(&usr2)
+		r2, err := schema.NewDocumentFrom(&usr2)
 		if err != nil {
 			t.Fatal(err)
 		}
-		r2.SetID(usr.ID)
 		r.Merge(r2)
 		assert.Equal(t, usr2.Contact.Email, r.GetString("contact.email"))
 		assert.Equal(t, usr.Contact.Phone, r.GetString("contact.phone"))
 	})
 	t.Run("empty", func(t *testing.T) {
 		r := schema.NewDocument()
-		assert.Equal(t, false, r.Empty())
+		assert.Equal(t, true, r.Valid())
 	})
 	t.Run("clone", func(t *testing.T) {
 		cloned := r.Clone()
@@ -119,11 +108,10 @@ func TestDocument(t *testing.T) {
 	})
 
 	t.Run("where", func(t *testing.T) {
-		r, err = schema.NewDocumentFromAny(&usr)
+		r, err = schema.NewDocumentFrom(&usr)
 		if err != nil {
 			t.Fatal(err)
 		}
-		r.SetID(usr.ID)
 		pass, err := r.Where([]schema.Where{
 			{
 				Field: "contact.email",

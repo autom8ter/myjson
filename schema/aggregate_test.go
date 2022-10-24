@@ -55,6 +55,7 @@ func TestAggregate(t *testing.T) {
 		i := 0
 		<-observable.ForEach(func(o interface{}) {
 			i++
+			t.Logf("%s", o)
 			// t.Log(i.(*Document).String())
 		}, func(err error) {
 			t.Fatal(err)
