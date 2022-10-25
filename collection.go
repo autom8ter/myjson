@@ -2,7 +2,6 @@ package wolverine
 
 import (
 	"context"
-	"fmt"
 	"github.com/autom8ter/machine/v4"
 	"github.com/autom8ter/wolverine/errors"
 	"github.com/autom8ter/wolverine/internal/prefix"
@@ -16,17 +15,17 @@ import (
 	"github.com/spf13/cast"
 	"golang.org/x/sync/errgroup"
 	"strings"
-	"sync"
 	"time"
 )
 
 type Collection struct {
-	schema   *schema.Collection
-	kv       *badger.DB
-	fullText bleve.Index
-	triggers []schema.Trigger
-	machine  machine.Machine
-	wg       sync.WaitGroup
+	schema       *schema.Collection
+	kv           *badger.DB
+	fullText     bleve.Index
+	triggers     []schema.Trigger
+	machine      machine.Machine
+	errorHandler func(collection string, err error)
+	db           *DB
 }
 
 func (c *Collection) Schema() *schema.Collection {
@@ -220,7 +219,7 @@ func (c *Collection) Query(ctx context.Context, query schema.Query) (schema.Page
 		}
 		return nil
 	}); err != nil {
-		fmt.Println(stacktrace.Propagate(err, ""))
+		return schema.Page{}, stacktrace.Propagate(err, "")
 	}
 	results = schema.SortOrder(query.OrderBy, results)
 
@@ -505,7 +504,7 @@ func (c *Collection) Aggregate(ctx context.Context, query schema.AggregateQuery)
 		}
 		return nil
 	}); err != nil {
-		fmt.Println(stacktrace.Propagate(err, ""))
+		return schema.Page{}, stacktrace.Propagate(err, "")
 	}
 	grouped := lo.GroupBy[*schema.Document](results, func(d *schema.Document) string {
 		var values []string
@@ -804,4 +803,27 @@ func (c *Collection) Close(ctx context.Context) error {
 		return stacktrace.Propagate(err, "database close failure")
 	}
 	return nil
+}
+
+func (c *Collection) GetRelationship(ctx context.Context, field string, document *schema.Document) (*schema.Document, error) {
+	if !c.Schema().HasRelationships() {
+		return nil, stacktrace.NewError("collection has no relationships")
+	}
+	fkeys := c.Schema().Relationships().ForeignKeys
+	for sourceField, fkey := range fkeys {
+		if field == sourceField {
+			var (
+				foreign *schema.Document
+				err     error
+			)
+			if err := c.db.Collection(ctx, fkey.Collection, func(parent *Collection) error {
+				foreign, err = parent.Get(ctx, document.GetString(sourceField))
+				return stacktrace.Propagate(err, "")
+			}); err != nil {
+				return nil, stacktrace.NewError("")
+			}
+			return foreign, nil
+		}
+	}
+	return nil, stacktrace.NewErrorWithCode(errors.ErrTODO, "relationship %s does not exist", field)
 }

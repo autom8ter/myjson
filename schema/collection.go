@@ -25,10 +25,12 @@ type Collection struct {
 	mu sync.RWMutex
 	// Schema is an extended json schema used to validate documents stored in the collection.
 	// Custom properties include: collection, indexes, and full_text
-	Schema       string `json:"schema"`
-	indexing     *Indexing
-	collection   string
-	loadedSchema *gojsonschema.Schema
+	Schema        string `json:"schema"`
+	indexing      *Indexing
+	relationships *Relationships
+	collection    string
+	properties    map[string]gjson.Result
+	loadedSchema  *gojsonschema.Schema
 }
 
 // ParseSchema parses the collection's json schema
@@ -36,29 +38,44 @@ func (c *Collection) ParseSchema() error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	var err error
+	if c.relationships == nil || c.relationships.ForeignKeys == nil {
+		c.relationships = &Relationships{ForeignKeys: map[string]ForeignKey{}}
+	}
 	c.loadedSchema, err = gojsonschema.NewSchema(gojsonschema.NewStringLoader(c.Schema))
 	if err != nil {
 		return stacktrace.PropagateWithCode(err, errors.ErrSchemaLoad, "failed to load schema")
 	}
-	c.collection = cast.ToString(gjson.Get(c.Schema, "collection").Value())
+	c.collection = cast.ToString(gjson.Get(c.Schema, "@collection").Value())
 	if c.collection == "" {
-		return stacktrace.NewErrorWithCode(errors.ErrEmptySchemaCollection, "empty 'collection' schema property")
+		return stacktrace.NewErrorWithCode(errors.ErrEmptySchemaCollection, "empty '@collection' schema property")
 	}
-	var indexing Indexing
-	if gjson.Get(c.Schema, "indexing").Value() == nil {
-		return stacktrace.NewErrorWithCode(errors.ErrTODO, "empty 'indexing' schema property: %s", c.collection)
+	var (
+		indexing Indexing
+	)
+	if gjson.Get(c.Schema, "@indexing").Value() == nil {
+		return stacktrace.NewErrorWithCode(errors.ErrTODO, "empty '@indexing' schema property: %s", c.collection)
 	}
-	if err := util.Decode(gjson.Get(c.Schema, "indexing").Value(), &indexing); err != nil {
+	if err := util.Decode(gjson.Get(c.Schema, "@indexing").Value(), &indexing); err != nil {
 		return stacktrace.PropagateWithCode(err, errors.ErrTODO, "failed to decode 'indexing' schema property: %s", c.collection)
 	}
 	if indexing.PrimaryKey == "" {
-		return stacktrace.PropagateWithCode(err, errors.ErrTODO, "missing 'primaryKey' from 'indexing' schema property: %s", c.collection)
+		return stacktrace.PropagateWithCode(err, errors.ErrTODO, "missing 'primaryKey' from '@indexing' schema property: %s", c.collection)
 	}
 	if len(indexing.Search) > 1 {
-		return stacktrace.PropagateWithCode(err, errors.ErrTODO, "up to a single search index is supported 'indexing.search': %s", c.collection)
+		return stacktrace.PropagateWithCode(err, errors.ErrTODO, "up to a single search index is supported '@indexing.search': %s", c.collection)
 	}
 	if !gjson.Get(c.Schema, fmt.Sprintf("properties.%s", indexing.PrimaryKey)).Exists() {
-		return stacktrace.PropagateWithCode(err, errors.ErrTODO, "primary key does not exist in properties: %s", c.collection)
+		return stacktrace.PropagateWithCode(err, errors.ErrTODO, "primary key field does not exist in properties: %s", c.collection)
+	}
+	c.properties = gjson.Get(c.Schema, "properties").Map()
+	for field, value := range c.properties {
+		if fkey := value.Get("@foreignKey").Value(); fkey != "" {
+			var foreignKey ForeignKey
+			if err := util.Decode(fkey, &foreignKey); err != nil {
+				return stacktrace.PropagateWithCode(err, errors.ErrTODO, "failed to decode '@foreignKey' schema property: %s", c.collection)
+			}
+			c.relationships.ForeignKeys[field] = foreignKey
+		}
 	}
 
 	for _, i := range indexing.Aggregate {
@@ -78,11 +95,22 @@ func (c *Collection) Collection() string {
 	return c.collection
 }
 
-// QueryIndexes returns the list of the indexes based on the schema's 'indexes' field on the collection's schema
+// Indexing returns the list of the indexes based on the schema's 'indexing' field on the collection's schema
 func (c *Collection) Indexing() Indexing {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	return *c.indexing
+}
+
+func (c *Collection) HasRelationships() bool {
+	return len(c.Relationships().ForeignKeys) > 0
+}
+
+// Relationships
+func (c *Collection) Relationships() Relationships {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return *c.relationships
 }
 
 // Validate validates the document against the collections json schema (if it exists)

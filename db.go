@@ -26,15 +26,18 @@ type Config struct {
 	StoragePath string `json:"storagePath"`
 	// Collections are the json document collections supported by the DB - At least one is required.
 	Collections []*schema.Collection `json:"collections"`
+	// ErrorHandler, if set, handles database errors - ex: log to stderr
+	ErrorHandler func(collection string, err error)
 }
 
 type DB struct {
-	config      Config
-	kv          *badger.DB
-	mu          sync.RWMutex
-	schema      *schema.Schema
-	machine     machine.Machine
-	collections []*Collection
+	config       Config
+	kv           *badger.DB
+	mu           sync.RWMutex
+	schema       *schema.Schema
+	machine      machine.Machine
+	collections  []*Collection
+	errorHandler func(collection string, err error)
 }
 
 func New(ctx context.Context, cfg Config) (*DB, error) {
@@ -55,11 +58,17 @@ func New(ctx context.Context, cfg Config) (*DB, error) {
 	}
 
 	d := &DB{
-		config:  *config,
-		kv:      kv,
-		mu:      sync.RWMutex{},
-		schema:  schema.NewSchema(nil),
-		machine: machine.New(),
+		config:       *config,
+		kv:           kv,
+		mu:           sync.RWMutex{},
+		schema:       schema.NewSchema(nil),
+		machine:      machine.New(),
+		errorHandler: config.ErrorHandler,
+	}
+	if d.errorHandler == nil {
+		d.errorHandler = func(collection string, err error) {
+			fmt.Printf("[%s] ERROR - %s\n", collection, err)
+		}
 	}
 	for _, collection := range config.Collections {
 		ft, err := openFullTextIndex(*config, collection.Collection(), false)
@@ -67,11 +76,13 @@ func New(ctx context.Context, cfg Config) (*DB, error) {
 			return nil, stacktrace.Propagate(err, "")
 		}
 		d.collections = append(d.collections, &Collection{
-			schema:   collection,
-			kv:       d.kv,
-			fullText: ft,
-			triggers: nil,
-			machine:  d.machine,
+			schema:       collection,
+			kv:           d.kv,
+			fullText:     ft,
+			triggers:     nil,
+			machine:      d.machine,
+			errorHandler: d.errorHandler,
+			db:           d,
 		})
 	}
 	{
@@ -84,11 +95,13 @@ func New(ctx context.Context, cfg Config) (*DB, error) {
 			return nil, stacktrace.Propagate(err, "")
 		}
 		d.collections = append(d.collections, &Collection{
-			schema:   systemCollection,
-			kv:       d.kv,
-			fullText: ft,
-			triggers: nil,
-			machine:  d.machine,
+			schema:       systemCollection,
+			kv:           d.kv,
+			fullText:     ft,
+			triggers:     nil,
+			machine:      d.machine,
+			errorHandler: d.errorHandler,
+			db:           d,
 		})
 	}
 

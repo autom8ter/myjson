@@ -223,6 +223,22 @@ func Test(t *testing.T) {
 				assert.GreaterOrEqual(t, results.Count, 1)
 				t.Logf("found %v regex search results in %s", results.Count, results.Stats.ExecutionTime)
 			})
+			t.Run("add tasks", func(t *testing.T) {
+				var taskDocs []*schema.Document
+				if err := db.Collection(ctx, "task", func(tasks *wolverine.Collection) error {
+					for _, u := range usrs {
+						task := testutil.NewTaskDoc(collection.Schema().GetDocumentID(u))
+						taskDocs = append(taskDocs, task)
+						assert.Nil(t, tasks.Set(ctx, task))
+						ur, err := tasks.GetRelationship(ctx, "user", task)
+						assert.Nil(t, err)
+						assert.Equal(t, u.Get("_id"), ur.Get("_id"))
+					}
+					return nil
+				}); err != nil {
+					t.Fatal(err)
+				}
+			})
 			t.Run("update contact.email", func(t *testing.T) {
 				for _, u := range usrs {
 					edit := u.Clone()
@@ -235,6 +251,7 @@ func Test(t *testing.T) {
 					assert.Equal(t, u.GetString("name"), doc.GetString("name"))
 				}
 			})
+
 			t.Run("delete first 50", func(t *testing.T) {
 				for _, id := range ids[:50] {
 					assert.Nil(t, collection.Delete(ctx, id))

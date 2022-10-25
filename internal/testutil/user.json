@@ -2,9 +2,9 @@
   "$id": "https://example.com/user.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "User",
-  "collection": "user",
+  "@collection": "user",
   "type": "object",
-  "indexing": {
+  "@indexing": {
     "primaryKey": "_id",
     "query": [
       {
