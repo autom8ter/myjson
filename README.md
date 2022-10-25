@@ -71,3 +71,9 @@ Features:
 - [ ] SQL-like query language
 - [ ] views
 - [ ] materialized views
+
+## Noteable Libraries
+
+- badgerdb (embedded key value storage)
+- bleve (embedded search indexing)
+- gjson (json parsing)

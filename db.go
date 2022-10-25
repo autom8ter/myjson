@@ -120,8 +120,6 @@ func (d *DB) Backup(ctx context.Context, w io.Writer) error {
 }
 
 func (d *DB) Restore(ctx context.Context, r io.Reader) error {
-	d.mu.Lock()
-	defer d.mu.Unlock()
 	if err := d.kv.Load(r, 256); err != nil {
 		return stacktrace.Propagate(err, "")
 	}

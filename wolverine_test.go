@@ -7,8 +7,10 @@ import (
 	"github.com/autom8ter/wolverine/schema"
 	"github.com/brianvoe/gofakeit/v6"
 	"github.com/stretchr/testify/assert"
+	"runtime"
 	"strings"
 	"testing"
+	"time"
 )
 
 func Test(t *testing.T) {
@@ -257,4 +259,6 @@ func Test(t *testing.T) {
 			return nil
 		}))
 	}))
+	time.Sleep(1 * time.Second)
+	t.Log(runtime.NumGoroutine())
 }

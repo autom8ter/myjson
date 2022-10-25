@@ -4,10 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"github.com/palantir/stacktrace"
-	"github.com/reactivex/rxgo/v2"
-	"github.com/spf13/cast"
-	"strings"
-	"sync"
 )
 
 // AggFunction is a function used to aggregate against a document field
@@ -47,13 +43,12 @@ func (a AggregateQuery) String() string {
 	return string(bits)
 }
 
-func (a AggregateQuery) reducer() func(ctx context.Context, i interface{}, i2 interface{}) (interface{}, error) {
-	return func(ctx context.Context, i interface{}, i2 interface{}) (interface{}, error) {
-		if i == nil {
-			i = i2
+func (a AggregateQuery) Reduce(ctx context.Context, documents []*Document) (*Document, error) {
+	var aggregated *Document
+	for _, next := range documents {
+		if aggregated == nil {
+			aggregated = next
 		}
-		aggregated := i.(*Document)
-		next := i2.(*Document)
 		for _, agg := range a.Aggregates {
 			if agg.Alias == "" {
 				return nil, stacktrace.NewError("empty aggregate alias: %s/%s", agg.Field, agg.Function)
@@ -77,76 +72,6 @@ func (a AggregateQuery) reducer() func(ctx context.Context, i interface{}, i2 in
 			}
 			aggregated.Set(agg.Alias, current)
 		}
-		return aggregated, nil
 	}
-}
-
-func (query AggregateQuery) pipeIndex(ctx context.Context, input chan rxgo.Item) (rxgo.Observable, error) {
-	limit := 1000000
-	if query.Limit > 0 {
-		limit = query.Limit
-	}
-	return rxgo.FromChannel(input, rxgo.WithContext(ctx), rxgo.WithCPUPool(), rxgo.WithObservationStrategy(rxgo.Eager)).
-		Skip(uint(query.Page * limit)).
-		Take(uint(limit)), nil
-}
-
-func (query AggregateQuery) Observe(ctx context.Context, input chan rxgo.Item, fullScan bool) (rxgo.Observable, error) {
-	limit := 1000000
-	if query.Limit > 0 {
-		limit = query.Limit
-	}
-	wg := sync.WaitGroup{}
-	mu := sync.RWMutex{}
-	grouped := make(chan rxgo.Item)
-	var grouping []*Document
-	if fullScan {
-		return query.Observe(ctx, pipeFullScan(ctx, input, query.Where, query.OrderBy), false)
-	}
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		for doc := range rxgo.FromEventSource(input, rxgo.WithContext(ctx), rxgo.WithCPUPool(), rxgo.WithObservationStrategy(rxgo.Eager)).
-			Filter(func(i interface{}) bool {
-				pass, err := i.(*Document).Where(query.Where)
-				if err != nil {
-					return false
-				}
-				return pass
-			}).GroupByDynamic(func(item rxgo.Item) string {
-			var values []string
-			for _, g := range query.GroupBy {
-				values = append(values, cast.ToString(item.V.(*Document).Get(g)))
-			}
-			return strings.Join(values, ".")
-		}).Observe() {
-			o := doc.V.(rxgo.GroupedObservable)
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
-				reduced := <-o.Reduce(query.reducer()).Observe()
-				mu.Lock()
-				grouping = append(grouping, reduced.V.(*Document))
-				mu.Unlock()
-			}()
-		}
-	}()
-	go func() {
-		wg.Wait()
-		for _, doc := range SortOrder(query.OrderBy, grouping) {
-			grouped <- rxgo.Of(doc)
-		}
-		close(grouped)
-	}()
-	return rxgo.FromChannel(grouped, rxgo.WithContext(ctx), rxgo.WithCPUPool(), rxgo.WithObservationStrategy(rxgo.Eager)).
-		Skip(uint(query.Page * limit)).
-		Take(uint(limit)).
-		Map(func(ctx context.Context, i interface{}) (interface{}, error) {
-			toSelect := query.GroupBy
-			for _, a := range query.Aggregates {
-				toSelect = append(toSelect, a.Alias)
-			}
-			i.(*Document).Select(toSelect)
-			return i, nil
-		}), nil
+	return aggregated, nil
 }

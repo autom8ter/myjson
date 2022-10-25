@@ -2,6 +2,7 @@ package wolverine
 
 import (
 	"context"
+	"fmt"
 	"github.com/autom8ter/machine/v4"
 	"github.com/autom8ter/wolverine/errors"
 	"github.com/autom8ter/wolverine/internal/prefix"
@@ -11,11 +12,11 @@ import (
 	"github.com/dgraph-io/badger/v3"
 	"github.com/hashicorp/go-multierror"
 	"github.com/palantir/stacktrace"
-	"github.com/reactivex/rxgo/v2"
 	"github.com/samber/lo"
 	"github.com/spf13/cast"
 	"golang.org/x/sync/errgroup"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -25,6 +26,7 @@ type Collection struct {
 	fullText bleve.Index
 	triggers []schema.Trigger
 	machine  machine.Machine
+	wg       sync.WaitGroup
 }
 
 func (c *Collection) Schema() *schema.Collection {
@@ -172,65 +174,69 @@ func (c *Collection) indexDocument(ctx context.Context, txn *badger.WriteBatch, 
 }
 
 func (c *Collection) Query(ctx context.Context, query schema.Query) (schema.Page, error) {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 	now := time.Now()
-	qmachine := machine.New()
 	index, err := c.schema.OptimizeQueryIndex(query.Where, query.OrderBy)
 	if err != nil {
 		return schema.Page{}, stacktrace.Propagate(err, "")
 	}
-	var (
-		input = make(chan rxgo.Item)
-	)
-	qmachine.Go(ctx, func(ctx context.Context) error {
-		if err := c.kv.View(func(txn *badger.Txn) error {
-			opts := badger.DefaultIteratorOptions
-			opts.PrefetchValues = true
-			opts.PrefetchSize = 10
-			opts.Prefix = index.Ref.GetPrefix(schema.IndexableFields(query.Where, query.OrderBy), "")
-			seek := opts.Prefix
+	var results []*schema.Document
+	if err := c.kv.View(func(txn *badger.Txn) error {
+		opts := badger.DefaultIteratorOptions
+		opts.PrefetchValues = true
+		opts.PrefetchSize = 10
+		opts.Prefix = index.Ref.GetPrefix(schema.IndexableFields(query.Where, query.OrderBy), "")
+		seek := opts.Prefix
 
-			if query.OrderBy.Direction == schema.DESC {
-				opts.Reverse = true
-				seek = prefix.PrefixNextKey(opts.Prefix)
-			}
-			it := txn.NewIterator(opts)
-			it.Seek(seek)
-			defer it.Close()
-			for it.ValidForPrefix(opts.Prefix) {
-				if ctx.Err() != nil {
-					return nil
-				}
-				item := it.Item()
-				err := item.Value(func(bits []byte) error {
-					document, err := schema.NewDocumentFromBytes(bits)
-					if err != nil {
-						return stacktrace.Propagate(err, "")
-					}
-					input <- rxgo.Of(document)
-					return nil
-				})
+		if query.OrderBy.Direction == schema.DESC {
+			opts.Reverse = true
+			seek = prefix.PrefixNextKey(opts.Prefix)
+		}
+		it := txn.NewIterator(opts)
+		it.Seek(seek)
+		defer it.Close()
+		for it.ValidForPrefix(opts.Prefix) {
+			item := it.Item()
+			err := item.Value(func(bits []byte) error {
+				document, err := schema.NewDocumentFromBytes(bits)
 				if err != nil {
 					return stacktrace.Propagate(err, "")
 				}
-				it.Next()
+				pass, err := document.Where(query.Where)
+				if err != nil {
+					return stacktrace.Propagate(err, "")
+				}
+				if !pass {
+					return nil
+				}
+				results = append(results, document)
+				return nil
+			})
+			if err != nil {
+				return stacktrace.Propagate(err, "")
 			}
-			return nil
-		}); err != nil {
-			close(input)
-			return stacktrace.Propagate(err, "")
+			it.Next()
 		}
-		close(input)
 		return nil
-	})
-	var results []*schema.Document
-	for result := range query.Observe(ctx, input, index.FullScan()).Observe() {
-		doc, ok := result.V.(*schema.Document)
-		if !ok {
-			return schema.Page{}, stacktrace.NewError("expected type: %T got: %#v", &schema.Document{}, result.V)
-		}
-		results = append(results, doc)
+	}); err != nil {
+		fmt.Println(stacktrace.Propagate(err, ""))
 	}
 	results = schema.SortOrder(query.OrderBy, results)
+
+	if query.Limit > 0 && query.Page > 0 {
+		results = lo.Slice(results, query.Limit*query.Page, (query.Limit*query.Page)+query.Limit)
+	}
+	if query.Limit > 0 && len(results) > query.Limit {
+		results = results[:query.Limit]
+	}
+
+	if len(query.Select) > 0 {
+		for _, result := range results {
+			result.Select(query.Select)
+		}
+	}
+
 	return schema.Page{
 		Documents: results,
 		NextPage:  query.Page + 1,
@@ -422,29 +428,13 @@ func (c *Collection) QueryDelete(ctx context.Context, query schema.Query) error 
 
 func (c *Collection) aggregateIndex(ctx context.Context, i *schema.AggregateIndex, query schema.AggregateQuery) (schema.Page, error) {
 	now := time.Now()
-	input := make(chan rxgo.Item)
-	go func() {
-		results := i.Aggregate(query.Aggregates...)
-		results = schema.SortOrder(query.OrderBy, results)
-		for _, result := range results {
-			input <- rxgo.Of(result)
-		}
-		close(input)
-	}()
-	limit := 1000000
-	if query.Limit > 0 {
-		limit = query.Limit
+	results := i.Aggregate(query.Aggregates...)
+	results = schema.SortOrder(query.OrderBy, results)
+	if query.Limit > 0 && query.Page > 0 {
+		results = lo.Slice(results, query.Limit*query.Page, (query.Limit*query.Page)+query.Limit)
 	}
-	pipe := rxgo.FromChannel(input, rxgo.WithContext(ctx), rxgo.WithCPUPool(), rxgo.WithObservationStrategy(rxgo.Eager)).
-		Skip(uint(query.Page * limit)).
-		Take(uint(limit))
-	var results []*schema.Document
-	for result := range pipe.Observe() {
-		doc, ok := result.V.(*schema.Document)
-		if !ok {
-			return schema.Page{}, stacktrace.NewError("expected type: %T got: %#v", &schema.Document{}, result.V)
-		}
-		results = append(results, doc)
+	if query.Limit > 0 && len(results) > query.Limit {
+		results = results[:query.Limit]
 	}
 
 	return schema.Page{
@@ -463,6 +453,8 @@ func (c *Collection) aggregateIndex(ctx context.Context, i *schema.AggregateInde
 }
 
 func (c *Collection) Aggregate(ctx context.Context, query schema.AggregateQuery) (schema.Page, error) {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 	indexes := c.schema.Indexing()
 	if indexes.Aggregate != nil {
 		for _, i := range indexes.Aggregate {
@@ -473,66 +465,81 @@ func (c *Collection) Aggregate(ctx context.Context, query schema.AggregateQuery)
 	}
 
 	now := time.Now()
-	var (
-		input = make(chan rxgo.Item)
-	)
 	index, err := c.schema.OptimizeQueryIndex(query.Where, query.OrderBy)
 	if err != nil {
 		return schema.Page{}, stacktrace.Propagate(err, "")
 	}
-
-	go func() {
-		if err := c.kv.View(func(txn *badger.Txn) error {
-			opts := badger.DefaultIteratorOptions
-			opts.PrefetchValues = true
-			opts.PrefetchSize = 10
-			opts.Prefix = index.Ref.GetPrefix(schema.IndexableFields(query.Where, query.OrderBy), "")
-			it := txn.NewIterator(opts)
-			it.Seek(opts.Prefix)
-			defer it.Close()
-			for it.ValidForPrefix(opts.Prefix) {
-				if ctx.Err() != nil {
-					return nil
-				}
-				item := it.Item()
-				err := item.Value(func(bits []byte) error {
-					document, err := schema.NewDocumentFromBytes(bits)
-					if err != nil {
-						return stacktrace.Propagate(err, "")
-					}
-					input <- rxgo.Of(document)
-					return nil
-				})
+	var results []*schema.Document
+	if err := c.kv.View(func(txn *badger.Txn) error {
+		opts := badger.DefaultIteratorOptions
+		opts.PrefetchValues = true
+		opts.PrefetchSize = 10
+		opts.Prefix = index.Ref.GetPrefix(schema.IndexableFields(query.Where, query.OrderBy), "")
+		it := txn.NewIterator(opts)
+		it.Seek(opts.Prefix)
+		defer it.Close()
+		for it.ValidForPrefix(opts.Prefix) {
+			if ctx.Err() != nil {
+				return nil
+			}
+			item := it.Item()
+			err := item.Value(func(bits []byte) error {
+				document, err := schema.NewDocumentFromBytes(bits)
 				if err != nil {
 					return stacktrace.Propagate(err, "")
 				}
-				it.Next()
+				pass, err := document.Where(query.Where)
+				if err != nil {
+					return stacktrace.Propagate(err, "")
+				}
+				if !pass {
+					return nil
+				}
+				results = append(results, document)
+				return nil
+			})
+			if err != nil {
+				return stacktrace.Propagate(err, "")
 			}
-			return nil
-		}); err != nil {
-			close(input)
-			panic(err)
+			it.Next()
 		}
-		close(input)
-	}()
-
-	pipe, err := query.Observe(ctx, input, index.FullScan())
-	if err != nil {
-		return schema.Page{}, stacktrace.Propagate(err, "")
+		return nil
+	}); err != nil {
+		fmt.Println(stacktrace.Propagate(err, ""))
 	}
-	var results []*schema.Document
-	for result := range pipe.Observe() {
-		doc, ok := result.V.(*schema.Document)
-		if !ok {
-			return schema.Page{}, nil
+	grouped := lo.GroupBy[*schema.Document](results, func(d *schema.Document) string {
+		var values []string
+		for _, g := range query.GroupBy {
+			values = append(values, cast.ToString(d.Get(g)))
 		}
-		results = append(results, doc)
+		return strings.Join(values, ".")
+	})
+	var reduced []*schema.Document
+	for _, values := range grouped {
+		value, err := query.Reduce(ctx, values)
+		if err != nil {
+			return schema.Page{}, stacktrace.Propagate(err, "")
+		}
+		reduced = append(reduced, value)
 	}
-	results = schema.SortOrder(query.OrderBy, results)
+	reduced = schema.SortOrder(query.OrderBy, reduced)
+	if query.Limit > 0 && query.Page > 0 {
+		reduced = lo.Slice(reduced, query.Limit*query.Page, (query.Limit*query.Page)+query.Limit)
+	}
+	if query.Limit > 0 && len(reduced) > query.Limit {
+		reduced = reduced[:query.Limit]
+	}
+	for _, r := range reduced {
+		toSelect := query.GroupBy
+		for _, a := range query.Aggregates {
+			toSelect = append(toSelect, a.Alias)
+		}
+		r.Select(toSelect)
+	}
 	return schema.Page{
-		Documents: results,
+		Documents: reduced,
 		NextPage:  query.Page + 1,
-		Count:     len(results),
+		Count:     len(reduced),
 		Stats: schema.PageStats{
 			ExecutionTime: time.Since(now),
 			IndexMatch:    index,
@@ -700,6 +707,7 @@ func (c *Collection) Search(ctx context.Context, q schema.SearchQuery) (schema.P
 		}
 		data = append(data, record)
 	}
+
 	if len(q.Select) > 0 {
 		for _, r := range data {
 			r.Select(q.Select)
@@ -787,10 +795,11 @@ func (c *Collection) Reindex(ctx context.Context) error {
 }
 
 func (c *Collection) Close(ctx context.Context) error {
-	err := c.machine.Wait()
-	err = multierror.Append(err, c.fullText.Close())
+	//c.wg.Wait()
+	var err error
 	err = multierror.Append(err, c.kv.Sync())
 	err = multierror.Append(err, c.kv.Close())
+	err = multierror.Append(err, c.fullText.Close())
 	if err, ok := err.(*multierror.Error); ok && len(err.Errors) > 0 {
 		return stacktrace.Propagate(err, "database close failure")
 	}
