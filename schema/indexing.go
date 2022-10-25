@@ -105,22 +105,22 @@ func (a *AggregateIndex) Matches(query AggregateQuery) bool {
 	return true
 }
 
-func (a *AggregateIndex) Aggregate(Aggregates ...Aggregate) []*Document {
+func (a *AggregateIndex) Aggregate(Aggregates ...Aggregate) []Document {
 	a.mu.RLock()
 	defer a.mu.RUnlock()
-	var documents []*Document
+	var documents []Document
 	for k, aggs := range a.metrics {
 
 		d := NewDocument()
 		var splitValues []any
 		json.Unmarshal([]byte(k), &splitValues)
 		for i, group := range a.GroupBy {
-			d.Set(group, splitValues[i])
+			d = d.Set(group, splitValues[i])
 		}
 		for agg, metric := range aggs {
 			for _, aggregate := range Aggregates {
 				if reflect.DeepEqual(agg, aggregate) {
-					d.Set(agg.Alias, cast.ToFloat64(metric.Front().Value))
+					d = d.Set(agg.Alias, cast.ToFloat64(metric.Front().Value))
 				}
 			}
 		}
@@ -130,7 +130,7 @@ func (a *AggregateIndex) Aggregate(Aggregates ...Aggregate) []*Document {
 }
 
 func (a *AggregateIndex) Trigger() Trigger {
-	return func(ctx context.Context, action Action, timing Timing, before, after *Document) error {
+	return func(ctx context.Context, action Action, timing Timing, before, after Document) error {
 		a.mu.Lock()
 		defer a.mu.Unlock()
 		switch action {

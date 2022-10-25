@@ -35,7 +35,7 @@ func Test(t *testing.T) {
 	})
 	assert.Nil(t, testutil.TestDB(testutil.AllCollections, func(ctx context.Context, db *wolverine.DB) {
 		assert.Nil(t, db.Collection(ctx, "user", func(collection *wolverine.Collection) error {
-			var usrs []*schema.Document
+			var usrs []schema.Document
 			var ids []string
 			t.Run("batch set", func(t *testing.T) {
 				timer := timer()
@@ -270,7 +270,7 @@ func Test(t *testing.T) {
 				t.Logf("found %v regex search results in %s", results.Count, results.Stats.ExecutionTime)
 			})
 			t.Run("add tasks", func(t *testing.T) {
-				var taskDocs []*schema.Document
+				var taskDocs []schema.Document
 				if err := db.Collection(ctx, "task", func(tasks *wolverine.Collection) error {
 					for _, u := range usrs {
 						task := testutil.NewTaskDoc(collection.Schema().GetDocumentID(u))
@@ -287,11 +287,12 @@ func Test(t *testing.T) {
 			})
 			t.Run("update contact.email", func(t *testing.T) {
 				for _, u := range usrs {
-					edit := u.Clone()
+					id := collection.Schema().GetDocumentID(u)
 					email := gofakeit.Email()
-					edit.Set("contact.email", email)
-					assert.Nil(t, collection.Update(ctx, edit))
-					doc, err := collection.Get(ctx, collection.Schema().GetDocumentID(edit))
+					assert.Nil(t, collection.Update(ctx, id, map[string]any{
+						"contact.email": email,
+					}))
+					doc, err := collection.Get(ctx, id)
 					assert.Nil(t, err)
 					assert.Equal(t, email, doc.GetString("contact.email"))
 					assert.Equal(t, u.GetString("name"), doc.GetString("name"))

@@ -59,9 +59,9 @@ func TestDocument(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		r.Merge(r2)
-		assert.Equal(t, usr2.Contact.Email, r.GetString("contact.email"))
-		assert.Equal(t, usr.Contact.Phone, r.GetString("contact.phone"))
+		r2 = r.Merge(r2)
+		assert.Equal(t, usr2.Contact.Email, r2.GetString("contact.email"))
+		assert.Equal(t, usr.Contact.Phone, r2.GetString("contact.phone"))
 	})
 	t.Run("empty", func(t *testing.T) {
 		r := schema.NewDocument()
@@ -101,7 +101,7 @@ func TestDocument(t *testing.T) {
 	})
 	t.Run("set all", func(t *testing.T) {
 		c := r.Clone()
-		c.SetAll(map[string]any{
+		c = c.SetAll(map[string]any{
 			"contact.email": gofakeit.Email(),
 		})
 		assert.NotEqual(t, r.Get("contact.email"), c.Get("contact.email"))
@@ -253,7 +253,7 @@ func TestDocument(t *testing.T) {
 		assert.False(t, pass)
 	})
 	t.Run("results", func(t *testing.T) {
-		var docs = []*schema.Document{
+		var docs = []schema.Document{
 			testutil.NewUserDoc(),
 			testutil.NewUserDoc(),
 			testutil.NewUserDoc(),

@@ -43,15 +43,15 @@ func (a AggregateQuery) String() string {
 	return string(bits)
 }
 
-func ApplyReducers(ctx context.Context, a AggregateQuery, documents []*Document) (*Document, error) {
-	var aggregated *Document
+func ApplyReducers(ctx context.Context, a AggregateQuery, documents []Document) (Document, error) {
+	var aggregated Document
 	for _, next := range documents {
-		if aggregated == nil {
+		if !aggregated.Valid() {
 			aggregated = next
 		}
 		for _, agg := range a.Aggregates {
 			if agg.Alias == "" {
-				return nil, stacktrace.NewError("empty aggregate alias: %s/%s", agg.Field, agg.Function)
+				return Document{}, stacktrace.NewError("empty aggregate alias: %s/%s", agg.Field, agg.Function)
 			}
 			current := aggregated.GetFloat(agg.Alias)
 			switch agg.Function {
@@ -68,9 +68,9 @@ func ApplyReducers(ctx context.Context, a AggregateQuery, documents []*Document)
 			case SUM:
 				current += next.GetFloat(agg.Field)
 			default:
-				return nil, stacktrace.NewError("unsupported aggregate function: %s/%s", agg.Field, agg.Function)
+				return Document{}, stacktrace.NewError("unsupported aggregate function: %s/%s", agg.Field, agg.Function)
 			}
-			aggregated.Set(agg.Alias, current)
+			aggregated = aggregated.Set(agg.Alias, current)
 		}
 	}
 	return aggregated, nil

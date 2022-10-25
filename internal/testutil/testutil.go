@@ -32,7 +32,7 @@ var (
 	AllCollections = []*schema.Collection{UserCollection, TaskCollection}
 )
 
-func NewUserDoc() *schema.Document {
+func NewUserDoc() schema.Document {
 	doc, err := schema.NewDocumentFrom(map[string]interface{}{
 		"_id":  gofakeit.UUID(),
 		"name": gofakeit.Name(),
@@ -54,7 +54,7 @@ func NewUserDoc() *schema.Document {
 	return doc
 }
 
-func NewTaskDoc(usrID string) *schema.Document {
+func NewTaskDoc(usrID string) schema.Document {
 	doc, err := schema.NewDocumentFrom(map[string]interface{}{
 		"_id":     gofakeit.UUID(),
 		"user":    usrID,

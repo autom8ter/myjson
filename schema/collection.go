@@ -114,7 +114,7 @@ func (c *Collection) Relationships() Relationships {
 }
 
 // Validate validates the document against the collections json schema (if it exists)
-func (c *Collection) Validate(doc *Document) (bool, error) {
+func (c *Collection) Validate(doc Document) (bool, error) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	var err error
@@ -213,6 +213,6 @@ func (c *Collection) GetQueryIndex(whereFields []string, orderBy string) (QueryI
 	}, nil
 }
 
-func (c *Collection) GetDocumentID(d *Document) string {
+func (c *Collection) GetDocumentID(d Document) string {
 	return cast.ToString(d.Get(c.indexing.PrimaryKey))
 }

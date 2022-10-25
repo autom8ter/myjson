@@ -34,21 +34,7 @@ func (c *Collection) Schema() *schema.Collection {
 	return c.schema
 }
 
-func (c *Collection) persistEvent(ctx context.Context, event *schema.Event) error {
-	if len(event.Documents) == 0 {
-		return nil
-	}
-	for _, document := range event.Documents {
-		if document.Get("_collection") != c.schema.Collection() {
-			document.Set("_collection", c.schema.Collection())
-		}
-		if !document.Valid() {
-			return stacktrace.NewErrorWithCode(errors.ErrTODO, "invalid json document")
-		}
-		if id := c.schema.GetDocumentID(document); id == "" {
-			return stacktrace.NewErrorWithCode(errors.ErrTODO, "document missing primary key %s", c.schema.Indexing().PrimaryKey)
-		}
-	}
+func (c *Collection) persistStateChange(ctx context.Context, event schema.StateChange) error {
 	txn := c.kv.NewWriteBatch()
 	var batch *bleve.Batch
 	if c.schema == nil {
@@ -57,16 +43,31 @@ func (c *Collection) persistEvent(ctx context.Context, event *schema.Event) erro
 	if c.schema.Indexing().HasSearchIndex() {
 		batch = c.fullText.NewBatch()
 	}
-	for _, after := range event.Documents {
-		docId := c.schema.GetDocumentID(after)
-		before, _ := c.Get(ctx, docId)
-		switch event.Action {
-		case schema.Update:
-			clone := before.Clone()
-			clone.Merge(after)
-			*after = *clone
+	if event.Updates != nil {
+		for id, edit := range event.Updates {
+			before, _ := c.Get(ctx, id)
+			before.Clone().SetAll(edit)
+			if err := c.indexDocument(ctx, txn, batch, schema.Update, id, before, before.Clone().SetAll(edit)); err != nil {
+				return stacktrace.Propagate(err, "")
+			}
 		}
-		if err := c.indexDocument(ctx, txn, batch, event.Action, docId, before, after); err != nil {
+	}
+	for _, id := range event.Deletes {
+		before, _ := c.Get(ctx, id)
+		if err := c.indexDocument(ctx, txn, batch, schema.Delete, id, before, schema.NewDocument()); err != nil {
+			return stacktrace.Propagate(err, "")
+		}
+	}
+	for _, after := range event.Sets {
+		if !after.Valid() {
+			return stacktrace.NewErrorWithCode(errors.ErrTODO, "invalid json document")
+		}
+		docId := c.schema.GetDocumentID(after)
+		if docId == "" {
+			return stacktrace.NewErrorWithCode(errors.ErrTODO, "document missing primary key %s", c.schema.Indexing().PrimaryKey)
+		}
+		before, _ := c.Get(ctx, docId)
+		if err := c.indexDocument(ctx, txn, batch, schema.Set, docId, before, after); err != nil {
 			return stacktrace.Propagate(err, "")
 		}
 	}
@@ -86,7 +87,7 @@ func (c *Collection) persistEvent(ctx context.Context, event *schema.Event) erro
 	return nil
 }
 
-func (c *Collection) indexDocument(ctx context.Context, txn *badger.WriteBatch, batch *bleve.Batch, action schema.Action, docId string, before, after *schema.Document) error {
+func (c *Collection) indexDocument(ctx context.Context, txn *badger.WriteBatch, batch *bleve.Batch, action schema.Action, docId string, before, after schema.Document) error {
 	if docId == "" {
 		return stacktrace.NewErrorWithCode(errors.ErrTODO, "empty document id")
 	}
@@ -101,8 +102,8 @@ func (c *Collection) indexDocument(ctx context.Context, txn *badger.WriteBatch, 
 	}
 	switch action {
 	case schema.Delete:
-		if before == nil {
-			return stacktrace.NewErrorWithCode(errors.ErrTODO, "failed to batch delete documents: missing before value")
+		if !before.Valid() {
+			return nil
 		}
 		for _, i := range c.schema.Indexing().Query {
 			pindex := c.schema.QueryIndexPrefix(*i)
@@ -117,7 +118,7 @@ func (c *Collection) indexDocument(ctx context.Context, txn *badger.WriteBatch, 
 			batch.Delete(docId)
 		}
 	case schema.Set, schema.Update:
-		if after != nil && c.Schema().GetDocumentID(after) != docId {
+		if c.Schema().GetDocumentID(after) != docId {
 			return stacktrace.NewErrorWithCode(errors.ErrTODO, "document id is immutable: %v -> %v", c.Schema().GetDocumentID(after), docId)
 		}
 		valid, err := c.schema.Validate(after)
@@ -129,7 +130,7 @@ func (c *Collection) indexDocument(ctx context.Context, txn *badger.WriteBatch, 
 		}
 		for _, idx := range c.schema.Indexing().Query {
 			pindex := c.schema.QueryIndexPrefix(*idx)
-			if before != nil {
+			if before.Valid() {
 				if err := txn.Delete(pindex.GetPrefix(before.Value(), docId)); err != nil {
 					return stacktrace.PropagateWithCode(
 						err,
@@ -141,10 +142,7 @@ func (c *Collection) indexDocument(ctx context.Context, txn *badger.WriteBatch, 
 				}
 			}
 			i := pindex.GetPrefix(after.Value(), docId)
-			if err := txn.SetEntry(&badger.Entry{
-				Key:   i,
-				Value: after.Bytes(),
-			}); err != nil {
+			if err := txn.Set(i, after.Bytes()); err != nil {
 				return stacktrace.PropagateWithCode(
 					err,
 					errors.ErrTODO,
@@ -163,6 +161,7 @@ func (c *Collection) indexDocument(ctx context.Context, txn *badger.WriteBatch, 
 			}
 		}
 	}
+
 	for _, t := range c.triggers {
 		if err := t(ctx, action, schema.After, before, after); err != nil {
 			return stacktrace.Propagate(err, "trigger failure")
@@ -186,7 +185,7 @@ func (c *Collection) Query(ctx context.Context, query schema.Query) (schema.Page
 	if err != nil {
 		return schema.Page{}, stacktrace.Propagate(err, "")
 	}
-	var results []*schema.Document
+	var results []schema.Document
 	if err := c.kv.View(func(txn *badger.Txn) error {
 		opts := badger.DefaultIteratorOptions
 		opts.PrefetchValues = true
@@ -237,8 +236,8 @@ func (c *Collection) Query(ctx context.Context, query schema.Query) (schema.Page
 	}
 
 	if len(query.Select) > 0 {
-		for _, result := range results {
-			result.Select(query.Select)
+		for i, result := range results {
+			results[i] = result.Select(query.Select)
 		}
 	}
 
@@ -253,13 +252,13 @@ func (c *Collection) Query(ctx context.Context, query schema.Query) (schema.Page
 	}, nil
 }
 
-func (c *Collection) Get(ctx context.Context, id string) (*schema.Document, error) {
+func (c *Collection) Get(ctx context.Context, id string) (schema.Document, error) {
 	var (
-		document *schema.Document
+		document schema.Document
 	)
 	pkey, err := c.schema.GetPrimaryKeyRef(id)
 	if err != nil {
-		return nil, stacktrace.PropagateWithCode(err, errors.ErrTODO, "failed to get document %s/%s primary key ref", c.schema.Collection(), id)
+		return schema.Document{}, stacktrace.PropagateWithCode(err, errors.ErrTODO, "failed to get document %s/%s primary key ref", c.schema.Collection(), id)
 	}
 	if err := c.kv.View(func(txn *badger.Txn) error {
 
@@ -277,8 +276,8 @@ func (c *Collection) Get(ctx context.Context, id string) (*schema.Document, erro
 	return document, nil
 }
 
-func (c *Collection) GetAll(ctx context.Context, ids []string) ([]*schema.Document, error) {
-	var documents []*schema.Document
+func (c *Collection) GetAll(ctx context.Context, ids []string) ([]schema.Document, error) {
+	var documents []schema.Document
 	if err := c.kv.View(func(txn *badger.Txn) error {
 		for _, id := range ids {
 			pkey, err := c.schema.GetPrimaryKeyRef(id)
@@ -334,11 +333,11 @@ func (c *Collection) QueryPaginate(ctx context.Context, query schema.Query, hand
 func (c *Collection) ChangeStream(ctx context.Context, fn schema.ChangeStreamHandler) error {
 	return c.machine.Subscribe(ctx, c.schema.Collection(), func(ctx context.Context, msg machine.Message) (bool, error) {
 		switch event := msg.Body.(type) {
-		case *schema.Event:
+		case *schema.StateChange:
 			if err := fn(ctx, event); err != nil {
 				return false, stacktrace.Propagate(err, "")
 			}
-		case schema.Event:
+		case schema.StateChange:
 			if err := fn(ctx, &event); err != nil {
 				return false, stacktrace.Propagate(err, "")
 			}
@@ -347,76 +346,60 @@ func (c *Collection) ChangeStream(ctx context.Context, fn schema.ChangeStreamHan
 	})
 }
 
-func (c *Collection) Set(ctx context.Context, document *schema.Document) error {
-	return stacktrace.Propagate(c.persistEvent(ctx, &schema.Event{
+func (c *Collection) Set(ctx context.Context, document schema.Document) error {
+	return stacktrace.Propagate(c.persistStateChange(ctx, schema.StateChange{
 		Collection: c.schema.Collection(),
-		Action:     schema.Set,
-		Documents:  []*schema.Document{document},
+		Sets:       []schema.Document{document},
 	}), "")
 }
 
-func (c *Collection) BatchSet(ctx context.Context, batch []*schema.Document) error {
-	return stacktrace.Propagate(c.persistEvent(ctx, &schema.Event{
+func (c *Collection) BatchSet(ctx context.Context, batch []schema.Document) error {
+	return stacktrace.Propagate(c.persistStateChange(ctx, schema.StateChange{
 		Collection: c.schema.Collection(),
-		Action:     schema.Set,
-		Documents:  batch,
+		Sets:       batch,
 	}), "")
 }
 
-func (c *Collection) Update(ctx context.Context, document *schema.Document) error {
-	return stacktrace.Propagate(c.persistEvent(ctx, &schema.Event{
+func (c *Collection) Update(ctx context.Context, id string, update map[string]any) error {
+	return stacktrace.Propagate(c.persistStateChange(ctx, schema.StateChange{
 		Collection: c.schema.Collection(),
-		Action:     schema.Update,
-		Documents:  []*schema.Document{document},
+		Updates: map[string]map[string]any{
+			id: update,
+		},
 	}), "")
 }
 
-func (c *Collection) BatchUpdate(ctx context.Context, batch []*schema.Document) error {
-	return c.persistEvent(ctx, &schema.Event{
+func (c *Collection) BatchUpdate(ctx context.Context, batch map[string]map[string]any) error {
+	return c.persistStateChange(ctx, schema.StateChange{
 		Collection: c.schema.Collection(),
-		Action:     schema.Update,
-		Documents:  batch,
+		Updates:    batch,
 	})
 }
 
 func (c *Collection) Delete(ctx context.Context, id string) error {
-	doc, err := c.Get(ctx, id)
-	if err != nil {
-		return stacktrace.Propagate(err, "failed to delete %s/%s", c.schema.Collection(), id)
-	}
-	return c.persistEvent(ctx, &schema.Event{
+	return c.persistStateChange(ctx, schema.StateChange{
 		Collection: c.schema.Collection(),
-		Action:     schema.Delete,
-		Documents:  []*schema.Document{doc},
+		Deletes:    []string{id},
 	})
 }
 
 func (c *Collection) BatchDelete(ctx context.Context, ids []string) error {
-	var documents []*schema.Document
-	for _, id := range ids {
-		doc, err := c.Get(ctx, id)
-		if err != nil {
-			return stacktrace.Propagate(err, "failed to batch delete %s/%s", c.schema.Collection(), id)
-		}
-		documents = append(documents, doc)
-	}
-
-	return c.persistEvent(ctx, &schema.Event{
+	return c.persistStateChange(ctx, schema.StateChange{
 		Collection: c.schema.Collection(),
-		Action:     schema.Delete,
-		Documents:  documents,
+		Deletes:    ids,
 	})
 }
 
-func (c *Collection) QueryUpdate(ctx context.Context, update *schema.Document, query schema.Query) error {
+func (c *Collection) QueryUpdate(ctx context.Context, update map[string]any, query schema.Query) error {
 	results, err := c.Query(ctx, query)
 	if err != nil {
 		return stacktrace.Propagate(err, "")
 	}
+	var updated []schema.Document
 	for _, document := range results.Documents {
-		document.Merge(update)
+		updated = append(updated, document.SetAll(update))
 	}
-	return stacktrace.Propagate(c.BatchSet(ctx, results.Documents), "")
+	return stacktrace.Propagate(c.BatchSet(ctx, updated), "")
 }
 
 func (c *Collection) QueryDelete(ctx context.Context, query schema.Query) error {
@@ -474,7 +457,7 @@ func (c *Collection) Aggregate(ctx context.Context, query schema.AggregateQuery)
 	if err != nil {
 		return schema.Page{}, stacktrace.Propagate(err, "")
 	}
-	var results []*schema.Document
+	var results []schema.Document
 	if err := c.kv.View(func(txn *badger.Txn) error {
 		opts := badger.DefaultIteratorOptions
 		opts.PrefetchValues = true
@@ -512,14 +495,14 @@ func (c *Collection) Aggregate(ctx context.Context, query schema.AggregateQuery)
 	}); err != nil {
 		return schema.Page{}, stacktrace.Propagate(err, "")
 	}
-	grouped := lo.GroupBy[*schema.Document](results, func(d *schema.Document) string {
+	grouped := lo.GroupBy[schema.Document](results, func(d schema.Document) string {
 		var values []string
 		for _, g := range query.GroupBy {
 			values = append(values, cast.ToString(d.Get(g)))
 		}
 		return strings.Join(values, ".")
 	})
-	var reduced []*schema.Document
+	var reduced []schema.Document
 	for _, values := range grouped {
 		value, err := schema.ApplyReducers(ctx, query, values)
 		if err != nil {
@@ -534,12 +517,12 @@ func (c *Collection) Aggregate(ctx context.Context, query schema.AggregateQuery)
 	if query.Limit > 0 && len(reduced) > query.Limit {
 		reduced = reduced[:query.Limit]
 	}
-	for _, r := range reduced {
+	for i, r := range reduced {
 		toSelect := query.GroupBy
 		for _, a := range query.Aggregates {
 			toSelect = append(toSelect, a.Alias)
 		}
-		r.Select(toSelect)
+		reduced[i] = r.Select(toSelect)
 	}
 	return schema.Page{
 		Documents: reduced,
@@ -698,7 +681,7 @@ func (c *Collection) Search(ctx context.Context, q schema.SearchQuery) (schema.P
 		return schema.Page{}, stacktrace.Propagate(err, "failed to search index: %s", c.schema.Collection())
 	}
 
-	var data []*schema.Document
+	var data []schema.Document
 	if len(results.Hits) == 0 {
 		return schema.Page{}, stacktrace.NewError("zero results")
 	}
@@ -714,8 +697,8 @@ func (c *Collection) Search(ctx context.Context, q schema.SearchQuery) (schema.P
 	}
 
 	if len(q.Select) > 0 {
-		for _, r := range data {
-			r.Select(q.Select)
+		for i, r := range data {
+			data[i] = r.Select(q.Select)
 		}
 	}
 	return schema.Page{
@@ -770,11 +753,11 @@ func (c *Collection) Reindex(ctx context.Context) error {
 		if len(results.Documents) == 0 {
 			break
 		}
-		var toSet []*schema.Document
+		var toSet []schema.Document
 		var toDelete []string
 		for _, r := range results.Documents {
 			result, _ := c.Get(ctx, c.schema.GetDocumentID(r))
-			if result != nil {
+			if result.Valid() {
 				toSet = append(toSet, result)
 			} else {
 				toDelete = append(toDelete, c.schema.GetDocumentID(r))
@@ -813,27 +796,27 @@ func (c *Collection) Close(ctx context.Context) error {
 	return nil
 }
 
-func (c *Collection) GetRelationship(ctx context.Context, field string, document *schema.Document) (*schema.Document, error) {
+func (c *Collection) GetRelationship(ctx context.Context, field string, document schema.Document) (schema.Document, error) {
 	if !c.Schema().HasRelationships() {
-		return nil, stacktrace.NewError("collection has no relationships")
+		return schema.Document{}, stacktrace.NewError("collection has no relationships")
 	}
 	fkeys := c.Schema().Relationships().ForeignKeys
 	for sourceField, fkey := range fkeys {
 		if field == sourceField {
 			var (
-				foreign *schema.Document
+				foreign schema.Document
 				err     error
 			)
 			if err := c.db.Collection(ctx, fkey.Collection, func(parent *Collection) error {
 				foreign, err = parent.Get(ctx, document.GetString(sourceField))
 				return stacktrace.Propagate(err, "")
 			}); err != nil {
-				return nil, stacktrace.NewError("")
+				return schema.Document{}, stacktrace.NewError("")
 			}
 			return foreign, nil
 		}
 	}
-	return nil, stacktrace.NewErrorWithCode(errors.ErrTODO, "relationship %s does not exist", field)
+	return schema.Document{}, stacktrace.NewErrorWithCode(errors.ErrTODO, "relationship %s does not exist", field)
 }
 
 func (c *Collection) Info(ctx context.Context) (CollectionInfo, error) {

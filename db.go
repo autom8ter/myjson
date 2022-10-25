@@ -171,7 +171,6 @@ func (c *Collection) openFullTextIndex(ctx context.Context, reindex bool) error 
 
 	indexMapping := bleve.NewIndexMapping()
 	indexMapping.AddDocumentMapping(c.schema.Collection(), documentMapping)
-	indexMapping.TypeField = "_collection"
 
 	path := fmt.Sprintf("%s/search/%s/index.db", c.db.config.StoragePath, c.schema.Collection())
 	if reindex {

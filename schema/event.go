@@ -8,14 +8,9 @@ const (
 	Delete = "delete"
 )
 
-type Event struct {
-	Collection string      `json:"collection"`
-	Action     Action      `json:"action,omitempty"`
-	Documents  []*Document `json:"documents,omitempty"`
-}
-
-type Command struct {
-	Collection string      `json:"collection"`
-	Action     Action      `json:"action,omitempty"`
-	Documents  []*Document `json:"documents,omitempty"`
+type StateChange struct {
+	Collection string                    `json:"collection"`
+	Deletes    []string                  `json:"deletes,omitempty"`
+	Sets       []Document                `json:"sets,omitempty"`
+	Updates    map[string]map[string]any `json:"updates,omitempty"`
 }
