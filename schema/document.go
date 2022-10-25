@@ -36,13 +36,25 @@ func NewDocumentFromBytes(json []byte) (Document, error) {
 	if !gjson.ValidBytes(json) {
 		return Document{}, stacktrace.NewError("invalid json")
 	}
-	return Document{
+	d := Document{
 		result: gjson.ParseBytes(json),
-	}, nil
+	}
+	if !d.Valid() {
+		return Document{}, stacktrace.NewError("invalid document")
+	}
+	return d, nil
 }
 
 // NewDocumentFrom creates a new document from the given value - the value must be json compatible
 func NewDocumentFrom(value any) (Document, error) {
+	var err error
+	switch value.(type) {
+	case map[string]any:
+		value, err = flat.Unflatten(value.(map[string]any), nil)
+		if err != nil {
+			return Document{}, stacktrace.NewError("failed to unflatten map: %#v", value)
+		}
+	}
 	bits, err := json.Marshal(value)
 	if err != nil {
 		return Document{}, stacktrace.NewError("failed to json encode value: %#v", value)
@@ -52,7 +64,7 @@ func NewDocumentFrom(value any) (Document, error) {
 
 // Valid returns whether the document is valid
 func (d Document) Valid() bool {
-	return gjson.ValidBytes(d.Bytes())
+	return gjson.ValidBytes(d.Bytes()) && !d.result.IsArray()
 }
 
 // String returns the document as a json string
@@ -67,7 +79,7 @@ func (d Document) Bytes() []byte {
 
 // Value returns the document as a map
 func (d Document) Value() map[string]any {
-	return d.result.Value().(map[string]interface{})
+	return cast.ToStringMap(d.result.Value())
 }
 
 // Clone allocates a new document with identical values
@@ -110,32 +122,60 @@ func (d Document) GetFloat(field string) float64 {
 	return d.result.Get(field).Float()
 }
 
+// GetArray gets an array field on the document. Get has GJSON syntax support and supports dot notation
+func (d Document) GetArray(field string) []any {
+	return cast.ToSlice(d.result.Get(field).Value())
+}
+
 // Set sets a field on the document. Dot notation is supported.
-func (d Document) Set(field string, val any) Document {
+func (d Document) Set(field string, val any) (Document, error) {
+	var (
+		result string
+		err    error
+	)
+
 	switch val := val.(type) {
 	case gjson.Result:
-		result, _ := sjson.Set(d.result.Raw, field, val.Value())
-		return Document{result: gjson.Parse(result)}
+		result, err = sjson.Set(d.result.Raw, field, val.Value())
+	case []byte:
+		result, err = sjson.SetRaw(d.result.Raw, field, string(val))
 	default:
-		result, _ := sjson.Set(d.result.Raw, field, val)
-		return Document{result: gjson.Parse(result)}
+		result, err = sjson.Set(d.result.Raw, field, val)
 	}
+	if err != nil {
+		return Document{}, stacktrace.Propagate(err, "")
+	}
+	doc := Document{result: gjson.Parse(result)}
+	if !doc.Valid() {
+		return Document{}, stacktrace.NewError("invalid document")
+	}
+	return doc, nil
 }
 
 // SetAll sets all fields on the document. Dot notation is supported.
-func (d Document) SetAll(values map[string]any) Document {
-	var doc Document
-	flattened, _ := flat.Flatten(values, nil)
-	for k, val := range flattened {
-		doc = d.Set(k, val)
+func (d Document) SetAll(values map[string]any) (Document, error) {
+	flattened, err := flat.Flatten(values, nil)
+	if err != nil {
+		return Document{}, stacktrace.Propagate(err, "")
 	}
-	return doc
+	dflat, err := flat.Flatten(d.Value(), nil)
+	if err != nil {
+		return Document{}, stacktrace.Propagate(err, "")
+	}
+	for k, val := range flattened {
+		dflat[k] = val
+	}
+	doc, err := NewDocumentFrom(dflat)
+	if err != nil {
+		return Document{}, stacktrace.Propagate(err, "")
+	}
+	return doc, nil
 }
 
 // Merge merges the doument with the provided document. This is not an overwrite.
-func (d Document) Merge(with Document) Document {
+func (d Document) Merge(with Document) (Document, error) {
 	if !with.Valid() {
-		return d
+		return d, nil
 	}
 	withMap := with.Value()
 	withFlat, err := flat.Flatten(withMap, nil)

@@ -173,7 +173,7 @@ func Test(t *testing.T) {
 				for _, doc := range results.Documents {
 					t.Logf("aggregate: %s", doc.String())
 				}
-				assert.EqualValues(t, []string{"account_id", "gender"}, results.Stats.IndexMatch.Fields)
+				assert.EqualValues(t, []string{"account_id"}, results.Stats.IndexMatch.Fields)
 				t.Logf("found %v aggregates in %s", results.Count, results.Stats.ExecutionTime)
 			})
 			t.Run("search wildcard name", func(t *testing.T) {

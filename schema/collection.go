@@ -1,7 +1,7 @@
 package schema
 
 import (
-	"container/list"
+	"encoding/json"
 	"fmt"
 	"github.com/autom8ter/wolverine/errors"
 	"github.com/autom8ter/wolverine/internal/prefix"
@@ -10,6 +10,10 @@ import (
 	"github.com/spf13/cast"
 	"github.com/tidwall/gjson"
 	"github.com/xeipuuv/gojsonschema"
+	"gopkg.in/yaml.v3"
+	"io/fs"
+	"io/ioutil"
+	"os"
 	"strings"
 	"sync"
 )
@@ -18,6 +22,64 @@ import (
 func LoadCollection(jsonSchema string) (*Collection, error) {
 	c := &Collection{Schema: jsonSchema}
 	return c, c.ParseSchema()
+}
+
+// LoadCollectionsFromDir loads all yaml/json collections in the specified directory
+func LoadCollectionsFromDir(collectionsDir string) ([]*Collection, error) {
+	var collections []*Collection
+	dir := os.DirFS(collectionsDir)
+	if err := fs.WalkDir(dir, ".", func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return stacktrace.Propagate(err, "")
+		}
+		if d.IsDir() {
+			return nil
+		}
+
+		switch {
+		case strings.HasSuffix(path, ".yaml"):
+			files, err := dir.Open(path)
+			if err != nil {
+				return stacktrace.Propagate(err, "")
+			}
+			f, err := ioutil.ReadAll(files)
+			if err != nil {
+				return stacktrace.Propagate(err, "")
+			}
+			data := map[string]interface{}{}
+			if err := yaml.Unmarshal(f, &data); err != nil {
+				return stacktrace.Propagate(err, "")
+			}
+			jsonData, err := json.Marshal(data)
+			if err != nil {
+				return stacktrace.Propagate(err, "")
+			}
+			var collection = &Collection{Schema: string(jsonData)}
+
+			if err := collection.ParseSchema(); err != nil {
+				return stacktrace.Propagate(err, "")
+			}
+			collections = append(collections, collection)
+		case strings.HasSuffix(path, ".json"):
+			files, err := dir.Open(path)
+			if err != nil {
+				return stacktrace.Propagate(err, "")
+			}
+			f, err := ioutil.ReadAll(files)
+			if err != nil {
+				return stacktrace.Propagate(err, "")
+			}
+			var collection = &Collection{Schema: string(f)}
+			if err := collection.ParseSchema(); err != nil {
+				return stacktrace.Propagate(err, "")
+			}
+			collections = append(collections, collection)
+		}
+		return nil
+	}); err != nil {
+		return nil, stacktrace.Propagate(err, "")
+	}
+	return collections, nil
 }
 
 // Collection is a collection of records of a given type. It is
@@ -76,11 +138,6 @@ func (c *Collection) ParseSchema() error {
 			}
 			c.relationships.ForeignKeys[field] = foreignKey
 		}
-	}
-
-	for _, i := range indexing.Aggregate {
-		i.mu = &sync.RWMutex{}
-		i.metrics = map[string]map[Aggregate]*list.List{}
 	}
 
 	c.indexing = &indexing

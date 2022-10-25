@@ -25,6 +25,18 @@ type Config struct {
 	Collections []*schema.Collection `json:"collections"`
 }
 
+// LoadConfig loads a config instance from the spefied storeage path and a directory containing the collection schemas
+func LoadConfig(storeagePath string, schemaDir string) (Config, error) {
+	collections, err := schema.LoadCollectionsFromDir(schemaDir)
+	if err != nil {
+		return Config{}, stacktrace.Propagate(err, "")
+	}
+	return Config{
+		StoragePath: storeagePath,
+		Collections: collections,
+	}, nil
+}
+
 type DB struct {
 	config       Config
 	kv           *badger.DB

@@ -46,8 +46,11 @@ func (c *Collection) persistStateChange(ctx context.Context, event schema.StateC
 	if event.Updates != nil {
 		for id, edit := range event.Updates {
 			before, _ := c.Get(ctx, id)
-			before.Clone().SetAll(edit)
-			if err := c.indexDocument(ctx, txn, batch, schema.Update, id, before, before.Clone().SetAll(edit)); err != nil {
+			after, err := before.SetAll(edit)
+			if err != nil {
+				return stacktrace.Propagate(err, "")
+			}
+			if err := c.indexDocument(ctx, txn, batch, schema.Update, id, before, after); err != nil {
 				return stacktrace.Propagate(err, "")
 			}
 		}
@@ -165,13 +168,6 @@ func (c *Collection) indexDocument(ctx context.Context, txn *badger.WriteBatch, 
 	for _, t := range c.triggers {
 		if err := t(ctx, action, schema.After, before, after); err != nil {
 			return stacktrace.Propagate(err, "trigger failure")
-		}
-	}
-	if c.schema.Indexing().Aggregate != nil {
-		for _, agg := range c.schema.Indexing().Aggregate {
-			if err := agg.Trigger()(ctx, action, schema.After, before, after); err != nil {
-				return stacktrace.Propagate(err, "aggregate trigger failure")
-			}
 		}
 	}
 	return nil
@@ -397,7 +393,11 @@ func (c *Collection) QueryUpdate(ctx context.Context, update map[string]any, que
 	}
 	var updated []schema.Document
 	for _, document := range results.Documents {
-		updated = append(updated, document.SetAll(update))
+		document, err := document.SetAll(update)
+		if err != nil {
+			return stacktrace.Propagate(err, "")
+		}
+		updated = append(updated, document)
 	}
 	return stacktrace.Propagate(c.BatchSet(ctx, updated), "")
 }
@@ -414,43 +414,9 @@ func (c *Collection) QueryDelete(ctx context.Context, query schema.Query) error 
 	return stacktrace.Propagate(c.BatchDelete(ctx, ids), "")
 }
 
-func (c *Collection) aggregateIndex(ctx context.Context, i *schema.AggregateIndex, query schema.AggregateQuery) (schema.Page, error) {
-	now := time.Now()
-	results := i.Aggregate(query.Aggregates...)
-	results = schema.SortOrder(query.OrderBy, results)
-	if query.Limit > 0 && query.Page > 0 {
-		results = lo.Slice(results, query.Limit*query.Page, (query.Limit*query.Page)+query.Limit)
-	}
-	if query.Limit > 0 && len(results) > query.Limit {
-		results = results[:query.Limit]
-	}
-
-	return schema.Page{
-		Documents: results,
-		NextPage:  query.Page + 1,
-		Count:     len(results),
-		Stats: schema.PageStats{
-			ExecutionTime: time.Since(now),
-			IndexMatch: schema.QueryIndexMatch{
-				Ref:     nil,
-				Fields:  i.GroupBy,
-				Ordered: false,
-			},
-		},
-	}, nil
-}
-
 func (c *Collection) Aggregate(ctx context.Context, query schema.AggregateQuery) (schema.Page, error) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	indexes := c.schema.Indexing()
-	if indexes.Aggregate != nil {
-		for _, i := range indexes.Aggregate {
-			if i.Matches(query) {
-				return c.aggregateIndex(ctx, i, query)
-			}
-		}
-	}
 
 	now := time.Now()
 	index, err := c.schema.OptimizeQueryIndex(query.Where, query.OrderBy)

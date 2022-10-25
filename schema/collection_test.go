@@ -26,7 +26,6 @@ func TestCollection(t *testing.T) {
 		assert.Equal(t, "_id", testutil.UserCollection.Indexing().PrimaryKey)
 		assert.Equal(t, true, testutil.UserCollection.Indexing().HasSearchIndex())
 		assert.Equal(t, true, testutil.UserCollection.Indexing().HasQueryIndex())
-		assert.Equal(t, true, testutil.UserCollection.Indexing().HasAggregateIndex())
 		assert.Equal(t, "user", testutil.UserCollection.Collection())
 		valid, err := testutil.UserCollection.Validate(testutil.NewUserDoc())
 		assert.Nil(t, err)
@@ -35,5 +34,10 @@ func TestCollection(t *testing.T) {
 		assert.NotNil(t, err)
 		assert.False(t, valid)
 		testutil.UserCollection.PrimaryQueryIndex()
+	})
+	t.Run("load collections from dir", func(t *testing.T) {
+		collections, err := schema.LoadCollectionsFromDir("../internal/testutil/")
+		assert.Nil(t, err)
+		assert.NotEqual(t, 0, len(collections))
 	})
 }

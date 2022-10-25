@@ -44,7 +44,10 @@ func (a AggregateQuery) String() string {
 }
 
 func ApplyReducers(ctx context.Context, a AggregateQuery, documents []Document) (Document, error) {
-	var aggregated Document
+	var (
+		aggregated Document
+		err        error
+	)
 	for _, next := range documents {
 		if !aggregated.Valid() {
 			aggregated = next
@@ -70,7 +73,10 @@ func ApplyReducers(ctx context.Context, a AggregateQuery, documents []Document) 
 			default:
 				return Document{}, stacktrace.NewError("unsupported aggregate function: %s/%s", agg.Field, agg.Function)
 			}
-			aggregated = aggregated.Set(agg.Alias, current)
+			aggregated, err = aggregated.Set(agg.Alias, current)
+			if err != nil {
+				return Document{}, stacktrace.Propagate(err, "")
+			}
 		}
 	}
 	return aggregated, nil
