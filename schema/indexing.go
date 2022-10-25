@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"github.com/autom8ter/wolverine/errors"
 	"github.com/autom8ter/wolverine/internal/prefix"
+	"github.com/autom8ter/wolverine/internal/util"
 	"github.com/palantir/stacktrace"
 	"github.com/spf13/cast"
 	"reflect"
@@ -109,8 +110,10 @@ func (a *AggregateIndex) Aggregate(Aggregates ...Aggregate) []*Document {
 	defer a.mu.RUnlock()
 	var documents []*Document
 	for k, aggs := range a.metrics {
+
 		d := NewDocument()
-		splitValues := strings.Split(k, ".")
+		var splitValues []any
+		json.Unmarshal([]byte(k), &splitValues)
 		for i, group := range a.GroupBy {
 			d.Set(group, splitValues[i])
 		}
@@ -132,11 +135,11 @@ func (a *AggregateIndex) Trigger() Trigger {
 		defer a.mu.Unlock()
 		switch action {
 		case Delete:
-			var groupValues []string
+			var groupValues []any
 			for _, g := range a.GroupBy {
-				groupValues = append(groupValues, cast.ToString(before.Get(g)))
+				groupValues = append(groupValues, before.Get(g))
 			}
-			groupKey := strings.Join(groupValues, ".")
+			groupKey := util.JSONString(groupValues)
 			if a.metrics[groupKey] == nil {
 				a.metrics[groupKey] = map[Aggregate]*list.List{}
 			}
@@ -156,11 +159,11 @@ func (a *AggregateIndex) Trigger() Trigger {
 				}
 			}
 		default:
-			var groupValues []string
+			var groupValues []any
 			for _, g := range a.GroupBy {
-				groupValues = append(groupValues, cast.ToString(after.Get(g)))
+				groupValues = append(groupValues, after.Get(g))
 			}
-			groupKey := strings.Join(groupValues, ".")
+			groupKey := util.JSONString(groupValues)
 			if a.metrics[groupKey] == nil {
 				a.metrics[groupKey] = map[Aggregate]*list.List{}
 			}

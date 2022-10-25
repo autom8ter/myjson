@@ -125,6 +125,16 @@ func TestDocument(t *testing.T) {
 		pass, err = r.Where([]schema.Where{
 			{
 				Field: "contact.email",
+				Op:    schema.Contains,
+				Value: email,
+			},
+		})
+		assert.Nil(t, err)
+		assert.True(t, pass)
+
+		pass, err = r.Where([]schema.Where{
+			{
+				Field: "contact.email",
 				Op:    "==",
 				Value: gofakeit.Email(),
 			},
@@ -207,6 +217,16 @@ func TestDocument(t *testing.T) {
 				Field: "age",
 				Op:    ">=",
 				Value: 50,
+			},
+		})
+		assert.Nil(t, err)
+		assert.True(t, pass)
+
+		pass, err = r.Where([]schema.Where{
+			{
+				Field: "age",
+				Op:    schema.In,
+				Value: []float64{50},
 			},
 		})
 		assert.Nil(t, err)

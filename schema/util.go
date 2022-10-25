@@ -1,7 +1,7 @@
 package schema
 
 import (
-	"github.com/tidwall/gjson"
+	"github.com/autom8ter/wolverine/internal/util"
 	"sort"
 )
 
@@ -24,16 +24,14 @@ func SortOrder(orderBy OrderBy, documents []*Document) []*Document {
 func compareField(field string, i, j *Document) bool {
 	iFieldVal := i.result.Get(field)
 	jFieldVal := j.result.Get(field)
-	switch i.result.Get(field).Type {
-	case gjson.Null:
-		return false
-	case gjson.False:
+	switch i.result.Get(field).Value().(type) {
+	case bool:
 		return iFieldVal.Bool() && !jFieldVal.Bool()
-	case gjson.Number:
+	case float64:
 		return iFieldVal.Float() > jFieldVal.Float()
-	case gjson.String:
+	case string:
 		return iFieldVal.String() > jFieldVal.String()
 	default:
-		return iFieldVal.String() > jFieldVal.String()
+		return util.JSONString(iFieldVal.Value()) > util.JSONString(jFieldVal.Value())
 	}
 }

@@ -22,9 +22,9 @@ func timer() func(t *testing.T) {
 
 func Test(t *testing.T) {
 	t.Run("set", func(t *testing.T) {
-		timer := timer()
-		defer timer(t)
 		assert.Nil(t, testutil.TestDB(testutil.AllCollections, func(ctx context.Context, db *wolverine.DB) {
+			timer := timer()
+			defer timer(t)
 			assert.Nil(t, db.Collection(ctx, "user", func(collection *wolverine.Collection) error {
 				for i := 0; i < 10; i++ {
 					assert.Nil(t, collection.Set(ctx, testutil.NewUserDoc()))
@@ -40,7 +40,7 @@ func Test(t *testing.T) {
 			t.Run("batch set", func(t *testing.T) {
 				timer := timer()
 				defer timer(t)
-				for i := 0; i < 1000; i++ {
+				for i := 0; i < 100; i++ {
 					usr := testutil.NewUserDoc()
 					ids = append(ids, collection.Schema().GetDocumentID(usr))
 					usrs = append(usrs, usr)
@@ -57,7 +57,7 @@ func Test(t *testing.T) {
 				defer timer(t)
 				allUsrs, err := collection.GetAll(ctx, ids)
 				assert.Nil(t, err)
-				assert.Equal(t, 1000, len(allUsrs))
+				assert.Equal(t, 100, len(allUsrs))
 			})
 			t.Run("get each", func(t *testing.T) {
 				timer := timer()
@@ -93,6 +93,29 @@ func Test(t *testing.T) {
 				}
 				t.Logf("found %v documents in %s", results.Count, results.Stats.ExecutionTime)
 			})
+			t.Run("query users account_id in 51-55", func(t *testing.T) {
+				timer := timer()
+				defer timer(t)
+				results, err := collection.Query(ctx, schema.Query{
+					Select: []string{"account_id"},
+					Where: []schema.Where{
+						{
+							Field: "account_id",
+							Op:    schema.In,
+							Value: []float64{51, 52, 53, 54, 55},
+						},
+					},
+					Page:    0,
+					Limit:   0,
+					OrderBy: schema.OrderBy{},
+				})
+				assert.Nil(t, err)
+				assert.Greater(t, len(results.Documents), 1)
+				for _, result := range results.Documents {
+					assert.Greater(t, result.GetFloat("account_id"), float64(50))
+				}
+				t.Logf("found %v documents in %s", results.Count, results.Stats.ExecutionTime)
+			})
 			t.Run("query all", func(t *testing.T) {
 				timer := timer()
 				defer timer(t)
@@ -103,7 +126,7 @@ func Test(t *testing.T) {
 					OrderBy: schema.OrderBy{},
 				})
 				assert.Nil(t, err)
-				assert.Equal(t, 1000, len(results.Documents))
+				assert.Equal(t, 100, len(results.Documents))
 				t.Logf("found %v documents in %s", results.Count, results.Stats.ExecutionTime)
 			})
 			t.Run("paginate all", func(t *testing.T) {
@@ -119,7 +142,7 @@ func Test(t *testing.T) {
 					return true
 				})
 				assert.Nil(t, err)
-				assert.Equal(t, 100, pageCount)
+				assert.Equal(t, 10, pageCount)
 			})
 			t.Run("aggregate account_id, gender, count", func(t *testing.T) {
 				results, err := collection.Aggregate(ctx, schema.AggregateQuery{

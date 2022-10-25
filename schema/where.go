@@ -16,6 +16,9 @@ const (
 	Lt WhereOp = "lt"
 	// Lte matches on greater than or equal to
 	Lte WhereOp = "lte"
+	// Contains matches on text containing a substring
+	Contains WhereOp = "contains"
+	In       WhereOp = "in"
 )
 
 // Where is field-level filter for database queries

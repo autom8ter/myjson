@@ -10,6 +10,7 @@ import (
 	"github.com/tidwall/gjson"
 	"github.com/tidwall/sjson"
 	"io"
+	"strings"
 )
 
 // Document is a database document with special attributes.
@@ -108,7 +109,7 @@ func (d *Document) Get(field string) any {
 
 // GetString gets a string field value on the document. Get has GJSON syntax support and supports dot notation
 func (d *Document) GetString(field string) string {
-	return d.result.Get(field).String()
+	return cast.ToString(d.result.Get(field).Value())
 }
 
 // GetBool gets a bool field value on the document. GetBool has GJSON syntax support and supports dot notation
@@ -190,6 +191,24 @@ func (d *Document) Where(wheres []Where) (bool, error) {
 			}
 		case "<=", Lte:
 			if d.GetFloat(w.Field) > cast.ToFloat64(w.Value) {
+				return false, nil
+			}
+		case In:
+			bits, _ := json.Marshal(w.Value)
+			arr := gjson.ParseBytes(bits).Array()
+			value := d.Get(w.Field)
+			match := false
+			for _, element := range arr {
+				if element.Value() == value {
+					match = true
+				}
+			}
+			if !match {
+				return false, nil
+			}
+
+		case Contains:
+			if !strings.Contains(d.GetString(w.Field), cast.ToString(w.Value)) {
 				return false, nil
 			}
 		default:
