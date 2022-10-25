@@ -24,7 +24,7 @@ type Collection struct {
 	schema       *schema.Collection
 	kv           *badger.DB
 	fullText     bleve.Index
-	triggers     []schema.Trigger
+	hooks        schema.Hooks
 	machine      machine.Machine
 	errorHandler func(collection string, err error)
 	db           *DB
@@ -34,7 +34,8 @@ func (c *Collection) Schema() *schema.Collection {
 	return c.schema
 }
 
-func (c *Collection) persistStateChange(ctx context.Context, event schema.StateChange) error {
+func (c *Collection) persistStateChange(ctx context.Context, change schema.StateChange) error {
+	var err error
 	txn := c.kv.NewWriteBatch()
 	var batch *bleve.Batch
 	if c.schema == nil {
@@ -43,8 +44,16 @@ func (c *Collection) persistStateChange(ctx context.Context, event schema.StateC
 	if c.schema.Indexing().HasSearchIndex() {
 		batch = c.fullText.NewBatch()
 	}
-	if event.Updates != nil {
-		for id, edit := range event.Updates {
+	for _, c := range c.hooks.StateChangeHooks {
+		if c.Function != nil && c.Timing == schema.Before {
+			ctx, change, err = c.Function(ctx, change)
+			if err != nil {
+				return stacktrace.Propagate(err, "")
+			}
+		}
+	}
+	if change.Updates != nil {
+		for id, edit := range change.Updates {
 			before, _ := c.Get(ctx, id)
 			after, err := before.SetAll(edit)
 			if err != nil {
@@ -55,13 +64,13 @@ func (c *Collection) persistStateChange(ctx context.Context, event schema.StateC
 			}
 		}
 	}
-	for _, id := range event.Deletes {
+	for _, id := range change.Deletes {
 		before, _ := c.Get(ctx, id)
 		if err := c.indexDocument(ctx, txn, batch, schema.Delete, id, before, schema.NewDocument()); err != nil {
 			return stacktrace.Propagate(err, "")
 		}
 	}
-	for _, after := range event.Sets {
+	for _, after := range change.Sets {
 		if !after.Valid() {
 			return stacktrace.NewErrorWithCode(errors.ErrTODO, "invalid json document")
 		}
@@ -83,9 +92,17 @@ func (c *Collection) persistStateChange(ctx context.Context, event schema.StateC
 	if err := txn.Flush(); err != nil {
 		return stacktrace.Propagate(err, "failed to batch collection documents")
 	}
+	for _, c := range c.hooks.StateChangeHooks {
+		if c.Function != nil && c.Timing == schema.After {
+			ctx, change, err = c.Function(ctx, change)
+			if err != nil {
+				return stacktrace.Propagate(err, "")
+			}
+		}
+	}
 	c.machine.Publish(ctx, machine.Message{
-		Channel: event.Collection,
-		Body:    event,
+		Channel: change.Collection,
+		Body:    change,
 	})
 	return nil
 }
@@ -97,11 +114,6 @@ func (c *Collection) indexDocument(ctx context.Context, txn *badger.WriteBatch, 
 	pkey, err := c.schema.GetPrimaryKeyRef(docId)
 	if err != nil {
 		return stacktrace.PropagateWithCode(err, errors.ErrTODO, "failed to get document %s/%s primary key ref", c.schema.Collection(), docId)
-	}
-	for _, c := range c.triggers {
-		if err := c(ctx, action, schema.Before, before, after); err != nil {
-			return stacktrace.Propagate(err, "trigger failure")
-		}
 	}
 	switch action {
 	case schema.Delete:
@@ -162,12 +174,6 @@ func (c *Collection) indexDocument(ctx context.Context, txn *badger.WriteBatch, 
 			if err := batch.Index(docId, after.Value()); err != nil {
 				return stacktrace.PropagateWithCode(err, errors.ErrTODO, "failed to batch set documents to search index")
 			}
-		}
-	}
-
-	for _, t := range c.triggers {
-		if err := t(ctx, action, schema.After, before, after); err != nil {
-			return stacktrace.Propagate(err, "trigger failure")
 		}
 	}
 	return nil
@@ -231,9 +237,13 @@ func (c *Collection) Query(ctx context.Context, query schema.Query) (schema.Page
 		results = results[:query.Limit]
 	}
 
-	if len(query.Select) > 0 {
+	if len(query.Select) > 0 && query.Select[0] != "*" {
 		for i, result := range results {
-			results[i] = result.Select(query.Select)
+			selected, err := result.Select(query.Select)
+			if err != nil {
+				return schema.Page{}, stacktrace.Propagate(err, "")
+			}
+			results[i] = selected
 		}
 	}
 
@@ -328,13 +338,13 @@ func (c *Collection) QueryPaginate(ctx context.Context, query schema.Query, hand
 
 func (c *Collection) ChangeStream(ctx context.Context, fn schema.ChangeStreamHandler) error {
 	return c.machine.Subscribe(ctx, c.schema.Collection(), func(ctx context.Context, msg machine.Message) (bool, error) {
-		switch event := msg.Body.(type) {
+		switch change := msg.Body.(type) {
 		case *schema.StateChange:
-			if err := fn(ctx, event); err != nil {
+			if err := fn(ctx, *change); err != nil {
 				return false, stacktrace.Propagate(err, "")
 			}
 		case schema.StateChange:
-			if err := fn(ctx, &event); err != nil {
+			if err := fn(ctx, change); err != nil {
 				return false, stacktrace.Propagate(err, "")
 			}
 		}
@@ -346,6 +356,7 @@ func (c *Collection) Set(ctx context.Context, document schema.Document) error {
 	return stacktrace.Propagate(c.persistStateChange(ctx, schema.StateChange{
 		Collection: c.schema.Collection(),
 		Sets:       []schema.Document{document},
+		Timestamp:  time.Now(),
 	}), "")
 }
 
@@ -353,6 +364,7 @@ func (c *Collection) BatchSet(ctx context.Context, batch []schema.Document) erro
 	return stacktrace.Propagate(c.persistStateChange(ctx, schema.StateChange{
 		Collection: c.schema.Collection(),
 		Sets:       batch,
+		Timestamp:  time.Now(),
 	}), "")
 }
 
@@ -362,6 +374,7 @@ func (c *Collection) Update(ctx context.Context, id string, update map[string]an
 		Updates: map[string]map[string]any{
 			id: update,
 		},
+		Timestamp: time.Now(),
 	}), "")
 }
 
@@ -369,6 +382,7 @@ func (c *Collection) BatchUpdate(ctx context.Context, batch map[string]map[strin
 	return c.persistStateChange(ctx, schema.StateChange{
 		Collection: c.schema.Collection(),
 		Updates:    batch,
+		Timestamp:  time.Now(),
 	})
 }
 
@@ -376,6 +390,7 @@ func (c *Collection) Delete(ctx context.Context, id string) error {
 	return c.persistStateChange(ctx, schema.StateChange{
 		Collection: c.schema.Collection(),
 		Deletes:    []string{id},
+		Timestamp:  time.Now(),
 	})
 }
 
@@ -383,6 +398,7 @@ func (c *Collection) BatchDelete(ctx context.Context, ids []string) error {
 	return c.persistStateChange(ctx, schema.StateChange{
 		Collection: c.schema.Collection(),
 		Deletes:    ids,
+		Timestamp:  time.Now(),
 	})
 }
 
@@ -488,7 +504,11 @@ func (c *Collection) Aggregate(ctx context.Context, query schema.AggregateQuery)
 		for _, a := range query.Aggregates {
 			toSelect = append(toSelect, a.Alias)
 		}
-		reduced[i] = r.Select(toSelect)
+		selected, err := r.Select(toSelect)
+		if err != nil {
+			return schema.Page{}, stacktrace.Propagate(err, "")
+		}
+		reduced[i] = selected
 	}
 	return schema.Page{
 		Documents: reduced,
@@ -662,9 +682,13 @@ func (c *Collection) Search(ctx context.Context, q schema.SearchQuery) (schema.P
 		data = append(data, record)
 	}
 
-	if len(q.Select) > 0 {
+	if len(q.Select) > 0 && q.Select[0] != "*" {
 		for i, r := range data {
-			data[i] = r.Select(q.Select)
+			selected, err := r.Select(q.Select)
+			if err != nil {
+				return schema.Page{}, stacktrace.Propagate(err, "")
+			}
+			data[i] = selected
 		}
 	}
 	return schema.Page{

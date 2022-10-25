@@ -59,30 +59,26 @@ func TestDocument(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		r2 = r.Merge(r2)
+		r2, err = r.Merge(r2)
+		assert.Nil(t, err)
 		assert.Equal(t, usr2.Contact.Email, r2.GetString("contact.email"))
 		assert.Equal(t, usr.Contact.Phone, r2.GetString("contact.phone"))
 	})
-	t.Run("empty", func(t *testing.T) {
+	t.Run("valid", func(t *testing.T) {
 		r := schema.NewDocument()
 		assert.Equal(t, true, r.Valid())
+		r, err := schema.NewDocumentFrom([]any{1})
+		assert.NotNil(t, err)
 	})
 	t.Run("clone", func(t *testing.T) {
 		cloned := r.Clone()
 		assert.Equal(t, r.String(), cloned.String())
 	})
 	t.Run("del", func(t *testing.T) {
-		r.Del("annotations")
+		r, err := r.Del("annotations")
+		assert.Nil(t, err)
 		val := r.Get("annotations")
 		assert.Nil(t, val)
-	})
-	t.Run("del", func(t *testing.T) {
-		r.Del("annotations")
-		val := r.Get("annotations")
-		assert.Nil(t, val)
-	})
-	t.Run("del", func(t *testing.T) {
-		assert.Equal(t, r.Value()["name"], "john smith")
 	})
 	t.Run("bytes", func(t *testing.T) {
 		assert.Equal(t, r.String(), string(r.Bytes()))
@@ -94,17 +90,22 @@ func TestDocument(t *testing.T) {
 	})
 	t.Run("select", func(t *testing.T) {
 		before := r.Get("contact.email")
-		selected := r.Select([]string{"contact.email"})
+		selected, err := r.Select([]string{"contact.email"})
+		assert.Nil(t, err)
 		after := selected.Get("contact.email")
 		assert.Equal(t, before, after)
 		assert.Nil(t, selected.Get("name"))
 	})
 	t.Run("set all", func(t *testing.T) {
 		c := r.Clone()
-		c = c.SetAll(map[string]any{
+		c, err = c.SetAll(map[string]any{
 			"contact.email": gofakeit.Email(),
 		})
+		assert.Nil(t, err)
 		assert.NotEqual(t, r.Get("contact.email"), c.Get("contact.email"))
+	})
+	t.Run("valid", func(t *testing.T) {
+
 	})
 
 	t.Run("where", func(t *testing.T) {
@@ -265,5 +266,29 @@ func TestDocument(t *testing.T) {
 		bits, err := json.Marshal(result)
 		assert.Nil(t, err)
 		t.Log(string(bits))
+	})
+}
+
+func BenchmarkDocument(b *testing.B) {
+	b.ReportAllocs()
+	doc := testutil.NewUserDoc()
+
+	// BenchmarkDocument/set-12             	  545349	      2145 ns/op	    1744 B/op	       7 allocs/op
+	b.Run("set", func(b *testing.B) {
+		b.ReportAllocs()
+		email := gofakeit.Email()
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			_, err := doc.Set("contact.email", email)
+			assert.Nil(b, err)
+		}
+	})
+	// BenchmarkDocument/get-12         	 3369182	       356.2 ns/op	      16 B/op	       1 allocs/op
+	b.Run("get", func(b *testing.B) {
+		b.ReportAllocs()
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			_ = doc.Get("contact.email")
+		}
 	})
 }
