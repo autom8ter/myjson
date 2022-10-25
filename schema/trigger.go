@@ -2,66 +2,42 @@ package schema
 
 import (
 	"context"
+	"github.com/autom8ter/wolverine/internal/util"
+	"github.com/autom8ter/wolverine/javascript"
+	"github.com/palantir/stacktrace"
 )
 
-type Timing string
+type HookPoint string
 
 const (
-	Before Timing = "before"
-	After  Timing = "after"
+	BeforeQuery       HookPoint = "beforeQuery"
+	BeforeStateChange HookPoint = "beforeStateChange"
 )
 
-type Hooks struct {
-	QueryHooks       []QueryHook       `json:"queryHooks"`
-	SearchQueryHooks []SearchQueryHook `json:"searchQueryHooks"`
-	GetHooks         []GetHook         `json:"getHooks"`
-	ReadHooks        []ReadHook        `json:"readHooks"`
-	StateChangeHooks []StateChangeHook `json:"stateChangeHooks"`
+type Hook struct {
+	Name            string
+	HookPoint       HookPoint
+	Func            HookFunc
+	IsInternal      bool
+	IsDeterministic bool
 }
 
-type QueryHook struct {
-	Name            string                                                                 `json:"name"`
-	Function        func(ctx context.Context, query Query) (context.Context, Query, error) `json:"-"`
-	IsInternal      bool                                                                   `json:"isInternal"`
-	IsDeterministic bool                                                                   `json:"isDeterministic"`
-}
+type HookFunc func(ctx context.Context, input any) (context.Context, any, error)
 
-type SearchQueryHook struct {
-	Name            string                                                                             `json:"name"`
-	Timing          Timing                                                                             `json:"timing"`
-	Function        func(ctx context.Context, query SearchQuery) (context.Context, SearchQuery, error) `json:"-"`
-	IsInternal      bool                                                                               `json:"isInternal"`
-	IsDeterministic bool                                                                               `json:"isDeterministic"`
-}
-
-type AggregateQueryHook struct {
-	Name            string                                                                                   `json:"name"`
-	Timing          Timing                                                                                   `json:"timing"`
-	Function        func(ctx context.Context, query AggregateQuery) (context.Context, AggregateQuery, error) `json:"-"`
-	IsInternal      bool                                                                                     `json:"isInternal"`
-	IsDeterministic bool                                                                                     `json:"isDeterministic"`
-}
-
-type GetHook struct {
-	Name            string                                     `json:"name"`
-	Timing          Timing                                     `json:"timing"`
-	Function        func(ctx context.Context, id string) error `json:"-"`
-	IsInternal      bool                                       `json:"isInternal"`
-	IsDeterministic bool                                       `json:"isDeterministic"`
-}
-
-type ReadHook struct {
-	Name            string                                                                          `json:"name"`
-	Timing          Timing                                                                          `json:"timing"`
-	Function        func(ctx context.Context, document Document) (context.Context, Document, error) `json:"-"`
-	IsInternal      bool                                                                            `json:"isInternal"`
-	IsDeterministic bool                                                                            `json:"isDeterministic"`
-}
-
-type StateChangeHook struct {
-	Name            string                                                                              `json:"name"`
-	Timing          Timing                                                                              `json:"timing"`
-	Function        func(ctx context.Context, change StateChange) (context.Context, StateChange, error) `json:"-"`
-	IsInternal      bool                                                                                `json:"isInternal"`
-	IsDeterministic bool                                                                                `json:"isDeterministic"`
+func JavascriptHookFunc(script string) HookFunc {
+	return func(ctx context.Context, input any) (context.Context, any, error) {
+		fn, err := javascript.Script(script).Parse()
+		if err != nil {
+			return ctx, nil, stacktrace.Propagate(err, "")
+		}
+		out, err := fn(input)
+		if err != nil {
+			return ctx, nil, stacktrace.Propagate(err, "")
+		}
+		var after StateChange
+		if err := util.Decode(out, after); err != nil {
+			return ctx, nil, stacktrace.Propagate(err, "")
+		}
+		return ctx, after, nil
+	}
 }

@@ -80,7 +80,7 @@ func New(ctx context.Context, cfg Config) (*DB, error) {
 		c := &Collection{
 			schema:       collection,
 			kv:           d.kv,
-			hooks:        schema.Hooks{},
+			core:         getCoreV1(),
 			machine:      d.machine,
 			errorHandler: d.errorHandler,
 			db:           d,
@@ -98,7 +98,7 @@ func New(ctx context.Context, cfg Config) (*DB, error) {
 		c := &Collection{
 			schema:       systemCollection,
 			kv:           d.kv,
-			hooks:        schema.Hooks{},
+			core:         getCoreV1(),
 			machine:      d.machine,
 			errorHandler: d.errorHandler,
 			db:           d,
