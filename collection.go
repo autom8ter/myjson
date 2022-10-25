@@ -516,7 +516,7 @@ func (c *Collection) Aggregate(ctx context.Context, query schema.AggregateQuery)
 	})
 	var reduced []*schema.Document
 	for _, values := range grouped {
-		value, err := query.Reduce(ctx, values)
+		value, err := schema.ApplyReducers(ctx, query, values)
 		if err != nil {
 			return schema.Page{}, stacktrace.Propagate(err, "")
 		}

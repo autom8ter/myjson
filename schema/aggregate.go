@@ -43,7 +43,7 @@ func (a AggregateQuery) String() string {
 	return string(bits)
 }
 
-func (a AggregateQuery) Reduce(ctx context.Context, documents []*Document) (*Document, error) {
+func ApplyReducers(ctx context.Context, a AggregateQuery, documents []*Document) (*Document, error) {
 	var aggregated *Document
 	for _, next := range documents {
 		if aggregated == nil {
