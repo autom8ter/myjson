@@ -13,8 +13,17 @@ import (
 	"time"
 )
 
+func timer() func(t *testing.T) {
+	now := time.Now()
+	return func(t *testing.T) {
+		t.Logf("duration: %s", time.Since(now))
+	}
+}
+
 func Test(t *testing.T) {
 	t.Run("set", func(t *testing.T) {
+		timer := timer()
+		defer timer(t)
 		assert.Nil(t, testutil.TestDB(testutil.AllCollections, func(ctx context.Context, db *wolverine.DB) {
 			assert.Nil(t, db.Collection(ctx, "user", func(collection *wolverine.Collection) error {
 				for i := 0; i < 10; i++ {
@@ -29,6 +38,8 @@ func Test(t *testing.T) {
 			var usrs []*schema.Document
 			var ids []string
 			t.Run("batch set", func(t *testing.T) {
+				timer := timer()
+				defer timer(t)
 				for i := 0; i < 1000; i++ {
 					usr := testutil.NewUserDoc()
 					ids = append(ids, collection.Schema().GetDocumentID(usr))
@@ -37,14 +48,20 @@ func Test(t *testing.T) {
 				assert.Nil(t, collection.BatchSet(ctx, usrs))
 			})
 			t.Run("reindex", func(t *testing.T) {
+				timer := timer()
+				defer timer(t)
 				assert.Nil(t, collection.Reindex(ctx))
 			})
 			t.Run("get all", func(t *testing.T) {
+				timer := timer()
+				defer timer(t)
 				allUsrs, err := collection.GetAll(ctx, ids)
 				assert.Nil(t, err)
 				assert.Equal(t, 1000, len(allUsrs))
 			})
 			t.Run("get each", func(t *testing.T) {
+				timer := timer()
+				defer timer(t)
 				for _, u := range usrs {
 					usr, err := collection.Get(ctx, collection.Schema().GetDocumentID(u))
 					if err != nil {
@@ -54,6 +71,8 @@ func Test(t *testing.T) {
 				}
 			})
 			t.Run("query users account_id > 50", func(t *testing.T) {
+				timer := timer()
+				defer timer(t)
 				results, err := collection.Query(ctx, schema.Query{
 					Select: []string{"account_id"},
 					Where: []schema.Where{
@@ -75,6 +94,8 @@ func Test(t *testing.T) {
 				t.Logf("found %v documents in %s", results.Count, results.Stats.ExecutionTime)
 			})
 			t.Run("query all", func(t *testing.T) {
+				timer := timer()
+				defer timer(t)
 				results, err := collection.Query(ctx, schema.Query{
 					Select:  nil,
 					Page:    0,
@@ -86,6 +107,8 @@ func Test(t *testing.T) {
 				t.Logf("found %v documents in %s", results.Count, results.Stats.ExecutionTime)
 			})
 			t.Run("paginate all", func(t *testing.T) {
+				timer := timer()
+				defer timer(t)
 				pageCount := 0
 				err := collection.QueryPaginate(ctx, schema.Query{
 					Page:    0,

@@ -3,6 +3,8 @@ package testutil
 import (
 	"context"
 	"github.com/autom8ter/wolverine/schema"
+	"io/ioutil"
+	"os"
 	"time"
 
 	"github.com/brianvoe/gofakeit/v6"
@@ -67,10 +69,16 @@ func NewTaskDoc(usrID string) *schema.Document {
 const MyEmail = "colemanword@gmail.com"
 
 func TestDB(collections []*schema.Collection, fn func(ctx context.Context, db *wolverine.DB)) error {
+	dir, err := ioutil.TempDir(".", "")
+	if err != nil {
+		return err
+	}
+	defer os.RemoveAll(dir)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
 	db, err := wolverine.New(ctx, wolverine.Config{
+		StoragePath: dir,
 		Collections: collections,
 	})
 	if err != nil {

@@ -15,10 +15,12 @@ import (
 	"github.com/spf13/cast"
 	"golang.org/x/sync/errgroup"
 	"strings"
+	"sync"
 	"time"
 )
 
 type Collection struct {
+	wg           sync.WaitGroup
 	schema       *schema.Collection
 	kv           *badger.DB
 	fullText     bleve.Index
@@ -37,6 +39,9 @@ func (c *Collection) persistEvent(ctx context.Context, event *schema.Event) erro
 		return nil
 	}
 	for _, document := range event.Documents {
+		if document.Get("_collection") != c.schema.Collection() {
+			document.Set("_collection", c.schema.Collection())
+		}
 		if !document.Valid() {
 			return stacktrace.NewErrorWithCode(errors.ErrTODO, "invalid json document")
 		}
@@ -65,9 +70,10 @@ func (c *Collection) persistEvent(ctx context.Context, event *schema.Event) erro
 			return stacktrace.Propagate(err, "")
 		}
 	}
+
 	if batch != nil {
 		if err := c.fullText.Batch(batch); err != nil {
-			return stacktrace.PropagateWithCode(err, errors.ErrTODO, "failed to batch documents")
+			c.db.errorHandler(c.schema.Collection(), err)
 		}
 	}
 	if err := txn.Flush(); err != nil {
@@ -794,11 +800,13 @@ func (c *Collection) Reindex(ctx context.Context) error {
 }
 
 func (c *Collection) Close(ctx context.Context) error {
-	//c.wg.Wait()
+	c.wg.Wait()
 	var err error
 	err = multierror.Append(err, c.kv.Sync())
 	err = multierror.Append(err, c.kv.Close())
-	err = multierror.Append(err, c.fullText.Close())
+	if c.fullText != nil {
+		err = multierror.Append(err, c.fullText.Close())
+	}
 	if err, ok := err.(*multierror.Error); ok && len(err.Errors) > 0 {
 		return stacktrace.Propagate(err, "database close failure")
 	}
@@ -826,4 +834,34 @@ func (c *Collection) GetRelationship(ctx context.Context, field string, document
 		}
 	}
 	return nil, stacktrace.NewErrorWithCode(errors.ErrTODO, "relationship %s does not exist", field)
+}
+
+func (c *Collection) Info(ctx context.Context) (CollectionInfo, error) {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	index, err := c.schema.OptimizeQueryIndex([]schema.Where{}, schema.OrderBy{})
+	if err != nil {
+		return CollectionInfo{}, stacktrace.Propagate(err, "")
+	}
+	count := 0
+	if err := c.kv.View(func(txn *badger.Txn) error {
+		opts := badger.DefaultIteratorOptions
+		opts.PrefetchValues = true
+		opts.PrefetchSize = 10
+		opts.Prefix = index.Ref.GetPrefix(schema.IndexableFields([]schema.Where{}, schema.OrderBy{}), "")
+		seek := opts.Prefix
+		it := txn.NewIterator(opts)
+		it.Seek(seek)
+		defer it.Close()
+
+		for it.ValidForPrefix(opts.Prefix) {
+			_ = it.Item()
+			count++
+			it.Next()
+		}
+		return nil
+	}); err != nil {
+		return CollectionInfo{}, stacktrace.Propagate(err, "")
+	}
+	return CollectionInfo{Count: count}, nil
 }

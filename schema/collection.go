@@ -29,7 +29,7 @@ type Collection struct {
 	indexing      *Indexing
 	relationships *Relationships
 	collection    string
-	properties    map[string]gjson.Result
+	properties    gjson.Result
 	loadedSchema  *gojsonschema.Schema
 }
 
@@ -67,8 +67,8 @@ func (c *Collection) ParseSchema() error {
 	if !gjson.Get(c.Schema, fmt.Sprintf("properties.%s", indexing.PrimaryKey)).Exists() {
 		return stacktrace.PropagateWithCode(err, errors.ErrTODO, "primary key field does not exist in properties: %s", c.collection)
 	}
-	c.properties = gjson.Get(c.Schema, "properties").Map()
-	for field, value := range c.properties {
+	c.properties = gjson.Get(c.Schema, "properties")
+	for field, value := range c.properties.Map() {
 		if fkey := value.Get("@foreignKey").Value(); fkey != "" {
 			var foreignKey ForeignKey
 			if err := util.Decode(fkey, &foreignKey); err != nil {
