@@ -1,6 +1,6 @@
 # Wolverine
 
-An embedded NoSQL database with support for full text search
+An embedded NoSQL database with support for JSON schemas, full text search, and aggregation
 
     go get -u github.com/autom8ter/wolverine
 
@@ -50,18 +50,12 @@ Build powerful, extensible, and feature-rich microservices without database depe
 - [x] query update
 - [x] query delete
 - [x] pagination
-- [ ] multi-field order by
-- [ ] unique constraints
-- [ ] external data importer
 
 ### System/Admin Engine
 
 - [x] backup
 - [x] restore
 - [x] reindex
-- [ ] incremental backup
-- [ ] migrations
-- [ ] distributed (raft)
 
 ### Extensibility
 
@@ -72,21 +66,130 @@ Build powerful, extensible, and feature-rich microservices without database depe
 
 ### Road to Beta
 
+- [ ] unique constraints
+- [ ] external data importer
+- [ ] incremental backup
+- [ ] migrations
+- [ ] better errors & error codes
+- [ ] cicd
 - [ ] awesome readme
 - [ ] benchmarks
 - [ ] examples
-- [ ] better errors & error codes
 - [ ] 80% test coverage
 - [ ] extensive comments
-- [ ] cicd
 
 ### Beta+ Roadmap
 
 - [ ] SQL-like query language
 - [ ] views
 - [ ] materialized views
+- [ ] multi-field order by
+- [ ] distributed (raft)
 
-## Contributing
+# Getting Started
+
+Create a collection schema:
+
+```json
+{
+  "$id": "https://example.com/user.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "User",
+  "type": "object",
+  "@config": {
+    "collection": "user",
+    "indexing": {
+      "query": [
+        {
+          "fields": [
+            "contact.email"
+          ]
+        },
+        {
+          "fields": [
+            "account_id"
+          ]
+        },
+        {
+          "fields": [
+            "language"
+          ]
+        }
+      ],
+      "search": [
+        {
+          "fields": [
+            "contact.email"
+          ]
+        }
+      ]
+    }
+  },
+  "required": [
+    "_id",
+    "name",
+    "age",
+    "contact",
+    "gender",
+    "account_id"
+  ],
+  "properties": {
+    "_id": {
+      "@primary": true,
+      "type": "string",
+      "description": "The user's id."
+    },
+    "name": {
+      "type": "string",
+      "description": "The user's name."
+    },
+    "contact": {
+      "type": "object",
+      "properties": {
+        "email": {
+          "type": "string",
+          "description": "The user's email."
+        }
+      }
+    },
+    "age": {
+      "description": "Age in years which must be equal to or greater than zero.",
+      "type": "integer",
+      "minimum": 0
+    },
+    "account_id": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "language": {
+      "type": "string",
+      "description": "The user's first language."
+    },
+    "gender": {
+      "type": "string",
+      "description": "The user's gender.",
+      "enum": [
+        "male",
+        "female"
+      ]
+    },
+    "timestamp": {
+      "type": "string"
+    },
+    "annotations": {
+      "type": "object"
+    }
+  }
+}
+```
+
+Instantiate a database instance:
+
+```go
+
+```
+
+# Contributing
 
 Install Dependencies
 

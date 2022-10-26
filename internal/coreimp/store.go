@@ -263,7 +263,7 @@ func (d defaultStore) persistCollection(ctx context.Context, collection *core.Co
 		if !after.Valid() {
 			return stacktrace.NewErrorWithCode(errors.ErrTODO, "invalid json document")
 		}
-		docId := collection.GetDocumentID(after)
+		docId := collection.GetPKey(after)
 		if docId == "" {
 			return stacktrace.NewErrorWithCode(errors.ErrTODO, "document missing primary key %s", collection.PKey())
 		}
@@ -314,8 +314,8 @@ func (d defaultStore) indexDocument(ctx context.Context, collection *core.Collec
 			batch.Delete(docId)
 		}
 	case core.Set, core.Update:
-		if collection.GetDocumentID(after) != docId {
-			return stacktrace.NewErrorWithCode(errors.ErrTODO, "document id is immutable: %v -> %v", collection.GetDocumentID(after), docId)
+		if collection.GetPKey(after) != docId {
+			return stacktrace.NewErrorWithCode(errors.ErrTODO, "document id is immutable: %v -> %v", collection.GetPKey(after), docId)
 		}
 		err := collection.Validate(ctx, after.Bytes())
 		if err != nil {

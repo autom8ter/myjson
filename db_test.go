@@ -46,7 +46,7 @@ func Test(t *testing.T) {
 				assert.Nil(t, err)
 				u, err := collection.Get(ctx, id)
 				assert.Nil(t, err)
-				assert.Equal(t, id, collection.Schema().GetDocumentID(u))
+				assert.Equal(t, id, collection.Schema().GetPKey(u))
 				return nil
 			}))
 		}))
@@ -96,7 +96,7 @@ func Test(t *testing.T) {
 				defer timer(t)
 				for i := 0; i < 100; i++ {
 					usr := testutil.NewUserDoc()
-					ids = append(ids, collection.Schema().GetDocumentID(usr))
+					ids = append(ids, collection.Schema().GetPKey(usr))
 					usrs = append(usrs, usr)
 				}
 				assert.Nil(t, collection.BatchSet(ctx, usrs))
@@ -117,7 +117,7 @@ func Test(t *testing.T) {
 				timer := timer()
 				defer timer(t)
 				for _, u := range usrs {
-					usr, err := collection.Get(ctx, collection.Schema().GetDocumentID(u))
+					usr, err := collection.Get(ctx, collection.Schema().GetPKey(u))
 					if err != nil {
 						t.Fatal(err)
 					}
@@ -325,7 +325,7 @@ func Test(t *testing.T) {
 			})
 			t.Run("update contact.email", func(t *testing.T) {
 				for _, u := range usrs {
-					id := collection.Schema().GetDocumentID(u)
+					id := collection.Schema().GetPKey(u)
 					email := gofakeit.Email()
 					assert.Nil(t, collection.Update(ctx, id, map[string]any{
 						"contact.email": email,
@@ -405,7 +405,7 @@ func Benchmark(b *testing.B) {
 				assert.Nil(b, collection.Set(ctx, doc))
 				b.ResetTimer()
 				for i := 0; i < b.N; i++ {
-					_, err := collection.Get(ctx, collection.Schema().GetDocumentID(doc))
+					_, err := collection.Get(ctx, collection.Schema().GetPKey(doc))
 					assert.Nil(b, err)
 				}
 				return nil

@@ -5,7 +5,6 @@ import (
 	"github.com/autom8ter/wolverine/errors"
 	"github.com/autom8ter/wolverine/internal/prefix"
 	"github.com/palantir/stacktrace"
-	"github.com/segmentio/ksuid"
 	"github.com/spf13/cast"
 	"gopkg.in/yaml.v3"
 	"io/fs"
@@ -150,9 +149,9 @@ func (c *Collection) GetPrimaryKeyRef(documentID string) ([]byte, error) {
 	}, documentID), nil
 }
 
-// SetID sets the documents primary key
-func (c *Collection) SetID(d *Document) error {
-	return stacktrace.Propagate(d.Set(c.Config().PrimaryKey, ksuid.New().String()), "")
+// SetPKey sets the documents primary key
+func (c *Collection) SetPKey(d *Document, id string) error {
+	return stacktrace.Propagate(d.Set(c.Config().PrimaryKey, id), "")
 }
 
 func (c *Collection) QueryIndexPrefix(i QueryIndex) *prefix.PrefixIndexRef {
@@ -201,6 +200,7 @@ func (c *Collection) getQueryIndex(whereFields []string, orderBy string) (QueryI
 	}, nil
 }
 
-func (c *Collection) GetDocumentID(d *Document) string {
+// GetPkey gets the documents primary key(if it exists)
+func (c *Collection) GetPKey(d *Document) string {
 	return cast.ToString(d.Get(c.Config().PrimaryKey))
 }

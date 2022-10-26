@@ -9,6 +9,7 @@ import (
 	"time"
 )
 
+// Collection is collection of documents in the database with the same schema. !-many collections are supported.
 type Collection struct {
 	schema *core.Collection
 	db     *DB
@@ -19,7 +20,7 @@ func (c *Collection) DB() *DB {
 	return c.db
 }
 
-// Schema
+// Schema returns the collecctions schema information
 func (c *Collection) Schema() *core.Collection {
 	return c.schema
 }
@@ -28,17 +29,17 @@ func (c *Collection) persistStateChange(ctx context.Context, change core.StateCh
 	return c.db.core.Persist(ctx, c.schema, change)
 }
 
-// Query
+// Query queries a list of documents
 func (c *Collection) Query(ctx context.Context, query core.Query) (core.Page, error) {
 	return c.db.core.Query(ctx, c.schema, query)
 }
 
-// Get
+// Get gets a single document by id
 func (c *Collection) Get(ctx context.Context, id string) (*core.Document, error) {
 	return c.db.core.Get(ctx, c.schema, id)
 }
 
-// GetAll
+// GetAll gets all documents by ids
 func (c *Collection) GetAll(ctx context.Context, ids []string) ([]*core.Document, error) {
 	return c.db.core.GetAll(ctx, c.schema, ids)
 }
@@ -67,35 +68,39 @@ func (c *Collection) QueryPaginate(ctx context.Context, query core.Query, handle
 	}
 }
 
-// ChangeStream
+// ChangeStream streams all state changes to the given function
 func (c *Collection) ChangeStream(ctx context.Context, fn core.ChangeStreamHandler) error {
 	return c.db.core.ChangeStream(ctx, c.schema, fn)
 }
 
-// Create
+// Create creates a new document - if the documents primary key is unset, it will be set as a sortable unique id
 func (c *Collection) Create(ctx context.Context, document *core.Document) (string, error) {
-	id := ksuid.New().String()
-	err := document.Set(c.schema.PKey(), id)
-	if err != nil {
-		return "", stacktrace.Propagate(err, "")
+	if c.schema.GetPKey(document) == "" {
+		id := ksuid.New().String()
+		err := c.schema.SetPKey(document, id)
+		if err != nil {
+			return "", stacktrace.Propagate(err, "")
+		}
 	}
-	return id, stacktrace.Propagate(c.persistStateChange(ctx, core.StateChange{
+	return c.schema.GetPKey(document), stacktrace.Propagate(c.persistStateChange(ctx, core.StateChange{
 		Collection: c.schema.Collection(),
 		Sets:       []*core.Document{document},
 		Timestamp:  time.Now(),
 	}), "")
 }
 
-// Create
+// BatchCreate creates 1-many documents. If each documents primary key is unset, it will be set as a sortable unique id.
 func (c *Collection) BatchCreate(ctx context.Context, documents []*core.Document) ([]string, error) {
 	var ids []string
 	for _, document := range documents {
-		id := ksuid.New().String()
-		err := document.Set(c.schema.PKey(), id)
-		if err != nil {
-			return nil, stacktrace.Propagate(err, "")
+		if c.schema.GetPKey(document) == "" {
+			id := ksuid.New().String()
+			err := c.schema.SetPKey(document, id)
+			if err != nil {
+				return nil, stacktrace.Propagate(err, "")
+			}
 		}
-		ids = append(ids, id)
+		ids = append(ids, c.schema.GetPKey(document))
 	}
 
 	if err := c.persistStateChange(ctx, core.StateChange{
@@ -108,7 +113,7 @@ func (c *Collection) BatchCreate(ctx context.Context, documents []*core.Document
 	return ids, nil
 }
 
-// Set
+// Set overwrites a single document. The documents primary key must be set.
 func (c *Collection) Set(ctx context.Context, document *core.Document) error {
 	return stacktrace.Propagate(c.persistStateChange(ctx, core.StateChange{
 		Collection: c.schema.Collection(),
@@ -117,7 +122,7 @@ func (c *Collection) Set(ctx context.Context, document *core.Document) error {
 	}), "")
 }
 
-// BatchSet
+// BatchSet overwrites 1-many documents. The documents primary key must be set.
 func (c *Collection) BatchSet(ctx context.Context, batch []*core.Document) error {
 	return stacktrace.Propagate(c.persistStateChange(ctx, core.StateChange{
 		Collection: c.schema.Collection(),
@@ -126,7 +131,7 @@ func (c *Collection) BatchSet(ctx context.Context, batch []*core.Document) error
 	}), "")
 }
 
-// Update
+// Update patches a single document. The documents primary key must be set.
 func (c *Collection) Update(ctx context.Context, id string, update map[string]any) error {
 	return stacktrace.Propagate(c.persistStateChange(ctx, core.StateChange{
 		Collection: c.schema.Collection(),
@@ -137,7 +142,7 @@ func (c *Collection) Update(ctx context.Context, id string, update map[string]an
 	}), "")
 }
 
-// BatchDelete
+// BatchUpdate patches a 1-many documents. The documents primary key must be set.
 func (c *Collection) BatchUpdate(ctx context.Context, batch map[string]map[string]any) error {
 	return stacktrace.Propagate(c.persistStateChange(ctx, core.StateChange{
 		Collection: c.schema.Collection(),
@@ -146,7 +151,7 @@ func (c *Collection) BatchUpdate(ctx context.Context, batch map[string]map[strin
 	}), "")
 }
 
-// Delete
+// Delete deletes a single document by id
 func (c *Collection) Delete(ctx context.Context, id string) error {
 	return stacktrace.Propagate(c.persistStateChange(ctx, core.StateChange{
 		Collection: c.schema.Collection(),
@@ -155,7 +160,7 @@ func (c *Collection) Delete(ctx context.Context, id string) error {
 	}), "")
 }
 
-// BatchDelete
+// BatchDelete deletes 1-many documents by id
 func (c *Collection) BatchDelete(ctx context.Context, ids []string) error {
 	return stacktrace.Propagate(c.persistStateChange(ctx, core.StateChange{
 		Collection: c.schema.Collection(),
@@ -164,7 +169,7 @@ func (c *Collection) BatchDelete(ctx context.Context, ids []string) error {
 	}), "")
 }
 
-// QueryUpdate
+// QueryUpdate updates the documents returned from the query
 func (c *Collection) QueryUpdate(ctx context.Context, update map[string]any, query core.Query) error {
 	results, err := c.Query(ctx, query)
 	if err != nil {
@@ -179,7 +184,7 @@ func (c *Collection) QueryUpdate(ctx context.Context, update map[string]any, que
 	return stacktrace.Propagate(c.BatchSet(ctx, results.Documents), "")
 }
 
-// QueryDelete
+// QueryDelete deletes the documents returned from the query
 func (c *Collection) QueryDelete(ctx context.Context, query core.Query) error {
 	results, err := c.Query(ctx, query)
 	if err != nil {
@@ -187,17 +192,17 @@ func (c *Collection) QueryDelete(ctx context.Context, query core.Query) error {
 	}
 	var ids []string
 	for _, document := range results.Documents {
-		ids = append(ids, c.schema.GetDocumentID(document))
+		ids = append(ids, c.schema.GetPKey(document))
 	}
 	return stacktrace.Propagate(c.BatchDelete(ctx, ids), "")
 }
 
-// Aggregate
+// Aggregate performs aggregations against the collection
 func (c *Collection) Aggregate(ctx context.Context, query core.AggregateQuery) (core.Page, error) {
 	return c.db.core.Aggregate(ctx, c.schema, query)
 }
 
-// Search
+// Search performs full text search queries against the collection. The collection must have a configured search index.
 func (c *Collection) Search(ctx context.Context, query core.SearchQuery) (core.Page, error) {
 	return c.db.core.Search(ctx, c.schema, query)
 }
@@ -253,12 +258,12 @@ func (c *Collection) Reindex(ctx context.Context) error {
 		var toSet []*core.Document
 		var toDelete []string
 		for _, r := range results.Documents {
-			result, _ := c.Get(ctx, c.schema.GetDocumentID(r))
+			result, _ := c.Get(ctx, c.schema.GetPKey(r))
 			if result.Valid() {
 				toSet = append(toSet, result)
 			} else {
-				toDelete = append(toDelete, c.schema.GetDocumentID(r))
-				_ = c.Delete(ctx, c.schema.GetDocumentID(r))
+				toDelete = append(toDelete, c.schema.GetPKey(r))
+				_ = c.Delete(ctx, c.schema.GetPKey(r))
 			}
 		}
 		if len(toSet) > 0 {
