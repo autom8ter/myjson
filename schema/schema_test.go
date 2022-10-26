@@ -10,19 +10,27 @@ import (
 )
 
 func TestSchema(t *testing.T) {
-	bits, err := testutil.UserCollection.Schema().MarshalJSON()
+	usrBytes, err := testutil.UserCollection.MarshalJSON()
+	assert.Nil(t, err)
+	taskBytes, err := testutil.TaskCollection.MarshalJSON()
 	assert.Nil(t, err)
 	t.Run("newJSONSchema", func(t *testing.T) {
-		_, err := schema.NewJSONSchema(bits)
+		_, err := schema.NewJSONSchema(usrBytes)
+		assert.Nil(t, err)
+		_, err = schema.NewJSONSchema(taskBytes)
 		assert.Nil(t, err)
 	})
 	t.Run("validate", func(t *testing.T) {
-		s, err := schema.NewJSONSchema(bits)
+		s, err := schema.NewJSONSchema(usrBytes)
 		assert.Nil(t, err)
 		assert.Nil(t, s.Validate(context.Background(), []byte(util.JSONString(testutil.NewUserDoc()))))
+
+		s, err = schema.NewJSONSchema(taskBytes)
+		assert.Nil(t, err)
+		assert.Nil(t, s.Validate(context.Background(), []byte(util.JSONString(testutil.NewTaskDoc("1")))))
 	})
 	t.Run("config", func(t *testing.T) {
-		s, err := schema.NewJSONSchema(bits)
+		s, err := schema.NewJSONSchema(usrBytes)
 		assert.Nil(t, err)
 		assert.Nil(t, s.Config().Validate())
 		assert.NotEmpty(t, s.Config().PrimaryKey)
@@ -30,5 +38,12 @@ func TestSchema(t *testing.T) {
 		assert.NotEmpty(t, s.Config().Indexing.Query)
 		assert.NotEmpty(t, s.Config().Indexing.Search)
 		assert.NotNil(t, s.Config().ForeignKeys)
+
+		s, err = schema.NewJSONSchema(taskBytes)
+		assert.Nil(t, err)
+		assert.Nil(t, s.Config().Validate())
+		assert.NotEmpty(t, s.Config().PrimaryKey)
+		assert.NotEmpty(t, s.Config().Collection)
+		assert.NotEmpty(t, s.Config().ForeignKeys)
 	})
 }

@@ -1,7 +1,6 @@
 package schema
 
 import (
-	"context"
 	"encoding/json"
 	"github.com/autom8ter/wolverine/errors"
 	"github.com/autom8ter/wolverine/internal/prefix"
@@ -13,8 +12,28 @@ import (
 	"io/ioutil"
 	"os"
 	"strings"
-	"sync"
 )
+
+// Collection is a collection of records of a given type. It is
+type Collection struct {
+	JSONSchema
+}
+
+// NewCollection creates a new Collection from the provided JSONSchema
+func NewCollection(schema JSONSchema) *Collection {
+	return &Collection{
+		JSONSchema: schema,
+	}
+}
+
+// NewCollectionFromBytes creates a new Collection from the provided JSONSchema bytes
+func NewCollectionFromBytes(jsonSchema []byte) (*Collection, error) {
+	scheme, err := NewJSONSchema(jsonSchema)
+	if err != nil {
+		return nil, stacktrace.Propagate(err, "")
+	}
+	return NewCollection(scheme), nil
+}
 
 // LoadCollectionsFromDir loads all yaml/json collections in the specified directory
 func LoadCollectionsFromDir(collectionsDir string) ([]*Collection, error) {
@@ -73,71 +92,29 @@ func LoadCollectionsFromDir(collectionsDir string) ([]*Collection, error) {
 	return collections, nil
 }
 
-// Collection is a collection of records of a given type. It is
-type Collection struct {
-	mu     sync.RWMutex
-	schema JSONSchema
-}
-
-func NewCollection(schema JSONSchema) *Collection {
-	return &Collection{
-		schema: schema,
-	}
-}
-
-func NewCollectionFromBytes(jsonSchema []byte) (*Collection, error) {
-	scheme, err := NewJSONSchema(jsonSchema)
-	if err != nil {
-		return nil, stacktrace.Propagate(err, "")
-	}
-	return NewCollection(scheme), nil
-}
-
 // Collection returns the name of the collection based on the schema's 'collection' field on the collection's schema
 func (c *Collection) Collection() string {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-	return c.schema.Config().Collection
+	return c.Config().Collection
 }
 
 // Indexing returns the list of the indexes based on the schema's 'indexing' field on the collection's schema
 func (c *Collection) Indexing() Indexing {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-	return c.schema.Config().Indexing
+	return c.Config().Indexing
 }
 
+// PKey returns the collections primary key
 func (c *Collection) PKey() string {
-	return c.schema.Config().PrimaryKey
+	return c.Config().PrimaryKey
 }
 
+// HasRelationships returns whether the collection has any foreign keys
 func (c *Collection) HasRelationships() bool {
-	return len(c.schema.Config().ForeignKeys) > 0
+	return len(c.Config().ForeignKeys) > 0
 }
 
+// FKeys returns the collections foreign keys
 func (c *Collection) FKeys() map[string]ForeignKey {
-	return c.schema.Config().ForeignKeys
-}
-
-// Schema
-func (c *Collection) Schema() JSONSchema {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-	return c.schema
-}
-
-// Validate validates the document against the collections json schema (if it exists)
-func (c *Collection) Validate(ctx context.Context, doc *Document) (bool, error) {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-	var err error
-	if c.schema == nil {
-		return true, stacktrace.PropagateWithCode(err, errors.ErrTODO, "empty schema")
-	}
-	if err := c.schema.Validate(ctx, doc.Bytes()); err != nil {
-		return false, err
-	}
-	return true, nil
+	return c.Config().ForeignKeys
 }
 
 // OptimizeQueryIndex selects the optimal index to use given the where/orderby clause
@@ -160,27 +137,27 @@ func (c *Collection) OptimizeQueryIndex(where []Where, order OrderBy) (QueryInde
 
 func (c *Collection) PrimaryQueryIndex() *prefix.PrefixIndexRef {
 	return c.QueryIndexPrefix(QueryIndex{
-		Fields: []string{c.schema.Config().PrimaryKey},
+		Fields: []string{c.Config().PrimaryKey},
 	})
 }
 
 // GetPrimaryKeyRef gets a reference to the documents primary key
 func (c *Collection) GetPrimaryKeyRef(documentID string) ([]byte, error) {
 	if documentID == "" {
-		return nil, stacktrace.NewErrorWithCode(errors.ErrTODO, "empty document id for property: %s", c.schema.Config().PrimaryKey)
+		return nil, stacktrace.NewErrorWithCode(errors.ErrTODO, "empty document id for property: %s", c.Config().PrimaryKey)
 	}
 	return c.PrimaryQueryIndex().GetPrefix(map[string]any{
-		c.schema.Config().PrimaryKey: documentID,
+		c.Config().PrimaryKey: documentID,
 	}, documentID), nil
 }
 
 // SetID sets the documents primary key
 func (c *Collection) SetID(d *Document) error {
-	return stacktrace.Propagate(d.Set(c.schema.Config().PrimaryKey, ksuid.New().String()), "")
+	return stacktrace.Propagate(d.Set(c.Config().PrimaryKey, ksuid.New().String()), "")
 }
 
 func (c *Collection) QueryIndexPrefix(i QueryIndex) *prefix.PrefixIndexRef {
-	return prefix.NewPrefixedIndex(c.schema.Config().Collection, i.Fields)
+	return prefix.NewPrefixedIndex(c.Config().Collection, i.Fields)
 }
 
 // GetQueryIndex gets the
@@ -194,8 +171,8 @@ func (c *Collection) getQueryIndex(whereFields []string, orderBy string) (QueryI
 	if !indexing.HasQueryIndex() {
 		return QueryIndexMatch{
 			Ref:     c.PrimaryQueryIndex(),
-			Fields:  []string{c.schema.Config().PrimaryKey},
-			Ordered: orderBy == c.schema.Config().PrimaryKey || orderBy == "",
+			Fields:  []string{c.Config().PrimaryKey},
+			Ordered: orderBy == c.Config().PrimaryKey || orderBy == "",
 		}, nil
 	}
 	for _, index := range indexing.Query {
@@ -220,11 +197,11 @@ func (c *Collection) getQueryIndex(whereFields []string, orderBy string) (QueryI
 	}
 	return QueryIndexMatch{
 		Ref:     c.PrimaryQueryIndex(),
-		Fields:  []string{c.schema.Config().PrimaryKey},
-		Ordered: orderBy == c.schema.Config().PrimaryKey || orderBy == "",
+		Fields:  []string{c.Config().PrimaryKey},
+		Ordered: orderBy == c.Config().PrimaryKey || orderBy == "",
 	}, nil
 }
 
 func (c *Collection) GetDocumentID(d *Document) string {
-	return cast.ToString(d.Get(c.schema.Config().PrimaryKey))
+	return cast.ToString(d.Get(c.Config().PrimaryKey))
 }
