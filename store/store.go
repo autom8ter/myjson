@@ -1,8 +1,9 @@
-package wolverine
+package store
 
 import (
 	"context"
 	"github.com/autom8ter/machine/v4"
+	"github.com/autom8ter/wolverine/core"
 	"github.com/autom8ter/wolverine/errors"
 	"github.com/autom8ter/wolverine/internal/prefix"
 	"github.com/autom8ter/wolverine/schema"
@@ -16,130 +17,31 @@ import (
 	"time"
 )
 
-type coreV1 struct {
-	persist      PersistFunc
-	aggregate    AggregateFunc
-	search       SearchFunc
-	query        QueryFunc
-	get          GetFunc
-	getAll       GetAllFunc
-	changeStream ChangeStreamFunc
+type defaultStore struct {
+	kv       *badger.DB
+	fullText bleve.Index
+	machine  machine.Machine
 }
 
-func getCoreV1() coreV1 {
-	return coreV1{
-		persist:      persistCollection,
-		aggregate:    aggregateCollection,
-		search:       searchCollection,
-		query:        queryCollection,
-		get:          getCollection,
-		getAll:       getAllCollection,
-		changeStream: changeStreamCollection,
+func Core(kv *badger.DB, fullText bleve.Index, machine machine.Machine) core.Core {
+	d := defaultStore{
+		kv:       kv,
+		fullText: fullText,
+		machine:  machine,
+	}
+	return core.Core{
+		Persist:      d.persistCollection,
+		Aggregate:    d.aggregateCollection,
+		Search:       d.searchCollection,
+		Query:        d.queryCollection,
+		Get:          d.getCollection,
+		GetAll:       d.getAllCollection,
+		ChangeStream: d.changeStreamCollection,
 	}
 }
 
-type Middleware struct {
-	Persist      []PersistWare
-	Aggregate    []AggregateWare
-	Search       []SearchWare
-	Query        []QueryWare
-	Get          []GetWare
-	GetAll       []GetAllWare
-	ChangeStream []ChangeStreamWare
-}
-
-func (c coreV1) Apply(m Middleware) coreV1 {
-	core := coreV1{
-		persist:      c.persist,
-		aggregate:    c.aggregate,
-		search:       c.search,
-		query:        c.query,
-		get:          c.get,
-		getAll:       c.getAll,
-		changeStream: c.changeStream,
-	}
-	if m.Persist != nil {
-		for _, m := range m.Persist {
-			core.persist = m(core.persist)
-		}
-	}
-	if m.Aggregate != nil {
-		for _, m := range m.Aggregate {
-			core.aggregate = m(core.aggregate)
-		}
-	}
-	if m.Search != nil {
-		for _, m := range m.Search {
-			core.search = m(core.search)
-		}
-	}
-	if m.Query != nil {
-		for _, m := range m.Query {
-			core.query = m(core.query)
-		}
-	}
-	if m.Get != nil {
-		for _, m := range m.Get {
-			core.get = m(core.get)
-		}
-	}
-	if m.GetAll != nil {
-		for _, m := range m.GetAll {
-			core.getAll = m(core.getAll)
-		}
-	}
-	if m.ChangeStream != nil {
-		for _, m := range m.ChangeStream {
-			core.changeStream = m(core.changeStream)
-		}
-	}
-	return core
-}
-
-// PersistFunc persists changes to a collection
-type PersistFunc func(ctx context.Context, c *Collection, change schema.StateChange) error
-
-// PersistWare wraps a PersistFunc and returns a new one
-type PersistWare func(PersistFunc) PersistFunc
-
-// AggregateFunc aggregates documents to a collection
-type AggregateFunc func(ctx context.Context, c *Collection, query schema.AggregateQuery) (schema.Page, error)
-
-// AggregateWare wraps a AggregateFunc and returns a new one
-type AggregateWare func(AggregateFunc) AggregateFunc
-
-// SearchFunc searches documents in a collection
-type SearchFunc func(ctx context.Context, c *Collection, query schema.SearchQuery) (schema.Page, error)
-
-// SearchWare wraps a SearchFunc and returns a new one
-type SearchWare func(SearchFunc) SearchFunc
-
-// QueryFunc queries documents in a collection
-type QueryFunc func(ctx context.Context, c *Collection, query schema.Query) (schema.Page, error)
-
-// QueryWare wraps a QueryFunc and returns a new one
-type QueryWare func(QueryFunc) QueryFunc
-
-// GetFunc gets documents in a collection
-type GetFunc func(ctx context.Context, c *Collection, id string) (schema.Document, error)
-
-// GetWare wraps a GetFunc and returns a new one
-type GetWare func(GetFunc) GetFunc
-
-// GetAllFunc gets multiple documents in a collection
-type GetAllFunc func(ctx context.Context, c *Collection, ids []string) ([]schema.Document, error)
-
-// GetAllWare wraps a GetAllFunc and returns a new one
-type GetAllWare func(GetAllFunc) GetAllFunc
-
-// ChangeStreamFunc listens to changes in a ccollection
-type ChangeStreamFunc func(ctx context.Context, c *Collection, fn schema.ChangeStreamHandler) error
-
-// ChangeStreamWare wraps a ChangeStreamFunc and returns a new one
-type ChangeStreamWare func(ChangeStreamFunc) ChangeStreamFunc
-
-func changeStreamCollection(ctx context.Context, c *Collection, fn schema.ChangeStreamHandler) error {
-	return c.machine.Subscribe(ctx, c.schema.Collection(), func(ctx context.Context, msg machine.Message) (bool, error) {
+func (d defaultStore) changeStreamCollection(ctx context.Context, collection *schema.Collection, fn schema.ChangeStreamHandler) error {
+	return d.machine.Subscribe(ctx, collection.Collection(), func(ctx context.Context, msg machine.Message) (bool, error) {
 		switch change := msg.Body.(type) {
 		case *schema.StateChange:
 			if err := fn(ctx, *change); err != nil {
@@ -154,17 +56,17 @@ func changeStreamCollection(ctx context.Context, c *Collection, fn schema.Change
 	})
 }
 
-func aggregateCollection(ctx context.Context, c *Collection, query schema.AggregateQuery) (schema.Page, error) {
+func (d defaultStore) aggregateCollection(ctx context.Context, collection *schema.Collection, query schema.AggregateQuery) (schema.Page, error) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
 	now := time.Now()
-	index, err := c.schema.OptimizeQueryIndex(query.Where, query.OrderBy)
+	index, err := collection.OptimizeQueryIndex(query.Where, query.OrderBy)
 	if err != nil {
 		return schema.Page{}, stacktrace.Propagate(err, "")
 	}
 	var results []schema.Document
-	if err := c.kv.View(func(txn *badger.Txn) error {
+	if err := d.kv.View(func(txn *badger.Txn) error {
 		opts := badger.DefaultIteratorOptions
 		opts.PrefetchValues = true
 		opts.PrefetchSize = 10
@@ -245,13 +147,13 @@ func aggregateCollection(ctx context.Context, c *Collection, query schema.Aggreg
 	}, nil
 }
 
-func getAllCollection(ctx context.Context, c *Collection, ids []string) ([]schema.Document, error) {
+func (d defaultStore) getAllCollection(ctx context.Context, collection *schema.Collection, ids []string) ([]schema.Document, error) {
 	var documents []schema.Document
-	if err := c.kv.View(func(txn *badger.Txn) error {
+	if err := d.kv.View(func(txn *badger.Txn) error {
 		for _, id := range ids {
-			pkey, err := c.schema.GetPrimaryKeyRef(id)
+			pkey, err := collection.GetPrimaryKeyRef(id)
 			if err != nil {
-				return stacktrace.PropagateWithCode(err, errors.ErrTODO, "failed to get document %s/%s primary key ref", c.schema.Collection(), id)
+				return stacktrace.PropagateWithCode(err, errors.ErrTODO, "failed to get document %s/%s primary key ref", collection.Collection(), id)
 			}
 			item, err := txn.Get(pkey)
 			if err != nil {
@@ -275,15 +177,15 @@ func getAllCollection(ctx context.Context, c *Collection, ids []string) ([]schem
 	return documents, nil
 }
 
-func getCollection(ctx context.Context, c *Collection, id string) (schema.Document, error) {
+func (d defaultStore) getCollection(ctx context.Context, collection *schema.Collection, id string) (schema.Document, error) {
 	var (
 		document schema.Document
 	)
-	pkey, err := c.schema.GetPrimaryKeyRef(id)
+	pkey, err := collection.GetPrimaryKeyRef(id)
 	if err != nil {
-		return schema.Document{}, stacktrace.PropagateWithCode(err, errors.ErrTODO, "failed to get document %s/%s primary key ref", c.schema.Collection(), id)
+		return schema.Document{}, stacktrace.PropagateWithCode(err, errors.ErrTODO, "failed to get document %s/%s primary key ref", collection.Collection(), id)
 	}
-	if err := c.kv.View(func(txn *badger.Txn) error {
+	if err := d.kv.View(func(txn *badger.Txn) error {
 		item, err := txn.Get(pkey)
 		if err != nil {
 			return stacktrace.Propagate(err, "")
@@ -298,30 +200,30 @@ func getCollection(ctx context.Context, c *Collection, id string) (schema.Docume
 	return document, nil
 }
 
-func persistCollection(ctx context.Context, c *Collection, change schema.StateChange) error {
-	txn := c.kv.NewWriteBatch()
+func (d defaultStore) persistCollection(ctx context.Context, collection *schema.Collection, change schema.StateChange) error {
+	txn := d.kv.NewWriteBatch()
 	var batch *bleve.Batch
-	if c.schema == nil {
+	if collection == nil {
 		return stacktrace.NewErrorWithCode(errors.ErrTODO, "null collection schema")
 	}
-	if c.schema.Indexing().HasSearchIndex() {
-		batch = c.fullText.NewBatch()
+	if collection.Indexing().HasSearchIndex() {
+		batch = d.fullText.NewBatch()
 	}
 	if change.Updates != nil {
 		for id, edit := range change.Updates {
-			before, _ := c.Get(ctx, id)
+			before, _ := d.getCollection(ctx, collection, id)
 			after, err := before.SetAll(edit)
 			if err != nil {
 				return stacktrace.Propagate(err, "")
 			}
-			if err := indexDocument(ctx, c, txn, batch, schema.Update, id, before, after); err != nil {
+			if err := d.indexDocument(ctx, collection, txn, batch, schema.Update, id, before, after); err != nil {
 				return stacktrace.Propagate(err, "")
 			}
 		}
 	}
 	for _, id := range change.Deletes {
-		before, _ := c.Get(ctx, id)
-		if err := indexDocument(ctx, c, txn, batch, schema.Delete, id, before, schema.NewDocument()); err != nil {
+		before, _ := d.getCollection(ctx, collection, id)
+		if err := d.indexDocument(ctx, collection, txn, batch, schema.Delete, id, before, schema.NewDocument()); err != nil {
 			return stacktrace.Propagate(err, "")
 		}
 	}
@@ -329,46 +231,46 @@ func persistCollection(ctx context.Context, c *Collection, change schema.StateCh
 		if !after.Valid() {
 			return stacktrace.NewErrorWithCode(errors.ErrTODO, "invalid json document")
 		}
-		docId := c.schema.GetDocumentID(after)
+		docId := collection.GetDocumentID(after)
 		if docId == "" {
-			return stacktrace.NewErrorWithCode(errors.ErrTODO, "document missing primary key %s", c.schema.Indexing().PrimaryKey)
+			return stacktrace.NewErrorWithCode(errors.ErrTODO, "document missing primary key %s", collection.Indexing().PrimaryKey)
 		}
-		before, _ := c.Get(ctx, docId)
-		if err := indexDocument(ctx, c, txn, batch, schema.Set, docId, before, after); err != nil {
+		before, _ := d.getCollection(ctx, collection, docId)
+		if err := d.indexDocument(ctx, collection, txn, batch, schema.Set, docId, before, after); err != nil {
 			return stacktrace.Propagate(err, "")
 		}
 	}
 
 	if batch != nil {
-		if err := c.fullText.Batch(batch); err != nil {
-			c.db.errorHandler(c.schema.Collection(), err)
+		if err := d.fullText.Batch(batch); err != nil {
+			return stacktrace.Propagate(err, "failed to batch collection documents")
 		}
 	}
 	if err := txn.Flush(); err != nil {
 		return stacktrace.Propagate(err, "failed to batch collection documents")
 	}
-	c.machine.Publish(ctx, machine.Message{
+	d.machine.Publish(ctx, machine.Message{
 		Channel: change.Collection,
 		Body:    change,
 	})
 	return nil
 }
 
-func indexDocument(ctx context.Context, c *Collection, txn *badger.WriteBatch, batch *bleve.Batch, action schema.Action, docId string, before, after schema.Document) error {
+func (d defaultStore) indexDocument(ctx context.Context, collection *schema.Collection, txn *badger.WriteBatch, batch *bleve.Batch, action schema.Action, docId string, before, after schema.Document) error {
 	if docId == "" {
 		return stacktrace.NewErrorWithCode(errors.ErrTODO, "empty document id")
 	}
-	pkey, err := c.schema.GetPrimaryKeyRef(docId)
+	pkey, err := collection.GetPrimaryKeyRef(docId)
 	if err != nil {
-		return stacktrace.PropagateWithCode(err, errors.ErrTODO, "failed to get document %s/%s primary key ref", c.schema.Collection(), docId)
+		return stacktrace.PropagateWithCode(err, errors.ErrTODO, "failed to get document %s/%s primary key ref", collection.Collection(), docId)
 	}
 	switch action {
 	case schema.Delete:
 		if !before.Valid() {
 			return nil
 		}
-		for _, i := range c.schema.Indexing().Query {
-			pindex := c.schema.QueryIndexPrefix(*i)
+		for _, i := range collection.Indexing().Query {
+			pindex := collection.QueryIndexPrefix(*i)
 			if err := txn.Delete(pindex.GetPrefix(before.Value(), docId)); err != nil {
 				return stacktrace.Propagate(err, "failed to batch delete documents")
 			}
@@ -380,25 +282,25 @@ func indexDocument(ctx context.Context, c *Collection, txn *badger.WriteBatch, b
 			batch.Delete(docId)
 		}
 	case schema.Set, schema.Update:
-		if c.Schema().GetDocumentID(after) != docId {
-			return stacktrace.NewErrorWithCode(errors.ErrTODO, "document id is immutable: %v -> %v", c.Schema().GetDocumentID(after), docId)
+		if collection.GetDocumentID(after) != docId {
+			return stacktrace.NewErrorWithCode(errors.ErrTODO, "document id is immutable: %v -> %v", collection.GetDocumentID(after), docId)
 		}
-		valid, err := c.schema.Validate(after)
+		valid, err := collection.Validate(after)
 		if err != nil {
 			return stacktrace.Propagate(err, "")
 		}
 		if !valid {
-			return stacktrace.NewError("%s/%s document has invalid schema", c.schema.Collection(), docId)
+			return stacktrace.NewError("%s/%s document has invalid schema", collection.Collection(), docId)
 		}
-		for _, idx := range c.schema.Indexing().Query {
-			pindex := c.schema.QueryIndexPrefix(*idx)
+		for _, idx := range collection.Indexing().Query {
+			pindex := collection.QueryIndexPrefix(*idx)
 			if before.Valid() {
 				if err := txn.Delete(pindex.GetPrefix(before.Value(), docId)); err != nil {
 					return stacktrace.PropagateWithCode(
 						err,
 						errors.ErrTODO,
 						"failed to delete document %s/%s index references",
-						c.schema.Collection(),
+						collection.Collection(),
 						docId,
 					)
 				}
@@ -409,7 +311,7 @@ func indexDocument(ctx context.Context, c *Collection, txn *badger.WriteBatch, b
 					err,
 					errors.ErrTODO,
 					"failed to set document %s/%s index references",
-					c.schema.Collection(),
+					collection.Collection(),
 					docId,
 				)
 			}
@@ -426,16 +328,16 @@ func indexDocument(ctx context.Context, c *Collection, txn *badger.WriteBatch, b
 	return nil
 }
 
-func queryCollection(ctx context.Context, c *Collection, query schema.Query) (schema.Page, error) {
+func (d defaultStore) queryCollection(ctx context.Context, collection *schema.Collection, query schema.Query) (schema.Page, error) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	now := time.Now()
-	index, err := c.schema.OptimizeQueryIndex(query.Where, query.OrderBy)
+	index, err := collection.OptimizeQueryIndex(query.Where, query.OrderBy)
 	if err != nil {
 		return schema.Page{}, stacktrace.Propagate(err, "")
 	}
 	var results []schema.Document
-	if err := c.kv.View(func(txn *badger.Txn) error {
+	if err := d.kv.View(func(txn *badger.Txn) error {
 		opts := badger.DefaultIteratorOptions
 		opts.PrefetchValues = true
 		opts.PrefetchSize = 10
@@ -505,12 +407,12 @@ func queryCollection(ctx context.Context, c *Collection, query schema.Query) (sc
 	}, nil
 }
 
-func searchCollection(ctx context.Context, c *Collection, q schema.SearchQuery) (schema.Page, error) {
-	if !c.schema.Indexing().HasSearchIndex() {
+func (d defaultStore) searchCollection(ctx context.Context, collection *schema.Collection, q schema.SearchQuery) (schema.Page, error) {
+	if !collection.Indexing().HasSearchIndex() {
 		return schema.Page{}, stacktrace.NewErrorWithCode(
 			errors.ErrTODO,
 			"%s does not have a search index",
-			c.schema.Collection(),
+			collection.Collection(),
 		)
 	}
 
@@ -646,9 +548,9 @@ func searchCollection(ctx context.Context, c *Collection, q schema.SearchQuery) 
 		searchRequest = bleve.NewSearchRequestOptions(bleve.NewConjunctionQuery(queries[0]), limit, q.Page*limit, false)
 	}
 	searchRequest.Fields = []string{"*"}
-	results, err := c.fullText.Search(searchRequest)
+	results, err := d.fullText.Search(searchRequest)
 	if err != nil {
-		return schema.Page{}, stacktrace.Propagate(err, "failed to search index: %s", c.schema.Collection())
+		return schema.Page{}, stacktrace.Propagate(err, "failed to search index: %s", collection.Collection())
 	}
 
 	var data []schema.Document
@@ -661,7 +563,7 @@ func searchCollection(ctx context.Context, c *Collection, q schema.SearchQuery) 
 		}
 		record, err := schema.NewDocumentFrom(h.Fields)
 		if err != nil {
-			return schema.Page{}, stacktrace.Propagate(err, "failed to search index: %s", c.schema.Collection())
+			return schema.Page{}, stacktrace.Propagate(err, "failed to search index: %s", collection.Collection())
 		}
 		data = append(data, record)
 	}

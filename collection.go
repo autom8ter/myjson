@@ -2,27 +2,18 @@ package wolverine
 
 import (
 	"context"
-	"github.com/autom8ter/machine/v4"
+	"github.com/autom8ter/wolverine/core"
 	"github.com/autom8ter/wolverine/errors"
 	"github.com/autom8ter/wolverine/schema"
-	"github.com/blevesearch/bleve"
-	"github.com/dgraph-io/badger/v3"
-	"github.com/hashicorp/go-multierror"
 	"github.com/palantir/stacktrace"
 	"golang.org/x/sync/errgroup"
-	"sync"
 	"time"
 )
 
 type Collection struct {
-	wg           sync.WaitGroup
-	schema       *schema.Collection
-	kv           *badger.DB
-	fullText     bleve.Index
-	machine      machine.Machine
-	errorHandler func(collection string, err error)
-	db           *DB
-	core         coreV1
+	schema *schema.Collection
+	db     *DB
+	core   core.Core
 }
 
 func (c *Collection) DB() *DB {
@@ -34,19 +25,19 @@ func (c *Collection) Schema() *schema.Collection {
 }
 
 func (c *Collection) persistStateChange(ctx context.Context, change schema.StateChange) error {
-	return c.core.persist(ctx, c, change)
+	return c.core.Persist(ctx, c.schema, change)
 }
 
 func (c *Collection) Query(ctx context.Context, query schema.Query) (schema.Page, error) {
-	return c.core.query(ctx, c, query)
+	return c.core.Query(ctx, c.schema, query)
 }
 
 func (c *Collection) Get(ctx context.Context, id string) (schema.Document, error) {
-	return c.core.get(ctx, c, id)
+	return c.core.Get(ctx, c.schema, id)
 }
 
 func (c *Collection) GetAll(ctx context.Context, ids []string) ([]schema.Document, error) {
-	return c.core.getAll(ctx, c, ids)
+	return c.core.GetAll(ctx, c.schema, ids)
 }
 
 // QueryPaginate paginates through each page of the query until the handlePage function returns false or there are no more results
@@ -74,7 +65,7 @@ func (c *Collection) QueryPaginate(ctx context.Context, query schema.Query, hand
 }
 
 func (c *Collection) ChangeStream(ctx context.Context, fn schema.ChangeStreamHandler) error {
-	return c.core.changeStream(ctx, c, fn)
+	return c.core.ChangeStream(ctx, c.schema, fn)
 }
 
 func (c *Collection) Set(ctx context.Context, document schema.Document) error {
@@ -104,27 +95,27 @@ func (c *Collection) Update(ctx context.Context, id string, update map[string]an
 }
 
 func (c *Collection) BatchUpdate(ctx context.Context, batch map[string]map[string]any) error {
-	return c.persistStateChange(ctx, schema.StateChange{
+	return stacktrace.Propagate(c.persistStateChange(ctx, schema.StateChange{
 		Collection: c.schema.Collection(),
 		Updates:    batch,
 		Timestamp:  time.Now(),
-	})
+	}), "")
 }
 
 func (c *Collection) Delete(ctx context.Context, id string) error {
-	return c.persistStateChange(ctx, schema.StateChange{
+	return stacktrace.Propagate(c.persistStateChange(ctx, schema.StateChange{
 		Collection: c.schema.Collection(),
 		Deletes:    []string{id},
 		Timestamp:  time.Now(),
-	})
+	}), "")
 }
 
 func (c *Collection) BatchDelete(ctx context.Context, ids []string) error {
-	return c.persistStateChange(ctx, schema.StateChange{
+	return stacktrace.Propagate(c.persistStateChange(ctx, schema.StateChange{
 		Collection: c.schema.Collection(),
 		Deletes:    ids,
 		Timestamp:  time.Now(),
-	})
+	}), "")
 }
 
 func (c *Collection) QueryUpdate(ctx context.Context, update map[string]any, query schema.Query) error {
@@ -156,11 +147,11 @@ func (c *Collection) QueryDelete(ctx context.Context, query schema.Query) error 
 }
 
 func (c *Collection) Aggregate(ctx context.Context, query schema.AggregateQuery) (schema.Page, error) {
-	return c.core.aggregate(ctx, c, query)
+	return c.core.Aggregate(ctx, c.schema, query)
 }
 
 func (c *Collection) Search(ctx context.Context, query schema.SearchQuery) (schema.Page, error) {
-	return c.core.search(ctx, c, query)
+	return c.core.Search(ctx, c.schema, query)
 }
 
 // SearchPaginate paginates through each page of the query until the handlePage function returns false or there are no more results
@@ -236,20 +227,6 @@ func (c *Collection) Reindex(ctx context.Context) error {
 	}
 	if err := egp.Wait(); err != nil {
 		return stacktrace.Propagate(err, "failed to reindex collection: %s", c.schema.Collection())
-	}
-	return nil
-}
-
-func (c *Collection) Close(ctx context.Context) error {
-	c.wg.Wait()
-	var err error
-	err = multierror.Append(err, c.kv.Sync())
-	err = multierror.Append(err, c.kv.Close())
-	if c.fullText != nil {
-		err = multierror.Append(err, c.fullText.Close())
-	}
-	if err, ok := err.(*multierror.Error); ok && len(err.Errors) > 0 {
-		return stacktrace.Propagate(err, "database close failure")
 	}
 	return nil
 }

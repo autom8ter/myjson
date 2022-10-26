@@ -5,8 +5,10 @@ import (
 	_ "embed"
 	"fmt"
 	"github.com/autom8ter/machine/v4"
+	"github.com/autom8ter/wolverine/core"
 	"github.com/autom8ter/wolverine/errors"
 	"github.com/autom8ter/wolverine/schema"
+	"github.com/autom8ter/wolverine/store"
 	"github.com/blevesearch/bleve"
 	"github.com/dgraph-io/badger/v3"
 	"github.com/palantir/stacktrace"
@@ -23,14 +25,15 @@ type Config struct {
 	StoragePath string `json:"storagePath"`
 	// Collections are the json document collections supported by the DB - At least one is required.
 	Collections []*schema.Collection `json:"collections"`
-	middleware  Middleware
+	middlewares []core.Middleware
 }
 
-func (c Config) AddMiddleware(m Middleware) Config {
+func (c Config) AddMiddleware(m core.Middleware) Config {
+	middlewares := append(c.middlewares, m)
 	return Config{
 		StoragePath: c.StoragePath,
 		Collections: c.Collections,
-		middleware:  m,
+		middlewares: middlewares,
 	}
 }
 
@@ -54,6 +57,7 @@ type DB struct {
 	machine      machine.Machine
 	collections  []*Collection
 	errorHandler func(collection string, err error)
+	closers      []func() error
 }
 
 func New(ctx context.Context, cfg Config) (*DB, error) {
@@ -86,57 +90,73 @@ func New(ctx context.Context, cfg Config) (*DB, error) {
 		}
 	}
 	for _, collection := range config.Collections {
-		c := &Collection{
-			schema:       collection,
-			kv:           d.kv,
-			core:         getCoreV1(),
-			machine:      d.machine,
-			errorHandler: d.errorHandler,
-			db:           d,
-		}
-		c.core = c.core.Apply(config.middleware)
-		if err := c.openFullTextIndex(ctx, false); err != nil {
+		idx, err := openFullTextIndex(ctx, cfg, collection, false)
+		if err != nil {
 			return nil, stacktrace.Propagate(err, "")
 		}
+		c := &Collection{
+			schema: collection,
+			core:   store.Core(kv, idx, d.machine),
+			db:     d,
+		}
+		for _, m := range config.middlewares {
+			c.core = c.core.Apply(m)
+		}
 		d.collections = append(d.collections, c)
+		d.closers = append(d.closers, func() error {
+			if idx != nil {
+				return idx.Close()
+			}
+			return nil
+		})
 	}
 	{
 		systemCollection, err := schema.LoadCollection(systemCollectionSchema)
 		if err != nil {
 			return nil, stacktrace.Propagate(err, "")
 		}
-		c := &Collection{
-			schema:       systemCollection,
-			kv:           d.kv,
-			core:         getCoreV1(),
-			machine:      d.machine,
-			errorHandler: d.errorHandler,
-			db:           d,
-		}
-		c.core = c.core.Apply(config.middleware)
-		if err := c.openFullTextIndex(ctx, false); err != nil {
+		idx, err := openFullTextIndex(ctx, cfg, systemCollection, false)
+		if err != nil {
 			return nil, stacktrace.Propagate(err, "")
 		}
+		c := &Collection{
+			schema: systemCollection,
+			core:   store.Core(kv, idx, d.machine),
+			db:     d,
+		}
+		for _, m := range config.middlewares {
+			c.core = c.core.Apply(m)
+		}
 		d.collections = append(d.collections, c)
+		d.closers = append(d.closers, func() error {
+			if idx != nil {
+				return idx.Close()
+			}
+			return nil
+		})
 	}
 
 	if err := d.ReIndex(ctx); err != nil {
 		return nil, stacktrace.Propagate(err, "failed to reindex")
 	}
+	d.closers = append(d.closers, func() error {
+		if err := d.kv.Sync(); err != nil {
+			return stacktrace.Propagate(err, "")
+		}
+		return stacktrace.Propagate(d.kv.Close(), "")
+	})
 	return d, nil
 }
 
 func (d *DB) Close(ctx context.Context) error {
 	d.mu.Lock()
 	defer d.mu.Unlock()
-	egp, ctx := errgroup.WithContext(ctx)
-	for _, c := range d.collections {
-		c := c
-		egp.Go(func() error {
-			return c.Close(ctx)
-		})
+	for _, c := range d.closers {
+		if err := c(); err != nil {
+			return stacktrace.Propagate(err, "")
+		}
 	}
-	return stacktrace.Propagate(egp.Wait(), "")
+	return nil
 }
 
 func (d *DB) Backup(ctx context.Context, w io.Writer) error {
@@ -181,11 +201,11 @@ func (d *DB) Collection(ctx context.Context, collection string, fn func(collecti
 //go:embed system.json
 var systemCollectionSchema string
 
-func (c *Collection) openFullTextIndex(ctx context.Context, reindex bool) error {
-	if !c.schema.Indexing().HasSearchIndex() {
-		return nil
+func openFullTextIndex(ctx context.Context, config Config, schema *schema.Collection, reindex bool) (bleve.Index, error) {
+	if !schema.Indexing().HasSearchIndex() {
+		return nil, nil
 	}
-	i := c.schema.Indexing().Search[0]
+	i := schema.Indexing().Search[0]
 	documentMapping := bleve.NewDocumentMapping()
 	for _, f := range i.Fields {
 		mapping := bleve.NewTextFieldMapping()
@@ -193,42 +213,41 @@ func (c *Collection) openFullTextIndex(ctx context.Context, reindex bool) error 
 	}
 
 	indexMapping := bleve.NewIndexMapping()
-	indexMapping.AddDocumentMapping(c.schema.Collection(), documentMapping)
+	indexMapping.AddDocumentMapping(schema.Collection(), documentMapping)
 
-	path := fmt.Sprintf("%s/search/%s/index.db", c.db.config.StoragePath, c.schema.Collection())
+	path := fmt.Sprintf("%s/search/%s/index.db", config.StoragePath, schema.Collection())
 	if reindex {
 		os.RemoveAll(path)
 	}
 	switch {
-	case c.db.config.StoragePath == "" && !reindex:
+	case config.StoragePath == "" && !reindex:
 		i, err := bleve.NewMemOnly(indexMapping)
 		if err != nil {
-			return stacktrace.Propagate(err, "failed to create %s search index", c.schema.Collection())
+			return nil, stacktrace.Propagate(err, "failed to create %s search index", schema.Collection())
 		}
-		c.fullText = i
-	case c.db.config.StoragePath == "" && reindex:
+		return i, nil
+	case config.StoragePath == "" && reindex:
 		i, err := bleve.NewMemOnly(indexMapping)
 		if err != nil {
-			return stacktrace.Propagate(err, "failed to create %s search index", c.schema.Collection())
+			return nil, stacktrace.Propagate(err, "failed to create %s search index", schema.Collection())
 		}
-		c.fullText = i
-	case reindex && c.db.config.StoragePath != "":
+		return i, nil
+	case reindex && config.StoragePath != "":
 		i, err := bleve.New(path, indexMapping)
 		if err != nil {
-			return stacktrace.Propagate(err, "failed to create %s search index at path: %s", c.schema.Collection(), path)
+			return nil, stacktrace.Propagate(err, "failed to create %s search index at path: %s", schema.Collection(), path)
 		}
-		c.fullText = i
+		return i, nil
 	default:
 		i, err := bleve.Open(path)
 		if err == nil {
-			c.fullText = i
+			return i, nil
 		} else {
 			i, err = bleve.New(path, indexMapping)
 			if err != nil {
-				return stacktrace.Propagate(err, "failed to create %s search index at path: %s", c.schema.Collection(), path)
+				return nil, stacktrace.Propagate(err, "failed to create %s search index at path: %s", schema.Collection(), path)
 			}
-			c.fullText = i
+			return i, nil
 		}
 	}
-	return nil
 }
