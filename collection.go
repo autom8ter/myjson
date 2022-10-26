@@ -35,12 +35,12 @@ func (c *Collection) Query(ctx context.Context, query schema.Query) (schema.Page
 }
 
 // Get
-func (c *Collection) Get(ctx context.Context, id string) (schema.Document, error) {
+func (c *Collection) Get(ctx context.Context, id string) (*schema.Document, error) {
 	return c.db.core.Get(ctx, c.schema, id)
 }
 
 // GetAll
-func (c *Collection) GetAll(ctx context.Context, ids []string) ([]schema.Document, error) {
+func (c *Collection) GetAll(ctx context.Context, ids []string) ([]*schema.Document, error) {
 	return c.db.core.GetAll(ctx, c.schema, ids)
 }
 
@@ -74,36 +74,34 @@ func (c *Collection) ChangeStream(ctx context.Context, fn schema.ChangeStreamHan
 }
 
 // Create
-func (c *Collection) Create(ctx context.Context, document schema.Document) (string, error) {
+func (c *Collection) Create(ctx context.Context, document *schema.Document) (string, error) {
 	id := ksuid.New().String()
-	document, err := document.Set(c.schema.Indexing().PrimaryKey, id)
+	err := document.Set(c.schema.Indexing().PrimaryKey, id)
 	if err != nil {
 		return "", stacktrace.Propagate(err, "")
 	}
 	return id, stacktrace.Propagate(c.persistStateChange(ctx, schema.StateChange{
 		Collection: c.schema.Collection(),
-		Sets:       []schema.Document{document},
+		Sets:       []*schema.Document{document},
 		Timestamp:  time.Now(),
 	}), "")
 }
 
 // Create
-func (c *Collection) BatchCreate(ctx context.Context, documents []schema.Document) ([]string, error) {
+func (c *Collection) BatchCreate(ctx context.Context, documents []*schema.Document) ([]string, error) {
 	var ids []string
-	var toCreate []schema.Document
 	for _, document := range documents {
 		id := ksuid.New().String()
-		doc, err := document.Set(c.schema.Indexing().PrimaryKey, id)
+		err := document.Set(c.schema.Indexing().PrimaryKey, id)
 		if err != nil {
 			return nil, stacktrace.Propagate(err, "")
 		}
 		ids = append(ids, id)
-		toCreate = append(toCreate, doc)
 	}
 
 	if err := c.persistStateChange(ctx, schema.StateChange{
 		Collection: c.schema.Collection(),
-		Sets:       toCreate,
+		Sets:       documents,
 		Timestamp:  time.Now(),
 	}); err != nil {
 		return nil, stacktrace.Propagate(err, "")
@@ -112,16 +110,16 @@ func (c *Collection) BatchCreate(ctx context.Context, documents []schema.Documen
 }
 
 // Set
-func (c *Collection) Set(ctx context.Context, document schema.Document) error {
+func (c *Collection) Set(ctx context.Context, document *schema.Document) error {
 	return stacktrace.Propagate(c.persistStateChange(ctx, schema.StateChange{
 		Collection: c.schema.Collection(),
-		Sets:       []schema.Document{document},
+		Sets:       []*schema.Document{document},
 		Timestamp:  time.Now(),
 	}), "")
 }
 
 // BatchSet
-func (c *Collection) BatchSet(ctx context.Context, batch []schema.Document) error {
+func (c *Collection) BatchSet(ctx context.Context, batch []*schema.Document) error {
 	return stacktrace.Propagate(c.persistStateChange(ctx, schema.StateChange{
 		Collection: c.schema.Collection(),
 		Sets:       batch,
@@ -173,15 +171,13 @@ func (c *Collection) QueryUpdate(ctx context.Context, update map[string]any, que
 	if err != nil {
 		return stacktrace.Propagate(err, "")
 	}
-	var updated []schema.Document
 	for _, document := range results.Documents {
-		document, err := document.SetAll(update)
+		err := document.SetAll(update)
 		if err != nil {
 			return stacktrace.Propagate(err, "")
 		}
-		updated = append(updated, document)
 	}
-	return stacktrace.Propagate(c.BatchSet(ctx, updated), "")
+	return stacktrace.Propagate(c.BatchSet(ctx, results.Documents), "")
 }
 
 // QueryDelete
@@ -255,7 +251,7 @@ func (c *Collection) Reindex(ctx context.Context) error {
 		if len(results.Documents) == 0 {
 			break
 		}
-		var toSet []schema.Document
+		var toSet []*schema.Document
 		var toDelete []string
 		for _, r := range results.Documents {
 			result, _ := c.Get(ctx, c.schema.GetDocumentID(r))
@@ -284,25 +280,25 @@ func (c *Collection) Reindex(ctx context.Context) error {
 	return nil
 }
 
-func (c *Collection) GetRelationship(ctx context.Context, field string, document schema.Document) (schema.Document, error) {
+func (c *Collection) GetRelationship(ctx context.Context, field string, document *schema.Document) (*schema.Document, error) {
 	if !c.Schema().HasRelationships() {
-		return schema.Document{}, stacktrace.NewError("collection has no relationships")
+		return nil, stacktrace.NewError("collection has no relationships")
 	}
 	fkeys := c.Schema().Relationships().ForeignKeys
 	for sourceField, fkey := range fkeys {
 		if field == sourceField {
 			var (
-				foreign schema.Document
+				foreign *schema.Document
 				err     error
 			)
 			if err := c.db.Collection(ctx, fkey.Collection, func(parent *Collection) error {
 				foreign, err = parent.Get(ctx, document.GetString(sourceField))
 				return stacktrace.Propagate(err, "")
 			}); err != nil {
-				return schema.Document{}, stacktrace.NewError("")
+				return nil, stacktrace.NewError("")
 			}
 			return foreign, nil
 		}
 	}
-	return schema.Document{}, stacktrace.NewErrorWithCode(errors.ErrTODO, "relationship %s does not exist", field)
+	return nil, stacktrace.NewErrorWithCode(errors.ErrTODO, "relationship %s does not exist", field)
 }

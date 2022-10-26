@@ -8,7 +8,7 @@ import (
 // Page is a page of documents
 type Page struct {
 	// Documents are the documents that make up the page
-	Documents []Document `json:"documents"`
+	Documents []*Document `json:"documents"`
 	// Next page
 	NextPage int `json:"next_page,omitempty"`
 	// Document count

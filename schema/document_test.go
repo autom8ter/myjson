@@ -59,10 +59,10 @@ func TestDocument(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		r2, err = r.Merge(r2)
+		err = r.Merge(r2)
 		assert.Nil(t, err)
-		assert.Equal(t, usr2.Contact.Email, r2.GetString("contact.email"))
-		assert.Equal(t, usr.Contact.Phone, r2.GetString("contact.phone"))
+		assert.Equal(t, usr2.Contact.Email, r.GetString("contact.email"))
+		assert.Equal(t, usr.Contact.Phone, r.GetString("contact.phone"))
 	})
 	t.Run("valid", func(t *testing.T) {
 		r := schema.NewDocument()
@@ -75,7 +75,7 @@ func TestDocument(t *testing.T) {
 		assert.Equal(t, r.String(), cloned.String())
 	})
 	t.Run("del", func(t *testing.T) {
-		r, err := r.Del("annotations")
+		err := r.Del("annotations")
 		assert.Nil(t, err)
 		val := r.Get("annotations")
 		assert.Nil(t, val)
@@ -90,15 +90,15 @@ func TestDocument(t *testing.T) {
 	})
 	t.Run("select", func(t *testing.T) {
 		before := r.Get("contact.email")
-		selected, err := r.Select([]string{"contact.email"})
+		err := r.Select([]string{"contact.email"})
 		assert.Nil(t, err)
-		after := selected.Get("contact.email")
+		after := r.Get("contact.email")
 		assert.Equal(t, before, after)
-		assert.Nil(t, selected.Get("name"))
+		assert.Nil(t, r.Get("name"))
 	})
 	t.Run("set all", func(t *testing.T) {
 		c := r.Clone()
-		c, err = c.SetAll(map[string]any{
+		err = c.SetAll(map[string]any{
 			"contact.email": gofakeit.Email(),
 		})
 		assert.Nil(t, err)
@@ -254,7 +254,7 @@ func TestDocument(t *testing.T) {
 		assert.False(t, pass)
 	})
 	t.Run("results", func(t *testing.T) {
-		var docs = []schema.Document{
+		var docs = []*schema.Document{
 			testutil.NewUserDoc(),
 			testutil.NewUserDoc(),
 			testutil.NewUserDoc(),
@@ -279,7 +279,7 @@ func BenchmarkDocument(b *testing.B) {
 		email := gofakeit.Email()
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
-			_, err := doc.Set("contact.email", email)
+			err := doc.Set("contact.email", email)
 			assert.Nil(b, err)
 		}
 	})

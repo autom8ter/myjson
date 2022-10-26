@@ -10,81 +10,93 @@ import (
 	"github.com/tidwall/sjson"
 	"io"
 	"strings"
+	"sync"
 )
 
 // Document is a database document with special attributes.
 // required attributes: _id(string), _collection(string)
 type Document struct {
 	result gjson.Result
+	mu     sync.RWMutex
 }
 
 // MarshalJSON satisfies the json Marshaler interface
-func (d Document) MarshalJSON() ([]byte, error) {
+func (d *Document) MarshalJSON() ([]byte, error) {
+	d.mu.RLock()
+	defer d.mu.RUnlock()
 	return d.Bytes(), nil
 }
 
 // NewDocument creates a new json document
-func NewDocument() Document {
+func NewDocument() *Document {
 	parsed := gjson.Parse("{}")
-	return Document{
+	return &Document{
 		result: parsed,
 	}
 }
 
 // NewDocumentFromBytes creates a new document from the given json bytes
-func NewDocumentFromBytes(json []byte) (Document, error) {
+func NewDocumentFromBytes(json []byte) (*Document, error) {
 	if !gjson.ValidBytes(json) {
-		return Document{}, stacktrace.NewError("invalid json")
+		return nil, stacktrace.NewError("invalid json")
 	}
-	d := Document{
+	d := &Document{
 		result: gjson.ParseBytes(json),
 	}
 	if !d.Valid() {
-		return Document{}, stacktrace.NewError("invalid document")
+		return nil, stacktrace.NewError("invalid document")
 	}
 	return d, nil
 }
 
 // NewDocumentFrom creates a new document from the given value - the value must be json compatible
-func NewDocumentFrom(value any) (Document, error) {
+func NewDocumentFrom(value any) (*Document, error) {
 	var err error
 	bits, err := json.Marshal(value)
 	if err != nil {
-		return Document{}, stacktrace.NewError("failed to json encode value: %#v", value)
+		return nil, stacktrace.NewError("failed to json encode value: %#v", value)
 	}
 	return NewDocumentFromBytes(bits)
 }
 
 // Valid returns whether the document is valid
-func (d Document) Valid() bool {
+func (d *Document) Valid() bool {
+	d.mu.RLock()
+	defer d.mu.RUnlock()
 	return gjson.ValidBytes(d.Bytes()) && !d.result.IsArray()
 }
 
 // String returns the document as a json string
-func (d Document) String() string {
+func (d *Document) String() string {
+	d.mu.RLock()
+	defer d.mu.RUnlock()
 	return d.result.Raw
 }
 
 // Bytes returns the document as json bytes
-func (d Document) Bytes() []byte {
+func (d *Document) Bytes() []byte {
 	return []byte(d.result.Raw)
 }
 
 // Value returns the document as a map
-func (d Document) Value() map[string]any {
+func (d *Document) Value() map[string]any {
+	d.mu.RLock()
+	defer d.mu.RUnlock()
 	return cast.ToStringMap(d.result.Value())
 }
 
 // Clone allocates a new document with identical values
-func (d Document) Clone() Document {
+func (d *Document) Clone() *Document {
+	d.mu.RLock()
+	defer d.mu.RUnlock()
 	raw := d.result.Raw
-	return Document{result: gjson.Parse(raw)}
+	return &Document{result: gjson.Parse(raw)}
 }
 
 // Select returns the document with only the selected fields populated
-func (d Document) Select(fields []string) (Document, error) {
+func (d *Document) Select(fields []string) error {
 	if len(fields) == 0 || fields[0] == "*" {
-		return d, nil
+		return nil
 	}
 	var (
 		selected = NewDocument()
@@ -94,45 +106,55 @@ func (d Document) Select(fields []string) (Document, error) {
 	for _, f := range fields {
 		patch[f] = d.Get(f)
 	}
-	selected, err := selected.SetAll(patch)
+	err := selected.SetAll(patch)
 	if err != nil {
-		return Document{}, stacktrace.Propagate(err, "")
+		return stacktrace.Propagate(err, "")
 	}
-	return selected, nil
+	d.result = selected.result
+	return nil
 }
 
 // Get gets a field on the document. Get has GJSON syntax support and supports dot notation
-func (d Document) Get(field string) any {
+func (d *Document) Get(field string) any {
+	d.mu.RLock()
+	defer d.mu.RUnlock()
 	return d.result.Get(field).Value()
 }
 
 // GetString gets a string field value on the document. Get has GJSON syntax support and supports dot notation
-func (d Document) GetString(field string) string {
+func (d *Document) GetString(field string) string {
+	d.mu.RLock()
+	defer d.mu.RUnlock()
 	return cast.ToString(d.result.Get(field).Value())
 }
 
 // GetBool gets a bool field value on the document. GetBool has GJSON syntax support and supports dot notation
-func (d Document) GetBool(field string) bool {
-	return d.result.Get(field).Bool()
+func (d *Document) GetBool(field string) bool {
+	return cast.ToBool(d.Get(field))
 }
 
 // GetFloat gets a bool field value on the document. GetFloat has GJSON syntax support and supports dot notation
-func (d Document) GetFloat(field string) float64 {
-	return d.result.Get(field).Float()
+func (d *Document) GetFloat(field string) float64 {
+	return cast.ToFloat64(d.Get(field))
 }
 
 // GetArray gets an array field on the document. Get has GJSON syntax support and supports dot notation
-func (d Document) GetArray(field string) []any {
-	return cast.ToSlice(d.result.Get(field).Value())
+func (d *Document) GetArray(field string) []any {
+	return cast.ToSlice(d.Get(field))
 }
 
 // Set sets a field on the document. Dot notation is supported.
-func (d Document) Set(field string, val any) (Document, error) {
+func (d *Document) Set(field string, val any) error {
+	return d.SetAll(map[string]any{
+		field: val,
+	})
+}
+
+func (d *Document) set(field string, val any) error {
 	var (
 		result string
 		err    error
 	)
-
 	switch val := val.(type) {
 	case gjson.Result:
 		result, err = sjson.Set(d.result.Raw, field, val.Value())
@@ -142,65 +164,63 @@ func (d Document) Set(field string, val any) (Document, error) {
 		result, err = sjson.Set(d.result.Raw, field, val)
 	}
 	if err != nil {
-		return Document{}, stacktrace.Propagate(err, "")
+		return stacktrace.Propagate(err, "")
 	}
-	doc := Document{result: gjson.Parse(result)}
-	if !doc.Valid() {
-		return Document{}, stacktrace.NewError("invalid document")
+	if !gjson.Valid(result) {
+		return stacktrace.NewError("invalid document")
 	}
-	return doc, nil
+	d.result = gjson.Parse(result)
+	return nil
 }
 
 // SetAll sets all fields on the document. Dot notation is supported.
-func (d Document) SetAll(values map[string]any) (Document, error) {
-	var doc = d.Clone()
+func (d *Document) SetAll(values map[string]any) error {
+	d.mu.Lock()
+	defer d.mu.Unlock()
 	var err error
 	for k, v := range values {
-		doc, err = doc.Set(k, v)
+		err = d.set(k, v)
 		if err != nil {
-			return Document{}, stacktrace.Propagate(err, "")
+			return stacktrace.Propagate(err, "")
 		}
 	}
-	return doc, nil
+	return nil
 }
 
 // Merge merges the doument with the provided document. This is not an overwrite.
-func (d Document) Merge(with Document) (Document, error) {
+func (d *Document) Merge(with *Document) error {
 	if !with.Valid() {
-		return d, nil
+		return stacktrace.NewError("invalid document")
 	}
 	withMap := with.Value()
 	flattened, err := flat2.Flatten(withMap, nil)
 	if err != nil {
-		return Document{}, stacktrace.Propagate(err, "")
+		return stacktrace.Propagate(err, "")
 	}
 	return d.SetAll(flattened)
 }
 
 // Del deletes a field from the document
-func (d Document) Del(field string) (Document, error) {
-	result, err := sjson.Delete(d.result.Raw, field)
-	if err != nil {
-		return Document{}, stacktrace.Propagate(err, "")
-	}
-	return Document{result: gjson.Parse(result)}, nil
+func (d *Document) Del(field string) error {
+	return d.DelAll(field)
 }
 
 // Del deletes a field from the document
-func (d Document) DelAll(fields ...string) (Document, error) {
-	var doc = d
-	var err error
+func (d *Document) DelAll(fields ...string) error {
+	d.mu.Lock()
+	defer d.mu.Unlock()
 	for _, field := range fields {
-		doc, err = doc.Del(field)
+		result, err := sjson.Delete(d.result.Raw, field)
 		if err != nil {
-			return Document{}, stacktrace.Propagate(err, "")
+			return stacktrace.Propagate(err, "")
 		}
+		d.result = gjson.Parse(result)
 	}
-	return doc, nil
+	return nil
 }
 
 // Where executes the where clauses against the document and returns true if it passes the clauses
-func (d Document) Where(wheres []Where) (bool, error) {
+func (d *Document) Where(wheres []Where) (bool, error) {
 	for _, w := range wheres {
 		switch w.Op {
 		case "==", Eq:
@@ -253,12 +273,12 @@ func (d Document) Where(wheres []Where) (bool, error) {
 }
 
 // Scan scans the json document into the value
-func (d Document) Scan(value any) error {
+func (d *Document) Scan(value any) error {
 	return util.Decode(d.Value(), &value)
 }
 
 // Encode encodes the json document to the io writer
-func (d Document) Encode(w io.Writer) error {
+func (d *Document) Encode(w io.Writer) error {
 	_, err := w.Write(d.Bytes())
 	if err != nil {
 		return stacktrace.Propagate(err, "failed to encode document")

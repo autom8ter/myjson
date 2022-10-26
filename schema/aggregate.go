@@ -43,18 +43,17 @@ func (a AggregateQuery) String() string {
 	return string(bits)
 }
 
-func ApplyReducers(ctx context.Context, a AggregateQuery, documents []Document) (Document, error) {
+func ApplyReducers(ctx context.Context, a AggregateQuery, documents []*Document) (*Document, error) {
 	var (
-		aggregated Document
-		err        error
+		aggregated *Document
 	)
 	for _, next := range documents {
-		if !aggregated.Valid() {
+		if aggregated == nil || !aggregated.Valid() {
 			aggregated = next
 		}
 		for _, agg := range a.Aggregates {
 			if agg.Alias == "" {
-				return Document{}, stacktrace.NewError("empty aggregate alias: %s/%s", agg.Field, agg.Function)
+				return nil, stacktrace.NewError("empty aggregate alias: %s/%s", agg.Field, agg.Function)
 			}
 			current := aggregated.GetFloat(agg.Alias)
 			switch agg.Function {
@@ -71,11 +70,10 @@ func ApplyReducers(ctx context.Context, a AggregateQuery, documents []Document) 
 			case SUM:
 				current += next.GetFloat(agg.Field)
 			default:
-				return Document{}, stacktrace.NewError("unsupported aggregate function: %s/%s", agg.Field, agg.Function)
+				return nil, stacktrace.NewError("unsupported aggregate function: %s/%s", agg.Field, agg.Function)
 			}
-			aggregated, err = aggregated.Set(agg.Alias, current)
-			if err != nil {
-				return Document{}, stacktrace.Propagate(err, "")
+			if err := aggregated.Set(agg.Alias, current); err != nil {
+				return nil, stacktrace.Propagate(err, "")
 			}
 		}
 	}

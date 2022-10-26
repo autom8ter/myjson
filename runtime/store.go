@@ -93,7 +93,7 @@ func (d defaultStore) aggregateCollection(ctx context.Context, collection *schem
 	if err != nil {
 		return schema.Page{}, stacktrace.Propagate(err, "")
 	}
-	var results []schema.Document
+	var results []*schema.Document
 	if err := d.kv.View(func(txn *badger.Txn) error {
 		opts := badger.DefaultIteratorOptions
 		opts.PrefetchValues = true
@@ -130,14 +130,14 @@ func (d defaultStore) aggregateCollection(ctx context.Context, collection *schem
 	}); err != nil {
 		return schema.Page{}, stacktrace.Propagate(err, "")
 	}
-	grouped := lo.GroupBy[schema.Document](results, func(d schema.Document) string {
+	grouped := lo.GroupBy[*schema.Document](results, func(d *schema.Document) string {
 		var values []string
 		for _, g := range query.GroupBy {
 			values = append(values, cast.ToString(d.Get(g)))
 		}
 		return strings.Join(values, ".")
 	})
-	var reduced []schema.Document
+	var reduced []*schema.Document
 	for _, values := range grouped {
 		value, err := schema.ApplyReducers(ctx, query, values)
 		if err != nil {
@@ -152,16 +152,15 @@ func (d defaultStore) aggregateCollection(ctx context.Context, collection *schem
 	if query.Limit > 0 && len(reduced) > query.Limit {
 		reduced = reduced[:query.Limit]
 	}
-	for i, r := range reduced {
+	for _, r := range reduced {
 		toSelect := query.GroupBy
 		for _, a := range query.Aggregates {
 			toSelect = append(toSelect, a.Alias)
 		}
-		selected, err := r.Select(toSelect)
+		err := r.Select(toSelect)
 		if err != nil {
 			return schema.Page{}, stacktrace.Propagate(err, "")
 		}
-		reduced[i] = selected
 	}
 	return schema.Page{
 		Documents: reduced,
@@ -174,8 +173,8 @@ func (d defaultStore) aggregateCollection(ctx context.Context, collection *schem
 	}, nil
 }
 
-func (d defaultStore) getAllCollection(ctx context.Context, collection *schema.Collection, ids []string) ([]schema.Document, error) {
-	var documents []schema.Document
+func (d defaultStore) getAllCollection(ctx context.Context, collection *schema.Collection, ids []string) ([]*schema.Document, error) {
+	var documents []*schema.Document
 	if err := d.kv.View(func(txn *badger.Txn) error {
 		for _, id := range ids {
 			pkey, err := collection.GetPrimaryKeyRef(id)
@@ -204,13 +203,13 @@ func (d defaultStore) getAllCollection(ctx context.Context, collection *schema.C
 	return documents, nil
 }
 
-func (d defaultStore) getCollection(ctx context.Context, collection *schema.Collection, id string) (schema.Document, error) {
+func (d defaultStore) getCollection(ctx context.Context, collection *schema.Collection, id string) (*schema.Document, error) {
 	var (
-		document schema.Document
+		document *schema.Document
 	)
 	pkey, err := collection.GetPrimaryKeyRef(id)
 	if err != nil {
-		return schema.Document{}, stacktrace.PropagateWithCode(err, errors.ErrTODO, "failed to get document %s/%s primary key ref", collection.Collection(), id)
+		return nil, stacktrace.PropagateWithCode(err, errors.ErrTODO, "failed to get document %s/%s primary key ref", collection.Collection(), id)
 	}
 	if err := d.kv.View(func(txn *badger.Txn) error {
 		item, err := txn.Get(pkey)
@@ -239,7 +238,11 @@ func (d defaultStore) persistCollection(ctx context.Context, collection *schema.
 	if change.Updates != nil {
 		for id, edit := range change.Updates {
 			before, _ := d.getCollection(ctx, collection, id)
-			after, err := before.SetAll(edit)
+			if !before.Valid() {
+				before = schema.NewDocument()
+			}
+			after := before.Clone()
+			err := after.SetAll(edit)
 			if err != nil {
 				return stacktrace.Propagate(err, "")
 			}
@@ -250,7 +253,7 @@ func (d defaultStore) persistCollection(ctx context.Context, collection *schema.
 	}
 	for _, id := range change.Deletes {
 		before, _ := d.getCollection(ctx, collection, id)
-		if err := d.indexDocument(ctx, collection, txn, batch, schema.Delete, id, before, schema.NewDocument()); err != nil {
+		if err := d.indexDocument(ctx, collection, txn, batch, schema.Delete, id, before, nil); err != nil {
 			return stacktrace.Propagate(err, "")
 		}
 	}
@@ -283,7 +286,7 @@ func (d defaultStore) persistCollection(ctx context.Context, collection *schema.
 	return nil
 }
 
-func (d defaultStore) indexDocument(ctx context.Context, collection *schema.Collection, txn *badger.WriteBatch, batch *bleve.Batch, action schema.Action, docId string, before, after schema.Document) error {
+func (d defaultStore) indexDocument(ctx context.Context, collection *schema.Collection, txn *badger.WriteBatch, batch *bleve.Batch, action schema.Action, docId string, before, after *schema.Document) error {
 	if docId == "" {
 		return stacktrace.NewErrorWithCode(errors.ErrTODO, "empty document id")
 	}
@@ -321,7 +324,7 @@ func (d defaultStore) indexDocument(ctx context.Context, collection *schema.Coll
 		}
 		for _, idx := range collection.Indexing().Query {
 			pindex := collection.QueryIndexPrefix(*idx)
-			if before.Valid() {
+			if before != nil && before.Valid() {
 				if err := txn.Delete(pindex.GetPrefix(before.Value(), docId)); err != nil {
 					return stacktrace.PropagateWithCode(
 						err,
@@ -363,7 +366,7 @@ func (d defaultStore) queryCollection(ctx context.Context, collection *schema.Co
 	if err != nil {
 		return schema.Page{}, stacktrace.Propagate(err, "")
 	}
-	var results []schema.Document
+	var results []*schema.Document
 	if err := d.kv.View(func(txn *badger.Txn) error {
 		opts := badger.DefaultIteratorOptions
 		opts.PrefetchValues = true
@@ -414,12 +417,11 @@ func (d defaultStore) queryCollection(ctx context.Context, collection *schema.Co
 	}
 
 	if len(query.Select) > 0 && query.Select[0] != "*" {
-		for i, result := range results {
-			selected, err := result.Select(query.Select)
+		for _, result := range results {
+			err := result.Select(query.Select)
 			if err != nil {
 				return schema.Page{}, stacktrace.Propagate(err, "")
 			}
-			results[i] = selected
 		}
 	}
 
@@ -529,7 +531,7 @@ func (d defaultStore) searchCollection(ctx context.Context, collection *schema.C
 		return schema.Page{}, stacktrace.Propagate(err, "failed to search index: %s", collection.Collection())
 	}
 
-	var data []schema.Document
+	var data []*schema.Document
 	if len(results.Hits) == 0 {
 		return schema.Page{}, stacktrace.NewError("zero results")
 	}
@@ -551,12 +553,11 @@ func (d defaultStore) searchCollection(ctx context.Context, collection *schema.C
 	}
 
 	if len(q.Select) > 0 && q.Select[0] != "*" {
-		for i, r := range data {
-			selected, err := r.Select(q.Select)
+		for _, r := range data {
+			err := r.Select(q.Select)
 			if err != nil {
 				return schema.Page{}, stacktrace.Propagate(err, "")
 			}
-			data[i] = selected
 		}
 	}
 	return schema.Page{

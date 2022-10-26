@@ -17,7 +17,7 @@ type StateChange struct {
 	ctx        context.Context
 	Collection string                    `json:"collection,omitempty"`
 	Deletes    []string                  `json:"deletes,omitempty"`
-	Sets       []Document                `json:"sets,omitempty"`
+	Sets       []*Document               `json:"sets,omitempty"`
 	Updates    map[string]map[string]any `json:"updates,omitempty"`
 	Timestamp  time.Time                 `json:"timestamp,omitempty"`
 }

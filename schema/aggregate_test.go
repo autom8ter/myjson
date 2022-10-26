@@ -11,7 +11,7 @@ import (
 func TestApplyReducers(t *testing.T) {
 	t.Run("sum age", func(t *testing.T) {
 		var expected = float64(0)
-		var docs []schema.Document
+		var docs []*schema.Document
 		for i := 0; i < 5; i++ {
 			u := testutil.NewUserDoc()
 			expected += u.GetFloat("age")

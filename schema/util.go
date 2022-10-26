@@ -5,7 +5,7 @@ import (
 	"sort"
 )
 
-func SortOrder(orderBy OrderBy, documents []Document) []Document {
+func SortOrder(orderBy OrderBy, documents []*Document) []*Document {
 	if orderBy.Field == "" {
 		return documents
 	}
@@ -21,7 +21,7 @@ func SortOrder(orderBy OrderBy, documents []Document) []Document {
 	return documents
 }
 
-func compareField(field string, i, j Document) bool {
+func compareField(field string, i, j *Document) bool {
 	iFieldVal := i.result.Get(field)
 	jFieldVal := j.result.Get(field)
 	switch i.result.Get(field).Value().(type) {

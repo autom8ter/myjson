@@ -52,7 +52,7 @@ func Test(t *testing.T) {
 		})
 		assert.Nil(t, testutil.TestDB(testutil.AllCollections, func(ctx context.Context, db *wolverine.DB) {
 			assert.Nil(t, db.Collection(ctx, "user", func(collection *wolverine.Collection) error {
-				var usrs []schema.Document
+				var usrs []*schema.Document
 				var ids []string
 				t.Run("batch set", func(t *testing.T) {
 					timer := timer()
@@ -287,7 +287,7 @@ func Test(t *testing.T) {
 					t.Logf("found %v regex search results in %s", results.Count, results.Stats.ExecutionTime)
 				})
 				t.Run("add tasks", func(t *testing.T) {
-					var taskDocs []schema.Document
+					var taskDocs []*schema.Document
 					if err := db.Collection(ctx, "task", func(tasks *wolverine.Collection) error {
 						for _, u := range usrs {
 							task := testutil.NewTaskDoc(collection.Schema().GetDocumentID(u))
@@ -399,7 +399,7 @@ func Benchmark(b *testing.B) {
 		assert.Nil(b, testutil.TestDB(testutil.AllCollections, func(ctx context.Context, db *wolverine.DB) {
 			assert.Nil(b, db.Collection(ctx, "user", func(collection *wolverine.Collection) error {
 				assert.Nil(b, collection.Set(ctx, doc))
-				var docs []schema.Document
+				var docs []*schema.Document
 				for i := 0; i < 100; i++ {
 					docs = append(docs, testutil.NewUserDoc())
 				}

@@ -7,6 +7,7 @@ import (
 	"github.com/autom8ter/wolverine/internal/prefix"
 	"github.com/autom8ter/wolverine/internal/util"
 	"github.com/palantir/stacktrace"
+	"github.com/segmentio/ksuid"
 	"github.com/spf13/cast"
 	"github.com/tidwall/gjson"
 	"github.com/xeipuuv/gojsonschema"
@@ -171,7 +172,7 @@ func (c *Collection) Relationships() Relationships {
 }
 
 // Validate validates the document against the collections json schema (if it exists)
-func (c *Collection) Validate(doc Document) (bool, error) {
+func (c *Collection) Validate(doc *Document) (bool, error) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	var err error
@@ -193,6 +194,7 @@ func (c *Collection) Validate(doc Document) (bool, error) {
 	return true, nil
 }
 
+// OptimizeQueryIndex selects the optimal index to use given the where/orderby clause
 func (c *Collection) OptimizeQueryIndex(where []Where, order OrderBy) (QueryIndexMatch, error) {
 	var whereFields []string
 	var whereValues = map[string]any{}
@@ -203,7 +205,7 @@ func (c *Collection) OptimizeQueryIndex(where []Where, order OrderBy) (QueryInde
 		whereFields = append(whereFields, w.Field)
 		whereValues[w.Field] = w.Value
 	}
-	index, err := c.GetQueryIndex(whereFields, order.Field)
+	index, err := c.getQueryIndex(whereFields, order.Field)
 	if err != nil {
 		return QueryIndexMatch{}, stacktrace.Propagate(err, "")
 	}
@@ -216,6 +218,7 @@ func (c *Collection) PrimaryQueryIndex() *prefix.PrefixIndexRef {
 	})
 }
 
+// GetPrimaryKeyRef gets a reference to the documents primary key
 func (c *Collection) GetPrimaryKeyRef(documentID string) ([]byte, error) {
 	if documentID == "" {
 		return nil, stacktrace.NewErrorWithCode(errors.ErrTODO, "empty document id for property: %s", c.indexing.PrimaryKey)
@@ -225,11 +228,17 @@ func (c *Collection) GetPrimaryKeyRef(documentID string) ([]byte, error) {
 	}, documentID), nil
 }
 
+// SetID sets the documents primary key
+func (c *Collection) SetID(d *Document) error {
+	return stacktrace.Propagate(d.Set(c.indexing.PrimaryKey, ksuid.New().String()), "")
+}
+
 func (c *Collection) QueryIndexPrefix(i QueryIndex) *prefix.PrefixIndexRef {
 	return prefix.NewPrefixedIndex(c.collection, i.Fields)
 }
 
-func (c *Collection) GetQueryIndex(whereFields []string, orderBy string) (QueryIndexMatch, error) {
+// GetQueryIndex gets the
+func (c *Collection) getQueryIndex(whereFields []string, orderBy string) (QueryIndexMatch, error) {
 	var (
 		target  *QueryIndex
 		matched int
@@ -270,6 +279,6 @@ func (c *Collection) GetQueryIndex(whereFields []string, orderBy string) (QueryI
 	}, nil
 }
 
-func (c *Collection) GetDocumentID(d Document) string {
+func (c *Collection) GetDocumentID(d *Document) string {
 	return cast.ToString(d.Get(c.indexing.PrimaryKey))
 }

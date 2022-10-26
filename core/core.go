@@ -12,8 +12,8 @@ type CoreAPI interface {
 	Aggregate(ctx context.Context, collection *schema.Collection, query schema.AggregateQuery) (schema.Page, error)
 	Search(ctx context.Context, collection *schema.Collection, query schema.SearchQuery) (schema.Page, error)
 	Query(ctx context.Context, collection *schema.Collection, query schema.Query) (schema.Page, error)
-	Get(ctx context.Context, collection *schema.Collection, id string) (schema.Document, error)
-	GetAll(ctx context.Context, collection *schema.Collection, ids []string) ([]schema.Document, error)
+	Get(ctx context.Context, collection *schema.Collection, id string) (*schema.Document, error)
+	GetAll(ctx context.Context, collection *schema.Collection, ids []string) ([]*schema.Document, error)
 	ChangeStream(ctx context.Context, collection *schema.Collection, fn schema.ChangeStreamHandler) error
 	Backup(ctx context.Context, w io.Writer, since uint64) error
 	Restore(ctx context.Context, r io.Reader) error
@@ -132,14 +132,14 @@ func (c Core) Query(ctx context.Context, collection *schema.Collection, query sc
 	return c.query(ctx, collection, query)
 }
 
-func (c Core) Get(ctx context.Context, collection *schema.Collection, id string) (schema.Document, error) {
+func (c Core) Get(ctx context.Context, collection *schema.Collection, id string) (*schema.Document, error) {
 	if c.get == nil {
-		return schema.Document{}, fmt.Errorf("unimplemented")
+		return nil, fmt.Errorf("unimplemented")
 	}
 	return c.get(ctx, collection, id)
 }
 
-func (c Core) GetAll(ctx context.Context, collection *schema.Collection, ids []string) ([]schema.Document, error) {
+func (c Core) GetAll(ctx context.Context, collection *schema.Collection, ids []string) ([]*schema.Document, error) {
 	if c.getAll == nil {
 		return nil, fmt.Errorf("unimplemented")
 	}
@@ -239,13 +239,13 @@ type QueryFunc func(ctx context.Context, collection *schema.Collection, query sc
 type QueryWare func(QueryFunc) QueryFunc
 
 // GetFunc gets documents in a collection
-type GetFunc func(ctx context.Context, collection *schema.Collection, id string) (schema.Document, error)
+type GetFunc func(ctx context.Context, collection *schema.Collection, id string) (*schema.Document, error)
 
 // GetWare wraps a GetFunc and returns a new one
 type GetWare func(GetFunc) GetFunc
 
 // GetAllFunc gets multiple documents in a collection
-type GetAllFunc func(ctx context.Context, collection *schema.Collection, ids []string) ([]schema.Document, error)
+type GetAllFunc func(ctx context.Context, collection *schema.Collection, ids []string) ([]*schema.Document, error)
 
 // GetAllWare wraps a GetAllFunc and returns a new one
 type GetAllWare func(GetAllFunc) GetAllFunc
