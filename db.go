@@ -50,14 +50,12 @@ func LoadConfig(storeagePath string, schemaDir string) (Config, error) {
 }
 
 type DB struct {
-	config       Config
-	kv           *badger.DB
-	mu           sync.RWMutex
-	schema       *schema.Schema
-	machine      machine.Machine
-	collections  []*Collection
-	errorHandler func(collection string, err error)
-	closers      []func() error
+	config      Config
+	kv          *badger.DB
+	mu          sync.RWMutex
+	core        core.Core
+	machine     machine.Machine
+	collections []*Collection
 }
 
 func New(ctx context.Context, cfg Config) (*DB, error) {
@@ -81,94 +79,62 @@ func New(ctx context.Context, cfg Config) (*DB, error) {
 		config:  *config,
 		kv:      kv,
 		mu:      sync.RWMutex{},
-		schema:  schema.NewSchema(nil),
 		machine: machine.New(),
 	}
-	if d.errorHandler == nil {
-		d.errorHandler = func(collection string, err error) {
-			fmt.Printf("[%s] ERROR - %s\n", collection, err)
-		}
-	}
+	var indexes = map[string]bleve.Index{}
 	for _, collection := range config.Collections {
 		idx, err := openFullTextIndex(ctx, cfg, collection, false)
 		if err != nil {
 			return nil, stacktrace.Propagate(err, "")
 		}
-		c := &Collection{
+		indexes[collection.Collection()] = idx
+
+		d.collections = append(d.collections, &Collection{
 			schema: collection,
-			core:   store.Core(kv, idx, d.machine),
 			db:     d,
-		}
-		for _, m := range config.middlewares {
-			c.core = c.core.Apply(m)
-		}
-		d.collections = append(d.collections, c)
-		d.closers = append(d.closers, func() error {
-			if idx != nil {
-				return idx.Close()
-			}
-			return nil
 		})
 	}
+
+	systemCollection, err := schema.LoadCollection(systemCollectionSchema)
+	if err != nil {
+		return nil, stacktrace.Propagate(err, "")
+	}
 	{
-		systemCollection, err := schema.LoadCollection(systemCollectionSchema)
-		if err != nil {
-			return nil, stacktrace.Propagate(err, "")
-		}
 		idx, err := openFullTextIndex(ctx, cfg, systemCollection, false)
 		if err != nil {
 			return nil, stacktrace.Propagate(err, "")
 		}
-		c := &Collection{
+		indexes[systemCollection.Collection()] = idx
+
+		d.collections = append(d.collections, &Collection{
 			schema: systemCollection,
-			core:   store.Core(kv, idx, d.machine),
 			db:     d,
-		}
-		for _, m := range config.middlewares {
-			c.core = c.core.Apply(m)
-		}
-		d.collections = append(d.collections, c)
-		d.closers = append(d.closers, func() error {
-			if idx != nil {
-				return idx.Close()
-			}
-			return nil
 		})
+	}
+
+	d.core = store.Core(kv, indexes, d.machine)
+	for _, m := range config.middlewares {
+		d.core = d.core.Apply(m)
 	}
 
 	if err := d.ReIndex(ctx); err != nil {
 		return nil, stacktrace.Propagate(err, "failed to reindex")
 	}
-	d.closers = append(d.closers, func() error {
-		if err := d.kv.Sync(); err != nil {
-			return stacktrace.Propagate(err, "")
-		}
-		return stacktrace.Propagate(d.kv.Close(), "")
-	})
 	return d, nil
 }
 
 func (d *DB) Close(ctx context.Context) error {
 	d.mu.Lock()
 	defer d.mu.Unlock()
-	for _, c := range d.closers {
-		if err := c(); err != nil {
-			return stacktrace.Propagate(err, "")
-		}
-	}
-	return nil
+	return d.core.Close(ctx)
 }
 
 func (d *DB) Backup(ctx context.Context, w io.Writer) error {
-	_, err := d.kv.Backup(w, 0)
-	if err != nil {
-		return stacktrace.Propagate(err, "failed backup")
-	}
-	return nil
+	return d.core.Backup(ctx, w, 0)
 }
 
 func (d *DB) Restore(ctx context.Context, r io.Reader) error {
-	if err := d.kv.Load(r, 256); err != nil {
+	if err := d.core.Restore(ctx, r); err != nil {
 		return stacktrace.Propagate(err, "")
 	}
 	return stacktrace.Propagate(d.ReIndex(ctx), "")

@@ -2,7 +2,6 @@ package wolverine
 
 import (
 	"context"
-	"github.com/autom8ter/wolverine/core"
 	"github.com/autom8ter/wolverine/errors"
 	"github.com/autom8ter/wolverine/schema"
 	"github.com/palantir/stacktrace"
@@ -13,7 +12,6 @@ import (
 type Collection struct {
 	schema *schema.Collection
 	db     *DB
-	core   core.Core
 }
 
 func (c *Collection) DB() *DB {
@@ -25,19 +23,19 @@ func (c *Collection) Schema() *schema.Collection {
 }
 
 func (c *Collection) persistStateChange(ctx context.Context, change schema.StateChange) error {
-	return c.core.Persist(ctx, c.schema, change)
+	return c.db.core.Persist(ctx, c.schema, change)
 }
 
 func (c *Collection) Query(ctx context.Context, query schema.Query) (schema.Page, error) {
-	return c.core.Query(ctx, c.schema, query)
+	return c.db.core.Query(ctx, c.schema, query)
 }
 
 func (c *Collection) Get(ctx context.Context, id string) (schema.Document, error) {
-	return c.core.Get(ctx, c.schema, id)
+	return c.db.core.Get(ctx, c.schema, id)
 }
 
 func (c *Collection) GetAll(ctx context.Context, ids []string) ([]schema.Document, error) {
-	return c.core.GetAll(ctx, c.schema, ids)
+	return c.db.core.GetAll(ctx, c.schema, ids)
 }
 
 // QueryPaginate paginates through each page of the query until the handlePage function returns false or there are no more results
@@ -65,7 +63,7 @@ func (c *Collection) QueryPaginate(ctx context.Context, query schema.Query, hand
 }
 
 func (c *Collection) ChangeStream(ctx context.Context, fn schema.ChangeStreamHandler) error {
-	return c.core.ChangeStream(ctx, c.schema, fn)
+	return c.db.core.ChangeStream(ctx, c.schema, fn)
 }
 
 func (c *Collection) Set(ctx context.Context, document schema.Document) error {
@@ -147,11 +145,11 @@ func (c *Collection) QueryDelete(ctx context.Context, query schema.Query) error 
 }
 
 func (c *Collection) Aggregate(ctx context.Context, query schema.AggregateQuery) (schema.Page, error) {
-	return c.core.Aggregate(ctx, c.schema, query)
+	return c.db.core.Aggregate(ctx, c.schema, query)
 }
 
 func (c *Collection) Search(ctx context.Context, query schema.SearchQuery) (schema.Page, error) {
-	return c.core.Search(ctx, c.schema, query)
+	return c.db.core.Search(ctx, c.schema, query)
 }
 
 // SearchPaginate paginates through each page of the query until the handlePage function returns false or there are no more results

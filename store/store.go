@@ -13,17 +13,18 @@ import (
 	"github.com/palantir/stacktrace"
 	"github.com/samber/lo"
 	"github.com/spf13/cast"
+	"io"
 	"strings"
 	"time"
 )
 
 type defaultStore struct {
 	kv       *badger.DB
-	fullText bleve.Index
+	fullText map[string]bleve.Index
 	machine  machine.Machine
 }
 
-func Core(kv *badger.DB, fullText bleve.Index, machine machine.Machine) core.Core {
+func Core(kv *badger.DB, fullText map[string]bleve.Index, machine machine.Machine) core.Core {
 	d := defaultStore{
 		kv:       kv,
 		fullText: fullText,
@@ -37,6 +38,9 @@ func Core(kv *badger.DB, fullText bleve.Index, machine machine.Machine) core.Cor
 		Get:          d.getCollection,
 		GetAll:       d.getAllCollection,
 		ChangeStream: d.changeStreamCollection,
+		Close:        d.closeAll,
+		Backup:       d.backup,
+		Restore:      d.restore,
 	}
 }
 
@@ -207,7 +211,7 @@ func (d defaultStore) persistCollection(ctx context.Context, collection *schema.
 		return stacktrace.NewErrorWithCode(errors.ErrTODO, "null collection schema")
 	}
 	if collection.Indexing().HasSearchIndex() {
-		batch = d.fullText.NewBatch()
+		batch = d.fullText[collection.Collection()].NewBatch()
 	}
 	if change.Updates != nil {
 		for id, edit := range change.Updates {
@@ -242,7 +246,7 @@ func (d defaultStore) persistCollection(ctx context.Context, collection *schema.
 	}
 
 	if batch != nil {
-		if err := d.fullText.Batch(batch); err != nil {
+		if err := d.fullText[collection.Collection()].Batch(batch); err != nil {
 			return stacktrace.Propagate(err, "failed to batch collection documents")
 		}
 	}
@@ -548,7 +552,7 @@ func (d defaultStore) searchCollection(ctx context.Context, collection *schema.C
 		searchRequest = bleve.NewSearchRequestOptions(bleve.NewConjunctionQuery(queries[0]), limit, q.Page*limit, false)
 	}
 	searchRequest.Fields = []string{"*"}
-	results, err := d.fullText.Search(searchRequest)
+	results, err := d.fullText[collection.Collection()].Search(searchRequest)
 	if err != nil {
 		return schema.Page{}, stacktrace.Propagate(err, "failed to search index: %s", collection.Collection())
 	}
@@ -585,4 +589,31 @@ func (d defaultStore) searchCollection(ctx context.Context, collection *schema.C
 			ExecutionTime: time.Since(now),
 		},
 	}, nil
+}
+
+func (d defaultStore) closeAll(ctx context.Context) error {
+	for _, i := range d.fullText {
+		if err := i.Close(); err != nil {
+			return stacktrace.Propagate(err, "")
+		}
+	}
+	if err := d.kv.Sync(); err != nil {
+		return stacktrace.Propagate(err, "")
+	}
+	return stacktrace.Propagate(d.kv.Close(), "")
+}
+
+func (d defaultStore) backup(ctx context.Context, w io.Writer, since uint64) error {
+	_, err := d.kv.Backup(w, since)
+	if err != nil {
+		return stacktrace.Propagate(err, "failed backup")
+	}
+	return nil
+}
+
+func (d defaultStore) restore(ctx context.Context, r io.Reader) error {
+	if err := d.kv.Load(r, 256); err != nil {
+		return stacktrace.Propagate(err, "")
+	}
+	return nil
 }

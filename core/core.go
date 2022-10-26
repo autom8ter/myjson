@@ -3,6 +3,7 @@ package core
 import (
 	"context"
 	"github.com/autom8ter/wolverine/schema"
+	"io"
 )
 
 type Core struct {
@@ -13,6 +14,9 @@ type Core struct {
 	Get          GetFunc
 	GetAll       GetAllFunc
 	ChangeStream ChangeStreamFunc
+	Close        CloseFunc
+	Backup       BackupFunc
+	Restore      RestoreFunc
 }
 
 type Middleware struct {
@@ -34,6 +38,9 @@ func (c Core) Apply(m Middleware) Core {
 		Get:          c.Get,
 		GetAll:       c.GetAll,
 		ChangeStream: c.ChangeStream,
+		Close:        c.Close,
+		Backup:       c.Backup,
+		Restore:      c.Restore,
 	}
 	if m.Persist != nil {
 		for _, m := range m.Persist {
@@ -114,3 +121,12 @@ type ChangeStreamFunc func(ctx context.Context, collection *schema.Collection, f
 
 // ChangeStreamWare wraps a ChangeStreamFunc and returns a new one
 type ChangeStreamWare func(ChangeStreamFunc) ChangeStreamFunc
+
+// Close closes the runtime
+type CloseFunc func(ctx context.Context) error
+
+// RestoreFunc restores data from the provided reader
+type RestoreFunc func(ctx context.Context, r io.Reader) error
+
+// BackupFunc backs up data into the provided writer
+type BackupFunc func(ctx context.Context, w io.Writer, since uint64) error
