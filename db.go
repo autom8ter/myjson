@@ -51,7 +51,6 @@ func LoadConfig(storeagePath string, schemaDir string) (Config, error) {
 
 type DB struct {
 	config      Config
-	kv          *badger.DB
 	mu          sync.RWMutex
 	core        core.Core
 	machine     machine.Machine
@@ -74,25 +73,25 @@ func New(ctx context.Context, cfg Config) (*DB, error) {
 	if err != nil {
 		return nil, stacktrace.Propagate(err, "")
 	}
-
 	d := &DB{
 		config:  *config,
-		kv:      kv,
 		mu:      sync.RWMutex{},
 		machine: machine.New(),
 	}
 	var indexes = map[string]bleve.Index{}
 	for _, collection := range config.Collections {
-		idx, err := openFullTextIndex(ctx, cfg, collection, false)
-		if err != nil {
-			return nil, stacktrace.Propagate(err, "")
-		}
-		indexes[collection.Collection()] = idx
-
 		d.collections = append(d.collections, &Collection{
 			schema: collection,
 			db:     d,
 		})
+		if collection.Indexing().HasSearchIndex() {
+			idx, err := openFullTextIndex(ctx, cfg, collection, false)
+			if err != nil {
+				return nil, stacktrace.Propagate(err, "")
+			}
+			indexes[collection.Collection()] = idx
+		}
+
 	}
 
 	systemCollection, err := schema.LoadCollection(systemCollectionSchema)
@@ -100,11 +99,13 @@ func New(ctx context.Context, cfg Config) (*DB, error) {
 		return nil, stacktrace.Propagate(err, "")
 	}
 	{
-		idx, err := openFullTextIndex(ctx, cfg, systemCollection, false)
-		if err != nil {
-			return nil, stacktrace.Propagate(err, "")
+		if systemCollection.Indexing().HasSearchIndex() {
+			idx, err := openFullTextIndex(ctx, cfg, systemCollection, false)
+			if err != nil {
+				return nil, stacktrace.Propagate(err, "")
+			}
+			indexes[systemCollection.Collection()] = idx
 		}
-		indexes[systemCollection.Collection()] = idx
 
 		d.collections = append(d.collections, &Collection{
 			schema: systemCollection,

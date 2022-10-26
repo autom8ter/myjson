@@ -30,6 +30,9 @@ func Core(kv *badger.DB, fullText map[string]bleve.Index, machine machine.Machin
 		fullText: fullText,
 		machine:  machine,
 	}
+	if d.fullText == nil {
+		d.fullText = map[string]bleve.Index{}
+	}
 	return core.Core{
 		Persist:      d.persistCollection,
 		Aggregate:    d.aggregateCollection,
