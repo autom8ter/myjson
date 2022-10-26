@@ -20,8 +20,6 @@ Features:
 - [x] regex
 - [x] wildcard
 - [x] term range
-- [x] date range
-- [x] geo distance
 - [x] boosting
 - [x] select fields
 

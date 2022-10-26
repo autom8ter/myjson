@@ -302,3 +302,29 @@ func (c *Collection) GetRelationship(ctx context.Context, field string, document
 	}
 	return nil, stacktrace.NewErrorWithCode(errors.ErrTODO, "relationship %s does not exist", field)
 }
+
+// Transform executes a transformation which is basically ETL from one collection to another
+func (c *Collection) Transform(ctx context.Context, transformation schema.ETL) error {
+	if transformation.Transformer == nil {
+		return stacktrace.NewError("empty transformer")
+	}
+	if transformation.OutputCollection == "" {
+		return stacktrace.NewError("empty output collection")
+	}
+	res, err := c.Query(ctx, transformation.Query)
+	if err != nil {
+		return stacktrace.Propagate(err, "")
+	}
+	res.Documents, err = transformation.Transformer(ctx, res.Documents)
+	if err != nil {
+		return stacktrace.Propagate(err, "")
+	}
+	if len(res.Documents) > 0 {
+		if err := c.db.Collection(ctx, transformation.OutputCollection, func(dest *Collection) error {
+			return stacktrace.Propagate(dest.BatchSet(ctx, res.Documents), "")
+		}); err != nil {
+			return stacktrace.Propagate(err, "")
+		}
+	}
+	return nil
+}
