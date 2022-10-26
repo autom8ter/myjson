@@ -116,10 +116,9 @@ func (d defaultStore) aggregateCollection(ctx context.Context, collection *schem
 				if err != nil {
 					return stacktrace.Propagate(err, "")
 				}
-				if !pass {
-					return nil
+				if pass {
+					results = append(results, document)
 				}
-				results = append(results, document)
 				return nil
 			})
 			if err != nil {

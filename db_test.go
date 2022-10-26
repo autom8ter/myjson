@@ -326,3 +326,72 @@ func Test(t *testing.T) {
 	time.Sleep(1 * time.Second)
 	t.Log(runtime.NumGoroutine())
 }
+
+//
+func Benchmark(b *testing.B) {
+	// Benchmark/set-12         	      22	  47669475 ns/op	  702120 B/op	    4481 allocs/op
+	b.Run("set", func(b *testing.B) {
+		b.ReportAllocs()
+		doc := testutil.NewUserDoc()
+		assert.Nil(b, testutil.TestDB(testutil.AllCollections, func(ctx context.Context, db *wolverine.DB) {
+			assert.Nil(b, db.Collection(ctx, "user", func(collection *wolverine.Collection) error {
+				b.ResetTimer()
+				for i := 0; i < b.N; i++ {
+					assert.Nil(b, collection.Set(ctx, doc))
+				}
+				return nil
+			}))
+		}))
+	})
+	// Benchmark/get-12         	  207938	      5389 ns/op	    4228 B/op	      31 allocs/op
+	b.Run("get", func(b *testing.B) {
+		b.ReportAllocs()
+		doc := testutil.NewUserDoc()
+		assert.Nil(b, testutil.TestDB(testutil.AllCollections, func(ctx context.Context, db *wolverine.DB) {
+			assert.Nil(b, db.Collection(ctx, "user", func(collection *wolverine.Collection) error {
+				assert.Nil(b, collection.Set(ctx, doc))
+				b.ResetTimer()
+				for i := 0; i < b.N; i++ {
+					_, err := collection.Get(ctx, collection.Schema().GetDocumentID(doc))
+					assert.Nil(b, err)
+				}
+				return nil
+			}))
+		}))
+	})
+	// Benchmark/query-12         	   55064	     20678 ns/op	   15849 B/op	     100 allocs/op
+	b.Run("query", func(b *testing.B) {
+		b.ReportAllocs()
+		doc := testutil.NewUserDoc()
+		assert.Nil(b, testutil.TestDB(testutil.AllCollections, func(ctx context.Context, db *wolverine.DB) {
+			assert.Nil(b, db.Collection(ctx, "user", func(collection *wolverine.Collection) error {
+				assert.Nil(b, collection.Set(ctx, doc))
+				var docs []schema.Document
+				for i := 0; i < 100; i++ {
+					docs = append(docs, testutil.NewUserDoc())
+				}
+				assert.Nil(b, collection.BatchSet(ctx, docs))
+				b.ResetTimer()
+				for i := 0; i < b.N; i++ {
+					results, err := collection.Query(ctx, schema.Query{
+						Select: nil,
+						Where: []schema.Where{
+							{
+								Field: "contact.email",
+								Op:    "==",
+								Value: doc.GetString("contact.email"),
+							},
+						},
+						Page:    0,
+						Limit:   10,
+						OrderBy: schema.OrderBy{},
+					})
+					assert.Nil(b, err)
+					assert.Equal(b, 1, len(results.Documents))
+					assert.Equal(b, "contact.email", results.Stats.IndexMatch.Fields[0])
+				}
+				return nil
+			}))
+		}))
+	})
+}
