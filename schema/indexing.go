@@ -6,9 +6,8 @@ import (
 
 // Indexing
 type Indexing struct {
-	PrimaryKey string         `json:"primaryKey"`
-	Query      []*QueryIndex  `json:"query"`
-	Search     []*SearchIndex `json:"search"`
+	Query  []*QueryIndex  `json:"query"`
+	Search []*SearchIndex `json:"search"`
 }
 
 func (i Indexing) HasQueryIndex() bool {

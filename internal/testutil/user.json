@@ -2,47 +2,49 @@
   "$id": "https://example.com/user.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "User",
-  "@collection": "user",
   "type": "object",
-  "@indexing": {
+  "@config": {
+    "collection": "user",
     "primaryKey": "_id",
-    "query": [
-      {
-        "fields": [
-          "contact.email"
-        ]
-      },
-      {
-        "fields": [
-          "account_id"
-        ]
-      },
-      {
-        "fields": [
-          "language"
-        ]
-      }
-    ],
-    "search": [
-      {
-        "fields": [
-          "contact.email"
-        ]
-      }
-    ],
-    "aggregate": [
-      {
-        "groupBy": [
-          "account_id",
-          "gender"
-        ],
-        "aggregates": {
-          "field": "gender",
-          "function": "count",
-          "alias": "gender_count"
+    "indexing": {
+      "query": [
+        {
+          "fields": [
+            "contact.email"
+          ]
+        },
+        {
+          "fields": [
+            "account_id"
+          ]
+        },
+        {
+          "fields": [
+            "language"
+          ]
         }
-      }
-    ]
+      ],
+      "search": [
+        {
+          "fields": [
+            "contact.email"
+          ]
+        }
+      ],
+      "aggregate": [
+        {
+          "groupBy": [
+            "account_id",
+            "gender"
+          ],
+          "aggregates": {
+            "field": "gender",
+            "function": "count",
+            "alias": "gender_count"
+          }
+        }
+      ]
+    }
   },
   "required": [
     "_id",
@@ -54,6 +56,7 @@
   ],
   "properties": {
     "_id": {
+      "@primary": true,
       "type": "string",
       "description": "The user's id."
     },

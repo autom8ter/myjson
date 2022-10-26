@@ -2,19 +2,20 @@
   "$id": "https://example.com/task.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "Task",
-  "@collection": "task",
   "type": "object",
-  "@indexing": {
-    "primaryKey": "_id",
-    "query": [
-      {
-        "fields": [
-          "user"
-        ]
-      }
-    ],
-    "search": [],
-    "aggregate": []
+  "@config": {
+    "collection": "task",
+    "indexing": {
+      "query": [
+        {
+          "fields": [
+            "user"
+          ]
+        }
+      ],
+      "search": [],
+      "aggregate": []
+    }
   },
   "required": [
     "_id",
@@ -23,13 +24,14 @@
   ],
   "properties": {
     "_id": {
+      "@primary": true,
       "type": "string",
       "description": "The user's id."
     },
     "user": {
       "type": "string",
       "description": "The id of the user who owns the task",
-      "@foreignKey": {
+      "@foreign": {
         "collection": "user"
       }
     },

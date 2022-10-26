@@ -263,7 +263,7 @@ func (d defaultStore) persistCollection(ctx context.Context, collection *schema.
 		}
 		docId := collection.GetDocumentID(after)
 		if docId == "" {
-			return stacktrace.NewErrorWithCode(errors.ErrTODO, "document missing primary key %s", collection.Indexing().PrimaryKey)
+			return stacktrace.NewErrorWithCode(errors.ErrTODO, "document missing primary key %s", collection.PKey())
 		}
 		before, _ := d.getCollection(ctx, collection, docId)
 		if err := d.indexDocument(ctx, collection, txn, batch, schema.Set, docId, before, after); err != nil {
@@ -315,7 +315,7 @@ func (d defaultStore) indexDocument(ctx context.Context, collection *schema.Coll
 		if collection.GetDocumentID(after) != docId {
 			return stacktrace.NewErrorWithCode(errors.ErrTODO, "document id is immutable: %v -> %v", collection.GetDocumentID(after), docId)
 		}
-		valid, err := collection.Validate(after)
+		valid, err := collection.Validate(ctx, after)
 		if err != nil {
 			return stacktrace.Propagate(err, "")
 		}

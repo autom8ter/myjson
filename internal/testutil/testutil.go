@@ -14,10 +14,13 @@ import (
 )
 
 func init() {
-	if err := UserCollection.ParseSchema(); err != nil {
+	var err error
+	UserCollection, err = schema.NewCollectionFromBytes([]byte(userSchema))
+	if err != nil {
 		panic(err)
 	}
-	if err := TaskCollection.ParseSchema(); err != nil {
+	TaskCollection, err = schema.NewCollectionFromBytes([]byte(taskSchema))
+	if err != nil {
 		panic(err)
 	}
 }
@@ -27,8 +30,8 @@ var (
 	userSchema string
 	//go:embed task.json
 	taskSchema     string
-	UserCollection = &schema.Collection{Schema: userSchema}
-	TaskCollection = &schema.Collection{Schema: taskSchema}
+	UserCollection *schema.Collection
+	TaskCollection *schema.Collection
 	AllCollections = []*schema.Collection{UserCollection, TaskCollection}
 )
 

@@ -76,7 +76,7 @@ func (c *Collection) ChangeStream(ctx context.Context, fn schema.ChangeStreamHan
 // Create
 func (c *Collection) Create(ctx context.Context, document *schema.Document) (string, error) {
 	id := ksuid.New().String()
-	err := document.Set(c.schema.Indexing().PrimaryKey, id)
+	err := document.Set(c.schema.PKey(), id)
 	if err != nil {
 		return "", stacktrace.Propagate(err, "")
 	}
@@ -92,7 +92,7 @@ func (c *Collection) BatchCreate(ctx context.Context, documents []*schema.Docume
 	var ids []string
 	for _, document := range documents {
 		id := ksuid.New().String()
-		err := document.Set(c.schema.Indexing().PrimaryKey, id)
+		err := document.Set(c.schema.PKey(), id)
 		if err != nil {
 			return nil, stacktrace.Propagate(err, "")
 		}
@@ -284,7 +284,7 @@ func (c *Collection) GetRelationship(ctx context.Context, field string, document
 	if !c.Schema().HasRelationships() {
 		return nil, stacktrace.NewError("collection has no relationships")
 	}
-	fkeys := c.Schema().Relationships().ForeignKeys
+	fkeys := c.schema.FKeys()
 	for sourceField, fkey := range fkeys {
 		if field == sourceField {
 			var (
