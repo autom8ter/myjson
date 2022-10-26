@@ -23,6 +23,15 @@ type Config struct {
 	StoragePath string `json:"storagePath"`
 	// Collections are the json document collections supported by the DB - At least one is required.
 	Collections []*schema.Collection `json:"collections"`
+	middleware  Middleware
+}
+
+func (c Config) AddMiddleware(m Middleware) Config {
+	return Config{
+		StoragePath: c.StoragePath,
+		Collections: c.Collections,
+		middleware:  m,
+	}
 }
 
 // LoadConfig loads a config instance from the spefied storeage path and a directory containing the collection schemas
@@ -85,6 +94,7 @@ func New(ctx context.Context, cfg Config) (*DB, error) {
 			errorHandler: d.errorHandler,
 			db:           d,
 		}
+		c.core = c.core.Apply(config.middleware)
 		if err := c.openFullTextIndex(ctx, false); err != nil {
 			return nil, stacktrace.Propagate(err, "")
 		}
@@ -103,6 +113,7 @@ func New(ctx context.Context, cfg Config) (*DB, error) {
 			errorHandler: d.errorHandler,
 			db:           d,
 		}
+		c.core = c.core.Apply(config.middleware)
 		if err := c.openFullTextIndex(ctx, false); err != nil {
 			return nil, stacktrace.Propagate(err, "")
 		}
