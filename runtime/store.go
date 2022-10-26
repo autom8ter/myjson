@@ -1,4 +1,4 @@
-package store
+package runtime
 
 import (
 	"context"
@@ -24,27 +24,48 @@ type defaultStore struct {
 	machine  machine.Machine
 }
 
-func Core(kv *badger.DB, fullText map[string]bleve.Index, machine machine.Machine) core.Core {
+// Default creates a new Core instance with the given storeage path and collections. Under the hood it is powered by BadgerDB and Blevesearch
+func Default(storagePath string, collections []*schema.Collection, middlewares ...core.Middleware) (core.Core, error) {
+	opts := badger.DefaultOptions(storagePath)
+	if storagePath == "" {
+		opts.InMemory = true
+		opts.Dir = ""
+		opts.ValueDir = ""
+	}
+	opts = opts.WithLoggingLevel(badger.ERROR)
+	kv, err := badger.Open(opts)
+	if err != nil {
+		return core.Core{}, stacktrace.Propagate(err, "")
+	}
 	d := defaultStore{
 		kv:       kv,
-		fullText: fullText,
-		machine:  machine,
+		fullText: map[string]bleve.Index{},
+		machine:  machine.New(),
 	}
-	if d.fullText == nil {
-		d.fullText = map[string]bleve.Index{}
+	for _, collection := range collections {
+		if collection.Indexing().HasSearchIndex() {
+			idx, err := openFullTextIndex(storagePath, collection, false)
+			if err != nil {
+				return core.Core{}, stacktrace.Propagate(err, "")
+			}
+			d.fullText[collection.Collection()] = idx
+		}
 	}
-	return core.Core{
-		Persist:      d.persistCollection,
-		Aggregate:    d.aggregateCollection,
-		Search:       d.searchCollection,
-		Query:        d.queryCollection,
-		Get:          d.getCollection,
-		GetAll:       d.getAllCollection,
-		ChangeStream: d.changeStreamCollection,
-		Close:        d.closeAll,
-		Backup:       d.backup,
-		Restore:      d.restore,
+	c := core.Core{}.
+		WithPersist(d.persistCollection).
+		WithAggregate(d.aggregateCollection).
+		WithSearch(d.searchCollection).
+		WithQuery(d.queryCollection).
+		WithGet(d.getCollection).
+		WithGetAll(d.getAllCollection).
+		WithChangeStream(d.changeStreamCollection).
+		WithClose(d.closeAll).
+		WithBackup(d.backup).
+		WithRestore(d.restore)
+	for _, mw := range middlewares {
+		c = c.Apply(mw)
 	}
+	return c, nil
 }
 
 func (d defaultStore) changeStreamCollection(ctx context.Context, collection *schema.Collection, fn schema.ChangeStreamHandler) error {

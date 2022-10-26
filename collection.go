@@ -14,10 +14,12 @@ type Collection struct {
 	db     *DB
 }
 
+// DB returns the collections underlying database connection
 func (c *Collection) DB() *DB {
 	return c.db
 }
 
+// Schema
 func (c *Collection) Schema() *schema.Collection {
 	return c.schema
 }
@@ -26,14 +28,17 @@ func (c *Collection) persistStateChange(ctx context.Context, change schema.State
 	return c.db.core.Persist(ctx, c.schema, change)
 }
 
+// Query
 func (c *Collection) Query(ctx context.Context, query schema.Query) (schema.Page, error) {
 	return c.db.core.Query(ctx, c.schema, query)
 }
 
+// Get
 func (c *Collection) Get(ctx context.Context, id string) (schema.Document, error) {
 	return c.db.core.Get(ctx, c.schema, id)
 }
 
+// GetAll
 func (c *Collection) GetAll(ctx context.Context, ids []string) ([]schema.Document, error) {
 	return c.db.core.GetAll(ctx, c.schema, ids)
 }
@@ -62,10 +67,12 @@ func (c *Collection) QueryPaginate(ctx context.Context, query schema.Query, hand
 	}
 }
 
+// ChangeStream
 func (c *Collection) ChangeStream(ctx context.Context, fn schema.ChangeStreamHandler) error {
 	return c.db.core.ChangeStream(ctx, c.schema, fn)
 }
 
+// Set
 func (c *Collection) Set(ctx context.Context, document schema.Document) error {
 	return stacktrace.Propagate(c.persistStateChange(ctx, schema.StateChange{
 		Collection: c.schema.Collection(),
@@ -74,6 +81,7 @@ func (c *Collection) Set(ctx context.Context, document schema.Document) error {
 	}), "")
 }
 
+// BatchSet
 func (c *Collection) BatchSet(ctx context.Context, batch []schema.Document) error {
 	return stacktrace.Propagate(c.persistStateChange(ctx, schema.StateChange{
 		Collection: c.schema.Collection(),
@@ -82,6 +90,7 @@ func (c *Collection) BatchSet(ctx context.Context, batch []schema.Document) erro
 	}), "")
 }
 
+// Update
 func (c *Collection) Update(ctx context.Context, id string, update map[string]any) error {
 	return stacktrace.Propagate(c.persistStateChange(ctx, schema.StateChange{
 		Collection: c.schema.Collection(),
@@ -92,6 +101,7 @@ func (c *Collection) Update(ctx context.Context, id string, update map[string]an
 	}), "")
 }
 
+// BatchDelete
 func (c *Collection) BatchUpdate(ctx context.Context, batch map[string]map[string]any) error {
 	return stacktrace.Propagate(c.persistStateChange(ctx, schema.StateChange{
 		Collection: c.schema.Collection(),
@@ -100,6 +110,7 @@ func (c *Collection) BatchUpdate(ctx context.Context, batch map[string]map[strin
 	}), "")
 }
 
+// Delete
 func (c *Collection) Delete(ctx context.Context, id string) error {
 	return stacktrace.Propagate(c.persistStateChange(ctx, schema.StateChange{
 		Collection: c.schema.Collection(),
@@ -108,6 +119,7 @@ func (c *Collection) Delete(ctx context.Context, id string) error {
 	}), "")
 }
 
+// BatchDelete
 func (c *Collection) BatchDelete(ctx context.Context, ids []string) error {
 	return stacktrace.Propagate(c.persistStateChange(ctx, schema.StateChange{
 		Collection: c.schema.Collection(),
@@ -116,6 +128,7 @@ func (c *Collection) BatchDelete(ctx context.Context, ids []string) error {
 	}), "")
 }
 
+// QueryUpdate
 func (c *Collection) QueryUpdate(ctx context.Context, update map[string]any, query schema.Query) error {
 	results, err := c.Query(ctx, query)
 	if err != nil {
@@ -132,6 +145,7 @@ func (c *Collection) QueryUpdate(ctx context.Context, update map[string]any, que
 	return stacktrace.Propagate(c.BatchSet(ctx, updated), "")
 }
 
+// QueryDelete
 func (c *Collection) QueryDelete(ctx context.Context, query schema.Query) error {
 	results, err := c.Query(ctx, query)
 	if err != nil {
@@ -144,10 +158,12 @@ func (c *Collection) QueryDelete(ctx context.Context, query schema.Query) error 
 	return stacktrace.Propagate(c.BatchDelete(ctx, ids), "")
 }
 
+// Aggregate
 func (c *Collection) Aggregate(ctx context.Context, query schema.AggregateQuery) (schema.Page, error) {
 	return c.db.core.Aggregate(ctx, c.schema, query)
 }
 
+// Search
 func (c *Collection) Search(ctx context.Context, query schema.SearchQuery) (schema.Page, error) {
 	return c.db.core.Search(ctx, c.schema, query)
 }
@@ -182,7 +198,7 @@ func (c *Collection) Reindex(ctx context.Context) error {
 		meta = schema.NewContext(map[string]any{})
 	}
 	meta.Set("_reindexing", true)
-	meta.Set("_is_internal", true)
+	meta.Set("_internal", true)
 	egp, ctx := errgroup.WithContext(meta.ToContext(ctx))
 	var page int
 	for {

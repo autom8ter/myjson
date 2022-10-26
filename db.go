@@ -3,18 +3,14 @@ package wolverine
 import (
 	"context"
 	_ "embed"
-	"fmt"
 	"github.com/autom8ter/machine/v4"
 	"github.com/autom8ter/wolverine/core"
 	"github.com/autom8ter/wolverine/errors"
+	"github.com/autom8ter/wolverine/runtime"
 	"github.com/autom8ter/wolverine/schema"
-	"github.com/autom8ter/wolverine/store"
-	"github.com/blevesearch/bleve"
-	"github.com/dgraph-io/badger/v3"
 	"github.com/palantir/stacktrace"
 	"golang.org/x/sync/errgroup"
 	"io"
-	"os"
 	"sync"
 )
 
@@ -28,6 +24,7 @@ type Config struct {
 	middlewares []core.Middleware
 }
 
+// AddMiddleware adds a middleware to the configuration. 0-many middlewares are supported
 func (c Config) AddMiddleware(m core.Middleware) Config {
 	middlewares := append(c.middlewares, m)
 	return Config{
@@ -37,7 +34,7 @@ func (c Config) AddMiddleware(m core.Middleware) Config {
 	}
 }
 
-// LoadConfig loads a config instance from the spefied storeage path and a directory containing the collection schemas
+// LoadConfig loads a config instance from the specified storeage path and a directory containing the collection schemas
 func LoadConfig(storeagePath string, schemaDir string) (Config, error) {
 	collections, err := schema.LoadCollectionsFromDir(schemaDir)
 	if err != nil {
@@ -61,63 +58,22 @@ func New(ctx context.Context, cfg Config) (*DB, error) {
 	if len(cfg.Collections) == 0 {
 		return nil, stacktrace.NewErrorWithCode(errors.ErrTODO, "zero collections configured")
 	}
-	config := &cfg
-	opts := badger.DefaultOptions(config.StoragePath)
-	if config.StoragePath == "" {
-		opts.InMemory = true
-		opts.Dir = ""
-		opts.ValueDir = ""
-	}
-	opts = opts.WithLoggingLevel(badger.ERROR)
-	kv, err := badger.Open(opts)
+	rcore, err := runtime.Default(cfg.StoragePath, cfg.Collections, cfg.middlewares...)
 	if err != nil {
-		return nil, stacktrace.Propagate(err, "")
+		return nil, stacktrace.NewErrorWithCode(errors.ErrTODO, "failed to configure core provider")
 	}
 	d := &DB{
-		config:  *config,
+		config:  cfg,
 		mu:      sync.RWMutex{},
+		core:    rcore,
 		machine: machine.New(),
 	}
-	var indexes = map[string]bleve.Index{}
-	for _, collection := range config.Collections {
+	for _, collection := range cfg.Collections {
 		d.collections = append(d.collections, &Collection{
 			schema: collection,
 			db:     d,
 		})
-		if collection.Indexing().HasSearchIndex() {
-			idx, err := openFullTextIndex(ctx, cfg, collection, false)
-			if err != nil {
-				return nil, stacktrace.Propagate(err, "")
-			}
-			indexes[collection.Collection()] = idx
-		}
-
 	}
-
-	systemCollection, err := schema.LoadCollection(systemCollectionSchema)
-	if err != nil {
-		return nil, stacktrace.Propagate(err, "")
-	}
-	{
-		if systemCollection.Indexing().HasSearchIndex() {
-			idx, err := openFullTextIndex(ctx, cfg, systemCollection, false)
-			if err != nil {
-				return nil, stacktrace.Propagate(err, "")
-			}
-			indexes[systemCollection.Collection()] = idx
-		}
-
-		d.collections = append(d.collections, &Collection{
-			schema: systemCollection,
-			db:     d,
-		})
-	}
-
-	d.core = store.Core(kv, indexes, d.machine)
-	for _, m := range config.middlewares {
-		d.core = d.core.Apply(m)
-	}
-
 	if err := d.ReIndex(ctx); err != nil {
 		return nil, stacktrace.Propagate(err, "failed to reindex")
 	}
@@ -131,10 +87,14 @@ func (d *DB) Close(ctx context.Context) error {
 }
 
 func (d *DB) Backup(ctx context.Context, w io.Writer) error {
+	d.mu.RLock()
+	defer d.mu.RUnlock()
 	return d.core.Backup(ctx, w, 0)
 }
 
 func (d *DB) Restore(ctx context.Context, r io.Reader) error {
+	d.mu.RLock()
+	defer d.mu.RUnlock()
 	if err := d.core.Restore(ctx, r); err != nil {
 		return stacktrace.Propagate(err, "")
 	}
@@ -165,56 +125,6 @@ func (d *DB) Collection(ctx context.Context, collection string, fn func(collecti
 	return stacktrace.NewError("collection not found")
 }
 
-//go:embed system.json
-var systemCollectionSchema string
-
-func openFullTextIndex(ctx context.Context, config Config, schema *schema.Collection, reindex bool) (bleve.Index, error) {
-	if !schema.Indexing().HasSearchIndex() {
-		return nil, nil
-	}
-	i := schema.Indexing().Search[0]
-	documentMapping := bleve.NewDocumentMapping()
-	for _, f := range i.Fields {
-		mapping := bleve.NewTextFieldMapping()
-		documentMapping.AddFieldMappingsAt(f, mapping)
-	}
-
-	indexMapping := bleve.NewIndexMapping()
-	indexMapping.AddDocumentMapping(schema.Collection(), documentMapping)
-
-	path := fmt.Sprintf("%s/search/%s/index.db", config.StoragePath, schema.Collection())
-	if reindex {
-		os.RemoveAll(path)
-	}
-	switch {
-	case config.StoragePath == "" && !reindex:
-		i, err := bleve.NewMemOnly(indexMapping)
-		if err != nil {
-			return nil, stacktrace.Propagate(err, "failed to create %s search index", schema.Collection())
-		}
-		return i, nil
-	case config.StoragePath == "" && reindex:
-		i, err := bleve.NewMemOnly(indexMapping)
-		if err != nil {
-			return nil, stacktrace.Propagate(err, "failed to create %s search index", schema.Collection())
-		}
-		return i, nil
-	case reindex && config.StoragePath != "":
-		i, err := bleve.New(path, indexMapping)
-		if err != nil {
-			return nil, stacktrace.Propagate(err, "failed to create %s search index at path: %s", schema.Collection(), path)
-		}
-		return i, nil
-	default:
-		i, err := bleve.Open(path)
-		if err == nil {
-			return i, nil
-		} else {
-			i, err = bleve.New(path, indexMapping)
-			if err != nil {
-				return nil, stacktrace.Propagate(err, "failed to create %s search index at path: %s", schema.Collection(), path)
-			}
-			return i, nil
-		}
-	}
+func (d *DB) Core() core.Core {
+	return d.core
 }
