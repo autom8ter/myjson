@@ -25,5 +25,10 @@ func TestSchema(t *testing.T) {
 		s, err := schema.NewJSONSchema(bits)
 		assert.Nil(t, err)
 		assert.Nil(t, s.Config().Validate())
+		assert.NotEmpty(t, s.Config().PrimaryKey)
+		assert.NotEmpty(t, s.Config().Collection)
+		assert.NotEmpty(t, s.Config().Indexing.Query)
+		assert.NotEmpty(t, s.Config().Indexing.Search)
+		assert.NotNil(t, s.Config().ForeignKeys)
 	})
 }
