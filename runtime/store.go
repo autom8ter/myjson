@@ -485,57 +485,6 @@ func (d defaultStore) searchCollection(ctx context.Context, collection *schema.C
 				qry.SetField(where.Field)
 				queries = append(queries, qry)
 			}
-		case schema.DateRange:
-			var (
-				from time.Time
-				to   time.Time
-			)
-			split := strings.Split(cast.ToString(where.Value), ",")
-			from = cast.ToTime(split[0])
-			if len(split) == 2 {
-				to = cast.ToTime(split[1])
-			}
-			qry := bleve.NewDateRangeQuery(from, to)
-			if where.Boost > 0 {
-				qry.SetBoost(where.Boost)
-			}
-			qry.SetField(where.Field)
-			queries = append(queries, qry)
-		case schema.TermRange:
-			var (
-				from string
-				to   string
-			)
-			split := strings.Split(cast.ToString(where.Value), ",")
-			from = split[0]
-			if len(split) == 2 {
-				to = split[1]
-			}
-			qry := bleve.NewTermRangeQuery(from, to)
-			if where.Boost > 0 {
-				qry.SetBoost(where.Boost)
-			}
-			qry.SetField(where.Field)
-			queries = append(queries, qry)
-		case schema.GeoDistance:
-			var (
-				from     float64
-				to       float64
-				distance string
-			)
-			split := strings.Split(cast.ToString(where.Value), ",")
-			if len(split) < 3 {
-				return schema.Page{}, stacktrace.NewError("geo distance where clause requires 3 comma separated values: lat(float), lng(float), distance(string)")
-			}
-			from = cast.ToFloat64(split[0])
-			to = cast.ToFloat64(split[1])
-			distance = cast.ToString(split[2])
-			qry := bleve.NewGeoDistanceQuery(from, to, distance)
-			if where.Boost > 0 {
-				qry.SetBoost(where.Boost)
-			}
-			qry.SetField(where.Field)
-			queries = append(queries, qry)
 		case schema.Prefix:
 			qry := bleve.NewPrefixQuery(cast.ToString(where.Value))
 			if where.Boost > 0 {
@@ -593,7 +542,13 @@ func (d defaultStore) searchCollection(ctx context.Context, collection *schema.C
 		if err != nil {
 			return schema.Page{}, stacktrace.Propagate(err, "failed to search index: %s", collection.Collection())
 		}
-		data = append(data, record)
+		pass, err := record.Where(q.Filter)
+		if err != nil {
+			return schema.Page{}, stacktrace.Propagate(err, "")
+		}
+		if pass {
+			data = append(data, record)
+		}
 	}
 
 	if len(q.Select) > 0 && q.Select[0] != "*" {

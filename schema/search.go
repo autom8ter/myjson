@@ -17,10 +17,7 @@ const (
 	// against collections that have full text search enabled
 	Regex SearchOp = "regex"
 	// Basic is a basic matcher that checks for an exact match.
-	Basic       SearchOp = "basic"
-	TermRange   SearchOp = "term_range"
-	DateRange   SearchOp = "date_range"
-	GeoDistance SearchOp = "geo_distance"
+	Basic SearchOp = "basic"
 )
 
 // Where is field-level filter for database queries
@@ -41,8 +38,10 @@ type SearchQuery struct {
 	Select []string `json:"select"`
 	// Where is a list of where clauses used to filter records based on full text search (required)
 	Where []SearchWhere `json:"where"`
-	//
+	// Filter filters out search results - filters are applied after the initial set of results are returned
+	Filter []Where `json:"filter"`
+	// Page is the page number of the search request. Total offset is limit*page : (limit*page)+limit
 	Page int `json:"page"`
-	// Limit limits the number of records returned by the query (optional)
+	// Limit limits the number of records returned by the query
 	Limit int `json:"limit"`
 }
