@@ -1,10 +1,10 @@
-package schema_test
+package core_test
 
 import (
 	"context"
+	"github.com/autom8ter/wolverine/core"
 	"github.com/autom8ter/wolverine/internal/testutil"
 	"github.com/autom8ter/wolverine/internal/util"
-	"github.com/autom8ter/wolverine/schema"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
@@ -15,22 +15,22 @@ func TestSchema(t *testing.T) {
 	taskBytes, err := testutil.TaskCollection.MarshalJSON()
 	assert.Nil(t, err)
 	t.Run("newJSONSchema", func(t *testing.T) {
-		_, err := schema.NewJSONSchema(usrBytes)
+		_, err := core.NewJSONSchema(usrBytes)
 		assert.Nil(t, err)
-		_, err = schema.NewJSONSchema(taskBytes)
+		_, err = core.NewJSONSchema(taskBytes)
 		assert.Nil(t, err)
 	})
 	t.Run("validate", func(t *testing.T) {
-		s, err := schema.NewJSONSchema(usrBytes)
+		s, err := core.NewJSONSchema(usrBytes)
 		assert.Nil(t, err)
 		assert.Nil(t, s.Validate(context.Background(), []byte(util.JSONString(testutil.NewUserDoc()))))
 
-		s, err = schema.NewJSONSchema(taskBytes)
+		s, err = core.NewJSONSchema(taskBytes)
 		assert.Nil(t, err)
 		assert.Nil(t, s.Validate(context.Background(), []byte(util.JSONString(testutil.NewTaskDoc("1")))))
 	})
 	t.Run("config", func(t *testing.T) {
-		s, err := schema.NewJSONSchema(usrBytes)
+		s, err := core.NewJSONSchema(usrBytes)
 		assert.Nil(t, err)
 		assert.Nil(t, s.Config().Validate())
 		assert.NotEmpty(t, s.Config().PrimaryKey)
@@ -39,7 +39,7 @@ func TestSchema(t *testing.T) {
 		assert.NotEmpty(t, s.Config().Indexing.Search)
 		assert.NotNil(t, s.Config().ForeignKeys)
 
-		s, err = schema.NewJSONSchema(taskBytes)
+		s, err = core.NewJSONSchema(taskBytes)
 		assert.Nil(t, err)
 		assert.Nil(t, s.Config().Validate())
 		assert.NotEmpty(t, s.Config().PrimaryKey)

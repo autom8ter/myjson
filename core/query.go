@@ -1,4 +1,4 @@
-package schema
+package core
 
 // Query is a query against the NOSQL database - it does not support full text search
 type Query struct {

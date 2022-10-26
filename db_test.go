@@ -4,8 +4,8 @@ import (
 	"bytes"
 	"context"
 	"github.com/autom8ter/wolverine"
+	"github.com/autom8ter/wolverine/core"
 	"github.com/autom8ter/wolverine/internal/testutil"
-	"github.com/autom8ter/wolverine/schema"
 	"github.com/brianvoe/gofakeit/v6"
 	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
@@ -73,7 +73,7 @@ func Test(t *testing.T) {
 					defer wg.Done()
 					ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
 					defer cancel()
-					assert.Nil(t, collection.ChangeStream(ctx, func(ctx context.Context, change schema.StateChange) error {
+					assert.Nil(t, collection.ChangeStream(ctx, func(ctx context.Context, change core.StateChange) error {
 						changes++
 						return nil
 					}))
@@ -89,7 +89,7 @@ func Test(t *testing.T) {
 	})
 	assert.Nil(t, testutil.TestDB(func(ctx context.Context, db *wolverine.DB) {
 		assert.Nil(t, db.Collection(ctx, "user", func(collection *wolverine.Collection) error {
-			var usrs []*schema.Document
+			var usrs []*core.Document
 			var ids []string
 			t.Run("batch set", func(t *testing.T) {
 				timer := timer()
@@ -127,9 +127,9 @@ func Test(t *testing.T) {
 			t.Run("query users account_id > 50", func(t *testing.T) {
 				timer := timer()
 				defer timer(t)
-				results, err := collection.Query(ctx, schema.Query{
+				results, err := collection.Query(ctx, core.Query{
 					Select: []string{"account_id"},
-					Where: []schema.Where{
+					Where: []core.Where{
 						{
 							Field: "account_id",
 							Op:    ">",
@@ -138,7 +138,7 @@ func Test(t *testing.T) {
 					},
 					Page:    0,
 					Limit:   0,
-					OrderBy: schema.OrderBy{},
+					OrderBy: core.OrderBy{},
 				})
 				assert.Nil(t, err)
 				assert.Greater(t, len(results.Documents), 1)
@@ -150,18 +150,18 @@ func Test(t *testing.T) {
 			t.Run("query users account_id in 51-55", func(t *testing.T) {
 				timer := timer()
 				defer timer(t)
-				results, err := collection.Query(ctx, schema.Query{
+				results, err := collection.Query(ctx, core.Query{
 					Select: []string{"account_id"},
-					Where: []schema.Where{
+					Where: []core.Where{
 						{
 							Field: "account_id",
-							Op:    schema.In,
+							Op:    core.In,
 							Value: []float64{51, 52, 53, 54, 55},
 						},
 					},
 					Page:    0,
 					Limit:   0,
-					OrderBy: schema.OrderBy{},
+					OrderBy: core.OrderBy{},
 				})
 				assert.Nil(t, err)
 				assert.Greater(t, len(results.Documents), 1)
@@ -173,11 +173,11 @@ func Test(t *testing.T) {
 			t.Run("query all", func(t *testing.T) {
 				timer := timer()
 				defer timer(t)
-				results, err := collection.Query(ctx, schema.Query{
+				results, err := collection.Query(ctx, core.Query{
 					Select:  nil,
 					Page:    0,
 					Limit:   0,
-					OrderBy: schema.OrderBy{},
+					OrderBy: core.OrderBy{},
 				})
 				assert.Nil(t, err)
 				assert.Equal(t, 100, len(results.Documents))
@@ -187,11 +187,11 @@ func Test(t *testing.T) {
 				timer := timer()
 				defer timer(t)
 				pageCount := 0
-				err := collection.QueryPaginate(ctx, schema.Query{
+				err := collection.QueryPaginate(ctx, core.Query{
 					Page:    0,
 					Limit:   10,
-					OrderBy: schema.OrderBy{},
-				}, func(page schema.Page) bool {
+					OrderBy: core.OrderBy{},
+				}, func(page core.Page) bool {
 					pageCount++
 					return true
 				})
@@ -199,27 +199,27 @@ func Test(t *testing.T) {
 				assert.Equal(t, 10, pageCount)
 			})
 			t.Run("aggregate account_id, gender, count", func(t *testing.T) {
-				results, err := collection.Aggregate(ctx, schema.AggregateQuery{
+				results, err := collection.Aggregate(ctx, core.AggregateQuery{
 					GroupBy: []string{"account_id"},
-					Where: []schema.Where{
+					Where: []core.Where{
 						{
 							Field: "account_id",
 							Op:    ">",
 							Value: 1,
 						},
 					},
-					Aggregates: []schema.Aggregate{
+					Aggregates: []core.Aggregate{
 						{
 							Field:    "gender",
-							Function: schema.COUNT,
+							Function: core.COUNT,
 							Alias:    "gender_count",
 						},
 					},
 					Page:  0,
 					Limit: 0,
-					OrderBy: schema.OrderBy{
+					OrderBy: core.OrderBy{
 						Field:     "account_id",
-						Direction: schema.DESC,
+						Direction: core.DESC,
 					},
 				})
 				assert.Nil(t, err)
@@ -231,17 +231,17 @@ func Test(t *testing.T) {
 				t.Logf("found %v aggregates in %s", results.Count, results.Stats.ExecutionTime)
 			})
 			t.Run("search wildcard name", func(t *testing.T) {
-				results, err := collection.Search(ctx, schema.SearchQuery{
+				results, err := collection.Search(ctx, core.SearchQuery{
 					Select: []string{"*"},
-					Where: []schema.SearchWhere{
+					Where: []core.SearchWhere{
 						{
 							Field: "name",
-							Op:    schema.Wildcard,
+							Op:    core.Wildcard,
 							Value: "*",
 						},
 						{
 							Field: "account_id",
-							Op:    schema.Basic,
+							Op:    core.Basic,
 							Value: 50,
 						},
 					},
@@ -253,12 +253,12 @@ func Test(t *testing.T) {
 				t.Logf("found %v wildcard search results in %s", results.Count, results.Stats.ExecutionTime)
 			})
 			t.Run("search basic contact.email ", func(t *testing.T) {
-				results, err := collection.Search(ctx, schema.SearchQuery{
+				results, err := collection.Search(ctx, core.SearchQuery{
 					Select: []string{"*"},
-					Where: []schema.SearchWhere{
+					Where: []core.SearchWhere{
 						{
 							Field: "contact.email",
-							Op:    schema.Basic,
+							Op:    core.Basic,
 							Value: usrs[0].GetString("contact.email"),
 						},
 					},
@@ -271,12 +271,12 @@ func Test(t *testing.T) {
 			})
 			t.Run("search prefix contact.email", func(t *testing.T) {
 				var prefix = strings.Split(usrs[0].GetString("contact.email"), "@")[0]
-				results, err := collection.Search(ctx, schema.SearchQuery{
+				results, err := collection.Search(ctx, core.SearchQuery{
 					Select: []string{"*"},
-					Where: []schema.SearchWhere{
+					Where: []core.SearchWhere{
 						{
 							Field: "contact.email",
-							Op:    schema.Prefix,
+							Op:    core.Prefix,
 							Value: prefix,
 						},
 					},
@@ -289,12 +289,12 @@ func Test(t *testing.T) {
 			})
 			t.Run("search fuzzy contact.email", func(t *testing.T) {
 				var prefix = strings.Split(usrs[0].GetString("contact.email"), "@")[0]
-				results, err := collection.Search(ctx, schema.SearchQuery{
+				results, err := collection.Search(ctx, core.SearchQuery{
 					Select: []string{"*"},
-					Where: []schema.SearchWhere{
+					Where: []core.SearchWhere{
 						{
 							Field: "contact.email",
-							Op:    schema.Fuzzy,
+							Op:    core.Fuzzy,
 							Value: prefix,
 						},
 					},
@@ -307,12 +307,12 @@ func Test(t *testing.T) {
 			})
 			t.Run("search regex contact.email", func(t *testing.T) {
 				var prefix = strings.Split(usrs[0].GetString("contact.email"), "@")[0]
-				results, err := collection.Search(ctx, schema.SearchQuery{
+				results, err := collection.Search(ctx, core.SearchQuery{
 					Select: []string{"*"},
-					Where: []schema.SearchWhere{
+					Where: []core.SearchWhere{
 						{
 							Field: "contact.email",
-							Op:    schema.Regex,
+							Op:    core.Regex,
 							Value: "^" + prefix,
 						},
 					},
@@ -351,11 +351,11 @@ func Test(t *testing.T) {
 				}
 			})
 			t.Run("query delete all", func(t *testing.T) {
-				assert.Nil(t, collection.QueryDelete(ctx, schema.Query{
+				assert.Nil(t, collection.QueryDelete(ctx, core.Query{
 					Select:  nil,
 					Page:    0,
 					Limit:   0,
-					OrderBy: schema.OrderBy{},
+					OrderBy: core.OrderBy{},
 				}))
 				for _, id := range ids[50:] {
 					_, err := collection.Get(ctx, id)
@@ -419,16 +419,16 @@ func Benchmark(b *testing.B) {
 		assert.Nil(b, testutil.TestDB(func(ctx context.Context, db *wolverine.DB) {
 			assert.Nil(b, db.Collection(ctx, "user", func(collection *wolverine.Collection) error {
 				assert.Nil(b, collection.Set(ctx, doc))
-				var docs []*schema.Document
+				var docs []*core.Document
 				for i := 0; i < 100; i++ {
 					docs = append(docs, testutil.NewUserDoc())
 				}
 				assert.Nil(b, collection.BatchSet(ctx, docs))
 				b.ResetTimer()
 				for i := 0; i < b.N; i++ {
-					results, err := collection.Query(ctx, schema.Query{
+					results, err := collection.Query(ctx, core.Query{
 						Select: nil,
-						Where: []schema.Where{
+						Where: []core.Where{
 							{
 								Field: "contact.email",
 								Op:    "==",
@@ -437,7 +437,7 @@ func Benchmark(b *testing.B) {
 						},
 						Page:    0,
 						Limit:   10,
-						OrderBy: schema.OrderBy{},
+						OrderBy: core.OrderBy{},
 					})
 					assert.Nil(b, err)
 					assert.Equal(b, 1, len(results.Documents))
@@ -453,32 +453,32 @@ func TestAggregate(t *testing.T) {
 	t.Run("sum basic", func(t *testing.T) {
 		assert.Nil(t, testutil.TestDB(func(ctx context.Context, db *wolverine.DB) {
 			assert.Nil(t, db.Collection(ctx, "user", func(collection *wolverine.Collection) error {
-				var usrs []*schema.Document
+				var usrs []*core.Document
 				ageSum := float64(0)
 				for i := 0; i < 10; i++ {
 					u := testutil.NewUserDoc()
 					ageSum += u.GetFloat("age")
 					usrs = append(usrs, u)
 				}
-				query := schema.AggregateQuery{
+				query := core.AggregateQuery{
 					GroupBy: []string{"account_id"},
 					//Where:      []schema.Where{
 					//	{
 					//
 					//	},
 					//},
-					Aggregates: []schema.Aggregate{
+					Aggregates: []core.Aggregate{
 						{
 							Field:    "age",
-							Function: schema.SUM,
+							Function: core.SUM,
 							Alias:    "age_sum",
 						},
 					},
 					Page:    0,
 					Limit:   0,
-					OrderBy: schema.OrderBy{},
+					OrderBy: core.OrderBy{},
 				}
-				result, err := schema.ApplyReducers(ctx, query, usrs)
+				result, err := core.ApplyReducers(ctx, query, usrs)
 				assert.Nil(t, err)
 				assert.Equal(t, ageSum, result.GetFloat("age_sum"))
 				return nil
@@ -488,38 +488,38 @@ func TestAggregate(t *testing.T) {
 	t.Run("sum advanced", func(t *testing.T) {
 		assert.Nil(t, testutil.TestDB(func(ctx context.Context, db *wolverine.DB) {
 			assert.Nil(t, db.Collection(ctx, "user", func(collection *wolverine.Collection) error {
-				var usrs []*schema.Document
+				var usrs []*core.Document
 
 				for i := 0; i < 10; i++ {
 					u := testutil.NewUserDoc()
 					usrs = append(usrs, u)
 				}
 				assert.Nil(t, collection.BatchSet(ctx, usrs))
-				query := schema.AggregateQuery{
+				query := core.AggregateQuery{
 					GroupBy: []string{"account_id"},
 					//Where:      []schema.Where{
 					//	{
 					//
 					//	},
 					//},
-					Aggregates: []schema.Aggregate{
+					Aggregates: []core.Aggregate{
 						{
 							Field:    "age",
-							Function: schema.SUM,
+							Function: core.SUM,
 							Alias:    "age_sum",
 						},
 					},
 					Page:    0,
 					Limit:   0,
-					OrderBy: schema.OrderBy{},
+					OrderBy: core.OrderBy{},
 				}
-				groups := lo.GroupBy[*schema.Document](usrs, func(t *schema.Document) string {
+				groups := lo.GroupBy[*core.Document](usrs, func(t *core.Document) string {
 					return t.GetString("account_id")
 				})
 
 				ageSum := map[string]float64{}
 				for grup, value := range groups {
-					result, err := schema.ApplyReducers(ctx, query, value)
+					result, err := core.ApplyReducers(ctx, query, value)
 					assert.Nil(t, err)
 					ageSum[grup] += result.GetFloat("age")
 				}

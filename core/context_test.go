@@ -1,8 +1,8 @@
-package schema_test
+package core_test
 
 import (
 	"context"
-	"github.com/autom8ter/wolverine/schema"
+	"github.com/autom8ter/wolverine/core"
 	"github.com/spf13/cast"
 	"github.com/stretchr/testify/assert"
 	"testing"
@@ -10,10 +10,10 @@ import (
 
 func TestContext(t *testing.T) {
 	ctx := context.Background()
-	c, ok := schema.GetContext(ctx)
+	c, ok := core.GetContext(ctx)
 	assert.False(t, ok)
 	assert.NotNil(t, c)
-	c = schema.NewContext(map[string]any{
+	c = core.NewContext(map[string]any{
 		"testing": true,
 	})
 	v, ok := c.Get("testing")
@@ -32,7 +32,7 @@ func TestContext(t *testing.T) {
 	assert.Nil(t, v)
 
 	ctx = c.ToContext(ctx)
-	c, ok = schema.GetContext(ctx)
+	c, ok = core.GetContext(ctx)
 	assert.True(t, ok)
 	assert.NotNil(t, c)
 }

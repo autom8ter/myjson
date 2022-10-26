@@ -2,7 +2,7 @@ package testutil
 
 import (
 	"context"
-	"github.com/autom8ter/wolverine/schema"
+	"github.com/autom8ter/wolverine/core"
 	"io/ioutil"
 	"os"
 	"time"
@@ -15,11 +15,11 @@ import (
 
 func init() {
 	var err error
-	UserCollection, err = schema.NewCollectionFromBytes([]byte(userSchema))
+	UserCollection, err = core.NewCollectionFromBytes([]byte(userSchema))
 	if err != nil {
 		panic(err)
 	}
-	TaskCollection, err = schema.NewCollectionFromBytes([]byte(taskSchema))
+	TaskCollection, err = core.NewCollectionFromBytes([]byte(taskSchema))
 	if err != nil {
 		panic(err)
 	}
@@ -30,13 +30,13 @@ var (
 	userSchema string
 	//go:embed task.json
 	taskSchema     string
-	TaskCollection = schema.NewCollectionFromBytesP([]byte(taskSchema))
-	UserCollection = schema.NewCollectionFromBytesP([]byte(userSchema))
-	AllCollections = []*schema.Collection{UserCollection, TaskCollection}
+	TaskCollection = core.NewCollectionFromBytesP([]byte(taskSchema))
+	UserCollection = core.NewCollectionFromBytesP([]byte(userSchema))
+	AllCollections = []*core.Collection{UserCollection, TaskCollection}
 )
 
-func NewUserDoc() *schema.Document {
-	doc, err := schema.NewDocumentFrom(map[string]interface{}{
+func NewUserDoc() *core.Document {
+	doc, err := core.NewDocumentFrom(map[string]interface{}{
 		"_id":  gofakeit.UUID(),
 		"name": gofakeit.Name(),
 		"contact": map[string]interface{}{
@@ -57,8 +57,8 @@ func NewUserDoc() *schema.Document {
 	return doc
 }
 
-func NewTaskDoc(usrID string) *schema.Document {
-	doc, err := schema.NewDocumentFrom(map[string]interface{}{
+func NewTaskDoc(usrID string) *core.Document {
+	doc, err := core.NewDocumentFrom(map[string]interface{}{
 		"_id":     gofakeit.UUID(),
 		"user":    usrID,
 		"content": gofakeit.LoremIpsumSentence(5),
@@ -71,7 +71,7 @@ func NewTaskDoc(usrID string) *schema.Document {
 
 const MyEmail = "colemanword@gmail.com"
 
-func TestDB(fn func(ctx context.Context, db *wolverine.DB), collections ...*schema.Collection) error {
+func TestDB(fn func(ctx context.Context, db *wolverine.DB), collections ...*core.Collection) error {
 	if len(collections) == 0 {
 		collections = append(collections, AllCollections...)
 	}

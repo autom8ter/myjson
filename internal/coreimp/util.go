@@ -2,13 +2,13 @@ package coreimp
 
 import (
 	"fmt"
-	"github.com/autom8ter/wolverine/schema"
+	"github.com/autom8ter/wolverine/core"
 	"github.com/blevesearch/bleve"
 	"github.com/palantir/stacktrace"
 	"os"
 )
 
-func openFullTextIndex(storagePath string, schema *schema.Collection, reindex bool) (bleve.Index, error) {
+func openFullTextIndex(storagePath string, schema *core.Collection, reindex bool) (bleve.Index, error) {
 	if !schema.Indexing().HasSearchIndex() {
 		return nil, nil
 	}

@@ -1,9 +1,9 @@
-package schema_test
+package core_test
 
 import (
 	"context"
+	"github.com/autom8ter/wolverine/core"
 	"github.com/autom8ter/wolverine/internal/testutil"
-	"github.com/autom8ter/wolverine/schema"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -28,12 +28,12 @@ func TestCollection(t *testing.T) {
 		assert.Equal(t, "user", testutil.UserCollection.Collection())
 		err := testutil.UserCollection.Validate(context.Background(), testutil.NewUserDoc().Bytes())
 		assert.Nil(t, err)
-		err = testutil.UserCollection.Validate(context.Background(), schema.NewDocument().Bytes())
+		err = testutil.UserCollection.Validate(context.Background(), core.NewDocument().Bytes())
 		assert.NotNil(t, err)
 		testutil.UserCollection.PrimaryQueryIndex()
 	})
 	t.Run("load collections from dir", func(t *testing.T) {
-		collections, err := schema.LoadCollectionsFromDir("../internal/testutil/")
+		collections, err := core.LoadCollectionsFromDir("../internal/testutil/")
 		assert.Nil(t, err)
 		assert.NotEqual(t, 0, len(collections))
 	})

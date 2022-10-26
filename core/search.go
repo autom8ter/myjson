@@ -1,4 +1,4 @@
-package schema
+package core
 
 // SearchOp is an operator used within a where clause in a full text search query
 type SearchOp string

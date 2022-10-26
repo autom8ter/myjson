@@ -7,7 +7,6 @@ import (
 	"github.com/autom8ter/wolverine/core"
 	"github.com/autom8ter/wolverine/errors"
 	"github.com/autom8ter/wolverine/internal/coreimp"
-	"github.com/autom8ter/wolverine/schema"
 	"github.com/palantir/stacktrace"
 	"github.com/samber/lo"
 	"golang.org/x/sync/errgroup"
@@ -21,7 +20,7 @@ type Config struct {
 	// Leave empty to operate the database in memory only.
 	StoragePath string `json:"storagePath"`
 	// Collections are the json document collections supported by the DB - At least one is required.
-	Collections []*schema.Collection `json:"collections"`
+	Collections []*core.Collection `json:"collections"`
 	middlewares []core.Middleware
 }
 
@@ -37,7 +36,7 @@ func (c Config) AddMiddleware(m core.Middleware) Config {
 
 // LoadConfig loads a config instance from the specified storeage path and a directory containing the collection schemas
 func LoadConfig(storeagePath string, schemaDir string) (Config, error) {
-	collections, err := schema.LoadCollectionsFromDir(schemaDir)
+	collections, err := core.LoadCollectionsFromDir(schemaDir)
 	if err != nil {
 		return Config{}, stacktrace.Propagate(err, "")
 	}

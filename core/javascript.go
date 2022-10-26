@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"context"
 	"github.com/autom8ter/wolverine/internal/util"
-	"github.com/autom8ter/wolverine/schema"
 	"github.com/dop251/goja"
 	"github.com/palantir/stacktrace"
 	"strings"
@@ -51,22 +50,22 @@ type JSFunction func(interface{}) (interface{}, error)
 
 func (f JSFunction) AggregateWare() AggregateWare {
 	return func(aggregateFunc AggregateFunc) AggregateFunc {
-		return func(ctx context.Context, collection *schema.Collection, query schema.AggregateQuery) (schema.Page, error) {
+		return func(ctx context.Context, collection *Collection, query AggregateQuery) (Page, error) {
 			input := map[string]any{
 				"query":      util.MustMap(query),
 				"collection": collection.Collection(),
 			}
-			metaCtx, ok := schema.GetContext(ctx)
+			metaCtx, ok := GetContext(ctx)
 			if ok {
 				input["context"] = metaCtx.Map()
 			}
 			val, err := f(input)
 			if err != nil {
-				return schema.Page{}, stacktrace.Propagate(err, "")
+				return Page{}, stacktrace.Propagate(err, "")
 			}
 			if val != nil {
 				if err := util.Decode(val, &query); err != nil {
-					return schema.Page{}, stacktrace.Propagate(err, "")
+					return Page{}, stacktrace.Propagate(err, "")
 				}
 			}
 			return aggregateFunc(ctx, collection, query)
@@ -76,22 +75,22 @@ func (f JSFunction) AggregateWare() AggregateWare {
 
 func (f JSFunction) QueryWare() QueryWare {
 	return func(queryFunc QueryFunc) QueryFunc {
-		return func(ctx context.Context, collection *schema.Collection, query schema.Query) (schema.Page, error) {
+		return func(ctx context.Context, collection *Collection, query Query) (Page, error) {
 			input := map[string]any{
 				"query":      util.MustMap(query),
 				"collection": collection.Collection(),
 			}
-			metaCtx, ok := schema.GetContext(ctx)
+			metaCtx, ok := GetContext(ctx)
 			if ok {
 				input["context"] = metaCtx.Map()
 			}
 			val, err := f(input)
 			if err != nil {
-				return schema.Page{}, stacktrace.Propagate(err, "")
+				return Page{}, stacktrace.Propagate(err, "")
 			}
 			if val != nil {
 				if err := util.Decode(val, &query); err != nil {
-					return schema.Page{}, stacktrace.Propagate(err, "")
+					return Page{}, stacktrace.Propagate(err, "")
 				}
 			}
 			return queryFunc(ctx, collection, query)
@@ -101,22 +100,22 @@ func (f JSFunction) QueryWare() QueryWare {
 
 func (f JSFunction) SearchWare() SearchWare {
 	return func(searchWare SearchFunc) SearchFunc {
-		return func(ctx context.Context, collection *schema.Collection, query schema.SearchQuery) (schema.Page, error) {
+		return func(ctx context.Context, collection *Collection, query SearchQuery) (Page, error) {
 			input := map[string]any{
 				"query":      util.MustMap(query),
 				"collection": collection.Collection(),
 			}
-			metaCtx, ok := schema.GetContext(ctx)
+			metaCtx, ok := GetContext(ctx)
 			if ok {
 				input["context"] = metaCtx.Map()
 			}
 			val, err := f(input)
 			if err != nil {
-				return schema.Page{}, stacktrace.Propagate(err, "")
+				return Page{}, stacktrace.Propagate(err, "")
 			}
 			if val != nil {
 				if err := util.Decode(val, &query); err != nil {
-					return schema.Page{}, stacktrace.Propagate(err, "")
+					return Page{}, stacktrace.Propagate(err, "")
 				}
 			}
 			return searchWare(ctx, collection, query)
@@ -126,12 +125,12 @@ func (f JSFunction) SearchWare() SearchWare {
 
 func (f JSFunction) PersistWare() PersistWare {
 	return func(persist PersistFunc) PersistFunc {
-		return func(ctx context.Context, collection *schema.Collection, change schema.StateChange) error {
+		return func(ctx context.Context, collection *Collection, change StateChange) error {
 			input := map[string]any{
 				"change":     util.MustMap(change),
 				"collection": collection.Collection(),
 			}
-			metaCtx, ok := schema.GetContext(ctx)
+			metaCtx, ok := GetContext(ctx)
 			if ok {
 				input["context"] = metaCtx.Map()
 			}
@@ -149,7 +148,7 @@ func (f JSFunction) PersistWare() PersistWare {
 
 func (f JSFunction) GetWare() GetWare {
 	return func(get GetFunc) GetFunc {
-		return func(ctx context.Context, collection *schema.Collection, id string) (*schema.Document, error) {
+		return func(ctx context.Context, collection *Collection, id string) (*Document, error) {
 			doc, err := get(ctx, collection, id)
 			if err != nil {
 				return nil, stacktrace.Propagate(err, "")
@@ -161,7 +160,7 @@ func (f JSFunction) GetWare() GetWare {
 
 func (f JSFunction) GetAllWare() GetAllWare {
 	return func(get GetAllFunc) GetAllFunc {
-		return func(ctx context.Context, collection *schema.Collection, ids []string) ([]*schema.Document, error) {
+		return func(ctx context.Context, collection *Collection, ids []string) ([]*Document, error) {
 			docs, err := get(ctx, collection, ids)
 			if err != nil {
 				return nil, stacktrace.Propagate(err, "")
@@ -179,14 +178,14 @@ func (f JSFunction) GetAllWare() GetAllWare {
 
 func (f JSFunction) ChangeStreamWare() ChangeStreamWare {
 	return func(changeStream ChangeStreamFunc) ChangeStreamFunc {
-		return func(ctx context.Context, collection *schema.Collection, fn schema.ChangeStreamHandler) error {
+		return func(ctx context.Context, collection *Collection, fn ChangeStreamHandler) error {
 
-			return changeStream(ctx, collection, func(ctx context.Context, change schema.StateChange) error {
+			return changeStream(ctx, collection, func(ctx context.Context, change StateChange) error {
 				input := map[string]any{
 					"change":     util.MustMap(change),
 					"collection": collection.Collection(),
 				}
-				metaCtx, ok := schema.GetContext(ctx)
+				metaCtx, ok := GetContext(ctx)
 				if ok {
 					input["context"] = metaCtx.Map()
 				}
@@ -203,13 +202,13 @@ func (f JSFunction) ChangeStreamWare() ChangeStreamWare {
 	}
 }
 
-func (f JSFunction) evalDocument(ctx context.Context, collection *schema.Collection, doc *schema.Document) (*schema.Document, error) {
+func (f JSFunction) evalDocument(ctx context.Context, collection *Collection, doc *Document) (*Document, error) {
 	input := map[string]any{
 		"id":         collection.GetDocumentID(doc),
 		"document":   doc.Value(),
 		"collection": collection.Collection(),
 	}
-	metaCtx, ok := schema.GetContext(ctx)
+	metaCtx, ok := GetContext(ctx)
 	if ok {
 		input["context"] = metaCtx.Map()
 	}

@@ -4,7 +4,6 @@ import (
 	"context"
 	"github.com/autom8ter/wolverine/core"
 	"github.com/autom8ter/wolverine/internal/testutil"
-	"github.com/autom8ter/wolverine/schema"
 	"github.com/spf13/cast"
 	"github.com/stretchr/testify/assert"
 	"testing"
@@ -61,7 +60,7 @@ func Test(t *testing.T) {
 	t.Run("getWare", func(t *testing.T) {
 		fn, err := getWareFunction.Parse()
 		assert.Nil(t, err)
-		doc, err := fn.GetWare()(func(ctx context.Context, collection *schema.Collection, id string) (*schema.Document, error) {
+		doc, err := fn.GetWare()(func(ctx context.Context, collection *core.Collection, id string) (*core.Document, error) {
 			return testutil.NewUserDoc(), nil
 		})(context.Background(), testutil.UserCollection, "1")
 		assert.Nil(t, err)

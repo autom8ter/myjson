@@ -1,4 +1,4 @@
-package schema
+package core
 
 import (
 	"github.com/autom8ter/wolverine/internal/util"

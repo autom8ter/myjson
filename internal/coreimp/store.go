@@ -6,7 +6,6 @@ import (
 	"github.com/autom8ter/wolverine/core"
 	"github.com/autom8ter/wolverine/errors"
 	"github.com/autom8ter/wolverine/internal/prefix"
-	"github.com/autom8ter/wolverine/schema"
 	"github.com/blevesearch/bleve"
 	"github.com/blevesearch/bleve/search/query"
 	"github.com/dgraph-io/badger/v3"
@@ -25,7 +24,7 @@ type defaultStore struct {
 }
 
 // Default creates a new Core instance with the given storeage path and collections. Under the hood it is powered by BadgerDB and Blevesearch
-func Default(storagePath string, collections []*schema.Collection, middlewares ...core.Middleware) (core.Core, error) {
+func Default(storagePath string, collections []*core.Collection, middlewares ...core.Middleware) (core.Core, error) {
 	opts := badger.DefaultOptions(storagePath)
 	if storagePath == "" {
 		opts.InMemory = true
@@ -71,14 +70,14 @@ func Default(storagePath string, collections []*schema.Collection, middlewares .
 	return c, nil
 }
 
-func (d defaultStore) changeStreamCollection(ctx context.Context, collection *schema.Collection, fn schema.ChangeStreamHandler) error {
+func (d defaultStore) changeStreamCollection(ctx context.Context, collection *core.Collection, fn core.ChangeStreamHandler) error {
 	return d.machine.Subscribe(ctx, collection.Collection(), func(ctx context.Context, msg machine.Message) (bool, error) {
 		switch change := msg.Body.(type) {
-		case *schema.StateChange:
+		case *core.StateChange:
 			if err := fn(ctx, *change); err != nil {
 				return false, stacktrace.Propagate(err, "")
 			}
-		case schema.StateChange:
+		case core.StateChange:
 			if err := fn(ctx, change); err != nil {
 				return false, stacktrace.Propagate(err, "")
 			}
@@ -87,21 +86,21 @@ func (d defaultStore) changeStreamCollection(ctx context.Context, collection *sc
 	})
 }
 
-func (d defaultStore) aggregateCollection(ctx context.Context, collection *schema.Collection, query schema.AggregateQuery) (schema.Page, error) {
+func (d defaultStore) aggregateCollection(ctx context.Context, collection *core.Collection, query core.AggregateQuery) (core.Page, error) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
 	now := time.Now()
 	index, err := collection.OptimizeQueryIndex(query.Where, query.OrderBy)
 	if err != nil {
-		return schema.Page{}, stacktrace.Propagate(err, "")
+		return core.Page{}, stacktrace.Propagate(err, "")
 	}
-	var results []*schema.Document
+	var results []*core.Document
 	if err := d.kv.View(func(txn *badger.Txn) error {
 		opts := badger.DefaultIteratorOptions
 		opts.PrefetchValues = true
 		opts.PrefetchSize = 10
-		opts.Prefix = index.Ref.GetPrefix(schema.IndexableFields(query.Where, query.OrderBy), "")
+		opts.Prefix = index.Ref.GetPrefix(core.IndexableFields(query.Where, query.OrderBy), "")
 		it := txn.NewIterator(opts)
 		it.Seek(opts.Prefix)
 		defer it.Close()
@@ -111,7 +110,7 @@ func (d defaultStore) aggregateCollection(ctx context.Context, collection *schem
 			}
 			item := it.Item()
 			err := item.Value(func(bits []byte) error {
-				document, err := schema.NewDocumentFromBytes(bits)
+				document, err := core.NewDocumentFromBytes(bits)
 				if err != nil {
 					return stacktrace.Propagate(err, "")
 				}
@@ -131,24 +130,24 @@ func (d defaultStore) aggregateCollection(ctx context.Context, collection *schem
 		}
 		return nil
 	}); err != nil {
-		return schema.Page{}, stacktrace.Propagate(err, "")
+		return core.Page{}, stacktrace.Propagate(err, "")
 	}
-	grouped := lo.GroupBy[*schema.Document](results, func(d *schema.Document) string {
+	grouped := lo.GroupBy[*core.Document](results, func(d *core.Document) string {
 		var values []string
 		for _, g := range query.GroupBy {
 			values = append(values, cast.ToString(d.Get(g)))
 		}
 		return strings.Join(values, ".")
 	})
-	var reduced []*schema.Document
+	var reduced []*core.Document
 	for _, values := range grouped {
-		value, err := schema.ApplyReducers(ctx, query, values)
+		value, err := core.ApplyReducers(ctx, query, values)
 		if err != nil {
-			return schema.Page{}, stacktrace.Propagate(err, "")
+			return core.Page{}, stacktrace.Propagate(err, "")
 		}
 		reduced = append(reduced, value)
 	}
-	reduced = schema.SortOrder(query.OrderBy, reduced)
+	reduced = core.SortOrder(query.OrderBy, reduced)
 	if query.Limit > 0 && query.Page > 0 {
 		reduced = lo.Slice(reduced, query.Limit*query.Page, (query.Limit*query.Page)+query.Limit)
 	}
@@ -162,22 +161,22 @@ func (d defaultStore) aggregateCollection(ctx context.Context, collection *schem
 		}
 		err := r.Select(toSelect)
 		if err != nil {
-			return schema.Page{}, stacktrace.Propagate(err, "")
+			return core.Page{}, stacktrace.Propagate(err, "")
 		}
 	}
-	return schema.Page{
+	return core.Page{
 		Documents: reduced,
 		NextPage:  query.Page + 1,
 		Count:     len(reduced),
-		Stats: schema.PageStats{
+		Stats: core.PageStats{
 			ExecutionTime: time.Since(now),
 			IndexMatch:    index,
 		},
 	}, nil
 }
 
-func (d defaultStore) getAllCollection(ctx context.Context, collection *schema.Collection, ids []string) ([]*schema.Document, error) {
-	var documents []*schema.Document
+func (d defaultStore) getAllCollection(ctx context.Context, collection *core.Collection, ids []string) ([]*core.Document, error) {
+	var documents []*core.Document
 	if err := d.kv.View(func(txn *badger.Txn) error {
 		for _, id := range ids {
 			pkey, err := collection.GetPrimaryKeyRef(id)
@@ -189,7 +188,7 @@ func (d defaultStore) getAllCollection(ctx context.Context, collection *schema.C
 				return stacktrace.Propagate(err, "")
 			}
 			if err := item.Value(func(val []byte) error {
-				document, err := schema.NewDocumentFromBytes(val)
+				document, err := core.NewDocumentFromBytes(val)
 				if err != nil {
 					return stacktrace.Propagate(err, "")
 				}
@@ -206,9 +205,9 @@ func (d defaultStore) getAllCollection(ctx context.Context, collection *schema.C
 	return documents, nil
 }
 
-func (d defaultStore) getCollection(ctx context.Context, collection *schema.Collection, id string) (*schema.Document, error) {
+func (d defaultStore) getCollection(ctx context.Context, collection *core.Collection, id string) (*core.Document, error) {
 	var (
-		document *schema.Document
+		document *core.Document
 	)
 	pkey, err := collection.GetPrimaryKeyRef(id)
 	if err != nil {
@@ -220,7 +219,7 @@ func (d defaultStore) getCollection(ctx context.Context, collection *schema.Coll
 			return stacktrace.Propagate(err, "")
 		}
 		return item.Value(func(val []byte) error {
-			document, err = schema.NewDocumentFromBytes(val)
+			document, err = core.NewDocumentFromBytes(val)
 			return stacktrace.Propagate(err, "")
 		})
 	}); err != nil {
@@ -229,7 +228,7 @@ func (d defaultStore) getCollection(ctx context.Context, collection *schema.Coll
 	return document, nil
 }
 
-func (d defaultStore) persistCollection(ctx context.Context, collection *schema.Collection, change schema.StateChange) error {
+func (d defaultStore) persistCollection(ctx context.Context, collection *core.Collection, change core.StateChange) error {
 	txn := d.kv.NewWriteBatch()
 	var batch *bleve.Batch
 	if collection == nil {
@@ -242,21 +241,21 @@ func (d defaultStore) persistCollection(ctx context.Context, collection *schema.
 		for id, edit := range change.Updates {
 			before, _ := d.getCollection(ctx, collection, id)
 			if !before.Valid() {
-				before = schema.NewDocument()
+				before = core.NewDocument()
 			}
 			after := before.Clone()
 			err := after.SetAll(edit)
 			if err != nil {
 				return stacktrace.Propagate(err, "")
 			}
-			if err := d.indexDocument(ctx, collection, txn, batch, schema.Update, id, before, after); err != nil {
+			if err := d.indexDocument(ctx, collection, txn, batch, core.Update, id, before, after); err != nil {
 				return stacktrace.Propagate(err, "")
 			}
 		}
 	}
 	for _, id := range change.Deletes {
 		before, _ := d.getCollection(ctx, collection, id)
-		if err := d.indexDocument(ctx, collection, txn, batch, schema.Delete, id, before, nil); err != nil {
+		if err := d.indexDocument(ctx, collection, txn, batch, core.Delete, id, before, nil); err != nil {
 			return stacktrace.Propagate(err, "")
 		}
 	}
@@ -269,7 +268,7 @@ func (d defaultStore) persistCollection(ctx context.Context, collection *schema.
 			return stacktrace.NewErrorWithCode(errors.ErrTODO, "document missing primary key %s", collection.PKey())
 		}
 		before, _ := d.getCollection(ctx, collection, docId)
-		if err := d.indexDocument(ctx, collection, txn, batch, schema.Set, docId, before, after); err != nil {
+		if err := d.indexDocument(ctx, collection, txn, batch, core.Set, docId, before, after); err != nil {
 			return stacktrace.Propagate(err, "")
 		}
 	}
@@ -289,7 +288,7 @@ func (d defaultStore) persistCollection(ctx context.Context, collection *schema.
 	return nil
 }
 
-func (d defaultStore) indexDocument(ctx context.Context, collection *schema.Collection, txn *badger.WriteBatch, batch *bleve.Batch, action schema.Action, docId string, before, after *schema.Document) error {
+func (d defaultStore) indexDocument(ctx context.Context, collection *core.Collection, txn *badger.WriteBatch, batch *bleve.Batch, action core.Action, docId string, before, after *core.Document) error {
 	if docId == "" {
 		return stacktrace.NewErrorWithCode(errors.ErrTODO, "empty document id")
 	}
@@ -298,7 +297,7 @@ func (d defaultStore) indexDocument(ctx context.Context, collection *schema.Coll
 		return stacktrace.PropagateWithCode(err, errors.ErrTODO, "failed to get document %s/%s primary key ref", collection.Collection(), docId)
 	}
 	switch action {
-	case schema.Delete:
+	case core.Delete:
 		if !before.Valid() {
 			return stacktrace.NewError("invalid document")
 		}
@@ -314,7 +313,7 @@ func (d defaultStore) indexDocument(ctx context.Context, collection *schema.Coll
 		if batch != nil {
 			batch.Delete(docId)
 		}
-	case schema.Set, schema.Update:
+	case core.Set, core.Update:
 		if collection.GetDocumentID(after) != docId {
 			return stacktrace.NewErrorWithCode(errors.ErrTODO, "document id is immutable: %v -> %v", collection.GetDocumentID(after), docId)
 		}
@@ -358,23 +357,23 @@ func (d defaultStore) indexDocument(ctx context.Context, collection *schema.Coll
 	return nil
 }
 
-func (d defaultStore) queryCollection(ctx context.Context, collection *schema.Collection, query schema.Query) (schema.Page, error) {
+func (d defaultStore) queryCollection(ctx context.Context, collection *core.Collection, query core.Query) (core.Page, error) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	now := time.Now()
 	index, err := collection.OptimizeQueryIndex(query.Where, query.OrderBy)
 	if err != nil {
-		return schema.Page{}, stacktrace.Propagate(err, "")
+		return core.Page{}, stacktrace.Propagate(err, "")
 	}
-	var results []*schema.Document
+	var results []*core.Document
 	if err := d.kv.View(func(txn *badger.Txn) error {
 		opts := badger.DefaultIteratorOptions
 		opts.PrefetchValues = true
 		opts.PrefetchSize = 10
-		opts.Prefix = index.Ref.GetPrefix(schema.IndexableFields(query.Where, query.OrderBy), "")
+		opts.Prefix = index.Ref.GetPrefix(core.IndexableFields(query.Where, query.OrderBy), "")
 		seek := opts.Prefix
 
-		if query.OrderBy.Direction == schema.DESC {
+		if query.OrderBy.Direction == core.DESC {
 			opts.Reverse = true
 			seek = prefix.PrefixNextKey(opts.Prefix)
 		}
@@ -384,7 +383,7 @@ func (d defaultStore) queryCollection(ctx context.Context, collection *schema.Co
 		for it.ValidForPrefix(opts.Prefix) {
 			item := it.Item()
 			err := item.Value(func(bits []byte) error {
-				document, err := schema.NewDocumentFromBytes(bits)
+				document, err := core.NewDocumentFromBytes(bits)
 				if err != nil {
 					return stacktrace.Propagate(err, "")
 				}
@@ -405,9 +404,9 @@ func (d defaultStore) queryCollection(ctx context.Context, collection *schema.Co
 		}
 		return nil
 	}); err != nil {
-		return schema.Page{}, stacktrace.Propagate(err, "")
+		return core.Page{}, stacktrace.Propagate(err, "")
 	}
-	results = schema.SortOrder(query.OrderBy, results)
+	results = core.SortOrder(query.OrderBy, results)
 
 	if query.Limit > 0 && query.Page > 0 {
 		results = lo.Slice(results, query.Limit*query.Page, (query.Limit*query.Page)+query.Limit)
@@ -420,25 +419,25 @@ func (d defaultStore) queryCollection(ctx context.Context, collection *schema.Co
 		for _, result := range results {
 			err := result.Select(query.Select)
 			if err != nil {
-				return schema.Page{}, stacktrace.Propagate(err, "")
+				return core.Page{}, stacktrace.Propagate(err, "")
 			}
 		}
 	}
 
-	return schema.Page{
+	return core.Page{
 		Documents: results,
 		NextPage:  query.Page + 1,
 		Count:     len(results),
-		Stats: schema.PageStats{
+		Stats: core.PageStats{
 			ExecutionTime: time.Since(now),
 			IndexMatch:    index,
 		},
 	}, nil
 }
 
-func (d defaultStore) searchCollection(ctx context.Context, collection *schema.Collection, q schema.SearchQuery) (schema.Page, error) {
+func (d defaultStore) searchCollection(ctx context.Context, collection *core.Collection, q core.SearchQuery) (core.Page, error) {
 	if !collection.Indexing().HasSearchIndex() {
-		return schema.Page{}, stacktrace.NewErrorWithCode(
+		return core.Page{}, stacktrace.NewErrorWithCode(
 			errors.ErrTODO,
 			"%s does not have a search index",
 			collection.Collection(),
@@ -459,10 +458,10 @@ func (d defaultStore) searchCollection(ctx context.Context, collection *schema.C
 	var queries []query.Query
 	for _, where := range q.Where {
 		if where.Value == nil {
-			return schema.Page{}, stacktrace.NewError("empty where clause value")
+			return core.Page{}, stacktrace.NewError("empty where clause value")
 		}
 		switch where.Op {
-		case schema.Basic:
+		case core.Basic:
 			switch where.Value.(type) {
 			case bool:
 				qry := bleve.NewBoolFieldQuery(cast.ToBool(where.Value))
@@ -486,28 +485,28 @@ func (d defaultStore) searchCollection(ctx context.Context, collection *schema.C
 				qry.SetField(where.Field)
 				queries = append(queries, qry)
 			}
-		case schema.Prefix:
+		case core.Prefix:
 			qry := bleve.NewPrefixQuery(cast.ToString(where.Value))
 			if where.Boost > 0 {
 				qry.SetBoost(where.Boost)
 			}
 			qry.SetField(where.Field)
 			queries = append(queries, qry)
-		case schema.Fuzzy:
+		case core.Fuzzy:
 			qry := bleve.NewFuzzyQuery(cast.ToString(where.Value))
 			if where.Boost > 0 {
 				qry.SetBoost(where.Boost)
 			}
 			qry.SetField(where.Field)
 			queries = append(queries, qry)
-		case schema.Regex:
+		case core.Regex:
 			qry := bleve.NewRegexpQuery(cast.ToString(where.Value))
 			if where.Boost > 0 {
 				qry.SetBoost(where.Boost)
 			}
 			qry.SetField(where.Field)
 			queries = append(queries, qry)
-		case schema.Wildcard:
+		case core.Wildcard:
 			qry := bleve.NewWildcardQuery(cast.ToString(where.Value))
 			if where.Boost > 0 {
 				qry.SetBoost(where.Boost)
@@ -528,24 +527,24 @@ func (d defaultStore) searchCollection(ctx context.Context, collection *schema.C
 	searchRequest.Fields = []string{"*"}
 	results, err := d.fullText[collection.Collection()].Search(searchRequest)
 	if err != nil {
-		return schema.Page{}, stacktrace.Propagate(err, "failed to search index: %s", collection.Collection())
+		return core.Page{}, stacktrace.Propagate(err, "failed to search index: %s", collection.Collection())
 	}
 
-	var data []*schema.Document
+	var data []*core.Document
 	if len(results.Hits) == 0 {
-		return schema.Page{}, stacktrace.NewError("zero results")
+		return core.Page{}, stacktrace.NewError("zero results")
 	}
 	for _, h := range results.Hits {
 		if len(h.Fields) == 0 {
 			continue
 		}
-		record, err := schema.NewDocumentFrom(h.Fields)
+		record, err := core.NewDocumentFrom(h.Fields)
 		if err != nil {
-			return schema.Page{}, stacktrace.Propagate(err, "failed to search index: %s", collection.Collection())
+			return core.Page{}, stacktrace.Propagate(err, "failed to search index: %s", collection.Collection())
 		}
 		pass, err := record.Where(q.Filter)
 		if err != nil {
-			return schema.Page{}, stacktrace.Propagate(err, "")
+			return core.Page{}, stacktrace.Propagate(err, "")
 		}
 		if pass {
 			data = append(data, record)
@@ -556,15 +555,15 @@ func (d defaultStore) searchCollection(ctx context.Context, collection *schema.C
 		for _, r := range data {
 			err := r.Select(q.Select)
 			if err != nil {
-				return schema.Page{}, stacktrace.Propagate(err, "")
+				return core.Page{}, stacktrace.Propagate(err, "")
 			}
 		}
 	}
-	return schema.Page{
+	return core.Page{
 		Documents: data,
 		NextPage:  q.Page + 1,
 		Count:     len(data),
-		Stats: schema.PageStats{
+		Stats: core.PageStats{
 			ExecutionTime: time.Since(now),
 		},
 	}, nil
