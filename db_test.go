@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"runtime"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
@@ -47,6 +48,30 @@ func Test(t *testing.T) {
 				for i := 0; i < 10; i++ {
 					assert.Nil(t, collection.Set(ctx, testutil.NewUserDoc()))
 				}
+				return nil
+			}))
+		}))
+	})
+	t.Run("change stream", func(t *testing.T) {
+		assert.Nil(t, testutil.TestDB(testutil.AllCollections, func(ctx context.Context, db *wolverine.DB) {
+			assert.Nil(t, db.Collection(ctx, "user", func(collection *wolverine.Collection) error {
+				wg := sync.WaitGroup{}
+				changes := 0
+				wg.Add(1)
+				go func() {
+					defer wg.Done()
+					ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
+					defer cancel()
+					assert.Nil(t, collection.ChangeStream(ctx, func(ctx context.Context, change schema.StateChange) error {
+						changes++
+						return nil
+					}))
+				}()
+				for i := 0; i < 3; i++ {
+					assert.Nil(t, collection.Set(ctx, testutil.NewUserDoc()))
+				}
+				wg.Wait()
+				assert.Equal(t, 3, changes)
 				return nil
 			}))
 		}))
