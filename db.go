@@ -125,6 +125,7 @@ func (d *DB) Collection(ctx context.Context, collection string, fn func(collecti
 	return stacktrace.NewError("collection not found")
 }
 
+// Core returns the underlying core implementation
 func (d *DB) Core() core.Core {
 	return d.core
 }

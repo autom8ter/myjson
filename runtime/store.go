@@ -294,7 +294,7 @@ func (d defaultStore) indexDocument(ctx context.Context, collection *schema.Coll
 	switch action {
 	case schema.Delete:
 		if !before.Valid() {
-			return nil
+			return stacktrace.NewError("invalid document")
 		}
 		for _, i := range collection.Indexing().Query {
 			pindex := collection.QueryIndexPrefix(*i)

@@ -1,9 +1,9 @@
 
 test:
-	@go test -race -covermode=atomic -coverprofile=coverage.out ./...
+	go test -race -covermode=atomic -coverprofile=coverage.out ./...
 
 bench:
-	@go test -bench=. -benchmem -run=^#
+	go test -bench=. -benchmem -run=^#
 
 lint:
-	@golangci-lint run
+	golangci-lint run

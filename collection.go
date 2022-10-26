@@ -5,6 +5,7 @@ import (
 	"github.com/autom8ter/wolverine/errors"
 	"github.com/autom8ter/wolverine/schema"
 	"github.com/palantir/stacktrace"
+	"github.com/segmentio/ksuid"
 	"golang.org/x/sync/errgroup"
 	"time"
 )
@@ -70,6 +71,44 @@ func (c *Collection) QueryPaginate(ctx context.Context, query schema.Query, hand
 // ChangeStream
 func (c *Collection) ChangeStream(ctx context.Context, fn schema.ChangeStreamHandler) error {
 	return c.db.core.ChangeStream(ctx, c.schema, fn)
+}
+
+// Create
+func (c *Collection) Create(ctx context.Context, document schema.Document) (string, error) {
+	id := ksuid.New().String()
+	document, err := document.Set(c.schema.Indexing().PrimaryKey, id)
+	if err != nil {
+		return "", stacktrace.Propagate(err, "")
+	}
+	return id, stacktrace.Propagate(c.persistStateChange(ctx, schema.StateChange{
+		Collection: c.schema.Collection(),
+		Sets:       []schema.Document{document},
+		Timestamp:  time.Now(),
+	}), "")
+}
+
+// Create
+func (c *Collection) BatchCreate(ctx context.Context, documents []schema.Document) ([]string, error) {
+	var ids []string
+	var toCreate []schema.Document
+	for _, document := range documents {
+		id := ksuid.New().String()
+		doc, err := document.Set(c.schema.Indexing().PrimaryKey, id)
+		if err != nil {
+			return nil, stacktrace.Propagate(err, "")
+		}
+		ids = append(ids, id)
+		toCreate = append(toCreate, doc)
+	}
+
+	if err := c.persistStateChange(ctx, schema.StateChange{
+		Collection: c.schema.Collection(),
+		Sets:       toCreate,
+		Timestamp:  time.Now(),
+	}); err != nil {
+		return nil, stacktrace.Propagate(err, "")
+	}
+	return ids, nil
 }
 
 // Set
