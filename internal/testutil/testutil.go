@@ -30,8 +30,8 @@ var (
 	userSchema string
 	//go:embed task.json
 	taskSchema     string
-	UserCollection *schema.Collection
-	TaskCollection *schema.Collection
+	TaskCollection = schema.NewCollectionFromBytesP([]byte(taskSchema))
+	UserCollection = schema.NewCollectionFromBytesP([]byte(userSchema))
 	AllCollections = []*schema.Collection{UserCollection, TaskCollection}
 )
 
@@ -71,7 +71,10 @@ func NewTaskDoc(usrID string) *schema.Document {
 
 const MyEmail = "colemanword@gmail.com"
 
-func TestDB(collections []*schema.Collection, fn func(ctx context.Context, db *wolverine.DB)) error {
+func TestDB(fn func(ctx context.Context, db *wolverine.DB), collections ...*schema.Collection) error {
+	if len(collections) == 0 {
+		collections = append(collections, AllCollections...)
+	}
 	dir, err := ioutil.TempDir(".", "")
 	if err != nil {
 		return err

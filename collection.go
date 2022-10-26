@@ -2,7 +2,6 @@ package wolverine
 
 import (
 	"context"
-	"github.com/autom8ter/wolverine/errors"
 	"github.com/autom8ter/wolverine/schema"
 	"github.com/palantir/stacktrace"
 	"github.com/segmentio/ksuid"
@@ -278,29 +277,6 @@ func (c *Collection) Reindex(ctx context.Context) error {
 		return stacktrace.Propagate(err, "failed to reindex collection: %s", c.schema.Collection())
 	}
 	return nil
-}
-
-func (c *Collection) GetRelationship(ctx context.Context, field string, document *schema.Document) (*schema.Document, error) {
-	if !c.Schema().HasRelationships() {
-		return nil, stacktrace.NewError("collection has no relationships")
-	}
-	fkeys := c.schema.FKeys()
-	for sourceField, fkey := range fkeys {
-		if field == sourceField {
-			var (
-				foreign *schema.Document
-				err     error
-			)
-			if err := c.db.Collection(ctx, fkey.Collection, func(parent *Collection) error {
-				foreign, err = parent.Get(ctx, document.GetString(sourceField))
-				return stacktrace.Propagate(err, "")
-			}); err != nil {
-				return nil, stacktrace.NewError("")
-			}
-			return foreign, nil
-		}
-	}
-	return nil, stacktrace.NewErrorWithCode(errors.ErrTODO, "relationship %s does not exist", field)
 }
 
 // Transform executes a transformation which is basically ETL from one collection to another

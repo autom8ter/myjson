@@ -1,4 +1,4 @@
-package runtime
+package coreimp
 
 import (
 	"context"
@@ -43,6 +43,9 @@ func Default(storagePath string, collections []*schema.Collection, middlewares .
 		machine:  machine.New(),
 	}
 	for _, collection := range collections {
+		if collection == nil {
+			panic("null collection")
+		}
 		if collection.Indexing().HasSearchIndex() {
 			idx, err := openFullTextIndex(storagePath, collection, false)
 			if err != nil {
@@ -315,12 +318,9 @@ func (d defaultStore) indexDocument(ctx context.Context, collection *schema.Coll
 		if collection.GetDocumentID(after) != docId {
 			return stacktrace.NewErrorWithCode(errors.ErrTODO, "document id is immutable: %v -> %v", collection.GetDocumentID(after), docId)
 		}
-		valid, err := collection.Validate(ctx, after)
+		err := collection.Validate(ctx, after.Bytes())
 		if err != nil {
 			return stacktrace.Propagate(err, "")
-		}
-		if !valid {
-			return stacktrace.NewError("%s/%s document has invalid schema", collection.Collection(), docId)
 		}
 		for _, idx := range collection.Indexing().Query {
 			pindex := collection.QueryIndexPrefix(*idx)

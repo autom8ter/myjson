@@ -6,12 +6,13 @@ import (
 	"github.com/autom8ter/machine/v4"
 	"github.com/autom8ter/wolverine/core"
 	"github.com/autom8ter/wolverine/errors"
-	"github.com/autom8ter/wolverine/runtime"
+	"github.com/autom8ter/wolverine/internal/coreimp"
 	"github.com/autom8ter/wolverine/schema"
 	"github.com/palantir/stacktrace"
+	"github.com/samber/lo"
 	"golang.org/x/sync/errgroup"
 	"io"
-	"sync"
+	"sort"
 )
 
 // Config configures a database instance
@@ -47,54 +48,50 @@ func LoadConfig(storeagePath string, schemaDir string) (Config, error) {
 }
 
 type DB struct {
-	config      Config
-	mu          sync.RWMutex
-	core        core.Core
-	machine     machine.Machine
-	collections []*Collection
+	config          Config
+	core            core.Core
+	machine         machine.Machine
+	collections     []*Collection
+	collectionNames []string
 }
 
 func New(ctx context.Context, cfg Config) (*DB, error) {
 	if len(cfg.Collections) == 0 {
 		return nil, stacktrace.NewErrorWithCode(errors.ErrTODO, "zero collections configured")
 	}
-	rcore, err := runtime.Default(cfg.StoragePath, cfg.Collections, cfg.middlewares...)
+	rcore, err := coreimp.Default(cfg.StoragePath, cfg.Collections, cfg.middlewares...)
 	if err != nil {
 		return nil, stacktrace.NewErrorWithCode(errors.ErrTODO, "failed to configure core provider")
 	}
 	d := &DB{
 		config:  cfg,
-		mu:      sync.RWMutex{},
 		core:    rcore,
 		machine: machine.New(),
 	}
+
 	for _, collection := range cfg.Collections {
 		d.collections = append(d.collections, &Collection{
 			schema: collection,
 			db:     d,
 		})
+		d.collectionNames = append(d.collectionNames, collection.Collection())
 	}
 	if err := d.ReIndex(ctx); err != nil {
 		return nil, stacktrace.Propagate(err, "failed to reindex")
 	}
+	sort.Strings(d.collectionNames)
 	return d, nil
 }
 
 func (d *DB) Close(ctx context.Context) error {
-	d.mu.Lock()
-	defer d.mu.Unlock()
 	return d.core.Close(ctx)
 }
 
 func (d *DB) Backup(ctx context.Context, w io.Writer) error {
-	d.mu.RLock()
-	defer d.mu.RUnlock()
 	return d.core.Backup(ctx, w, 0)
 }
 
 func (d *DB) Restore(ctx context.Context, r io.Reader) error {
-	d.mu.RLock()
-	defer d.mu.RUnlock()
 	if err := d.core.Restore(ctx, r); err != nil {
 		return stacktrace.Propagate(err, "")
 	}
@@ -115,8 +112,6 @@ func (d *DB) ReIndex(ctx context.Context) error {
 }
 
 func (d *DB) Collection(ctx context.Context, collection string, fn func(collection *Collection) error) error {
-	d.mu.RLock()
-	defer d.mu.RUnlock()
 	for _, c := range d.collections {
 		if c.schema.Collection() == collection {
 			return fn(c)
@@ -125,7 +120,24 @@ func (d *DB) Collection(ctx context.Context, collection string, fn func(collecti
 	return stacktrace.NewError("collection not found")
 }
 
-// Core returns the underlying core implementation
-func (d *DB) Core() core.Core {
-	return d.core
+// Collections executes the given function on each registered collection concurrently then waits for all functions to finish executing
+func (d *DB) Collections(ctx context.Context, fn func(collection *Collection) error) error {
+	egp, ctx := errgroup.WithContext(ctx)
+	for _, c := range d.collections {
+		c := c
+		egp.Go(func() error {
+			return stacktrace.Propagate(fn(c), "")
+		})
+	}
+	return egp.Wait()
+}
+
+// RegisteredCollections returns a list of registered collections
+func (d *DB) RegisteredCollections() []string {
+	return d.collectionNames
+}
+
+// HasCollection returns true if the collection is present in the database
+func (d *DB) HasCollection(name string) bool {
+	return lo.Contains(d.collectionNames, name)
 }

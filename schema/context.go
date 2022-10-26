@@ -13,7 +13,6 @@ const (
 )
 
 type Context struct {
-	sync.RWMutex
 	tags sync.Map
 }
 
@@ -50,7 +49,9 @@ func (m *Context) SetAll(data map[string]any) {
 }
 
 func (m *Context) Set(key string, value any) {
-	m.tags.Store(key, value)
+	m.SetAll(map[string]any{
+		key: value,
+	})
 }
 
 func (m *Context) Del(key string) {

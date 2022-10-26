@@ -35,6 +35,15 @@ func NewCollectionFromBytes(jsonSchema []byte) (*Collection, error) {
 	return NewCollection(scheme), nil
 }
 
+// NewCollectionFromBytes creates a new Collection from the provided JSONSchema bytes - it panics on error
+func NewCollectionFromBytesP(jsonSchema []byte) *Collection {
+	scheme, err := NewJSONSchema(jsonSchema)
+	if err != nil {
+		panic(stacktrace.Propagate(err, "failed to parse json schema"))
+	}
+	return NewCollection(scheme)
+}
+
 // LoadCollectionsFromDir loads all yaml/json collections in the specified directory
 func LoadCollectionsFromDir(collectionsDir string) ([]*Collection, error) {
 	var collections []*Collection
@@ -105,16 +114,6 @@ func (c *Collection) Indexing() Indexing {
 // PKey returns the collections primary key
 func (c *Collection) PKey() string {
 	return c.Config().PrimaryKey
-}
-
-// HasRelationships returns whether the collection has any foreign keys
-func (c *Collection) HasRelationships() bool {
-	return len(c.Config().ForeignKeys) > 0
-}
-
-// FKeys returns the collections foreign keys
-func (c *Collection) FKeys() map[string]ForeignKey {
-	return c.Config().ForeignKeys
 }
 
 // OptimizeQueryIndex selects the optimal index to use given the where/orderby clause

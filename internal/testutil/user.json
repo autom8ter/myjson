@@ -5,7 +5,6 @@
   "type": "object",
   "@config": {
     "collection": "user",
-    "primaryKey": "_id",
     "indexing": {
       "query": [
         {
@@ -29,19 +28,6 @@
           "fields": [
             "contact.email"
           ]
-        }
-      ],
-      "aggregate": [
-        {
-          "groupBy": [
-            "account_id",
-            "gender"
-          ],
-          "aggregates": {
-            "field": "gender",
-            "function": "count",
-            "alias": "gender_count"
-          }
         }
       ]
     }

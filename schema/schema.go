@@ -11,18 +11,23 @@ import (
 	"github.com/tidwall/gjson"
 )
 
+// JSONSchemaConfig holds custom properties extracted from a JSON schema file
 type JSONSchemaConfig struct {
-	Collection  string                `json:"collection" validate:"required,lowercase,alpha"`
-	PrimaryKey  string                `json:"primaryKey" validate:"required"`
-	Indexing    Indexing              `json:"indexing" validate:"required"`
-	ForeignKeys map[string]ForeignKey `json:"foreignKeys"`
+	// Collection is the object's collection name - it is extracted from the schemas @config.collection field
+	Collection string `json:"collection" validate:"required,lowercase,alpha"`
+	// PrimaryKey is the objects unique identifier which is gathered from the firt property specifying '@primary: true'
+	PrimaryKey string `json:"primaryKey" validate:"required"`
+	// Indexing is the object's configured indexing - it is extracted from the schemas @config.indexing field
+	Indexing Indexing `json:"indexing" validate:"required"`
 }
 
+// Validate validates the json schema config
 func (j JSONSchemaConfig) Validate() error {
 	validate := validator.New()
 	return validate.Struct(&j)
 }
 
+// JSONSchema is a custom json schema used by collections for configuration and type validation
 type JSONSchema interface {
 	Validate(ctx context.Context, bits []byte) error
 	Config() JSONSchemaConfig
@@ -36,6 +41,7 @@ type collectionSchema struct {
 	config JSONSchemaConfig
 }
 
+// NewJSONSchema creates a new json schema from the given bytes
 func NewJSONSchema(schemaData []byte) (JSONSchema, error) {
 	parsed := gjson.ParseBytes(schemaData)
 	if parsed.Get("type").String() != "object" {
@@ -53,20 +59,11 @@ func NewJSONSchema(schemaData []byte) (JSONSchema, error) {
 	if err := json.Unmarshal([]byte(configExtract.Raw), &config); err != nil {
 		return nil, stacktrace.Propagate(err, "")
 	}
-	if config.ForeignKeys == nil {
-		config.ForeignKeys = map[string]ForeignKey{}
-	}
 	properties := parsed.Get("properties")
 	for k, v := range properties.Map() {
 		switch {
-		case v.Get("@foreign").Exists():
-			var fkey ForeignKey
-			if err := util.Decode(v.Get("@foreign").Value(), &fkey); err != nil {
-				return nil, stacktrace.Propagate(err, "failed to decode foreign key")
-			}
-			config.ForeignKeys[k] = fkey
 		case v.Get("@primary").Exists() && config.PrimaryKey == "":
-			config.PrimaryKey = v.Get("@primary").String()
+			config.PrimaryKey = k
 		}
 	}
 	if config.PrimaryKey == "" {
@@ -75,11 +72,12 @@ func NewJSONSchema(schemaData []byte) (JSONSchema, error) {
 	if config.Collection == "" {
 		return nil, stacktrace.NewError("missing property: @config.collection")
 	}
-	return &collectionSchema{
+	c := &collectionSchema{
 		schema: rs,
 		raw:    parsed,
 		config: config,
-	}, nil
+	}
+	return c, config.Validate()
 }
 
 func (c *collectionSchema) Config() JSONSchemaConfig {

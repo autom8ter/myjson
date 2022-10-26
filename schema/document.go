@@ -13,6 +13,12 @@ import (
 	"sync"
 )
 
+// Ref is a reference to a document
+type Ref struct {
+	Collection string `json:"collection"`
+	ID         string `json:"id"`
+}
+
 // Document is a database document with special attributes.
 // required attributes: _id(string), _collection(string)
 type Document struct {

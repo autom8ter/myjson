@@ -9,7 +9,7 @@ import (
 )
 
 func TestCollection(t *testing.T) {
-	assert.Nil(t, testutil.TestDB(testutil.AllCollections, func(ctx context.Context, db *wolverine.DB) {
+	assert.Nil(t, testutil.TestDB(func(ctx context.Context, db *wolverine.DB) {
 		assert.Nil(t, db.Collection(ctx, "user", func(collection *wolverine.Collection) error {
 			t.Run("schema", func(t *testing.T) {
 				assert.NotNil(t, collection.Schema())
@@ -21,7 +21,7 @@ func TestCollection(t *testing.T) {
 				assert.NotNil(t, collection.Schema().PrimaryQueryIndex())
 			})
 			t.Run("schema not empty", func(t *testing.T) {
-				assert.NotEmpty(t, collection.Schema().Schema)
+				assert.NotEmpty(t, collection.Schema().Config())
 			})
 			t.Run("schema name not empty", func(t *testing.T) {
 				assert.NotEmpty(t, collection.Schema().Collection())
