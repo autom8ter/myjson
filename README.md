@@ -97,8 +97,10 @@ Create a [json schema](https://json-schema.org/):
   "title": "user",
   "type": "object",
   "@collection": "user",
+  "@primaryKey": "_id",
   "@indexing": {
-    "query": [
+    "searchEnabled": true,
+    "indexes": [
       {
         "fields": [
           "contact.email"
@@ -112,13 +114,6 @@ Create a [json schema](https://json-schema.org/):
       {
         "fields": [
           "language"
-        ]
-      }
-    ],
-    "search": [
-      {
-        "fields": [
-          "contact.email"
         ]
       }
     ]
@@ -135,7 +130,6 @@ Create a [json schema](https://json-schema.org/):
   ],
   "properties": {
     "_id": {
-      "@primary": true,
       "type": "string",
       "description": "The user's id."
     },
@@ -214,17 +208,16 @@ Instantiate a database instance:
 
 Each document collection is configured via a JSON Schema document with the following custom properties:
 
-| property                  | description                                | required |
-|---------------------------|--------------------------------------------|----------|
-| @collection               | the name of the collection                 | true     |
-| @indexing                 | custom query and search index entries      | false    |
-| @primary                  | the document's primary key                 | true     |
-| @indexing.query           | an array of query indexes  (order matters) | false    |
-| @indexing.query[].fields  | an array of fields to index                | false    |
-| @indexing.search          | an array of search indexes                 | false    |
-| @indexing.search[].fields | an array of fields to index                | false    |
-| @flags                    | arbitrary key(string)value(string) pairs   | false    |
-| @annotations              | arbitrary key(string)value(string) pairs   | false    |
+| property                   | description                                    | required |
+|----------------------------|------------------------------------------------|----------|
+| @collection                | the name of the collection                     | true     |
+| @primaryKey                | the document's primary key                     | true     |
+| @indexing                  | indexing details                               | false    |
+| @indexing.indexes[].fields | an array of fields to index                    | false    |
+| @indexing.indexes[].unique | whether the index is a unique index            | false    |                           |                                                |          |
+| @indexing.searchEnabled    | whether search indexing is enabled(all fields) | false    |
+| @flags                     | arbitrary key(string)value(string) pairs       | false    |
+| @annotations               | arbitrary key(string)value(string) pairs       | false    |
 
 ## Limitations
 

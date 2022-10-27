@@ -100,8 +100,8 @@ func LoadCollectionsFromDir(collectionsDir string) ([]*Collection, error) {
 	return collections, nil
 }
 
-// OptimizeQueryIndex selects the optimal index to use given the where/orderby clause
-func (c *Collection) OptimizeQueryIndex(where []Where, order OrderBy) (QueryIndexMatch, error) {
+// OptimizeIndex selects the optimal index to use given the where/orderby clause
+func (c *Collection) OptimizeIndex(where []Where, order OrderBy) (IndexMatch, error) {
 	var whereFields []string
 	var whereValues = map[string]any{}
 	for _, w := range where {
@@ -111,15 +111,15 @@ func (c *Collection) OptimizeQueryIndex(where []Where, order OrderBy) (QueryInde
 		whereFields = append(whereFields, w.Field)
 		whereValues[w.Field] = w.Value
 	}
-	index, err := c.getQueryIndex(whereFields, order.Field)
+	index, err := c.getIndex(whereFields, order.Field)
 	if err != nil {
-		return QueryIndexMatch{}, stacktrace.Propagate(err, "")
+		return IndexMatch{}, stacktrace.Propagate(err, "")
 	}
 	return index, nil
 }
 
-// PrimaryQueryIndex returns a reference to the primary index
-func (c *Collection) PrimaryQueryIndex() *prefix.PrefixIndexRef {
+// PrimaryIndex returns a reference to the primary index
+func (c *Collection) PrimaryIndex() *prefix.PrefixIndexRef {
 	return prefix.NewPrefixedIndex(c.Collection(), []string{c.PrimaryKey()})
 }
 
@@ -128,7 +128,7 @@ func (c *Collection) GetPrimaryKeyRef(documentID string) ([]byte, error) {
 	if documentID == "" {
 		return nil, stacktrace.NewErrorWithCode(errors.ErrTODO, "empty document id for property: %s", c.PrimaryKey())
 	}
-	return c.PrimaryQueryIndex().GetPrefix(map[string]any{
+	return c.PrimaryIndex().GetPrefix(map[string]any{
 		c.PrimaryKey(): documentID,
 	}, documentID), nil
 }
@@ -138,22 +138,22 @@ func (c *Collection) SetPrimaryKey(d *Document, id string) error {
 	return stacktrace.Propagate(d.Set(c.PrimaryKey(), id), "failed to set primary key")
 }
 
-// GetQueryIndex gets the
-func (c *Collection) getQueryIndex(whereFields []string, orderBy string) (QueryIndexMatch, error) {
+// GetIndex gets the
+func (c *Collection) getIndex(whereFields []string, orderBy string) (IndexMatch, error) {
 	var (
-		target  *QueryIndex
+		target  *Index
 		matched int
 		ordered bool
 	)
 	indexing := c.Indexing()
-	if !indexing.HasQueryIndex() {
-		return QueryIndexMatch{
-			Ref:     c.PrimaryQueryIndex(),
+	if !indexing.HasIndexes() {
+		return IndexMatch{
+			Ref:     c.PrimaryIndex(),
 			Fields:  []string{c.PrimaryKey()},
 			Ordered: orderBy == c.PrimaryKey() || orderBy == "",
 		}, nil
 	}
-	for _, index := range indexing.Query {
+	for _, index := range indexing.Indexes {
 		isOrdered := index.Fields[0] == orderBy
 		var totalMatched int
 		for i, f := range whereFields {
@@ -167,14 +167,14 @@ func (c *Collection) getQueryIndex(whereFields []string, orderBy string) (QueryI
 		}
 	}
 	if target != nil && len(target.Fields) > 0 {
-		return QueryIndexMatch{
+		return IndexMatch{
 			Ref:     prefix.NewPrefixedIndex(c.Collection(), target.Fields),
 			Fields:  target.Fields,
 			Ordered: ordered,
 		}, nil
 	}
-	return QueryIndexMatch{
-		Ref:     c.PrimaryQueryIndex(),
+	return IndexMatch{
+		Ref:     c.PrimaryIndex(),
 		Fields:  []string{c.PrimaryKey()},
 		Ordered: orderBy == c.PrimaryKey() || orderBy == "",
 	}, nil

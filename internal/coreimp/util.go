@@ -9,18 +9,11 @@ import (
 )
 
 func openFullTextIndex(storagePath string, schema *core.Collection, reindex bool) (bleve.Index, error) {
-	if !schema.Indexing().HasSearchIndex() {
+	if !schema.Indexing().SearchEnabled {
 		return nil, nil
-	}
-	i := schema.Indexing().Search[0]
-	documentMapping := bleve.NewDocumentMapping()
-	for _, f := range i.Fields {
-		mapping := bleve.NewTextFieldMapping()
-		documentMapping.AddFieldMappingsAt(f, mapping)
 	}
 
 	indexMapping := bleve.NewIndexMapping()
-	indexMapping.AddDocumentMapping(schema.Collection(), documentMapping)
 
 	path := fmt.Sprintf("%s/search/%s/index.db", storagePath, schema.Collection())
 	if reindex {

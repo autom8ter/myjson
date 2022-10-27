@@ -44,7 +44,7 @@ type collectionSchema struct {
 	flags map[string]bool
 	// Annotations are arbitrary key value pairs
 	annotations      map[string]string
-	uniqueProperties map[string]struct{}
+	uniqueProperties map[string][]string
 	fields           map[string]*field
 }
 
@@ -59,42 +59,22 @@ func NewJSONSchema(schemaData []byte) (JSONSchema, error) {
 		return nil, stacktrace.Propagate(err, "")
 	}
 	c := &collectionSchema{
-		schema:      rs,
-		raw:         parsed,
-		collection:  parsed.Get("@collection").String(),
-		primaryKey:  "",
-		indexing:    Indexing{},
-		flags:       map[string]bool{},
-		annotations: map[string]string{},
-		fields:      map[string]*field{},
+		schema:           rs,
+		raw:              parsed,
+		collection:       parsed.Get("@collection").String(),
+		primaryKey:       parsed.Get("@primaryKey").String(),
+		indexing:         Indexing{},
+		flags:            map[string]bool{},
+		annotations:      map[string]string{},
+		uniqueProperties: map[string][]string{},
+		fields:           map[string]*field{},
 	}
 	fields, err := getFields(parsed.Get("properties"))
 	if err != nil {
 		return nil, stacktrace.Propagate(err, "failed to parse properties")
 	}
 	c.fields = fields
-	//flatProps, err := flat.Flatten(cast.ToStringMap(c.raw.Get("properties").Value()), nil)
-	//if err != nil {
-	//	return nil, stacktrace.Propagate(err, "")
-	//}
-	//for field, value := range flatProps {
-	//	fieldSplit := strings.Split(field, ".")
-	//	leaf := fieldSplit[len(fieldSplit)-1]
-	//	switch leaf {
-	//	case "@primary":
-	//		c.primaryKey = fieldSplit[len(fieldSplit)-2]
-	//	case "@unique":
-	//		c.uniqueProperties[fieldSplit[len(fieldSplit)-2]] = struct{}{}
-	//	}
-	//}
-	for k, v := range c.fields {
-		if v.Props["@primary"] != nil {
-			c.primaryKey = k
-		}
-		if v.Props["@unique"] != nil {
-			c.uniqueProperties[k] = struct{}{}
-		}
-	}
+
 	if c.primaryKey == "" {
 		return nil, stacktrace.NewError("missing primary key: @primary")
 	}

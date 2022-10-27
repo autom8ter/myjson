@@ -23,8 +23,8 @@ func (p Page) String() string {
 
 // PageStats are statistics collected from a query returning a page
 type PageStats struct {
-	ExecutionTime time.Duration   `json:"execution_time,omitempty"`
-	IndexMatch    QueryIndexMatch `json:"index_match,omitempty"`
+	ExecutionTime time.Duration `json:"execution_time,omitempty"`
+	IndexMatch    IndexMatch    `json:"index_match,omitempty"`
 }
 
 // PageHandler handles a page of documents during pagination. If the handler returns false, pagination will discontinue

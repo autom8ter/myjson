@@ -33,9 +33,9 @@ func TestSchema(t *testing.T) {
 		s, err := core.NewJSONSchema(usrBytes)
 		assert.Nil(t, err)
 		assert.NotEmpty(t, s.PrimaryKey)
+		assert.EqualValues(t, "_id", s.PrimaryKey())
 		assert.NotEmpty(t, s.Collection())
-		assert.NotEmpty(t, s.Indexing().Query)
-		assert.NotEmpty(t, s.Indexing().Search)
+		assert.NotEmpty(t, s.Indexing().Indexes)
 
 		s, err = core.NewJSONSchema(taskBytes)
 		assert.Nil(t, err)

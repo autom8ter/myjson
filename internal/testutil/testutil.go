@@ -75,7 +75,8 @@ func TestDB(fn func(ctx context.Context, db *wolverine.DB), collections ...*core
 	if len(collections) == 0 {
 		collections = append(collections, AllCollections...)
 	}
-	dir, err := ioutil.TempDir(".", "")
+	os.MkdirAll("tmp", 0700)
+	dir, err := ioutil.TempDir("./tmp", "")
 	if err != nil {
 		return err
 	}

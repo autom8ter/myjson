@@ -40,6 +40,7 @@ func ExampleNew() {
   "title": "user",
   "type": "object",
   "@collection": "user",
+  "@primaryKey": "_id",
   "@indexing": {
     "query": [
       {
@@ -78,7 +79,6 @@ func ExampleNew() {
   ],
   "properties": {
     "_id": {
-      "@primary": true,
       "type": "string",
       "description": "The user's id."
     },

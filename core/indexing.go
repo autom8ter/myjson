@@ -6,24 +6,23 @@ import (
 
 // Indexing
 type Indexing struct {
-	Query  []*QueryIndex  `json:"query"`
-	Search []*SearchIndex `json:"search"`
+	SearchEnabled bool     `json:"searchEnabled"`
+	Indexes       []*Index `json:"indexes"`
 }
 
-func (i Indexing) HasQueryIndex() bool {
-	return i.Query != nil && len(i.Query) > 0
+func (i Indexing) HasIndexes() bool {
+	return i.Indexes != nil && len(i.Indexes) > 0
 }
 
-func (i Indexing) HasSearchIndex() bool {
-	return i.Search != nil && len(i.Search) > 0
-}
-
-// QueryIndex is a database index used for quickly finding records with specific field values
-type QueryIndex struct {
+// Index is a database index used for quickly finding records with specific field values
+type Index struct {
+	// Fields to index - order matters
 	Fields []string `json:"fields"`
+	// Unique indicates that it's a unique index which will enforce uniqueness
+	Unique bool `json:"unique"`
 }
 
-type QueryIndexMatch struct {
+type IndexMatch struct {
 	Ref           *prefix.PrefixIndexRef `json:"-"`
 	Fields        []string               `json:"fields"`
 	Ordered       bool                   `json:"ordered"`
@@ -31,13 +30,8 @@ type QueryIndexMatch struct {
 	targetOrderBy string
 }
 
-func (i QueryIndexMatch) FullScan() bool {
+func (i IndexMatch) FullScan() bool {
 	return i.targetOrderBy != "" && !i.Ordered
-}
-
-// SearchIndex
-type SearchIndex struct {
-	Fields []string `json:"fields"`
 }
 
 func IndexableFields(where []Where, by OrderBy) map[string]any {

@@ -4,8 +4,10 @@
   "title": "user",
   "type": "object",
   "@collection": "user",
+  "@primaryKey": "_id",
   "@indexing": {
-    "query": [
+    "searchEnabled": true,
+    "indexes": [
       {
         "fields": [
           "contact.email"
@@ -19,13 +21,6 @@
       {
         "fields": [
           "language"
-        ]
-      }
-    ],
-    "search": [
-      {
-        "fields": [
-          "contact.email"
         ]
       }
     ]
@@ -42,7 +37,6 @@
   ],
   "properties": {
     "_id": {
-      "@primary": true,
       "type": "string",
       "description": "The user's id."
     },

@@ -18,7 +18,7 @@ func TestCollection(t *testing.T) {
 				assert.NotNil(t, collection.DB())
 			})
 			t.Run("schema primary query index", func(t *testing.T) {
-				assert.NotNil(t, collection.Schema().PrimaryQueryIndex())
+				assert.NotNil(t, collection.Schema().PrimaryIndex())
 			})
 			t.Run("schema not empty", func(t *testing.T) {
 				assert.NotEmpty(t, collection.Schema())

@@ -45,7 +45,7 @@ func Default(storagePath string, collections []*core.Collection, middlewares ...
 		if collection == nil {
 			panic("null collection")
 		}
-		if collection.Indexing().HasSearchIndex() {
+		if collection.Indexing().SearchEnabled {
 			idx, err := openFullTextIndex(storagePath, collection, false)
 			if err != nil {
 				return core.Core{}, stacktrace.Propagate(err, "")
@@ -91,7 +91,7 @@ func (d defaultStore) aggregateCollection(ctx context.Context, collection *core.
 	defer cancel()
 
 	now := time.Now()
-	index, err := collection.OptimizeQueryIndex(query.Where, query.OrderBy)
+	index, err := collection.OptimizeIndex(query.Where, query.OrderBy)
 	if err != nil {
 		return core.Page{}, stacktrace.Propagate(err, "")
 	}
@@ -234,7 +234,7 @@ func (d defaultStore) persistCollection(ctx context.Context, collection *core.Co
 	if collection == nil {
 		return stacktrace.NewErrorWithCode(errors.ErrTODO, "null collection schema")
 	}
-	if collection.Indexing().HasSearchIndex() {
+	if collection.Indexing().SearchEnabled {
 		batch = d.fullText[collection.Collection()].NewBatch()
 	}
 	if change.Updates != nil {
@@ -301,7 +301,7 @@ func (d defaultStore) indexDocument(ctx context.Context, collection *core.Collec
 		if !before.Valid() {
 			return stacktrace.NewError("invalid document")
 		}
-		for _, i := range collection.Indexing().Query {
+		for _, i := range collection.Indexing().Indexes {
 			pindex := prefix.NewPrefixedIndex(collection.Collection(), i.Fields)
 			if err := txn.Delete(pindex.GetPrefix(before.Value(), docId)); err != nil {
 				return stacktrace.Propagate(err, "failed to batch delete documents")
@@ -321,7 +321,7 @@ func (d defaultStore) indexDocument(ctx context.Context, collection *core.Collec
 		if err != nil {
 			return stacktrace.Propagate(err, "")
 		}
-		for _, idx := range collection.Indexing().Query {
+		for _, idx := range collection.Indexing().Indexes {
 			pindex := prefix.NewPrefixedIndex(collection.Collection(), idx.Fields)
 			if before != nil && before.Valid() {
 				if err := txn.Delete(pindex.GetPrefix(before.Value(), docId)); err != nil {
@@ -361,7 +361,7 @@ func (d defaultStore) queryCollection(ctx context.Context, collection *core.Coll
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	now := time.Now()
-	index, err := collection.OptimizeQueryIndex(query.Where, query.OrderBy)
+	index, err := collection.OptimizeIndex(query.Where, query.OrderBy)
 	if err != nil {
 		return core.Page{}, stacktrace.Propagate(err, "")
 	}
@@ -436,7 +436,7 @@ func (d defaultStore) queryCollection(ctx context.Context, collection *core.Coll
 }
 
 func (d defaultStore) searchCollection(ctx context.Context, collection *core.Collection, q core.SearchQuery) (core.Page, error) {
-	if !collection.Indexing().HasSearchIndex() {
+	if !collection.Indexing().SearchEnabled {
 		return core.Page{}, stacktrace.NewErrorWithCode(
 			errors.ErrTODO,
 			"%s does not have a search index",

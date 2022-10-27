@@ -4,16 +4,16 @@
   "title": "task",
   "type": "object",
   "@collection": "task",
+  "@primaryKey": "_id",
   "@indexing": {
-    "query": [
+    "searchEnabled": false,
+    "indexes": [
       {
         "fields": [
           "user"
         ]
       }
-    ],
-    "search": [],
-    "aggregate": []
+    ]
   },
   "@flags": {},
   "@annotations": {},
@@ -24,7 +24,6 @@
   ],
   "properties": {
     "_id": {
-      "@primary": true,
       "type": "string",
       "description": "The user's id."
     },
