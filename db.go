@@ -21,20 +21,12 @@ type Config struct {
 	StoragePath string `json:"storagePath"`
 	// Collections are the json document collections supported by the DB - At least one is required.
 	Collections []*core.Collection `json:"collections"`
-	middlewares []core.Middleware
-}
-
-// AddMiddleware adds a middleware to the configuration and returns a new one. 0-many middlewares are supported
-func (c Config) AddMiddleware(m core.Middleware) Config {
-	return Config{
-		StoragePath: c.StoragePath,
-		Collections: c.Collections,
-		middlewares: append(c.middlewares, m),
-	}
+	// Middlewares are middlewares to apply to the database instance
+	Middlewares []core.Middleware
 }
 
 // LoadConfig loads a config instance from the specified storeage path and a directory containing the collection schemas
-func LoadConfig(storeagePath string, schemaDir string) (Config, error) {
+func LoadConfig(storeagePath string, schemaDir string, middlewares ...core.Middleware) (Config, error) {
 	collections, err := core.LoadCollectionsFromDir(schemaDir)
 	if err != nil {
 		return Config{}, stacktrace.Propagate(err, "")
@@ -42,6 +34,7 @@ func LoadConfig(storeagePath string, schemaDir string) (Config, error) {
 	return Config{
 		StoragePath: storeagePath,
 		Collections: collections,
+		Middlewares: middlewares,
 	}, nil
 }
 
@@ -54,18 +47,15 @@ type DB struct {
 	collectionNames []string
 }
 
-// New creates a new database instance from the given config
-func New(ctx context.Context, cfg Config) (*DB, error) {
+// NewFromCore creates a DB instance from the given core API. This function should only be used if the underlying database
+// engine needs to be swapped out.
+func NewFromCore(ctx context.Context, cfg Config, c core.Core) (*DB, error) {
 	if len(cfg.Collections) == 0 {
 		return nil, stacktrace.NewErrorWithCode(errors.ErrTODO, "zero collections configured")
 	}
-	rcore, err := coreimp.Default(cfg.StoragePath, cfg.Collections, cfg.middlewares...)
-	if err != nil {
-		return nil, stacktrace.NewErrorWithCode(errors.ErrTODO, "failed to configure core provider")
-	}
 	d := &DB{
 		config:  cfg,
-		core:    rcore,
+		core:    c,
 		machine: machine.New(),
 	}
 
@@ -81,6 +71,15 @@ func New(ctx context.Context, cfg Config) (*DB, error) {
 	}
 	sort.Strings(d.collectionNames)
 	return d, nil
+}
+
+// New creates a new database instance from the given config
+func New(ctx context.Context, cfg Config) (*DB, error) {
+	rcore, err := coreimp.Default(cfg.StoragePath, cfg.Collections, cfg.Middlewares...)
+	if err != nil {
+		return nil, stacktrace.NewErrorWithCode(errors.ErrTODO, "failed to configure core provider")
+	}
+	return NewFromCore(ctx, cfg, rcore)
 }
 
 // Close closes the database

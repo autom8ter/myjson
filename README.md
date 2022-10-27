@@ -59,12 +59,12 @@ Build powerful, extensible, and feature-rich microservices without database depe
 
 ### Extensibility
 
-- [x] core logic can be wrapped with middlewares for enhanced functionality
-- [x] embedded javascript middleware functions available for adding functionality without needing to recompile
-- [x] change streams available for integration with external systems
-- [ ] dedicated extensions library
+- [x] Core logic can be wrapped with middlewares for enhanced functionality
+- [x] Embedded javascript middleware functions available for adding functionality without needing to recompile
+- [x] Change streams available for integration with external systems
+- [ ] Dedicated extensions library
 
-### Road to Beta
+### Roadmap
 
 - [ ] codegen from collection schema
 - [ ] unique constraints
@@ -78,54 +78,53 @@ Build powerful, extensible, and feature-rich microservices without database depe
 - [ ] examples
 - [ ] 80% test coverage
 - [ ] extensive comments
-
-### Beta+ Roadmap
-
 - [ ] SQL-like query language
 - [ ] views
 - [ ] materialized views
 - [ ] multi-field order by
 - [ ] distributed (raft)
 
-# Getting Started
+## Getting Started
 
-Create a collection schema:
+    go get -u github.com/autom8ter/wolverine
+
+Create a [json schema](https://json-schema.org/):
 
 ```json
 {
   "$id": "https://example.com/user.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "User",
+  "title": "user",
   "type": "object",
-  "@config": {
-    "collection": "user",
-    "indexing": {
-      "query": [
-        {
-          "fields": [
-            "contact.email"
-          ]
-        },
-        {
-          "fields": [
-            "account_id"
-          ]
-        },
-        {
-          "fields": [
-            "language"
-          ]
-        }
-      ],
-      "search": [
-        {
-          "fields": [
-            "contact.email"
-          ]
-        }
-      ]
-    }
+  "@collection": "user",
+  "@indexing": {
+    "query": [
+      {
+        "fields": [
+          "contact.email"
+        ]
+      },
+      {
+        "fields": [
+          "account_id"
+        ]
+      },
+      {
+        "fields": [
+          "language"
+        ]
+      }
+    ],
+    "search": [
+      {
+        "fields": [
+          "contact.email"
+        ]
+      }
+    ]
   },
+  "@flags": {},
+  "@annotations": {},
   "required": [
     "_id",
     "name",
@@ -184,13 +183,55 @@ Create a collection schema:
 }
 ```
 
+Instantiate a collection:
+
+
+    userSchema := core.NewCollectionFromBytesP([]byte(schema))
+
+
 Instantiate a database instance:
 
-```go
+	config := wolverine.Config{
+		StoragePath: "", // leave empty for in memory
+		Collections: []*schema.Collection{userSchema},
+		// add as many custom middlewares as needed
+		Middlewares: []core.Middleware{{
+			Persist:      []core.PersistWare{},
+			Aggregate:    []core.AggregateWare{},
+			Search:       []core.SearchWare{},
+			Query:        []core.QueryWare{},
+			Get:          []core.GetWare{},
+			GetAll:       []core.GetAllWare{},
+			ChangeStream: []core.ChangeStreamWare{},
+		}},
+	}
+	db, err := wolverine.New(context.Background(), config)
+	if err != nil {
+		panic(err)
+	}
 
-```
+## Document Collection Schema Properties
 
-# Contributing
+Each document collection is configured via a JSON Schema document with the following custom properties:
+
+| property                  | description                                | required |
+|---------------------------|--------------------------------------------|----------|
+| @collection               | the name of the collection                 | true     |
+| @indexing                 | custom query and search index entries      | false    |
+| @primary                  | the document's primary key                 | true     |
+| @indexing.query           | an array of query indexes  (order matters) | false    |
+| @indexing.query[].fields  | an array of fields to index                | false    |
+| @indexing.search          | an array of search indexes                 | false    |
+| @indexing.search[].fields | an array of fields to index                | false    |
+| @flags                    | arbitrary key(string)value(string) pairs   | false    |
+| @annotations              | arbitrary key(string)value(string) pairs   | false    |
+
+## Limitations
+
+- Search enabled collections have poor write performance. Only add search indexes if you really need them.
+- 
+
+## Contributing
 
 Install Dependencies
 
