@@ -1,0 +1,5 @@
+package wolverine
+
+func Example() {
+	
+}
