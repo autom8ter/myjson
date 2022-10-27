@@ -22,7 +22,7 @@ func TestCollection(t *testing.T) {
 		assert.Nil(t, err)
 	})
 	t.Run("primary index", func(t *testing.T) {
-		assert.Equal(t, "_id", testutil.UserCollection.PKey())
+		assert.Equal(t, "_id", testutil.UserCollection.PrimaryKey())
 		assert.Equal(t, true, testutil.UserCollection.Indexing().HasSearchIndex())
 		assert.Equal(t, true, testutil.UserCollection.Indexing().HasQueryIndex())
 		assert.Equal(t, "user", testutil.UserCollection.Collection())

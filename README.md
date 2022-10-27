@@ -1,6 +1,6 @@
 # Wolverine
 
-An embedded NoSQL database with support for JSON schemas, full text search, and aggregation
+An embedded, durable NoSQL database with support for schemas, full text search, and aggregation
 
     go get -u github.com/autom8ter/wolverine
 
@@ -10,7 +10,7 @@ An embedded NoSQL database with support for JSON schemas, full text search, and 
 - [bleve](github.com/blevesearch/bleve) - search indexing
 - [gjson](github.com/tidwall/gjson) - json extraction utilities
 - [sjson](github.com/tidwall/sjson) - json mutation utilities
-- [lo](github.com/samber/lo) - generic collection functions
+- [lo](github.com/samber/lo) - generics
 - [machine](github.com/autom8ter/machine/v4) - in-memory publish/subscribe functionality
 - [jsonschema](github.com/qri-io/jsonschema) - json schema support
 - [goja](github.com/dop251/goja) - embedded javascript runtime
@@ -66,6 +66,7 @@ Build powerful, extensible, and feature-rich microservices without database depe
 
 ### Road to Beta
 
+- [ ] codegen from collection schema
 - [ ] unique constraints
 - [ ] external data importer
 - [ ] incremental backup

@@ -147,7 +147,7 @@ func Test(t *testing.T) {
 				}
 				t.Logf("found %v documents in %s", results.Count, results.Stats.ExecutionTime)
 			})
-			t.Run("query users account_id in 51-55", func(t *testing.T) {
+			t.Run("query users account_id in 51-60", func(t *testing.T) {
 				timer := timer()
 				defer timer(t)
 				results, err := collection.Query(ctx, core.Query{
@@ -156,7 +156,7 @@ func Test(t *testing.T) {
 						{
 							Field: "account_id",
 							Op:    core.In,
-							Value: []float64{51, 52, 53, 54, 55},
+							Value: []float64{51, 52, 53, 54, 55, 56, 57, 58, 59, 60},
 						},
 					},
 					Page:    0,
@@ -197,38 +197,6 @@ func Test(t *testing.T) {
 				})
 				assert.Nil(t, err)
 				assert.Equal(t, 10, pageCount)
-			})
-			t.Run("aggregate account_id, gender, count", func(t *testing.T) {
-				results, err := collection.Aggregate(ctx, core.AggregateQuery{
-					GroupBy: []string{"account_id"},
-					Where: []core.Where{
-						{
-							Field: "account_id",
-							Op:    ">",
-							Value: 1,
-						},
-					},
-					Aggregates: []core.Aggregate{
-						{
-							Field:    "gender",
-							Function: core.COUNT,
-							Alias:    "gender_count",
-						},
-					},
-					Page:  0,
-					Limit: 0,
-					OrderBy: core.OrderBy{
-						Field:     "account_id",
-						Direction: core.DESC,
-					},
-				})
-				assert.Nil(t, err)
-				assert.Greater(t, results.Count, 1)
-				for _, doc := range results.Documents {
-					t.Logf("aggregate: %s", doc.String())
-				}
-				assert.EqualValues(t, []string{"account_id"}, results.Stats.IndexMatch.Fields)
-				t.Logf("found %v aggregates in %s", results.Count, results.Stats.ExecutionTime)
 			})
 			t.Run("search wildcard name", func(t *testing.T) {
 				results, err := collection.Search(ctx, core.SearchQuery{
@@ -509,9 +477,12 @@ func TestAggregate(t *testing.T) {
 							Alias:    "age_sum",
 						},
 					},
-					Page:    0,
-					Limit:   0,
-					OrderBy: core.OrderBy{},
+					Page:  0,
+					Limit: 0,
+					OrderBy: core.OrderBy{
+						Field:     "account_id",
+						Direction: core.ASC,
+					},
 				}
 				groups := lo.GroupBy[*core.Document](usrs, func(t *core.Document) string {
 					return t.GetString("account_id")
@@ -527,7 +498,10 @@ func TestAggregate(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
+				assert.NotEqual(t, 0, results.Count)
+				var accounts []string
 				for _, result := range results.Documents {
+					accounts = append(accounts, result.GetString("account_id"))
 					assert.Equal(t, ageSum[result.GetString("account_id")], result.GetFloat("age_sum"))
 				}
 				return nil

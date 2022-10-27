@@ -77,7 +77,7 @@ func (c *Collection) ChangeStream(ctx context.Context, fn core.ChangeStreamHandl
 func (c *Collection) Create(ctx context.Context, document *core.Document) (string, error) {
 	if c.schema.GetPKey(document) == "" {
 		id := ksuid.New().String()
-		err := c.schema.SetPKey(document, id)
+		err := c.schema.SetPrimaryKey(document, id)
 		if err != nil {
 			return "", stacktrace.Propagate(err, "")
 		}
@@ -95,7 +95,7 @@ func (c *Collection) BatchCreate(ctx context.Context, documents []*core.Document
 	for _, document := range documents {
 		if c.schema.GetPKey(document) == "" {
 			id := ksuid.New().String()
-			err := c.schema.SetPKey(document, id)
+			err := c.schema.SetPrimaryKey(document, id)
 			if err != nil {
 				return nil, stacktrace.Propagate(err, "")
 			}

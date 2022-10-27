@@ -1,37 +1,37 @@
 {
   "$id": "https://example.com/user.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "User",
+  "title": "user",
   "type": "object",
-  "@config": {
-    "collection": "user",
-    "indexing": {
-      "query": [
-        {
-          "fields": [
-            "contact.email"
-          ]
-        },
-        {
-          "fields": [
-            "account_id"
-          ]
-        },
-        {
-          "fields": [
-            "language"
-          ]
-        }
-      ],
-      "search": [
-        {
-          "fields": [
-            "contact.email"
-          ]
-        }
-      ]
-    }
+  "@collection": "user",
+  "@indexing": {
+    "query": [
+      {
+        "fields": [
+          "contact.email"
+        ]
+      },
+      {
+        "fields": [
+          "account_id"
+        ]
+      },
+      {
+        "fields": [
+          "language"
+        ]
+      }
+    ],
+    "search": [
+      {
+        "fields": [
+          "contact.email"
+        ]
+      }
+    ]
   },
+  "@flags": {},
+  "@annotations": {},
   "required": [
     "_id",
     "name",

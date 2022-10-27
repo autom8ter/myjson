@@ -265,7 +265,7 @@ func (d defaultStore) persistCollection(ctx context.Context, collection *core.Co
 		}
 		docId := collection.GetPKey(after)
 		if docId == "" {
-			return stacktrace.NewErrorWithCode(errors.ErrTODO, "document missing primary key %s", collection.PKey())
+			return stacktrace.NewErrorWithCode(errors.ErrTODO, "document missing primary key %s", collection.PrimaryKey())
 		}
 		before, _ := d.getCollection(ctx, collection, docId)
 		if err := d.indexDocument(ctx, collection, txn, batch, core.Set, docId, before, after); err != nil {
@@ -302,7 +302,7 @@ func (d defaultStore) indexDocument(ctx context.Context, collection *core.Collec
 			return stacktrace.NewError("invalid document")
 		}
 		for _, i := range collection.Indexing().Query {
-			pindex := collection.QueryIndexPrefix(*i)
+			pindex := prefix.NewPrefixedIndex(collection.Collection(), i.Fields)
 			if err := txn.Delete(pindex.GetPrefix(before.Value(), docId)); err != nil {
 				return stacktrace.Propagate(err, "failed to batch delete documents")
 			}
@@ -322,7 +322,7 @@ func (d defaultStore) indexDocument(ctx context.Context, collection *core.Collec
 			return stacktrace.Propagate(err, "")
 		}
 		for _, idx := range collection.Indexing().Query {
-			pindex := collection.QueryIndexPrefix(*idx)
+			pindex := prefix.NewPrefixedIndex(collection.Collection(), idx.Fields)
 			if before != nil && before.Valid() {
 				if err := txn.Delete(pindex.GetPrefix(before.Value(), docId)); err != nil {
 					return stacktrace.PropagateWithCode(

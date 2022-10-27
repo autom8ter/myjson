@@ -100,21 +100,6 @@ func LoadCollectionsFromDir(collectionsDir string) ([]*Collection, error) {
 	return collections, nil
 }
 
-// Collection returns the name of the collection based on the schema's 'collection' field on the collection's schema
-func (c *Collection) Collection() string {
-	return c.Config().Collection
-}
-
-// Indexing returns the list of the indexes based on the schema's 'indexing' field on the collection's schema
-func (c *Collection) Indexing() Indexing {
-	return c.Config().Indexing
-}
-
-// PKey returns the collections primary key
-func (c *Collection) PKey() string {
-	return c.Config().PrimaryKey
-}
-
 // OptimizeQueryIndex selects the optimal index to use given the where/orderby clause
 func (c *Collection) OptimizeQueryIndex(where []Where, order OrderBy) (QueryIndexMatch, error) {
 	var whereFields []string
@@ -133,29 +118,24 @@ func (c *Collection) OptimizeQueryIndex(where []Where, order OrderBy) (QueryInde
 	return index, nil
 }
 
+// PrimaryQueryIndex returns a reference to the primary index
 func (c *Collection) PrimaryQueryIndex() *prefix.PrefixIndexRef {
-	return c.QueryIndexPrefix(QueryIndex{
-		Fields: []string{c.Config().PrimaryKey},
-	})
+	return prefix.NewPrefixedIndex(c.Collection(), []string{c.PrimaryKey()})
 }
 
-// GetPrimaryKeyRef gets a reference to the documents primary key
+// GetPrimaryKeyRef gets a reference to the documents primary key in the primary index
 func (c *Collection) GetPrimaryKeyRef(documentID string) ([]byte, error) {
 	if documentID == "" {
-		return nil, stacktrace.NewErrorWithCode(errors.ErrTODO, "empty document id for property: %s", c.Config().PrimaryKey)
+		return nil, stacktrace.NewErrorWithCode(errors.ErrTODO, "empty document id for property: %s", c.PrimaryKey())
 	}
 	return c.PrimaryQueryIndex().GetPrefix(map[string]any{
-		c.Config().PrimaryKey: documentID,
+		c.PrimaryKey(): documentID,
 	}, documentID), nil
 }
 
-// SetPKey sets the documents primary key
-func (c *Collection) SetPKey(d *Document, id string) error {
-	return stacktrace.Propagate(d.Set(c.Config().PrimaryKey, id), "")
-}
-
-func (c *Collection) QueryIndexPrefix(i QueryIndex) *prefix.PrefixIndexRef {
-	return prefix.NewPrefixedIndex(c.Config().Collection, i.Fields)
+// SetPrimaryKey sets the documents primary key
+func (c *Collection) SetPrimaryKey(d *Document, id string) error {
+	return stacktrace.Propagate(d.Set(c.PrimaryKey(), id), "failed to set primary key")
 }
 
 // GetQueryIndex gets the
@@ -169,8 +149,8 @@ func (c *Collection) getQueryIndex(whereFields []string, orderBy string) (QueryI
 	if !indexing.HasQueryIndex() {
 		return QueryIndexMatch{
 			Ref:     c.PrimaryQueryIndex(),
-			Fields:  []string{c.Config().PrimaryKey},
-			Ordered: orderBy == c.Config().PrimaryKey || orderBy == "",
+			Fields:  []string{c.PrimaryKey()},
+			Ordered: orderBy == c.PrimaryKey() || orderBy == "",
 		}, nil
 	}
 	for _, index := range indexing.Query {
@@ -188,19 +168,19 @@ func (c *Collection) getQueryIndex(whereFields []string, orderBy string) (QueryI
 	}
 	if target != nil && len(target.Fields) > 0 {
 		return QueryIndexMatch{
-			Ref:     c.QueryIndexPrefix(*target),
+			Ref:     prefix.NewPrefixedIndex(c.Collection(), target.Fields),
 			Fields:  target.Fields,
 			Ordered: ordered,
 		}, nil
 	}
 	return QueryIndexMatch{
 		Ref:     c.PrimaryQueryIndex(),
-		Fields:  []string{c.Config().PrimaryKey},
-		Ordered: orderBy == c.Config().PrimaryKey || orderBy == "",
+		Fields:  []string{c.PrimaryKey()},
+		Ordered: orderBy == c.PrimaryKey() || orderBy == "",
 	}, nil
 }
 
 // GetPkey gets the documents primary key(if it exists)
 func (c *Collection) GetPKey(d *Document) string {
-	return cast.ToString(d.Get(c.Config().PrimaryKey))
+	return cast.ToString(d.Get(c.PrimaryKey()))
 }

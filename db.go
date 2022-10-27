@@ -24,13 +24,12 @@ type Config struct {
 	middlewares []core.Middleware
 }
 
-// AddMiddleware adds a middleware to the configuration. 0-many middlewares are supported
+// AddMiddleware adds a middleware to the configuration and returns a new one. 0-many middlewares are supported
 func (c Config) AddMiddleware(m core.Middleware) Config {
-	middlewares := append(c.middlewares, m)
 	return Config{
 		StoragePath: c.StoragePath,
 		Collections: c.Collections,
-		middlewares: middlewares,
+		middlewares: append(c.middlewares, m),
 	}
 }
 
@@ -46,6 +45,7 @@ func LoadConfig(storeagePath string, schemaDir string) (Config, error) {
 	}, nil
 }
 
+// DB is an embedded, durable NoSQL database with support for schemas, full text search, and aggregation
 type DB struct {
 	config          Config
 	core            core.Core
@@ -54,6 +54,7 @@ type DB struct {
 	collectionNames []string
 }
 
+// New creates a new database instance from the given config
 func New(ctx context.Context, cfg Config) (*DB, error) {
 	if len(cfg.Collections) == 0 {
 		return nil, stacktrace.NewErrorWithCode(errors.ErrTODO, "zero collections configured")
@@ -82,14 +83,17 @@ func New(ctx context.Context, cfg Config) (*DB, error) {
 	return d, nil
 }
 
+// Close closes the database
 func (d *DB) Close(ctx context.Context) error {
 	return d.core.Close(ctx)
 }
 
+// Backup backs up the database to the given writer
 func (d *DB) Backup(ctx context.Context, w io.Writer) error {
 	return d.core.Backup(ctx, w, 0)
 }
 
+// Restore restores data from the given reader
 func (d *DB) Restore(ctx context.Context, r io.Reader) error {
 	if err := d.core.Restore(ctx, r); err != nil {
 		return stacktrace.Propagate(err, "")
@@ -97,6 +101,7 @@ func (d *DB) Restore(ctx context.Context, r io.Reader) error {
 	return stacktrace.Propagate(d.ReIndex(ctx), "")
 }
 
+// ReIndex reindexes every collection in the database
 func (d *DB) ReIndex(ctx context.Context) error {
 	egp, ctx := errgroup.WithContext(ctx)
 	for _, c := range d.collections {
@@ -110,6 +115,7 @@ func (d *DB) ReIndex(ctx context.Context) error {
 	return stacktrace.Propagate(egp.Wait(), "")
 }
 
+// Collection executes the given function on the collection
 func (d *DB) Collection(ctx context.Context, collection string, fn func(collection *Collection) error) error {
 	for _, c := range d.collections {
 		if c.schema.Collection() == collection {

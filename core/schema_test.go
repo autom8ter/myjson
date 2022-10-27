@@ -32,16 +32,14 @@ func TestSchema(t *testing.T) {
 	t.Run("config", func(t *testing.T) {
 		s, err := core.NewJSONSchema(usrBytes)
 		assert.Nil(t, err)
-		assert.Nil(t, s.Config().Validate())
-		assert.NotEmpty(t, s.Config().PrimaryKey)
-		assert.NotEmpty(t, s.Config().Collection)
-		assert.NotEmpty(t, s.Config().Indexing.Query)
-		assert.NotEmpty(t, s.Config().Indexing.Search)
+		assert.NotEmpty(t, s.PrimaryKey)
+		assert.NotEmpty(t, s.Collection())
+		assert.NotEmpty(t, s.Indexing().Query)
+		assert.NotEmpty(t, s.Indexing().Search)
 
 		s, err = core.NewJSONSchema(taskBytes)
 		assert.Nil(t, err)
-		assert.Nil(t, s.Config().Validate())
-		assert.NotEmpty(t, s.Config().PrimaryKey)
-		assert.NotEmpty(t, s.Config().Collection)
+		assert.NotEmpty(t, s.PrimaryKey())
+		assert.NotEmpty(t, s.Collection())
 	})
 }
