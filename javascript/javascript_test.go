@@ -1,15 +1,16 @@
-package core_test
+package javascript_test
 
 import (
 	"context"
 	"github.com/autom8ter/wolverine/core"
 	"github.com/autom8ter/wolverine/internal/testutil"
+	"github.com/autom8ter/wolverine/javascript"
 	"github.com/spf13/cast"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
 
-var sumFunction = core.Javascript(`
+var sumFunction = javascript.Javascript(`
 function sum(input) {
 	let output = {}
 	output.sum = input.a * input.b;
@@ -17,7 +18,7 @@ function sum(input) {
 }
 `)
 
-var countFunction = core.Javascript(`
+var countFunction = javascript.Javascript(`
 function count(input) {
 	let output = {}
 	output.count = input.length
@@ -25,7 +26,7 @@ function count(input) {
 }
 `)
 
-var getWareFunction = core.Javascript(`
+var getWareFunction = javascript.Javascript(`
 function transform(input) {
 	let output = {};
 	output.transformed = true;

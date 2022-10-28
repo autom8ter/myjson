@@ -5,6 +5,7 @@ import (
 	"github.com/autom8ter/wolverine/internal/util"
 	flat2 "github.com/nqd/flat"
 	"github.com/palantir/stacktrace"
+	"github.com/samber/lo"
 	"github.com/spf13/cast"
 	"github.com/tidwall/gjson"
 	"github.com/tidwall/sjson"
@@ -290,4 +291,32 @@ func (d *Document) Encode(w io.Writer) error {
 		return stacktrace.Propagate(err, "failed to encode document")
 	}
 	return nil
+}
+
+type Documents []*Document
+
+func (documents Documents) GroupBy(fields []string) map[string][]*Document {
+	return lo.GroupBy[*Document](documents, func(d *Document) string {
+		var values []string
+		for _, g := range fields {
+			values = append(values, cast.ToString(d.Get(g)))
+		}
+		return strings.Join(values, ".")
+	})
+}
+
+func (documents Documents) Slice(start, end int) Documents {
+	return lo.Slice[*Document](documents, start, end)
+}
+
+func (documents Documents) Filter(predicate func(document *Document, i int) bool) Documents {
+	return lo.Filter[*Document](documents, predicate)
+}
+
+func (documents Documents) Map(mapper func(t *Document, i int) *Document) Documents {
+	return lo.Map[*Document, *Document](documents, mapper)
+}
+
+func (documents Documents) Reduce(reducer func(accumulated, next *Document, i int) *Document) *Document {
+	return lo.Reduce[*Document](documents, reducer, NewDocument())
 }

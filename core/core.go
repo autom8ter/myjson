@@ -19,7 +19,7 @@ type CoreAPI interface {
 	// Get gets a single document
 	Get(ctx context.Context, collection *Collection, id string) (*Document, error)
 	// Get gets a list of documents
-	GetAll(ctx context.Context, collection *Collection, ids []string) ([]*Document, error)
+	GetAll(ctx context.Context, collection *Collection, ids []string) (Documents, error)
 	// ChangeStream streams state changes to the given function
 	ChangeStream(ctx context.Context, collection *Collection, fn ChangeStreamHandler) error
 	// Backup backs up the database to the given writer
@@ -169,7 +169,7 @@ func (c Core) Get(ctx context.Context, collection *Collection, id string) (*Docu
 }
 
 // GetAll gets all documents by id
-func (c Core) GetAll(ctx context.Context, collection *Collection, ids []string) ([]*Document, error) {
+func (c Core) GetAll(ctx context.Context, collection *Collection, ids []string) (Documents, error) {
 	if c.getAll == nil {
 		return nil, fmt.Errorf("unimplemented")
 	}
@@ -278,7 +278,7 @@ type GetFunc func(ctx context.Context, collection *Collection, id string) (*Docu
 type GetWare func(GetFunc) GetFunc
 
 // GetAllFunc gets multiple documents in a collection
-type GetAllFunc func(ctx context.Context, collection *Collection, ids []string) ([]*Document, error)
+type GetAllFunc func(ctx context.Context, collection *Collection, ids []string) (Documents, error)
 
 // GetAllWare wraps a GetAllFunc and returns a new one
 type GetAllWare func(GetAllFunc) GetAllFunc

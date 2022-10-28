@@ -175,7 +175,7 @@ func (d defaultStore) aggregateCollection(ctx context.Context, collection *core.
 	}, nil
 }
 
-func (d defaultStore) getAllCollection(ctx context.Context, collection *core.Collection, ids []string) ([]*core.Document, error) {
+func (d defaultStore) getAllCollection(ctx context.Context, collection *core.Collection, ids []string) (core.Documents, error) {
 	var documents []*core.Document
 	if err := d.kv.View(func(txn *badger.Txn) error {
 		for _, id := range ids {
