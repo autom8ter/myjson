@@ -4,10 +4,9 @@ import (
 	"encoding/json"
 	"github.com/autom8ter/wolverine/core"
 	"github.com/autom8ter/wolverine/internal/testutil"
-	"testing"
-
 	"github.com/brianvoe/gofakeit/v6"
 	"github.com/stretchr/testify/assert"
+	"testing"
 )
 
 func TestDocument(t *testing.T) {

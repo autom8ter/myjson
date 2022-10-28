@@ -180,7 +180,7 @@ func (c *Collection) getIndex(whereFields []string, orderBy string) (IndexMatch,
 	}, nil
 }
 
-// GetPkey gets the documents primary key(if it exists)
-func (c *Collection) GetPKey(d *Document) string {
+// GetPrimaryKey gets the documents primary key(if it exists)
+func (c *Collection) GetPrimaryKey(d *Document) string {
 	return cast.ToString(d.Get(c.PrimaryKey()))
 }

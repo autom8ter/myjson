@@ -223,7 +223,7 @@ func (f JSFunction) ChangeStreamWare() ChangeStreamWare {
 
 func (f JSFunction) evalDocument(ctx context.Context, collection *Collection, doc *Document) (*Document, error) {
 	input := map[string]any{
-		"id":         collection.GetPKey(doc),
+		"id":         collection.GetPrimaryKey(doc),
 		"document":   doc.Value(),
 		"collection": collection.Collection(),
 	}

@@ -75,14 +75,14 @@ func (c *Collection) ChangeStream(ctx context.Context, fn core.ChangeStreamHandl
 
 // Create creates a new document - if the documents primary key is unset, it will be set as a sortable unique id
 func (c *Collection) Create(ctx context.Context, document *core.Document) (string, error) {
-	if c.schema.GetPKey(document) == "" {
+	if c.schema.GetPrimaryKey(document) == "" {
 		id := ksuid.New().String()
 		err := c.schema.SetPrimaryKey(document, id)
 		if err != nil {
 			return "", stacktrace.Propagate(err, "")
 		}
 	}
-	return c.schema.GetPKey(document), stacktrace.Propagate(c.persistStateChange(ctx, core.StateChange{
+	return c.schema.GetPrimaryKey(document), stacktrace.Propagate(c.persistStateChange(ctx, core.StateChange{
 		Collection: c.schema.Collection(),
 		Sets:       []*core.Document{document},
 		Timestamp:  time.Now(),
@@ -93,14 +93,14 @@ func (c *Collection) Create(ctx context.Context, document *core.Document) (strin
 func (c *Collection) BatchCreate(ctx context.Context, documents []*core.Document) ([]string, error) {
 	var ids []string
 	for _, document := range documents {
-		if c.schema.GetPKey(document) == "" {
+		if c.schema.GetPrimaryKey(document) == "" {
 			id := ksuid.New().String()
 			err := c.schema.SetPrimaryKey(document, id)
 			if err != nil {
 				return nil, stacktrace.Propagate(err, "")
 			}
 		}
-		ids = append(ids, c.schema.GetPKey(document))
+		ids = append(ids, c.schema.GetPrimaryKey(document))
 	}
 
 	if err := c.persistStateChange(ctx, core.StateChange{
@@ -192,7 +192,7 @@ func (c *Collection) QueryDelete(ctx context.Context, query core.Query) error {
 	}
 	var ids []string
 	for _, document := range results.Documents {
-		ids = append(ids, c.schema.GetPKey(document))
+		ids = append(ids, c.schema.GetPrimaryKey(document))
 	}
 	return stacktrace.Propagate(c.BatchDelete(ctx, ids), "")
 }
@@ -258,12 +258,12 @@ func (c *Collection) Reindex(ctx context.Context) error {
 		var toSet []*core.Document
 		var toDelete []string
 		for _, r := range results.Documents {
-			result, _ := c.Get(ctx, c.schema.GetPKey(r))
+			result, _ := c.Get(ctx, c.schema.GetPrimaryKey(r))
 			if result.Valid() {
 				toSet = append(toSet, result)
 			} else {
-				toDelete = append(toDelete, c.schema.GetPKey(r))
-				_ = c.Delete(ctx, c.schema.GetPKey(r))
+				toDelete = append(toDelete, c.schema.GetPrimaryKey(r))
+				_ = c.Delete(ctx, c.schema.GetPrimaryKey(r))
 			}
 		}
 		if len(toSet) > 0 {
