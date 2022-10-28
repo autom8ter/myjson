@@ -6,38 +6,31 @@ import (
 	"github.com/autom8ter/wolverine/core"
 	"github.com/autom8ter/wolverine/errors"
 	"github.com/autom8ter/wolverine/internal/prefix"
+	"github.com/autom8ter/wolverine/kv"
+	"github.com/autom8ter/wolverine/kv/badger"
 	"github.com/blevesearch/bleve"
 	"github.com/blevesearch/bleve/search/query"
-	"github.com/dgraph-io/badger/v3"
 	"github.com/palantir/stacktrace"
 	"github.com/samber/lo"
 	"github.com/spf13/cast"
-	"io"
 	"strings"
 	"time"
 )
 
 type defaultStore struct {
-	kv       *badger.DB
+	kv       kv.DB
 	fullText map[string]bleve.Index
 	machine  machine.Machine
 }
 
 // Default creates a new Core instance with the given storeage path and collections. Under the hood it is powered by BadgerDB and Blevesearch
 func Default(storagePath string, collections []*core.Collection, middlewares ...core.Middleware) (core.Core, error) {
-	opts := badger.DefaultOptions(storagePath)
-	if storagePath == "" {
-		opts.InMemory = true
-		opts.Dir = ""
-		opts.ValueDir = ""
-	}
-	opts = opts.WithLoggingLevel(badger.ERROR)
-	kv, err := badger.Open(opts)
+	db, err := badger.New(storagePath)
 	if err != nil {
 		return core.Core{}, stacktrace.Propagate(err, "")
 	}
 	d := defaultStore{
-		kv:       kv,
+		kv:       db,
 		fullText: map[string]bleve.Index{},
 		machine:  machine.New(),
 	}
@@ -61,9 +54,7 @@ func Default(storagePath string, collections []*core.Collection, middlewares ...
 		WithGet(d.getCollection).
 		WithGetAll(d.getAllCollection).
 		WithChangeStream(d.changeStreamCollection).
-		WithClose(d.closeAll).
-		WithBackup(d.backup).
-		WithRestore(d.restore)
+		WithClose(d.closeAll)
 	for _, mw := range middlewares {
 		c = c.Apply(mw)
 	}
@@ -89,40 +80,47 @@ func (d defaultStore) changeStreamCollection(ctx context.Context, collection *co
 func (d defaultStore) aggregateCollection(ctx context.Context, collection *core.Collection, query core.AggregateQuery) (core.Page, error) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
-
 	now := time.Now()
 	index, err := collection.OptimizeIndex(query.Where, query.OrderBy)
 	if err != nil {
 		return core.Page{}, stacktrace.Propagate(err, "")
 	}
 	var results []*core.Document
-	if err := d.kv.View(func(txn *badger.Txn) error {
-		opts := badger.DefaultIteratorOptions
-		opts.PrefetchValues = true
-		opts.PrefetchSize = 10
-		opts.Prefix = index.Ref.GetPrefix(core.IndexableFields(query.Where, query.OrderBy), "")
-		it := txn.NewIterator(opts)
+	if err := d.kv.Tx(false, func(tx kv.Tx) error {
+		opts := kv.IterOpts{
+			Prefix:  index.Ref.GetPrefix(core.IndexableFields(query.Where, query.OrderBy), ""),
+			Seek:    nil,
+			Reverse: false,
+		}
+		if query.OrderBy.Direction == core.DESC {
+			opts.Reverse = true
+			opts.Seek = prefix.PrefixNextKey(opts.Prefix)
+		} else {
+			opts.Seek = opts.Prefix
+		}
+		it := tx.NewIterator(opts)
 		it.Seek(opts.Prefix)
 		defer it.Close()
-		for it.ValidForPrefix(opts.Prefix) {
+		for it.Valid() {
 			if ctx.Err() != nil {
 				return nil
 			}
 			item := it.Item()
-			err := item.Value(func(bits []byte) error {
-				document, err := core.NewDocumentFromBytes(bits)
-				if err != nil {
-					return stacktrace.Propagate(err, "")
-				}
-				pass, err := document.Where(query.Where)
-				if err != nil {
-					return stacktrace.Propagate(err, "")
-				}
-				if pass {
-					results = append(results, document)
-				}
-				return nil
-			})
+			bits, err := item.Value()
+			if err != nil {
+				return stacktrace.Propagate(err, "")
+			}
+			document, err := core.NewDocumentFromBytes(bits)
+			if err != nil {
+				return stacktrace.Propagate(err, "")
+			}
+			pass, err := document.Where(query.Where)
+			if err != nil {
+				return stacktrace.Propagate(err, "")
+			}
+			if pass {
+				results = append(results, document)
+			}
 			if err != nil {
 				return stacktrace.Propagate(err, "")
 			}
@@ -177,26 +175,22 @@ func (d defaultStore) aggregateCollection(ctx context.Context, collection *core.
 
 func (d defaultStore) getAllCollection(ctx context.Context, collection *core.Collection, ids []string) (core.Documents, error) {
 	var documents []*core.Document
-	if err := d.kv.View(func(txn *badger.Txn) error {
+	if err := d.kv.Tx(false, func(txn kv.Tx) error {
 		for _, id := range ids {
 			pkey, err := collection.GetPrimaryKeyRef(id)
 			if err != nil {
 				return stacktrace.PropagateWithCode(err, errors.ErrTODO, "failed to get document %s/%s primary key ref", collection.Collection(), id)
 			}
-			item, err := txn.Get(pkey)
+			value, err := txn.Get(pkey)
 			if err != nil {
 				return stacktrace.Propagate(err, "")
 			}
-			if err := item.Value(func(val []byte) error {
-				document, err := core.NewDocumentFromBytes(val)
-				if err != nil {
-					return stacktrace.Propagate(err, "")
-				}
-				documents = append(documents, document)
-				return nil
-			}); err != nil {
+
+			document, err := core.NewDocumentFromBytes(value)
+			if err != nil {
 				return stacktrace.Propagate(err, "")
 			}
+			documents = append(documents, document)
 		}
 		return nil
 	}); err != nil {
@@ -213,15 +207,16 @@ func (d defaultStore) getCollection(ctx context.Context, collection *core.Collec
 	if err != nil {
 		return nil, stacktrace.PropagateWithCode(err, errors.ErrTODO, "failed to get document %s/%s primary key ref", collection.Collection(), id)
 	}
-	if err := d.kv.View(func(txn *badger.Txn) error {
-		item, err := txn.Get(pkey)
+	if err := d.kv.Tx(false, func(txn kv.Tx) error {
+		val, err := txn.Get(pkey)
 		if err != nil {
 			return stacktrace.Propagate(err, "")
 		}
-		return item.Value(func(val []byte) error {
-			document, err = core.NewDocumentFromBytes(val)
+		document, err = core.NewDocumentFromBytes(val)
+		if err != nil {
 			return stacktrace.Propagate(err, "")
-		})
+		}
+		return nil
 	}); err != nil {
 		return document, err
 	}
@@ -229,7 +224,7 @@ func (d defaultStore) getCollection(ctx context.Context, collection *core.Collec
 }
 
 func (d defaultStore) persistCollection(ctx context.Context, collection *core.Collection, change core.StateChange) error {
-	txn := d.kv.NewWriteBatch()
+	txn := d.kv.Batch()
 	var batch *bleve.Batch
 	if collection == nil {
 		return stacktrace.NewErrorWithCode(errors.ErrTODO, "null collection schema")
@@ -310,7 +305,7 @@ type singleChange struct {
 	after  *core.Document
 }
 
-func (d defaultStore) indexDocument(ctx context.Context, txn *badger.WriteBatch, batch *bleve.Batch, collection *core.Collection, change *singleChange) error {
+func (d defaultStore) indexDocument(ctx context.Context, txn kv.Batch, batch *bleve.Batch, collection *core.Collection, change *singleChange) error {
 	if change.docId == "" {
 		return stacktrace.NewErrorWithCode(errors.ErrTODO, "empty document id")
 	}
@@ -355,7 +350,7 @@ func (d defaultStore) indexDocument(ctx context.Context, txn *badger.WriteBatch,
 	return nil
 }
 
-func (d defaultStore) updateSecondaryIndex(ctx context.Context, txn *badger.WriteBatch, collection *core.Collection, idx *core.Index, change *singleChange) error {
+func (d defaultStore) updateSecondaryIndex(ctx context.Context, txn kv.Batch, collection *core.Collection, idx *core.Index, change *singleChange) error {
 	switch change.action {
 	case core.Delete:
 		pindex := prefix.NewPrefixedIndex(collection.Collection(), idx.Fields)
@@ -398,37 +393,38 @@ func (d defaultStore) queryCollection(ctx context.Context, collection *core.Coll
 		return core.Page{}, stacktrace.Propagate(err, "")
 	}
 	var results []*core.Document
-	if err := d.kv.View(func(txn *badger.Txn) error {
-		opts := badger.DefaultIteratorOptions
-		opts.PrefetchValues = true
-		opts.PrefetchSize = 10
-		opts.Prefix = index.Ref.GetPrefix(core.IndexableFields(query.Where, query.OrderBy), "")
-		seek := opts.Prefix
-
+	if err := d.kv.Tx(false, func(txn kv.Tx) error {
+		opts := kv.IterOpts{
+			Prefix:  index.Ref.GetPrefix(core.IndexableFields(query.Where, query.OrderBy), ""),
+			Seek:    nil,
+			Reverse: false,
+		}
 		if query.OrderBy.Direction == core.DESC {
 			opts.Reverse = true
-			seek = prefix.PrefixNextKey(opts.Prefix)
+			opts.Seek = prefix.PrefixNextKey(opts.Prefix)
+		} else {
+			opts.Seek = opts.Prefix
 		}
 		it := txn.NewIterator(opts)
-		it.Seek(seek)
 		defer it.Close()
-		for it.ValidForPrefix(opts.Prefix) {
+		for it.Valid() {
 			item := it.Item()
-			err := item.Value(func(bits []byte) error {
-				document, err := core.NewDocumentFromBytes(bits)
-				if err != nil {
-					return stacktrace.Propagate(err, "")
-				}
-				pass, err := document.Where(query.Where)
-				if err != nil {
-					return stacktrace.Propagate(err, "")
-				}
-				if !pass {
-					return nil
-				}
-				results = append(results, document)
+			bits, err := item.Value()
+			if err != nil {
+				return stacktrace.Propagate(err, "")
+			}
+			document, err := core.NewDocumentFromBytes(bits)
+			if err != nil {
+				return stacktrace.Propagate(err, "")
+			}
+			pass, err := document.Where(query.Where)
+			if err != nil {
+				return stacktrace.Propagate(err, "")
+			}
+			if !pass {
 				return nil
-			})
+			}
+			results = append(results, document)
 			if err != nil {
 				return stacktrace.Propagate(err, "")
 			}
@@ -601,29 +597,65 @@ func (d defaultStore) searchCollection(ctx context.Context, collection *core.Col
 	}, nil
 }
 
+func (d defaultStore) forEach(ctx context.Context, collection *core.Collection, where []core.Where, reverse bool, fn func(d *core.Document) (bool, error)) error {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	index, err := collection.OptimizeIndex(where, core.OrderBy{})
+	if err != nil {
+		return stacktrace.Propagate(err, "")
+	}
+	if err := d.kv.Tx(false, func(txn kv.Tx) error {
+		opts := kv.IterOpts{
+			Prefix:  index.Ref.GetPrefix(core.IndexableFields(where, core.OrderBy{}), ""),
+			Seek:    nil,
+			Reverse: false,
+		}
+		if reverse {
+			opts.Reverse = true
+			opts.Seek = prefix.PrefixNextKey(opts.Prefix)
+		} else {
+			opts.Seek = opts.Prefix
+		}
+		it := txn.NewIterator(opts)
+		defer it.Close()
+		for it.Valid() {
+			item := it.Item()
+			bits, err := item.Value()
+			if err != nil {
+				return stacktrace.Propagate(err, "")
+			}
+			document, err := core.NewDocumentFromBytes(bits)
+			if err != nil {
+				return stacktrace.Propagate(err, "")
+			}
+			pass, err := document.Where(where)
+			if err != nil {
+				return stacktrace.Propagate(err, "")
+			}
+			if pass {
+				shouldContinue, err := fn(document)
+				if err != nil {
+					return stacktrace.Propagate(err, "")
+				}
+				if !shouldContinue {
+					return nil
+				}
+			}
+
+			it.Next()
+		}
+		return nil
+	}); err != nil {
+		return stacktrace.Propagate(err, "")
+	}
+	return nil
+}
+
 func (d defaultStore) closeAll(ctx context.Context) error {
 	for _, i := range d.fullText {
 		if err := i.Close(); err != nil {
 			return stacktrace.Propagate(err, "")
 		}
 	}
-	if err := d.kv.Sync(); err != nil {
-		return stacktrace.Propagate(err, "")
-	}
 	return stacktrace.Propagate(d.kv.Close(), "")
-}
-
-func (d defaultStore) backup(ctx context.Context, w io.Writer, since uint64) error {
-	_, err := d.kv.Backup(w, since)
-	if err != nil {
-		return stacktrace.Propagate(err, "failed backup")
-	}
-	return nil
-}
-
-func (d defaultStore) restore(ctx context.Context, r io.Reader) error {
-	if err := d.kv.Load(r, 256); err != nil {
-		return stacktrace.Propagate(err, "")
-	}
-	return nil
 }
