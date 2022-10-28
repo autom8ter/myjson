@@ -85,7 +85,9 @@ func TestDB(fn func(ctx context.Context, db *wolverine.DB), collections ...*core
 	defer cancel()
 
 	db, err := wolverine.New(ctx, wolverine.Config{
-		StoragePath: dir,
+		Params: map[string]string{
+			"storage_path": dir,
+		},
 		Collections: collections,
 	})
 	if err != nil {

@@ -10,23 +10,21 @@ import (
 
 func TestCollection(t *testing.T) {
 	assert.Nil(t, testutil.TestDB(func(ctx context.Context, db *wolverine.DB) {
-		assert.Nil(t, db.Collection(ctx, "user", func(collection *wolverine.Collection) error {
-			t.Run("schema", func(t *testing.T) {
-				assert.NotNil(t, collection.Schema())
-			})
-			t.Run("db", func(t *testing.T) {
-				assert.NotNil(t, collection.DB())
-			})
-			t.Run("schema primary query index", func(t *testing.T) {
-				assert.NotNil(t, collection.Schema().PrimaryIndex())
-			})
-			t.Run("schema not empty", func(t *testing.T) {
-				assert.NotEmpty(t, collection.Schema())
-			})
-			t.Run("schema name not empty", func(t *testing.T) {
-				assert.NotEmpty(t, collection.Schema().Collection())
-			})
-			return nil
-		}))
+		collection := db.Collection("user")
+		t.Run("schema", func(t *testing.T) {
+			assert.NotNil(t, collection.Schema())
+		})
+		t.Run("db", func(t *testing.T) {
+			assert.NotNil(t, collection.DB())
+		})
+		t.Run("schema primary query index", func(t *testing.T) {
+			assert.NotNil(t, collection.Schema().PrimaryIndex())
+		})
+		t.Run("schema not empty", func(t *testing.T) {
+			assert.NotEmpty(t, collection.Schema())
+		})
+		t.Run("schema name not empty", func(t *testing.T) {
+			assert.NotEmpty(t, collection.Schema().Collection())
+		})
 	}))
 }

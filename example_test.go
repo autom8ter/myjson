@@ -1,7 +1,6 @@
 package wolverine_test
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"github.com/autom8ter/wolverine"
@@ -12,18 +11,11 @@ import (
 
 func getDB() *wolverine.DB {
 	config := wolverine.Config{
-		StoragePath: "",
+		Params: map[string]string{
+			"provider":     "default",
+			"storage_path": "./db",
+		},
 		Collections: testutil.AllCollections,
-		// add as many custom middlewares as needed
-		Middlewares: []core.Middleware{{
-			Persist:      []core.PersistWare{},
-			Aggregate:    []core.AggregateWare{},
-			Search:       []core.SearchWare{},
-			Query:        []core.QueryWare{},
-			Get:          []core.GetWare{},
-			GetAll:       []core.GetAllWare{},
-			ChangeStream: []core.ChangeStreamWare{},
-		}},
 	}
 	db, err := wolverine.New(context.Background(), config)
 	if err != nil {
@@ -126,7 +118,7 @@ func ExampleNew() {
 }`
 	userSchema := core.NewCollectionFromBytesP([]byte(schema))
 	db, err := wolverine.New(context.Background(), wolverine.Config{
-		StoragePath: "",
+		Params:      map[string]string{},
 		Collections: []*core.Collection{userSchema},
 	})
 	if err != nil {
@@ -137,24 +129,6 @@ func ExampleNew() {
 
 	// Output:
 	// user
-}
-
-func ExampleDB_Backup() {
-	db := getDB()
-	buffer := bytes.NewBuffer(nil)
-	err := db.Backup(context.Background(), buffer)
-	if err != nil {
-		panic(err)
-	}
-}
-
-func ExampleDB_Restore() {
-	db := getDB()
-	buffer := bytes.NewBuffer(nil)
-	err := db.Restore(context.Background(), buffer)
-	if err != nil {
-		panic(err)
-	}
 }
 
 func ExampleDB_Close() {
@@ -173,24 +147,9 @@ func ExampleDB_HasCollection() {
 
 func ExampleDB_Collection() {
 	db := getDB()
+	collection := db.Collection("user")
 	ctx := context.Background()
-	if err := db.Collection(ctx, "user", func(collection *wolverine.Collection) error {
-		if err := collection.Set(ctx, testutil.NewUserDoc()); err != nil {
-			panic(err)
-		}
-		return nil
-	}); err != nil {
-		panic(err)
-	}
-}
-
-func ExampleDB_Collections() {
-	db := getDB()
-	ctx := context.Background()
-	if err := db.Collections(ctx, func(collection *wolverine.Collection) error {
-		fmt.Println(collection.Schema().Collection())
-		return nil
-	}); err != nil {
+	if err := collection.Set(ctx, testutil.NewUserDoc()); err != nil {
 		panic(err)
 	}
 }
