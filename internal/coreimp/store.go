@@ -248,12 +248,11 @@ func (d defaultStore) persistCollection(ctx context.Context, collection *core.Co
 			if err != nil {
 				return stacktrace.Propagate(err, "")
 			}
-			if err := d.indexDocument(ctx, txn, batch, &singleChange{
-				collection: collection,
-				action:     core.Update,
-				docId:      id,
-				before:     before,
-				after:      after,
+			if err := d.indexDocument(ctx, txn, batch, collection, &singleChange{
+				action: core.Update,
+				docId:  id,
+				before: before,
+				after:  after,
 			}); err != nil {
 				return stacktrace.Propagate(err, "")
 			}
@@ -261,12 +260,11 @@ func (d defaultStore) persistCollection(ctx context.Context, collection *core.Co
 	}
 	for _, id := range change.Deletes {
 		before, _ := d.getCollection(ctx, collection, id)
-		if err := d.indexDocument(ctx, txn, batch, &singleChange{
-			collection: collection,
-			action:     core.Delete,
-			docId:      id,
-			before:     before,
-			after:      nil,
+		if err := d.indexDocument(ctx, txn, batch, collection, &singleChange{
+			action: core.Delete,
+			docId:  id,
+			before: before,
+			after:  nil,
 		}); err != nil {
 			return stacktrace.Propagate(err, "")
 		}
@@ -280,12 +278,11 @@ func (d defaultStore) persistCollection(ctx context.Context, collection *core.Co
 			return stacktrace.NewErrorWithCode(errors.ErrTODO, "document missing primary key %s", collection.PrimaryKey())
 		}
 		before, _ := d.getCollection(ctx, collection, docId)
-		if err := d.indexDocument(ctx, txn, batch, &singleChange{
-			collection: collection,
-			action:     core.Set,
-			docId:      docId,
-			before:     before,
-			after:      after,
+		if err := d.indexDocument(ctx, txn, batch, collection, &singleChange{
+			action: core.Set,
+			docId:  docId,
+			before: before,
+			after:  after,
 		}); err != nil {
 			return stacktrace.Propagate(err, "")
 		}
@@ -307,23 +304,22 @@ func (d defaultStore) persistCollection(ctx context.Context, collection *core.Co
 }
 
 type singleChange struct {
-	collection *core.Collection
-	action     core.Action
-	docId      string
-	before     *core.Document
-	after      *core.Document
+	action core.Action
+	docId  string
+	before *core.Document
+	after  *core.Document
 }
 
-func (d defaultStore) indexDocument(ctx context.Context, txn *badger.WriteBatch, batch *bleve.Batch, change *singleChange) error {
+func (d defaultStore) indexDocument(ctx context.Context, txn *badger.WriteBatch, batch *bleve.Batch, collection *core.Collection, change *singleChange) error {
 	if change.docId == "" {
 		return stacktrace.NewErrorWithCode(errors.ErrTODO, "empty document id")
 	}
-	pkey, err := change.collection.GetPrimaryKeyRef(change.docId)
+	pkey, err := collection.GetPrimaryKeyRef(change.docId)
 	if err != nil {
-		return stacktrace.PropagateWithCode(err, errors.ErrTODO, "failed to get document %s/%s primary key ref", change.collection.Collection(), change.docId)
+		return stacktrace.PropagateWithCode(err, errors.ErrTODO, "failed to get document %s/%s primary key ref", collection.Collection(), change.docId)
 	}
-	for _, i := range change.collection.Indexing().Indexes {
-		if err := d.updateSecondaryIndex(ctx, txn, i, change); err != nil {
+	for _, i := range collection.Indexing().Indexes {
+		if err := d.updateSecondaryIndex(ctx, txn, collection, i, change); err != nil {
 			return stacktrace.PropagateWithCode(err, errors.ErrTODO, "")
 		}
 	}
@@ -339,10 +335,10 @@ func (d defaultStore) indexDocument(ctx context.Context, txn *badger.WriteBatch,
 			batch.Delete(change.docId)
 		}
 	case core.Set, core.Update:
-		if change.collection.GetPrimaryKey(change.after) != change.docId {
-			return stacktrace.NewErrorWithCode(errors.ErrTODO, "document id is immutable: %v -> %v", change.collection.GetPrimaryKey(change.after), change.docId)
+		if collection.GetPrimaryKey(change.after) != change.docId {
+			return stacktrace.NewErrorWithCode(errors.ErrTODO, "document id is immutable: %v -> %v", collection.GetPrimaryKey(change.after), change.docId)
 		}
-		err := change.collection.Validate(ctx, change.after.Bytes())
+		err := collection.Validate(ctx, change.after.Bytes())
 		if err != nil {
 			return stacktrace.Propagate(err, "")
 		}
@@ -359,22 +355,22 @@ func (d defaultStore) indexDocument(ctx context.Context, txn *badger.WriteBatch,
 	return nil
 }
 
-func (d defaultStore) updateSecondaryIndex(ctx context.Context, txn *badger.WriteBatch, idx *core.Index, change *singleChange) error {
+func (d defaultStore) updateSecondaryIndex(ctx context.Context, txn *badger.WriteBatch, collection *core.Collection, idx *core.Index, change *singleChange) error {
 	switch change.action {
 	case core.Delete:
-		pindex := prefix.NewPrefixedIndex(change.collection.Collection(), idx.Fields)
+		pindex := prefix.NewPrefixedIndex(collection.Collection(), idx.Fields)
 		if err := txn.Delete(pindex.GetPrefix(change.before.Value(), change.docId)); err != nil {
 			return stacktrace.Propagate(err, "failed to delete index references")
 		}
 	case core.Set, core.Update:
-		pindex := prefix.NewPrefixedIndex(change.collection.Collection(), idx.Fields)
+		pindex := prefix.NewPrefixedIndex(collection.Collection(), idx.Fields)
 		if change.before != nil && change.before.Valid() {
 			if err := txn.Delete(pindex.GetPrefix(change.before.Value(), change.docId)); err != nil {
 				return stacktrace.PropagateWithCode(
 					err,
 					errors.ErrTODO,
 					"failed to delete document %s/%s index references",
-					change.collection.Collection(),
+					collection.Collection(),
 					change.docId,
 				)
 			}
@@ -385,7 +381,7 @@ func (d defaultStore) updateSecondaryIndex(ctx context.Context, txn *badger.Writ
 				err,
 				errors.ErrTODO,
 				"failed to set document %s/%s index references",
-				change.collection.Collection(),
+				collection.Collection(),
 				change.docId,
 			)
 		}
