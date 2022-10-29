@@ -2,7 +2,6 @@ package wolverine
 
 import (
 	"encoding/json"
-	"github.com/autom8ter/wolverine/errors"
 	"github.com/autom8ter/wolverine/internal/prefix"
 	"github.com/palantir/stacktrace"
 	"github.com/spf13/cast"
@@ -126,7 +125,7 @@ func (c *Collection) PrimaryIndex() *prefix.PrefixIndexRef {
 // GetPrimaryKeyRef gets a reference to the documents primary key in the primary index
 func (c *Collection) GetPrimaryKeyRef(documentID string) ([]byte, error) {
 	if documentID == "" {
-		return nil, stacktrace.NewErrorWithCode(errors.ErrTODO, "empty document id for property: %s", c.PrimaryKey())
+		return nil, stacktrace.NewErrorWithCode(ErrTODO, "empty document id for property: %s", c.PrimaryKey())
 	}
 	return c.PrimaryIndex().GetPrefix(map[string]any{
 		c.PrimaryKey(): documentID,
@@ -182,5 +181,8 @@ func (c *Collection) getIndex(whereFields []string, orderBy string) (IndexMatch,
 
 // GetPrimaryKey gets the documents primary key(if it exists)
 func (c *Collection) GetPrimaryKey(d *Document) string {
+	if d == nil {
+		return ""
+	}
 	return cast.ToString(d.Get(c.PrimaryKey()))
 }

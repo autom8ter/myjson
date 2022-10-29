@@ -26,8 +26,6 @@ func Test(t *testing.T) {
 			assert.True(t, db.HasCollection("user"))
 			assert.True(t, db.HasCollection("task"))
 			assert.False(t, db.HasCollection("zebras"))
-			hasUser := false
-			assert.True(t, hasUser)
 		}))
 	})
 	t.Run("create", func(t *testing.T) {
@@ -90,13 +88,6 @@ func Test(t *testing.T) {
 			timer := timer()
 			defer timer(t)
 			assert.Nil(t, collection.Reindex(ctx))
-		})
-		t.Run("get all", func(t *testing.T) {
-			timer := timer()
-			defer timer(t)
-			allUsrs, err := collection.GetAll(ctx, ids)
-			assert.Nil(t, err)
-			assert.Equal(t, 100, len(allUsrs))
 		})
 		t.Run("get each", func(t *testing.T) {
 			timer := timer()

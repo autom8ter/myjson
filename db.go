@@ -4,7 +4,6 @@ import (
 	"context"
 	_ "embed"
 	"github.com/autom8ter/machine/v4"
-	"github.com/autom8ter/wolverine/errors"
 	"github.com/autom8ter/wolverine/kv"
 	"github.com/autom8ter/wolverine/kv/badger"
 	"github.com/palantir/stacktrace"
@@ -17,7 +16,8 @@ import (
 
 // Config configures a database instance
 type Config struct {
-	Params map[string]string `json:"params"`
+	Provider string            `json:"provider"`
+	Params   map[string]string `json:"params"`
 	// Collections are the json document collections supported by the DB - At least one is required.
 	Collections []*Collection `json:"collections"`
 	// Middlewares are middlewares to apply to the database instance
@@ -50,7 +50,7 @@ type DB struct {
 // engine needs to be swapped out.
 func NewFromCore(ctx context.Context, cfg Config, c CoreAPI) (*DB, error) {
 	if len(cfg.Collections) == 0 {
-		return nil, stacktrace.NewErrorWithCode(errors.ErrTODO, "zero collections configured")
+		return nil, stacktrace.NewErrorWithCode(ErrTODO, "zero collections configured")
 	}
 	d := &DB{
 		config:  cfg,
@@ -78,13 +78,13 @@ func New(ctx context.Context, cfg Config) (*DB, error) {
 		db  kv.DB
 		err error
 	)
-	switch cfg.Params["provider"] {
+	switch cfg.Provider {
 	default:
 		db, err = badger.New(cfg.Params["storage_path"])
 	}
 	rcore, err := NewCore(db, cfg.Collections)
 	if err != nil {
-		return nil, stacktrace.NewErrorWithCode(errors.ErrTODO, "failed to configure core provider")
+		return nil, stacktrace.NewErrorWithCode(ErrTODO, "failed to configure core provider")
 	}
 	return NewFromCore(ctx, cfg, rcore)
 }
@@ -168,27 +168,10 @@ func (c *DBCollection) Get(ctx context.Context, id string) (*Document, error) {
 	}); err != nil {
 		return nil, stacktrace.Propagate(err, "")
 	}
-	return doc, nil
-}
-
-// GetAll gets all documents by ids
-func (c *DBCollection) GetAll(ctx context.Context, ids []string) ([]*Document, error) {
-	var docs = make([]*Document, len(ids))
-	if err := c.db.core.Scan(ctx, c.schema, Scan{
-		Filter: []Where{
-			{
-				Field: c.schema.PrimaryKey(),
-				Op:    In,
-				Value: ids,
-			},
-		},
-	}, func(d *Document) (bool, error) {
-		docs = append(docs, d)
-		return false, nil
-	}); err != nil {
-		return nil, stacktrace.Propagate(err, "")
+	if doc == nil {
+		return nil, stacktrace.NewErrorWithCode(ErrTODO, "%s not found", id)
 	}
-	return docs, nil
+	return doc, nil
 }
 
 // QueryPaginate paginates through each page of the query until the handlePage function returns false or there are no more results
@@ -404,8 +387,8 @@ func (c *DBCollection) Reindex(ctx context.Context) error {
 }
 
 // Transform executes a transformation which is basically ETL from one collection to another
-func (c *DBCollection) Transform(ctx context.Context, transformation ETL) error {
-	if transformation.Transformer == nil {
+func (c *DBCollection) Transform(ctx context.Context, transformation ETL, handler ETLFunc) error {
+	if handler == nil {
 		return stacktrace.NewError("empty transformer")
 	}
 	if transformation.OutputCollection == "" {
@@ -415,7 +398,7 @@ func (c *DBCollection) Transform(ctx context.Context, transformation ETL) error 
 	if err != nil {
 		return stacktrace.Propagate(err, "")
 	}
-	res.Documents, err = transformation.Transformer(ctx, res.Documents)
+	res.Documents, err = handler(ctx, res.Documents)
 	if err != nil {
 		return stacktrace.Propagate(err, "")
 	}

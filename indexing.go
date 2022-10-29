@@ -6,8 +6,7 @@ import (
 
 // Indexing
 type Indexing struct {
-	SearchEnabled bool     `json:"searchEnabled"`
-	Indexes       []*Index `json:"indexes"`
+	Indexes []*Index `json:"indexes"`
 }
 
 func (i Indexing) HasIndexes() bool {

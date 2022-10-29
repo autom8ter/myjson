@@ -3,7 +3,6 @@ package wolverine
 import (
 	"context"
 	"github.com/autom8ter/machine/v4"
-	"github.com/autom8ter/wolverine/errors"
 	"github.com/autom8ter/wolverine/internal/prefix"
 	"github.com/autom8ter/wolverine/kv"
 	"github.com/palantir/stacktrace"
@@ -150,7 +149,7 @@ func (d coreImplementation) getAllCollection(ctx context.Context, collection *Co
 		for _, id := range ids {
 			pkey, err := collection.GetPrimaryKeyRef(id)
 			if err != nil {
-				return stacktrace.PropagateWithCode(err, errors.ErrTODO, "failed to get document %s/%s primary key ref", collection.Collection(), id)
+				return stacktrace.PropagateWithCode(err, ErrTODO, "failed to get document %s/%s primary key ref", collection.Collection(), id)
 			}
 			value, err := txn.Get(pkey)
 			if err != nil {
@@ -176,7 +175,7 @@ func (d coreImplementation) getCollection(ctx context.Context, collection *Colle
 	)
 	pkey, err := collection.GetPrimaryKeyRef(id)
 	if err != nil {
-		return nil, stacktrace.PropagateWithCode(err, errors.ErrTODO, "failed to get document %s/%s primary key ref", collection.Collection(), id)
+		return nil, stacktrace.PropagateWithCode(err, ErrTODO, "failed to get document %s/%s primary key ref", collection.Collection(), id)
 	}
 	if err := d.kv.Tx(false, func(txn kv.Tx) error {
 		val, err := txn.Get(pkey)
@@ -197,7 +196,7 @@ func (d coreImplementation) getCollection(ctx context.Context, collection *Colle
 func (d coreImplementation) Persist(ctx context.Context, collection *Collection, change StateChange) error {
 	txn := d.kv.Batch()
 	if collection == nil {
-		return stacktrace.NewErrorWithCode(errors.ErrTODO, "null collection schema")
+		return stacktrace.NewErrorWithCode(ErrTODO, "null collection schema")
 	}
 	if change.Updates != nil {
 		for id, edit := range change.Updates {
@@ -233,11 +232,11 @@ func (d coreImplementation) Persist(ctx context.Context, collection *Collection,
 	}
 	for _, after := range change.Sets {
 		if !after.Valid() {
-			return stacktrace.NewErrorWithCode(errors.ErrTODO, "invalid json document")
+			return stacktrace.NewErrorWithCode(ErrTODO, "invalid json document")
 		}
 		docId := collection.GetPrimaryKey(after)
 		if docId == "" {
-			return stacktrace.NewErrorWithCode(errors.ErrTODO, "document missing primary key %s", collection.PrimaryKey())
+			return stacktrace.NewErrorWithCode(ErrTODO, "document missing primary key %s", collection.PrimaryKey())
 		}
 		before, _ := d.getCollection(ctx, collection, docId)
 		if err := d.indexDocument(ctx, txn, collection, &singleChange{
@@ -268,15 +267,15 @@ type singleChange struct {
 
 func (d coreImplementation) indexDocument(ctx context.Context, txn kv.Batch, collection *Collection, change *singleChange) error {
 	if change.docId == "" {
-		return stacktrace.NewErrorWithCode(errors.ErrTODO, "empty document id")
+		return stacktrace.NewErrorWithCode(ErrTODO, "empty document id")
 	}
 	pkey, err := collection.GetPrimaryKeyRef(change.docId)
 	if err != nil {
-		return stacktrace.PropagateWithCode(err, errors.ErrTODO, "failed to get document %s/%s primary key ref", collection.Collection(), change.docId)
+		return stacktrace.PropagateWithCode(err, ErrTODO, "failed to get document %s/%s primary key ref", collection.Collection(), change.docId)
 	}
 	for _, i := range collection.Indexing().Indexes {
 		if err := d.updateSecondaryIndex(ctx, txn, collection, i, change); err != nil {
-			return stacktrace.PropagateWithCode(err, errors.ErrTODO, "")
+			return stacktrace.PropagateWithCode(err, ErrTODO, "")
 		}
 	}
 	switch change.action {
@@ -289,7 +288,7 @@ func (d coreImplementation) indexDocument(ctx context.Context, txn kv.Batch, col
 		}
 	case Set, Update:
 		if collection.GetPrimaryKey(change.after) != change.docId {
-			return stacktrace.NewErrorWithCode(errors.ErrTODO, "document id is immutable: %v -> %v", collection.GetPrimaryKey(change.after), change.docId)
+			return stacktrace.NewErrorWithCode(ErrTODO, "document id is immutable: %v -> %v", collection.GetPrimaryKey(change.after), change.docId)
 		}
 		err := collection.Validate(ctx, change.after.Bytes())
 		if err != nil {
@@ -297,7 +296,7 @@ func (d coreImplementation) indexDocument(ctx context.Context, txn kv.Batch, col
 		}
 
 		if err := txn.Set(pkey, change.after.Bytes()); err != nil {
-			return stacktrace.PropagateWithCode(err, errors.ErrTODO, "failed to batch set documents to primary index")
+			return stacktrace.PropagateWithCode(err, ErrTODO, "failed to batch set documents to primary index")
 		}
 	}
 	return nil
@@ -316,7 +315,7 @@ func (d coreImplementation) updateSecondaryIndex(ctx context.Context, txn kv.Bat
 			if err := txn.Delete(pindex.GetPrefix(change.before.Value(), change.docId)); err != nil {
 				return stacktrace.PropagateWithCode(
 					err,
-					errors.ErrTODO,
+					ErrTODO,
 					"failed to delete document %s/%s index references",
 					collection.Collection(),
 					change.docId,
@@ -327,7 +326,7 @@ func (d coreImplementation) updateSecondaryIndex(ctx context.Context, txn kv.Bat
 		if err := txn.Set(i, change.after.Bytes()); err != nil {
 			return stacktrace.PropagateWithCode(
 				err,
-				errors.ErrTODO,
+				ErrTODO,
 				"failed to set document %s/%s index references",
 				collection.Collection(),
 				change.docId,

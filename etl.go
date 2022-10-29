@@ -2,10 +2,9 @@ package wolverine
 
 import "context"
 
-type Transformer func(ctx context.Context, docs []*Document) ([]*Document, error)
+type ETLFunc func(ctx context.Context, docs Documents) (Documents, error)
 
 type ETL struct {
 	OutputCollection string
 	Query            Query
-	Transformer      Transformer
 }

@@ -1,4 +1,4 @@
-package errors
+package wolverine
 
 import "github.com/palantir/stacktrace"
 
