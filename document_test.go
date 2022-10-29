@@ -3,7 +3,6 @@ package wolverine_test
 import (
 	"encoding/json"
 	"github.com/autom8ter/wolverine"
-	"github.com/autom8ter/wolverine/internal/testutil"
 	"github.com/brianvoe/gofakeit/v6"
 	"github.com/stretchr/testify/assert"
 	"testing"
@@ -254,9 +253,9 @@ func TestDocument(t *testing.T) {
 	})
 	t.Run("results", func(t *testing.T) {
 		var docs = []*wolverine.Document{
-			testutil.NewUserDoc(),
-			testutil.NewUserDoc(),
-			testutil.NewUserDoc(),
+			wolverine.NewUserDoc(),
+			wolverine.NewUserDoc(),
+			wolverine.NewUserDoc(),
 		}
 		result := wolverine.Page{
 			Documents: docs,
@@ -270,7 +269,7 @@ func TestDocument(t *testing.T) {
 
 func BenchmarkDocument(b *testing.B) {
 	b.ReportAllocs()
-	doc := testutil.NewUserDoc()
+	doc := wolverine.NewUserDoc()
 
 	// BenchmarkDocument/set-12             	  545349	      2145 ns/op	    1744 B/op	       7 allocs/op
 	b.Run("set", func(b *testing.B) {

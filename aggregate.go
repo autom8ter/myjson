@@ -43,15 +43,16 @@ func (a AggregateQuery) String() string {
 	return string(bits)
 }
 
-func ApplyReducers(ctx context.Context, a AggregateQuery, documents []*Document) (*Document, error) {
+// Aggregate
+func (d Documents) Aggregate(ctx context.Context, aggregates []Aggregate) (*Document, error) {
 	var (
 		aggregated *Document
 	)
-	for _, next := range documents {
+	for _, next := range d {
 		if aggregated == nil || !aggregated.Valid() {
 			aggregated = next
 		}
-		for _, agg := range a.Aggregates {
+		for _, agg := range aggregates {
 			if agg.Alias == "" {
 				return nil, stacktrace.NewError("empty aggregate alias: %s/%s", agg.Field, agg.Function)
 			}

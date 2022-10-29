@@ -8,8 +8,6 @@ import (
 type CoreAPI interface {
 	//  Persist persists changes to a collection
 	Persist(ctx context.Context, collection *Collection, change StateChange) error
-	// Aggregate aggregates documents in the database
-	Aggregate(ctx context.Context, collection *Collection, query AggregateQuery) (Page, error)
 	// Query queries for documents
 	Query(ctx context.Context, collection *Collection, query Query) (Page, error)
 	// Scan scans the collection applying the scanner function to each matching document

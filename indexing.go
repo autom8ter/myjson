@@ -1,7 +1,7 @@
 package wolverine
 
 import (
-	"github.com/autom8ter/wolverine/internal/prefix"
+	"github.com/autom8ter/wolverine/prefix"
 )
 
 // Indexing

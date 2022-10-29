@@ -89,6 +89,11 @@ func New(ctx context.Context, cfg Config) (*DB, error) {
 	return NewFromCore(ctx, cfg, rcore)
 }
 
+// Core returns the CoreAPI instance powering the database
+func (d *DB) Core() CoreAPI {
+	return d.core
+}
+
 // Close closes the database
 func (d *DB) Close(ctx context.Context) error {
 	return d.core.Close(ctx)
@@ -329,7 +334,58 @@ func (c *DBCollection) QueryDelete(ctx context.Context, query Query) error {
 
 // Aggregate performs aggregations against the collection
 func (c *DBCollection) Aggregate(ctx context.Context, query AggregateQuery) (Page, error) {
-	return c.db.core.Aggregate(ctx, c.schema, query)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	now := time.Now()
+	index, err := c.schema.OptimizeIndex(query.Where, query.OrderBy)
+	if err != nil {
+		return Page{}, stacktrace.Propagate(err, "")
+	}
+	var results Documents
+	if err := c.db.core.Scan(ctx, c.schema, Scan{
+		Filter:  query.Where,
+		Reverse: query.OrderBy.Direction == DESC,
+	}, func(d *Document) (bool, error) {
+		results = append(results, d)
+		return true, nil
+	}); err != nil {
+		return Page{}, stacktrace.Propagate(err, "")
+	}
+	var reduced Documents
+	for _, values := range results.GroupBy(query.GroupBy) {
+		value, err := values.Aggregate(ctx, query.Aggregates)
+		if err != nil {
+			return Page{}, stacktrace.Propagate(err, "")
+		}
+		reduced = append(reduced, value)
+	}
+	reduced = reduced.OrderBy(query.OrderBy)
+	if query.Limit > 0 && query.Page > 0 {
+		reduced = lo.Slice(reduced, query.Limit*query.Page, (query.Limit*query.Page)+query.Limit)
+	}
+	if query.Limit > 0 && len(reduced) > query.Limit {
+		reduced = reduced[:query.Limit]
+	}
+
+	return Page{
+		Documents: reduced.Map(func(t *Document, i int) *Document {
+			toSelect := query.GroupBy
+			for _, a := range query.Aggregates {
+				toSelect = append(toSelect, a.Alias)
+			}
+			err := t.Select(toSelect)
+			if err != nil {
+				//	return Page{}, stacktrace.Propagate(err, "")
+			}
+			return t
+		}),
+		NextPage: query.Page + 1,
+		Count:    len(reduced),
+		Stats: PageStats{
+			ExecutionTime: time.Since(now),
+			IndexMatch:    index,
+		},
+	}, nil
 }
 
 // Reindex the collection

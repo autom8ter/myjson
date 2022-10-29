@@ -1,4 +1,4 @@
-package testutil
+package wolverine
 
 import (
 	"context"
@@ -9,33 +9,32 @@ import (
 	"github.com/brianvoe/gofakeit/v6"
 
 	_ "embed"
-	"github.com/autom8ter/wolverine"
 )
 
 func init() {
 	var err error
-	UserCollection, err = wolverine.NewCollectionFromBytes([]byte(userSchema))
+	UserCollection, err = NewCollectionFromBytes([]byte(userSchema))
 	if err != nil {
 		panic(err)
 	}
-	TaskCollection, err = wolverine.NewCollectionFromBytes([]byte(taskSchema))
+	TaskCollection, err = NewCollectionFromBytes([]byte(taskSchema))
 	if err != nil {
 		panic(err)
 	}
 }
 
 var (
-	//go:embed user.json
+	//go:embed testdata/user.json
 	userSchema string
-	//go:embed task.json
+	//go:embed testdata/task.json
 	taskSchema     string
-	TaskCollection = wolverine.NewCollectionFromBytesP([]byte(taskSchema))
-	UserCollection = wolverine.NewCollectionFromBytesP([]byte(userSchema))
-	AllCollections = []*wolverine.Collection{UserCollection, TaskCollection}
+	TaskCollection = NewCollectionFromBytesP([]byte(taskSchema))
+	UserCollection = NewCollectionFromBytesP([]byte(userSchema))
+	AllCollections = []*Collection{UserCollection, TaskCollection}
 )
 
-func NewUserDoc() *wolverine.Document {
-	doc, err := wolverine.NewDocumentFrom(map[string]interface{}{
+func NewUserDoc() *Document {
+	doc, err := NewDocumentFrom(map[string]interface{}{
 		"_id":  gofakeit.UUID(),
 		"name": gofakeit.Name(),
 		"contact": map[string]interface{}{
@@ -56,8 +55,8 @@ func NewUserDoc() *wolverine.Document {
 	return doc
 }
 
-func NewTaskDoc(usrID string) *wolverine.Document {
-	doc, err := wolverine.NewDocumentFrom(map[string]interface{}{
+func NewTaskDoc(usrID string) *Document {
+	doc, err := NewDocumentFrom(map[string]interface{}{
 		"_id":     gofakeit.UUID(),
 		"user":    usrID,
 		"content": gofakeit.LoremIpsumSentence(5),
@@ -70,7 +69,7 @@ func NewTaskDoc(usrID string) *wolverine.Document {
 
 const MyEmail = "colemanword@gmail.com"
 
-func TestDB(fn func(ctx context.Context, db *wolverine.DB), collections ...*wolverine.Collection) error {
+func TestDB(fn func(ctx context.Context, db *DB), collections ...*Collection) error {
 	if len(collections) == 0 {
 		collections = append(collections, AllCollections...)
 	}
@@ -83,7 +82,7 @@ func TestDB(fn func(ctx context.Context, db *wolverine.DB), collections ...*wolv
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	db, err := wolverine.New(ctx, wolverine.Config{
+	db, err := New(ctx, Config{
 		Params: map[string]string{
 			"storage_path": dir,
 		},

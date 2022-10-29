@@ -2,7 +2,7 @@ package prefix_test
 
 import (
 	"bytes"
-	"github.com/autom8ter/wolverine/internal/prefix"
+	"github.com/autom8ter/wolverine/prefix"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )

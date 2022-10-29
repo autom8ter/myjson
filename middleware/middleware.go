@@ -9,7 +9,6 @@ import (
 // Middleware is a set of wrapper functions that alter core functionality
 type Middleware struct {
 	Persist      PersistWare
-	Aggregate    AggregateWare
 	Query        QueryWare
 	ChangeStream ChangeStreamWare
 	Scan         ScanWare
@@ -24,9 +23,6 @@ func applyCoreMiddleware(c wolverine.CoreAPI, m Middleware) wolverine.CoreAPI {
 	wrapped := coreWrapper{}
 	if m.Persist != nil {
 		wrapped.persist = m.Persist(c.Persist)
-	}
-	if m.Aggregate != nil {
-		wrapped.aggregate = m.Aggregate(c.Aggregate)
 	}
 	if m.Query != nil {
 		wrapped.query = m.Query(c.Query)
@@ -45,12 +41,6 @@ type PersistFunc func(ctx context.Context, collection *wolverine.Collection, cha
 
 // PersistWare wraps a PersistFunc and returns a new one
 type PersistWare func(PersistFunc) PersistFunc
-
-// AggregateFunc aggregates documents to a collection
-type AggregateFunc func(ctx context.Context, collection *wolverine.Collection, query wolverine.AggregateQuery) (wolverine.Page, error)
-
-// AggregateWare wraps a AggregateFunc and returns a new one
-type AggregateWare func(AggregateFunc) AggregateFunc
 
 // QueryFunc queries documents in a collection
 type QueryFunc func(ctx context.Context, collection *wolverine.Collection, query wolverine.Query) (wolverine.Page, error)
@@ -75,7 +65,6 @@ type CloseFunc func(ctx context.Context) error
 
 type coreWrapper struct {
 	persist      PersistFunc
-	aggregate    AggregateFunc
 	query        QueryFunc
 	scan         ScanFunc
 	changeStream ChangeStreamFunc
@@ -98,13 +87,6 @@ func (c coreWrapper) Persist(ctx context.Context, collection *wolverine.Collecti
 		return fmt.Errorf("unimplemented")
 	}
 	return c.persist(ctx, collection, change)
-}
-
-func (c coreWrapper) Aggregate(ctx context.Context, collection *wolverine.Collection, query wolverine.AggregateQuery) (wolverine.Page, error) {
-	if c.aggregate == nil {
-		return wolverine.Page{}, fmt.Errorf("unimplemented")
-	}
-	return c.aggregate(ctx, collection, query)
 }
 
 func (c coreWrapper) Query(ctx context.Context, collection *wolverine.Collection, query wolverine.Query) (wolverine.Page, error) {

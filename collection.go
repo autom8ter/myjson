@@ -2,7 +2,7 @@ package wolverine
 
 import (
 	"encoding/json"
-	"github.com/autom8ter/wolverine/internal/prefix"
+	"github.com/autom8ter/wolverine/prefix"
 	"github.com/palantir/stacktrace"
 	"github.com/spf13/cast"
 	"gopkg.in/yaml.v3"

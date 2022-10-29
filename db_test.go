@@ -3,9 +3,7 @@ package wolverine_test
 import (
 	"context"
 	"github.com/autom8ter/wolverine"
-	"github.com/autom8ter/wolverine/internal/testutil"
 	"github.com/brianvoe/gofakeit/v6"
-	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 	"runtime"
 	"sync"
@@ -22,16 +20,16 @@ func timer() func(t *testing.T) {
 
 func Test(t *testing.T) {
 	t.Run("basic collection checks", func(t *testing.T) {
-		assert.Nil(t, testutil.TestDB(func(ctx context.Context, db *wolverine.DB) {
+		assert.Nil(t, wolverine.TestDB(func(ctx context.Context, db *wolverine.DB) {
 			assert.True(t, db.HasCollection("user"))
 			assert.True(t, db.HasCollection("task"))
 			assert.False(t, db.HasCollection("zebras"))
 		}))
 	})
 	t.Run("create", func(t *testing.T) {
-		assert.Nil(t, testutil.TestDB(func(ctx context.Context, db *wolverine.DB) {
+		assert.Nil(t, wolverine.TestDB(func(ctx context.Context, db *wolverine.DB) {
 			collection := db.Collection("user")
-			id, err := collection.Create(ctx, testutil.NewUserDoc())
+			id, err := collection.Create(ctx, wolverine.NewUserDoc())
 			assert.Nil(t, err)
 			u, err := collection.Get(ctx, id)
 			assert.Nil(t, err)
@@ -39,17 +37,17 @@ func Test(t *testing.T) {
 		}))
 	})
 	t.Run("set", func(t *testing.T) {
-		assert.Nil(t, testutil.TestDB(func(ctx context.Context, db *wolverine.DB) {
+		assert.Nil(t, wolverine.TestDB(func(ctx context.Context, db *wolverine.DB) {
 			collection := db.Collection("user")
 			timer := timer()
 			defer timer(t)
 			for i := 0; i < 10; i++ {
-				assert.Nil(t, collection.Set(ctx, testutil.NewUserDoc()))
+				assert.Nil(t, collection.Set(ctx, wolverine.NewUserDoc()))
 			}
 		}))
 	})
 	t.Run("change stream", func(t *testing.T) {
-		assert.Nil(t, testutil.TestDB(func(ctx context.Context, db *wolverine.DB) {
+		assert.Nil(t, wolverine.TestDB(func(ctx context.Context, db *wolverine.DB) {
 			collection := db.Collection("user")
 			wg := sync.WaitGroup{}
 			changes := 0
@@ -64,13 +62,13 @@ func Test(t *testing.T) {
 				}))
 			}()
 			for i := 0; i < 3; i++ {
-				assert.Nil(t, collection.Set(ctx, testutil.NewUserDoc()))
+				assert.Nil(t, collection.Set(ctx, wolverine.NewUserDoc()))
 			}
 			wg.Wait()
 			assert.Equal(t, 3, changes)
 		}))
 	})
-	assert.Nil(t, testutil.TestDB(func(ctx context.Context, db *wolverine.DB) {
+	assert.Nil(t, wolverine.TestDB(func(ctx context.Context, db *wolverine.DB) {
 		collection := db.Collection("user")
 		var usrs []*wolverine.Document
 		var ids []string
@@ -78,7 +76,7 @@ func Test(t *testing.T) {
 			timer := timer()
 			defer timer(t)
 			for i := 0; i < 100; i++ {
-				usr := testutil.NewUserDoc()
+				usr := wolverine.NewUserDoc()
 				ids = append(ids, collection.Schema().GetPrimaryKey(usr))
 				usrs = append(usrs, usr)
 			}
@@ -217,8 +215,8 @@ func Benchmark(b *testing.B) {
 	// Benchmark/set-12         	      22	  47669475 ns/op	  702120 B/op	    4481 allocs/op
 	b.Run("set", func(b *testing.B) {
 		b.ReportAllocs()
-		doc := testutil.NewUserDoc()
-		assert.Nil(b, testutil.TestDB(func(ctx context.Context, db *wolverine.DB) {
+		doc := wolverine.NewUserDoc()
+		assert.Nil(b, wolverine.TestDB(func(ctx context.Context, db *wolverine.DB) {
 			collection := db.Collection("user")
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
@@ -229,8 +227,8 @@ func Benchmark(b *testing.B) {
 	// Benchmark/get-12         	  207938	      5389 ns/op	    4228 B/op	      31 allocs/op
 	b.Run("get", func(b *testing.B) {
 		b.ReportAllocs()
-		doc := testutil.NewUserDoc()
-		assert.Nil(b, testutil.TestDB(func(ctx context.Context, db *wolverine.DB) {
+		doc := wolverine.NewUserDoc()
+		assert.Nil(b, wolverine.TestDB(func(ctx context.Context, db *wolverine.DB) {
 			collection := db.Collection("user")
 			assert.Nil(b, collection.Set(ctx, doc))
 			b.ResetTimer()
@@ -243,13 +241,13 @@ func Benchmark(b *testing.B) {
 	// Benchmark/query-12         	   55064	     20678 ns/op	   15849 B/op	     100 allocs/op
 	b.Run("query", func(b *testing.B) {
 		b.ReportAllocs()
-		doc := testutil.NewUserDoc()
-		assert.Nil(b, testutil.TestDB(func(ctx context.Context, db *wolverine.DB) {
+		doc := wolverine.NewUserDoc()
+		assert.Nil(b, wolverine.TestDB(func(ctx context.Context, db *wolverine.DB) {
 			collection := db.Collection("user")
 			assert.Nil(b, collection.Set(ctx, doc))
 			var docs []*wolverine.Document
 			for i := 0; i < 100; i++ {
-				docs = append(docs, testutil.NewUserDoc())
+				docs = append(docs, wolverine.NewUserDoc())
 			}
 			assert.Nil(b, collection.BatchSet(ctx, docs))
 			b.ResetTimer()
@@ -276,45 +274,13 @@ func Benchmark(b *testing.B) {
 }
 
 func TestAggregate(t *testing.T) {
-	t.Run("sum basic", func(t *testing.T) {
-		assert.Nil(t, testutil.TestDB(func(ctx context.Context, db *wolverine.DB) {
-			var usrs []*wolverine.Document
-			ageSum := float64(0)
-			for i := 0; i < 10; i++ {
-				u := testutil.NewUserDoc()
-				ageSum += u.GetFloat("age")
-				usrs = append(usrs, u)
-			}
-			query := wolverine.AggregateQuery{
-				GroupBy: []string{"account_id"},
-				//Where:      []schema.Where{
-				//	{
-				//
-				//	},
-				//},
-				Aggregates: []wolverine.Aggregate{
-					{
-						Field:    "age",
-						Function: wolverine.SUM,
-						Alias:    "age_sum",
-					},
-				},
-				Page:    0,
-				Limit:   0,
-				OrderBy: wolverine.OrderBy{},
-			}
-			result, err := wolverine.ApplyReducers(ctx, query, usrs)
-			assert.Nil(t, err)
-			assert.Equal(t, ageSum, result.GetFloat("age_sum"))
-		}))
-	})
 	t.Run("sum advanced", func(t *testing.T) {
-		assert.Nil(t, testutil.TestDB(func(ctx context.Context, db *wolverine.DB) {
+		assert.Nil(t, wolverine.TestDB(func(ctx context.Context, db *wolverine.DB) {
 			collection := db.Collection("user")
-			var usrs []*wolverine.Document
+			var usrs wolverine.Documents
 
 			for i := 0; i < 10; i++ {
-				u := testutil.NewUserDoc()
+				u := wolverine.NewUserDoc()
 				usrs = append(usrs, u)
 			}
 			assert.Nil(t, collection.BatchSet(ctx, usrs))
@@ -339,13 +305,11 @@ func TestAggregate(t *testing.T) {
 					Direction: wolverine.ASC,
 				},
 			}
-			groups := lo.GroupBy[*wolverine.Document](usrs, func(t *wolverine.Document) string {
-				return t.GetString("account_id")
-			})
+			groups := usrs.GroupBy([]string{"account_id"})
 
 			ageSum := map[string]float64{}
 			for grup, value := range groups {
-				result, err := wolverine.ApplyReducers(ctx, query, value)
+				result, err := value.Aggregate(ctx, query.Aggregates)
 				assert.Nil(t, err)
 				ageSum[grup] += result.GetFloat("age")
 			}
@@ -364,7 +328,7 @@ func TestAggregate(t *testing.T) {
 }
 
 func TestDBCollection(t *testing.T) {
-	assert.Nil(t, testutil.TestDB(func(ctx context.Context, db *wolverine.DB) {
+	assert.Nil(t, wolverine.TestDB(func(ctx context.Context, db *wolverine.DB) {
 		collection := db.Collection("user")
 		t.Run("schema", func(t *testing.T) {
 			assert.NotNil(t, collection.Schema())

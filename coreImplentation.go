@@ -3,12 +3,10 @@ package wolverine
 import (
 	"context"
 	"github.com/autom8ter/machine/v4"
-	"github.com/autom8ter/wolverine/internal/prefix"
 	"github.com/autom8ter/wolverine/kv"
+	"github.com/autom8ter/wolverine/prefix"
 	"github.com/palantir/stacktrace"
 	"github.com/samber/lo"
-	"github.com/spf13/cast"
-	"strings"
 	"time"
 )
 
@@ -45,102 +43,6 @@ func (d coreImplementation) ChangeStream(ctx context.Context, collection *Collec
 		}
 		return true, nil
 	})
-}
-
-func (d coreImplementation) Aggregate(ctx context.Context, collection *Collection, query AggregateQuery) (Page, error) {
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-	now := time.Now()
-	index, err := collection.OptimizeIndex(query.Where, query.OrderBy)
-	if err != nil {
-		return Page{}, stacktrace.Propagate(err, "")
-	}
-	var results []*Document
-	if err := d.kv.Tx(false, func(tx kv.Tx) error {
-		opts := kv.IterOpts{
-			Prefix:  index.Ref.GetPrefix(IndexableFields(query.Where, query.OrderBy)).Prefix(),
-			Seek:    nil,
-			Reverse: false,
-		}
-		if query.OrderBy.Direction == DESC {
-			opts.Reverse = true
-			opts.Seek = prefix.PrefixNextKey(opts.Prefix)
-		} else {
-			opts.Seek = opts.Prefix
-		}
-		it := tx.NewIterator(opts)
-		it.Seek(opts.Prefix)
-		defer it.Close()
-		for it.Valid() {
-			if ctx.Err() != nil {
-				return nil
-			}
-			item := it.Item()
-			bits, err := item.Value()
-			if err != nil {
-				return stacktrace.Propagate(err, "")
-			}
-			document, err := NewDocumentFromBytes(bits)
-			if err != nil {
-				return stacktrace.Propagate(err, "")
-			}
-			pass, err := document.Where(query.Where)
-			if err != nil {
-				return stacktrace.Propagate(err, "")
-			}
-			if pass {
-				results = append(results, document)
-			}
-			if err != nil {
-				return stacktrace.Propagate(err, "")
-			}
-			it.Next()
-		}
-		return nil
-	}); err != nil {
-		return Page{}, stacktrace.Propagate(err, "")
-	}
-	grouped := lo.GroupBy[*Document](results, func(d *Document) string {
-		var values []string
-		for _, g := range query.GroupBy {
-			values = append(values, cast.ToString(d.Get(g)))
-		}
-		return strings.Join(values, ".")
-	})
-	var reduced Documents
-	for _, values := range grouped {
-		value, err := ApplyReducers(ctx, query, values)
-		if err != nil {
-			return Page{}, stacktrace.Propagate(err, "")
-		}
-		reduced = append(reduced, value)
-	}
-	reduced = reduced.OrderBy(query.OrderBy)
-	if query.Limit > 0 && query.Page > 0 {
-		reduced = lo.Slice(reduced, query.Limit*query.Page, (query.Limit*query.Page)+query.Limit)
-	}
-	if query.Limit > 0 && len(reduced) > query.Limit {
-		reduced = reduced[:query.Limit]
-	}
-	for _, r := range reduced {
-		toSelect := query.GroupBy
-		for _, a := range query.Aggregates {
-			toSelect = append(toSelect, a.Alias)
-		}
-		err := r.Select(toSelect)
-		if err != nil {
-			return Page{}, stacktrace.Propagate(err, "")
-		}
-	}
-	return Page{
-		Documents: reduced,
-		NextPage:  query.Page + 1,
-		Count:     len(reduced),
-		Stats: PageStats{
-			ExecutionTime: time.Since(now),
-			IndexMatch:    index,
-		},
-	}, nil
 }
 
 func (d coreImplementation) getAllCollection(ctx context.Context, collection *Collection, ids []string) (Documents, error) {

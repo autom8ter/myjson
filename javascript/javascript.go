@@ -58,32 +58,6 @@ func (s Javascript) FunctionName() string {
 // JSFunction is a go representation of a javascript function
 type JSFunction func(interface{}) (interface{}, error)
 
-// AggregateWare converts the javascript function to an aggregate middleware
-// input: query(map), collection(string), context(map)
-// sideEffects: the aggregate query is merged with the return value from the script
-func (f JSFunction) AggregateWare() middleware.AggregateWare {
-	return func(aggregateFunc middleware.AggregateFunc) middleware.AggregateFunc {
-		return func(ctx context.Context, collection *wolverine.Collection, query wolverine.AggregateQuery) (wolverine.Page, error) {
-			input := map[string]any{
-				"query":      mustMap(query),
-				"collection": collection.Collection(),
-			}
-			metaCtx, _ := wolverine.GetContext(ctx)
-			input["context"] = metaCtx.Map()
-			val, err := f(input)
-			if err != nil {
-				return wolverine.Page{}, stacktrace.Propagate(err, "")
-			}
-			if val != nil {
-				if err := wolverine.Decode(val, &query); err != nil {
-					return wolverine.Page{}, stacktrace.Propagate(err, "")
-				}
-			}
-			return aggregateFunc(ctx, collection, query)
-		}
-	}
-}
-
 // QueryWare converts the javascript function to a query middleware
 // input: query(map), collection(string), context(map)
 // sideEffects: the query is merged with the return value(map) from the script

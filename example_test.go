@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"github.com/autom8ter/wolverine"
-	"github.com/autom8ter/wolverine/internal/testutil"
 	"strings"
 )
 
@@ -14,7 +13,7 @@ func getDB() *wolverine.DB {
 			"provider":     "default",
 			"storage_path": "./db",
 		},
-		Collections: testutil.AllCollections,
+		Collections: wolverine.AllCollections,
 	}
 	db, err := wolverine.New(context.Background(), config)
 	if err != nil {
@@ -148,7 +147,7 @@ func ExampleDB_Collection() {
 	db := getDB()
 	collection := db.Collection("user")
 	ctx := context.Background()
-	if err := collection.Set(ctx, testutil.NewUserDoc()); err != nil {
+	if err := collection.Set(ctx, wolverine.NewUserDoc()); err != nil {
 		panic(err)
 	}
 }

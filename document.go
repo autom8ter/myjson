@@ -295,14 +295,17 @@ func (d *Document) Encode(w io.Writer) error {
 
 type Documents []*Document
 
-func (documents Documents) GroupBy(fields []string) map[string][]*Document {
-	return lo.GroupBy[*Document](documents, func(d *Document) string {
+func (documents Documents) GroupBy(fields []string) map[string]Documents {
+	var grouped = map[string]Documents{}
+	for _, d := range documents {
 		var values []string
 		for _, g := range fields {
 			values = append(values, cast.ToString(d.Get(g)))
 		}
-		return strings.Join(values, ".")
-	})
+		group := strings.Join(values, ".")
+		grouped[group] = append(grouped[group], d)
+	}
+	return grouped
 }
 
 func (documents Documents) Slice(start, end int) Documents {
