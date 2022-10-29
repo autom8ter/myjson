@@ -1,4 +1,4 @@
-package core
+package wolverine
 
 import (
 	"context"
@@ -108,7 +108,7 @@ func (d coreImplementation) Aggregate(ctx context.Context, collection *Collectio
 		}
 		return strings.Join(values, ".")
 	})
-	var reduced []*Document
+	var reduced Documents
 	for _, values := range grouped {
 		value, err := ApplyReducers(ctx, query, values)
 		if err != nil {
@@ -116,7 +116,7 @@ func (d coreImplementation) Aggregate(ctx context.Context, collection *Collectio
 		}
 		reduced = append(reduced, value)
 	}
-	reduced = SortOrder(query.OrderBy, reduced)
+	reduced = reduced.OrderBy(query.OrderBy)
 	if query.Limit > 0 && query.Page > 0 {
 		reduced = lo.Slice(reduced, query.Limit*query.Page, (query.Limit*query.Page)+query.Limit)
 	}
@@ -345,7 +345,7 @@ func (d coreImplementation) Query(ctx context.Context, collection *Collection, q
 	if err != nil {
 		return Page{}, stacktrace.Propagate(err, "")
 	}
-	var results []*Document
+	var results Documents
 	if err := d.kv.Tx(false, func(txn kv.Tx) error {
 		opts := kv.IterOpts{
 			Prefix:  index.Ref.GetPrefix(IndexableFields(query.Where, query.OrderBy), ""),
@@ -387,7 +387,7 @@ func (d coreImplementation) Query(ctx context.Context, collection *Collection, q
 	}); err != nil {
 		return Page{}, stacktrace.Propagate(err, "")
 	}
-	results = SortOrder(query.OrderBy, results)
+	results = results.OrderBy(query.OrderBy)
 
 	if query.Limit > 0 && query.Page > 0 {
 		results = lo.Slice(results, query.Limit*query.Page, (query.Limit*query.Page)+query.Limit)

@@ -3,8 +3,8 @@ package javascript
 import (
 	"bufio"
 	"context"
-	"github.com/autom8ter/wolverine/core"
-	"github.com/autom8ter/wolverine/internal/util"
+	"github.com/autom8ter/wolverine"
+	"github.com/autom8ter/wolverine/middleware"
 	"github.com/dop251/goja"
 	"github.com/palantir/stacktrace"
 	"strings"
@@ -61,22 +61,22 @@ type JSFunction func(interface{}) (interface{}, error)
 // AggregateWare converts the javascript function to an aggregate middleware
 // input: query(map), collection(string), context(map)
 // sideEffects: the aggregate query is merged with the return value from the script
-func (f JSFunction) AggregateWare() core.AggregateWare {
-	return func(aggregateFunc core.AggregateFunc) core.AggregateFunc {
-		return func(ctx context.Context, collection *core.Collection, query core.AggregateQuery) (core.Page, error) {
+func (f JSFunction) AggregateWare() middleware.AggregateWare {
+	return func(aggregateFunc middleware.AggregateFunc) middleware.AggregateFunc {
+		return func(ctx context.Context, collection *wolverine.Collection, query wolverine.AggregateQuery) (wolverine.Page, error) {
 			input := map[string]any{
-				"query":      util.MustMap(query),
+				"query":      mustMap(query),
 				"collection": collection.Collection(),
 			}
-			metaCtx, _ := core.GetContext(ctx)
+			metaCtx, _ := wolverine.GetContext(ctx)
 			input["context"] = metaCtx.Map()
 			val, err := f(input)
 			if err != nil {
-				return core.Page{}, stacktrace.Propagate(err, "")
+				return wolverine.Page{}, stacktrace.Propagate(err, "")
 			}
 			if val != nil {
-				if err := util.Decode(val, &query); err != nil {
-					return core.Page{}, stacktrace.Propagate(err, "")
+				if err := wolverine.Decode(val, &query); err != nil {
+					return wolverine.Page{}, stacktrace.Propagate(err, "")
 				}
 			}
 			return aggregateFunc(ctx, collection, query)
@@ -87,22 +87,22 @@ func (f JSFunction) AggregateWare() core.AggregateWare {
 // QueryWare converts the javascript function to a query middleware
 // input: query(map), collection(string), context(map)
 // sideEffects: the query is merged with the return value(map) from the script
-func (f JSFunction) QueryWare() core.QueryWare {
-	return func(queryFunc core.QueryFunc) core.QueryFunc {
-		return func(ctx context.Context, collection *core.Collection, query core.Query) (core.Page, error) {
+func (f JSFunction) QueryWare() middleware.QueryWare {
+	return func(queryFunc middleware.QueryFunc) middleware.QueryFunc {
+		return func(ctx context.Context, collection *wolverine.Collection, query wolverine.Query) (wolverine.Page, error) {
 			input := map[string]any{
-				"query":      util.MustMap(query),
+				"query":      mustMap(query),
 				"collection": collection.Collection(),
 			}
-			metaCtx, _ := core.GetContext(ctx)
+			metaCtx, _ := wolverine.GetContext(ctx)
 			input["context"] = metaCtx.Map()
 			val, err := f(input)
 			if err != nil {
-				return core.Page{}, stacktrace.Propagate(err, "")
+				return wolverine.Page{}, stacktrace.Propagate(err, "")
 			}
 			if val != nil {
-				if err := util.Decode(val, &query); err != nil {
-					return core.Page{}, stacktrace.Propagate(err, "")
+				if err := wolverine.Decode(val, &query); err != nil {
+					return wolverine.Page{}, stacktrace.Propagate(err, "")
 				}
 			}
 			return queryFunc(ctx, collection, query)
@@ -110,88 +110,26 @@ func (f JSFunction) QueryWare() core.QueryWare {
 	}
 }
 
-// SearchWare converts the javascript function to a search middleware
-// input: query(map), collection(string), context(map)
-// sideEffects: the search query is merged with the return value(map) from the script
-func (f JSFunction) SearchWare() core.SearchWare {
-	return func(searchWare core.SearchFunc) core.SearchFunc {
-		return func(ctx context.Context, collection *core.Collection, query core.SearchQuery) (core.Page, error) {
-			input := map[string]any{
-				"query":      util.MustMap(query),
-				"collection": collection.Collection(),
-			}
-			metaCtx, _ := core.GetContext(ctx)
-			input["context"] = metaCtx.Map()
-			val, err := f(input)
-			if err != nil {
-				return core.Page{}, stacktrace.Propagate(err, "")
-			}
-			if val != nil {
-				if err := util.Decode(val, &query); err != nil {
-					return core.Page{}, stacktrace.Propagate(err, "")
-				}
-			}
-			return searchWare(ctx, collection, query)
-		}
-	}
-}
-
 // PersistWare converts the javascript function to a persist middleware
 // input: stateChange(map), collection(string), context(map)
 // sideEffects: the stateChange is merged with the return value(map) from the script
-func (f JSFunction) PersistWare() core.PersistWare {
-	return func(persist core.PersistFunc) core.PersistFunc {
-		return func(ctx context.Context, collection *core.Collection, change core.StateChange) error {
+func (f JSFunction) PersistWare() middleware.PersistWare {
+	return func(persist middleware.PersistFunc) middleware.PersistFunc {
+		return func(ctx context.Context, collection *wolverine.Collection, change wolverine.StateChange) error {
 			input := map[string]any{
-				"change":     util.MustMap(change),
+				"change":     mustMap(change),
 				"collection": collection.Collection(),
 			}
-			metaCtx, _ := core.GetContext(ctx)
+			metaCtx, _ := wolverine.GetContext(ctx)
 			input["context"] = metaCtx.Map()
 			val, err := f(input)
 			if err != nil {
 				return stacktrace.Propagate(err, "")
 			}
 			if m, ok := val.(map[string]any); ok {
-				return stacktrace.Propagate(util.Decode(&m, &change), "")
+				return stacktrace.Propagate(wolverine.Decode(&m, &change), "")
 			}
 			return persist(ctx, collection, change)
-		}
-	}
-}
-
-// GetWare converts the javascript function to a get middleware
-// input: id(string), collection(string), context(map)
-// sideEffects: the return document is merged with the return value(map) from the script
-func (f JSFunction) GetWare() core.GetWare {
-	return func(get core.GetFunc) core.GetFunc {
-		return func(ctx context.Context, collection *core.Collection, id string) (*core.Document, error) {
-			doc, err := get(ctx, collection, id)
-			if err != nil {
-				return nil, stacktrace.Propagate(err, "")
-			}
-			return f.evalDocument(ctx, collection, doc)
-		}
-	}
-}
-
-// GetAllWare converts the javascript function to a get all middleware
-// input: ids([]string), collection(string), context(map)
-// sideEffects: the return documents are merged with the return value(map) from the script
-func (f JSFunction) GetAllWare() core.GetAllWare {
-	return func(get core.GetAllFunc) core.GetAllFunc {
-		return func(ctx context.Context, collection *core.Collection, ids []string) (core.Documents, error) {
-			docs, err := get(ctx, collection, ids)
-			if err != nil {
-				return nil, stacktrace.Propagate(err, "")
-			}
-			for _, doc := range docs {
-				_, err := f.evalDocument(ctx, collection, doc)
-				if err != nil {
-					return nil, stacktrace.Propagate(err, "")
-				}
-			}
-			return docs, nil
 		}
 	}
 }
@@ -199,22 +137,22 @@ func (f JSFunction) GetAllWare() core.GetAllWare {
 // ChangeStreamWare converts the javascript function to a change stream middleware
 // input: stateChange(map), collection(string), context(map)
 // sideEffects: the state change is merged with the return value(map) from the script
-func (f JSFunction) ChangeStreamWare() core.ChangeStreamWare {
-	return func(changeStream core.ChangeStreamFunc) core.ChangeStreamFunc {
-		return func(ctx context.Context, collection *core.Collection, fn core.ChangeStreamHandler) error {
-			return changeStream(ctx, collection, func(ctx context.Context, change core.StateChange) error {
+func (f JSFunction) ChangeStreamWare() middleware.ChangeStreamWare {
+	return func(changeStream middleware.ChangeStreamFunc) middleware.ChangeStreamFunc {
+		return func(ctx context.Context, collection *wolverine.Collection, fn wolverine.ChangeStreamHandler) error {
+			return changeStream(ctx, collection, func(ctx context.Context, change wolverine.StateChange) error {
 				input := map[string]any{
-					"change":     util.MustMap(change),
+					"change":     mustMap(change),
 					"collection": collection.Collection(),
 				}
-				metaCtx, _ := core.GetContext(ctx)
+				metaCtx, _ := wolverine.GetContext(ctx)
 				input["context"] = metaCtx.Map()
 				val, err := f(input)
 				if err != nil {
 					return stacktrace.Propagate(err, "")
 				}
 				if m, ok := val.(map[string]any); ok {
-					return stacktrace.Propagate(util.Decode(&m, &change), "")
+					return stacktrace.Propagate(wolverine.Decode(&m, &change), "")
 				}
 				return nil
 			})
@@ -222,14 +160,14 @@ func (f JSFunction) ChangeStreamWare() core.ChangeStreamWare {
 	}
 }
 
-func (f JSFunction) evalDocument(ctx context.Context, collection *core.Collection, doc *core.Document) (*core.Document, error) {
+func (f JSFunction) evalDocument(ctx context.Context, collection *wolverine.Collection, doc *wolverine.Document) (*wolverine.Document, error) {
 	input := map[string]any{
 		"id":         collection.GetPrimaryKey(doc),
 		"document":   doc.Value(),
 		"collection": collection.Collection(),
 	}
 
-	metaCtx, _ := core.GetContext(ctx)
+	metaCtx, _ := wolverine.GetContext(ctx)
 	input["context"] = metaCtx.Map()
 	val, err := f(input)
 	if err != nil {
@@ -241,4 +179,20 @@ func (f JSFunction) evalDocument(ctx context.Context, collection *core.Collectio
 		}
 	}
 	return doc, nil
+}
+
+func toMap(o any) (map[string]any, error) {
+	data := map[string]any{}
+	if err := wolverine.Decode(&data, &o); err != nil {
+		return nil, err
+	}
+	return data, nil
+}
+
+func mustMap(o any) map[string]any {
+	data := map[string]any{}
+	if err := wolverine.Decode(&data, &o); err != nil {
+		panic(err)
+	}
+	return data
 }

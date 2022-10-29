@@ -1,4 +1,4 @@
-package core
+package wolverine
 
 import (
 	"github.com/autom8ter/wolverine/internal/prefix"

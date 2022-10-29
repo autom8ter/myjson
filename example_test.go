@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"github.com/autom8ter/wolverine"
-	"github.com/autom8ter/wolverine/core"
 	"github.com/autom8ter/wolverine/internal/testutil"
 	"strings"
 )
@@ -116,10 +115,10 @@ func ExampleNew() {
     }
   }
 }`
-	userSchema := core.NewCollectionFromBytesP([]byte(schema))
+	userSchema := wolverine.NewCollectionFromBytesP([]byte(schema))
 	db, err := wolverine.New(context.Background(), wolverine.Config{
 		Params:      map[string]string{},
-		Collections: []*core.Collection{userSchema},
+		Collections: []*wolverine.Collection{userSchema},
 	})
 	if err != nil {
 		panic(err)

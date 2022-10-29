@@ -1,10 +1,9 @@
-package core
+package wolverine
 
 import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/autom8ter/wolverine/internal/util"
 	"github.com/nqd/flat"
 	"github.com/palantir/stacktrace"
 	"github.com/qri-io/jsonschema"
@@ -82,17 +81,17 @@ func NewJSONSchema(schemaData []byte) (JSONSchema, error) {
 		return nil, stacktrace.NewError("missing collection: @collection")
 	}
 	if parsed.Get("@flags").Exists() {
-		if err := util.Decode(parsed.Get("@flags").Value(), &c.flags); err != nil {
+		if err := Decode(parsed.Get("@flags").Value(), &c.flags); err != nil {
 			return nil, stacktrace.Propagate(err, "failed to decode @flags")
 		}
 	}
 	if parsed.Get("@annotations").Exists() {
-		if err := util.Decode(parsed.Get("@annotations").Value(), &c.flags); err != nil {
+		if err := Decode(parsed.Get("@annotations").Value(), &c.flags); err != nil {
 			return nil, stacktrace.Propagate(err, "failed to decode @annotations")
 		}
 	}
 	if parsed.Get("@indexing").Exists() {
-		if err := util.Decode(parsed.Get("@indexing").Value(), &c.indexing); err != nil {
+		if err := Decode(parsed.Get("@indexing").Value(), &c.indexing); err != nil {
 			return nil, stacktrace.Propagate(err, "failed to decode @indexing")
 		}
 	}
@@ -128,7 +127,7 @@ func (c *collectionSchema) UnmarshalJSON(bytes []byte) error {
 }
 
 func (c *collectionSchema) String() string {
-	return util.JSONString(c)
+	return JSONString(c)
 }
 
 func (c *collectionSchema) Validate(ctx context.Context, bits []byte) error {
@@ -137,7 +136,7 @@ func (c *collectionSchema) Validate(ctx context.Context, bits []byte) error {
 		return stacktrace.Propagate(err, "")
 	}
 	if len(kerrs) > 0 {
-		return fmt.Errorf("schema validation error: %s", util.JSONString(&kerrs))
+		return fmt.Errorf("schema validation error: %s", JSONString(&kerrs))
 	}
 	return nil
 }

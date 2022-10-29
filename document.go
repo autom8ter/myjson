@@ -1,8 +1,7 @@
-package core
+package wolverine
 
 import (
 	"encoding/json"
-	"github.com/autom8ter/wolverine/internal/util"
 	flat2 "github.com/nqd/flat"
 	"github.com/palantir/stacktrace"
 	"github.com/samber/lo"
@@ -10,6 +9,7 @@ import (
 	"github.com/tidwall/gjson"
 	"github.com/tidwall/sjson"
 	"io"
+	"sort"
 	"strings"
 	"sync"
 )
@@ -281,7 +281,7 @@ func (d *Document) Where(wheres []Where) (bool, error) {
 
 // Scan scans the json document into the value
 func (d *Document) Scan(value any) error {
-	return util.Decode(d.Value(), &value)
+	return Decode(d.Value(), &value)
 }
 
 // Encode encodes the json document to the io writer
@@ -319,4 +319,20 @@ func (documents Documents) Map(mapper func(t *Document, i int) *Document) Docume
 
 func (documents Documents) Reduce(reducer func(accumulated, next *Document, i int) *Document) *Document {
 	return lo.Reduce[*Document](documents, reducer, NewDocument())
+}
+
+func (d Documents) OrderBy(orderBy OrderBy) Documents {
+	if orderBy.Field == "" {
+		return d
+	}
+	if orderBy.Direction == DESC {
+		sort.Slice(d, func(i, j int) bool {
+			return compareField(orderBy.Field, d[i], d[j])
+		})
+	} else {
+		sort.Slice(d, func(i, j int) bool {
+			return !compareField(orderBy.Field, d[i], d[j])
+		})
+	}
+	return d
 }

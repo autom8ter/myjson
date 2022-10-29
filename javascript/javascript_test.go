@@ -1,9 +1,6 @@
 package javascript_test
 
 import (
-	"context"
-	"github.com/autom8ter/wolverine/core"
-	"github.com/autom8ter/wolverine/internal/testutil"
 	"github.com/autom8ter/wolverine/javascript"
 	"github.com/spf13/cast"
 	"github.com/stretchr/testify/assert"
@@ -58,13 +55,4 @@ func Test(t *testing.T) {
 		assert.EqualValues(t, 3, output)
 	})
 
-	t.Run("getWare", func(t *testing.T) {
-		fn, err := getWareFunction.Parse()
-		assert.Nil(t, err)
-		doc, err := fn.GetWare()(func(ctx context.Context, collection *core.Collection, id string) (*core.Document, error) {
-			return testutil.NewUserDoc(), nil
-		})(context.Background(), testutil.UserCollection, "1")
-		assert.Nil(t, err)
-		assert.Equal(t, true, doc.Get("transformed"))
-	})
 }

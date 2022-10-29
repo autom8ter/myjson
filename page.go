@@ -1,7 +1,6 @@
-package core
+package wolverine
 
 import (
-	"github.com/autom8ter/wolverine/internal/util"
 	"time"
 )
 
@@ -18,7 +17,7 @@ type Page struct {
 }
 
 func (p Page) String() string {
-	return util.JSONString(&p)
+	return JSONString(&p)
 }
 
 // PageStats are statistics collected from a query returning a page
