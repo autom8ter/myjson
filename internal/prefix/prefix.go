@@ -8,10 +8,31 @@ import (
 	"github.com/spf13/cast"
 )
 
+type IndexProvider func(collection string, fields []string) Index
+
+type Index interface {
+	Collection() string
+	Fields() []string
+	GetPrefix(fields map[string]any) PrefixRef
+}
+
+type PrefixRef interface {
+	Prefix() []byte
+	Seek(id []byte) []byte
+}
+
 type PrefixIndexRef struct {
 	collection    string
 	initialPrefix []string
 	fields        []string
+}
+
+func (d PrefixIndexRef) Collection() string {
+	return d.collection
+}
+
+func (d PrefixIndexRef) Fields() []string {
+	return d.fields
 }
 
 func NewPrefixedIndex(collection string, fields []string) *PrefixIndexRef {
@@ -22,7 +43,21 @@ func NewPrefixedIndex(collection string, fields []string) *PrefixIndexRef {
 	}
 }
 
-func (d PrefixIndexRef) GetPrefix(fields map[string]any, documentID string) []byte {
+type indexRef struct {
+	path [][]byte
+}
+
+func (i indexRef) Prefix() []byte {
+	return bytes.Join(i.path, []byte("."))
+}
+
+func (i indexRef) Seek(id []byte) []byte {
+	i.path = append(i.path, id)
+	return bytes.Join(i.path, []byte("."))
+}
+
+// GetPrefix
+func (d PrefixIndexRef) GetPrefix(fields map[string]any) PrefixRef {
 	fields, _ = flat.Flatten(fields, nil)
 	var path [][]byte
 	for _, i := range d.initialPrefix {
@@ -35,10 +70,7 @@ func (d PrefixIndexRef) GetPrefix(fields map[string]any, documentID string) []by
 			path = append(path, encodeValue(k), encodeValue(v))
 		}
 	}
-	if documentID != "" {
-		path = append(path, encodeValue(documentID))
-	}
-	return bytes.Join(path, []byte("."))
+	return indexRef{path: path}
 }
 
 func encodeValue(value any) []byte {

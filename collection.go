@@ -129,7 +129,7 @@ func (c *Collection) GetPrimaryKeyRef(documentID string) ([]byte, error) {
 	}
 	return c.PrimaryIndex().GetPrefix(map[string]any{
 		c.PrimaryKey(): documentID,
-	}, documentID), nil
+	}).Seek([]byte(documentID)), nil
 }
 
 // SetPrimaryKey sets the documents primary key

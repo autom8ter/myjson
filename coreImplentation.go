@@ -58,7 +58,7 @@ func (d coreImplementation) Aggregate(ctx context.Context, collection *Collectio
 	var results []*Document
 	if err := d.kv.Tx(false, func(tx kv.Tx) error {
 		opts := kv.IterOpts{
-			Prefix:  index.Ref.GetPrefix(IndexableFields(query.Where, query.OrderBy), ""),
+			Prefix:  index.Ref.GetPrefix(IndexableFields(query.Where, query.OrderBy)).Prefix(),
 			Seek:    nil,
 			Reverse: false,
 		}
@@ -306,13 +306,13 @@ func (d coreImplementation) updateSecondaryIndex(ctx context.Context, txn kv.Bat
 	switch change.action {
 	case Delete:
 		pindex := prefix.NewPrefixedIndex(collection.Collection(), idx.Fields)
-		if err := txn.Delete(pindex.GetPrefix(change.before.Value(), change.docId)); err != nil {
+		if err := txn.Delete(pindex.GetPrefix(change.before.Value()).Seek([]byte(change.docId))); err != nil {
 			return stacktrace.Propagate(err, "failed to delete index references")
 		}
 	case Set, Update:
 		pindex := prefix.NewPrefixedIndex(collection.Collection(), idx.Fields)
 		if change.before != nil && change.before.Valid() {
-			if err := txn.Delete(pindex.GetPrefix(change.before.Value(), change.docId)); err != nil {
+			if err := txn.Delete(pindex.GetPrefix(change.before.Value()).Seek([]byte(change.docId))); err != nil {
 				return stacktrace.PropagateWithCode(
 					err,
 					ErrTODO,
@@ -322,7 +322,7 @@ func (d coreImplementation) updateSecondaryIndex(ctx context.Context, txn kv.Bat
 				)
 			}
 		}
-		i := pindex.GetPrefix(change.after.Value(), change.docId)
+		i := pindex.GetPrefix(change.after.Value()).Seek([]byte(change.docId))
 		if err := txn.Set(i, change.after.Bytes()); err != nil {
 			return stacktrace.PropagateWithCode(
 				err,
@@ -347,7 +347,7 @@ func (d coreImplementation) Query(ctx context.Context, collection *Collection, q
 	var results Documents
 	if err := d.kv.Tx(false, func(txn kv.Tx) error {
 		opts := kv.IterOpts{
-			Prefix:  index.Ref.GetPrefix(IndexableFields(query.Where, query.OrderBy), ""),
+			Prefix:  index.Ref.GetPrefix(IndexableFields(query.Where, query.OrderBy)).Prefix(),
 			Seek:    nil,
 			Reverse: false,
 		}
@@ -427,7 +427,7 @@ func (d coreImplementation) Scan(ctx context.Context, collection *Collection, sc
 	}
 	if err := d.kv.Tx(false, func(txn kv.Tx) error {
 		opts := kv.IterOpts{
-			Prefix:  index.Ref.GetPrefix(IndexableFields(scan.Filter, OrderBy{}), ""),
+			Prefix:  index.Ref.GetPrefix(IndexableFields(scan.Filter, OrderBy{})).Prefix(),
 			Seek:    nil,
 			Reverse: scan.Reverse,
 		}
