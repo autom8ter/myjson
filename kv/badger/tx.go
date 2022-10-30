@@ -15,22 +15,24 @@ func (b *badgerTx) NewIterator(kopts kv.IterOpts) kv.Iterator {
 	opts.PrefetchSize = 10
 	opts.Prefix = kopts.Prefix
 	opts.Reverse = kopts.Reverse
-	return &badgerIterator{iter: b.txn.NewIterator(opts), opts: kopts}
+	iter := b.txn.NewIterator(opts)
+	iter.Rewind()
+	return &badgerIterator{iter: iter, opts: kopts}
 }
 
-func (b badgerTx) Get(key []byte) ([]byte, error) {
-	item, err := b.txn.Get(key)
+func (b *badgerTx) Get(key []byte) ([]byte, error) {
+	i, err := b.txn.Get(key)
 	if err != nil {
 		return nil, err
 	}
-	val, err := item.ValueCopy(nil)
+	val, err := i.ValueCopy(nil)
 	return val, err
 }
 
-func (b badgerTx) Set(key, value []byte) error {
+func (b *badgerTx) Set(key, value []byte) error {
 	return b.txn.Set(key, value)
 }
 
-func (b badgerTx) Delete(key []byte) error {
+func (b *badgerTx) Delete(key []byte) error {
 	return b.txn.Delete(key)
 }

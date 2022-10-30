@@ -196,7 +196,6 @@ func (d coreImplementation) indexDocument(ctx context.Context, txn kv.Batch, col
 		if err != nil {
 			return stacktrace.Propagate(err, "")
 		}
-
 		if err := txn.Set(pkey, change.after.Bytes()); err != nil {
 			return stacktrace.PropagateWithCode(err, ErrTODO, "failed to batch set documents to primary index")
 		}
@@ -327,9 +326,10 @@ func (d coreImplementation) Scan(ctx context.Context, collection *Collection, sc
 	if err != nil {
 		return stacktrace.Propagate(err, "")
 	}
+	pfx := index.Ref.GetPrefix(IndexableFields(scan.Filter, OrderBy{})).Prefix()
 	if err := d.kv.Tx(false, func(txn kv.Tx) error {
 		opts := kv.IterOpts{
-			Prefix:  index.Ref.GetPrefix(IndexableFields(scan.Filter, OrderBy{})).Prefix(),
+			Prefix:  pfx,
 			Seek:    nil,
 			Reverse: scan.Reverse,
 		}
@@ -363,7 +363,6 @@ func (d coreImplementation) Scan(ctx context.Context, collection *Collection, sc
 					return nil
 				}
 			}
-
 			it.Next()
 		}
 		return nil

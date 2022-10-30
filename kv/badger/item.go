@@ -7,7 +7,7 @@ type item struct {
 }
 
 func (i item) Key() []byte {
-	return i.Key()
+	return i.item.Key()
 }
 
 func (i item) Value() ([]byte, error) {

@@ -29,7 +29,7 @@ func TestCollection(t *testing.T) {
 		wolverine.UserCollection.PrimaryIndex()
 	})
 	t.Run("load collections from dir", func(t *testing.T) {
-		collections, err := wolverine.LoadCollectionsFromDir("internal/testutil/")
+		collections, err := wolverine.LoadCollectionsFromDir("testdata/")
 		assert.Nil(t, err)
 		assert.NotEqual(t, 0, len(collections))
 	})

@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-func TestApplyReducers(t *testing.T) {
+func TestAggregate(t *testing.T) {
 	t.Run("sum age", func(t *testing.T) {
 		var expected = float64(0)
 		var docs Documents

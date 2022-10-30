@@ -25,12 +25,14 @@ func New(storagePath string) (kv.DB, error) {
 }
 
 func (b *badgerKV) Tx(isUpdate bool, fn func(kv.Tx) error) error {
-	tx := b.db.NewTransaction(isUpdate)
-	defer tx.Discard()
-	if err := fn(&badgerTx{txn: tx}); err != nil {
-		return err
+	if isUpdate {
+		return b.db.Update(func(txn *badger.Txn) error {
+			return fn(&badgerTx{txn: txn})
+		})
 	}
-	return tx.Commit()
+	return b.db.View(func(txn *badger.Txn) error {
+		return fn(&badgerTx{txn: txn})
+	})
 }
 
 func (b *badgerKV) Batch() kv.Batch {

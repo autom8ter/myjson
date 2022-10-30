@@ -104,11 +104,11 @@ func (c *Collection) OptimizeIndex(where []Where, order OrderBy) (IndexMatch, er
 	var whereFields []string
 	var whereValues = map[string]any{}
 	for _, w := range where {
-		if w.Op != "==" && w.Op != Eq {
-			continue
+		switch w.Op {
+		case "==", Eq:
+			whereFields = append(whereFields, w.Field)
+			whereValues[w.Field] = w.Value
 		}
-		whereFields = append(whereFields, w.Field)
-		whereValues[w.Field] = w.Value
 	}
 	index, err := c.getIndex(whereFields, order.Field)
 	if err != nil {

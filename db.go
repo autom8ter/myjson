@@ -168,8 +168,10 @@ func (c *DBCollection) Get(ctx context.Context, id string) (*Document, error) {
 			},
 		},
 	}, func(d *Document) (bool, error) {
-		doc = d
-		return false, nil
+		if doc == nil {
+			doc = d
+		}
+		return true, nil
 	}); err != nil {
 		return nil, stacktrace.Propagate(err, "")
 	}
@@ -399,7 +401,6 @@ func (c *DBCollection) Reindex(ctx context.Context) error {
 	egp, ctx := errgroup.WithContext(meta.ToContext(ctx))
 	var page int
 	for {
-
 		results, err := c.Query(ctx, Query{
 			Select:  nil,
 			Where:   nil,

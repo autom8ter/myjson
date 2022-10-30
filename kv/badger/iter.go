@@ -30,5 +30,5 @@ func (b *badgerIterator) Item() kv.Item {
 }
 
 func (b *badgerIterator) Next() {
-	b.Next()
+	b.iter.Next()
 }
