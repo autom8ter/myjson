@@ -378,7 +378,7 @@ func (d *coreImplementation) indexDocument(ctx context.Context, txn kv.Batch, co
 		if c.GetPrimaryKey(change.after) != change.docId {
 			return stacktrace.NewErrorWithCode(ErrTODO, "document id is immutable: %v -> %v", c.GetPrimaryKey(change.after), change.docId)
 		}
-		err := c.Validate(ctx, change.after.Bytes())
+		err := c.Validate(ctx, change.after)
 		if err != nil {
 			return stacktrace.Propagate(err, "")
 		}

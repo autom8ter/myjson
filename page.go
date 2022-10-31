@@ -16,14 +16,12 @@ type Page struct {
 	Stats PageStats `json:"stats"`
 }
 
-func (p Page) String() string {
-	return JSONString(&p)
-}
-
 // PageStats are statistics collected from a query returning a page
 type PageStats struct {
+	// ExecutionTime is the execution time to get the page
 	ExecutionTime time.Duration `json:"execution_time,omitempty"`
-	IndexMatch    IndexMatch    `json:"index_match,omitempty"`
+	// IndexMatch is the index that was used to get the page
+	IndexMatch IndexMatch `json:"index_match,omitempty"`
 }
 
 // PageHandler handles a page of documents during pagination. If the handler returns false, pagination will discontinue

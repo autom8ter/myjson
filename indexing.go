@@ -8,6 +8,7 @@ import (
 	"github.com/spf13/cast"
 )
 
+// Index is a database index used to optimize queries against a collection
 type Index struct {
 	// Collection is the collection the index belongs to
 	Collection string `json:"collection"`

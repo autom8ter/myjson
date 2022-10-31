@@ -1,6 +1,7 @@
 package wolverine
 
 import (
+	"context"
 	"encoding/json"
 	flat2 "github.com/nqd/flat"
 	"github.com/palantir/stacktrace"
@@ -293,8 +294,10 @@ func (d *Document) Encode(w io.Writer) error {
 	return nil
 }
 
+// Documents is an array of documents
 type Documents []*Document
 
+// GroupBy groups the documents by the given fields
 func (documents Documents) GroupBy(fields []string) map[string]Documents {
 	var grouped = map[string]Documents{}
 	for _, d := range documents {
@@ -308,22 +311,27 @@ func (documents Documents) GroupBy(fields []string) map[string]Documents {
 	return grouped
 }
 
+// Slice slices the documents into a subarray of documents
 func (documents Documents) Slice(start, end int) Documents {
 	return lo.Slice[*Document](documents, start, end)
 }
 
+// Filter applies the filter function against the documents
 func (documents Documents) Filter(predicate func(document *Document, i int) bool) Documents {
 	return lo.Filter[*Document](documents, predicate)
 }
 
+// Map applies the mapper function against the documents
 func (documents Documents) Map(mapper func(t *Document, i int) *Document) Documents {
 	return lo.Map[*Document, *Document](documents, mapper)
 }
 
+// Reduce applies the reducer function to the documents and returns a single document
 func (documents Documents) Reduce(reducer func(accumulated, next *Document, i int) *Document) *Document {
 	return lo.Reduce[*Document](documents, reducer, NewDocument())
 }
 
+// OrderBy orders the documents by the OrderBy clause
 func (d Documents) OrderBy(orderBy OrderBy) Documents {
 	if orderBy.Field == "" {
 		return d
@@ -338,4 +346,42 @@ func (d Documents) OrderBy(orderBy OrderBy) Documents {
 		})
 	}
 	return d
+}
+
+// Aggregate reduces the documents with the input aggregates
+func (d Documents) Aggregate(ctx context.Context, aggregates []Aggregate) (*Document, error) {
+	var (
+		aggregated *Document
+	)
+	for _, next := range d {
+		if aggregated == nil || !aggregated.Valid() {
+			aggregated = next
+		}
+		for _, agg := range aggregates {
+			if agg.Alias == "" {
+				return nil, stacktrace.NewError("empty aggregate alias: %s/%s", agg.Field, agg.Function)
+			}
+			current := aggregated.GetFloat(agg.Alias)
+			switch agg.Function {
+			case COUNT:
+				current++
+			case MAX:
+				if value := next.GetFloat(agg.Field); value > current {
+					current = value
+				}
+			case MIN:
+				if value := next.GetFloat(agg.Field); value < current {
+					current = value
+				}
+			case SUM:
+				current += next.GetFloat(agg.Field)
+			default:
+				return nil, stacktrace.NewError("unsupported aggregate function: %s/%s", agg.Field, agg.Function)
+			}
+			if err := aggregated.Set(agg.Alias, current); err != nil {
+				return nil, stacktrace.Propagate(err, "")
+			}
+		}
+	}
+	return aggregated, nil
 }

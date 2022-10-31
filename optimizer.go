@@ -4,13 +4,13 @@ import (
 	"github.com/palantir/stacktrace"
 )
 
+// Optimizer selects the best index from a set of indexes based on a query
 type Optimizer interface {
 	// BestIndex selects the optimal index to use based on the given where clauses
 	BestIndex(indexes map[string]Index, where []Where, order OrderBy) (IndexMatch, error)
 }
 
-type defaultOptimizer struct {
-}
+type defaultOptimizer struct{}
 
 // BestIndex selects the optimal index to use given the where/orderby clause
 func (o defaultOptimizer) BestIndex(indexes map[string]Index, where []Where, order OrderBy) (IndexMatch, error) {

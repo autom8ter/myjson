@@ -9,7 +9,6 @@ import (
 	"github.com/palantir/stacktrace"
 	"github.com/samber/lo"
 	"github.com/segmentio/ksuid"
-	"golang.org/x/sync/errgroup"
 	"sort"
 	"time"
 )
@@ -91,18 +90,6 @@ func (d *DB) Core() CoreAPI {
 // Close closes the database
 func (d *DB) Close(ctx context.Context) error {
 	return d.core.Close(ctx)
-}
-
-// ReIndex reindexes every collection in the database
-func (d *DB) ReIndex(ctx context.Context) error {
-	egp, ctx := errgroup.WithContext(ctx)
-	for _, c := range d.collections {
-		c := c
-		egp.Go(func() error {
-			return d.Collection(c.schema.Name()).Reindex(ctx)
-		})
-	}
-	return stacktrace.Propagate(egp.Wait(), "")
 }
 
 // Collection executes the given function on the collection
@@ -378,59 +365,6 @@ func (c *DBCollection) Aggregate(ctx context.Context, query AggregateQuery) (Pag
 			IndexMatch:    match,
 		},
 	}, nil
-}
-
-// Reindex the collection
-func (c *DBCollection) Reindex(ctx context.Context) error {
-	meta, ok := GetContext(ctx)
-	if !ok {
-		meta = NewContext(map[string]any{})
-	}
-	meta.Set("_reindexing", true)
-	meta.Set("_internal", true)
-	egp, ctx := errgroup.WithContext(meta.ToContext(ctx))
-	var page int
-	for {
-		results, err := c.Query(ctx, Query{
-			Select:  nil,
-			Where:   nil,
-			Page:    page,
-			Limit:   1000,
-			OrderBy: OrderBy{},
-		})
-		if err != nil {
-			return stacktrace.Propagate(err, "failed to reindex collection: %s", c.schema.Name())
-		}
-		if len(results.Documents) == 0 {
-			break
-		}
-		var toSet []*Document
-		var toDelete []string
-		for _, r := range results.Documents {
-			result, _ := c.Get(ctx, c.schema.GetPrimaryKey(r))
-			if result.Valid() {
-				toSet = append(toSet, result)
-			} else {
-				toDelete = append(toDelete, c.schema.GetPrimaryKey(r))
-				_ = c.Delete(ctx, c.schema.GetPrimaryKey(r))
-			}
-		}
-		if len(toSet) > 0 {
-			egp.Go(func() error {
-				return stacktrace.Propagate(c.BatchSet(ctx, toSet), "")
-			})
-		}
-		if len(toDelete) > 0 {
-			egp.Go(func() error {
-				return stacktrace.Propagate(c.BatchDelete(ctx, toDelete), "")
-			})
-		}
-		page = results.NextPage
-	}
-	if err := egp.Wait(); err != nil {
-		return stacktrace.Propagate(err, "failed to reindex collection: %s", c.schema.Name())
-	}
-	return nil
 }
 
 // Transform executes a transformation which is basically ETL from one collection to another

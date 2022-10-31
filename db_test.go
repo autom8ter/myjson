@@ -83,11 +83,6 @@ func Test(t *testing.T) {
 			}
 			assert.Nil(t, collection.BatchSet(ctx, usrs))
 		})
-		t.Run("reindex", func(t *testing.T) {
-			timer := timer()
-			defer timer(t)
-			assert.Nil(t, collection.Reindex(ctx))
-		})
 		t.Run("get each", func(t *testing.T) {
 			timer := timer()
 			defer timer(t)

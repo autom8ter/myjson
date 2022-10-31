@@ -7,6 +7,7 @@ import (
 	"reflect"
 )
 
+// Collection is database collection containing 1-many documents of the same type
 type Collection struct {
 	name       string
 	primaryKey string
@@ -67,14 +68,17 @@ func NewCollection(name string, primaryKey string, opts ...CollectionOpt) *Colle
 	return c
 }
 
+// Name returns the collections name
 func (c *Collection) Name() string {
 	return c.name
 }
 
+// PrimaryKey returns the collections primary key
 func (c *Collection) PrimaryKey() string {
 	return c.primaryKey
 }
 
+// Indexes returns the collections configured indexes
 func (c *Collection) Indexes() []Index {
 	var indexes []Index
 	for _, i := range c.indexes {
@@ -83,11 +87,12 @@ func (c *Collection) Indexes() []Index {
 	return indexes
 }
 
-func (c *Collection) Validate(ctx context.Context, bits []byte) error {
+// Validate validates the input document - it is used by the CoreAPI to validate changes to documents
+func (c *Collection) Validate(ctx context.Context, d *Document) error {
 	if len(c.validators) == 0 {
 		return nil
 	}
-	doc, err := NewDocumentFromBytes(bits)
+	doc, err := NewDocumentFromBytes(d.Bytes())
 	if err != nil {
 		return stacktrace.Propagate(err, "")
 	}

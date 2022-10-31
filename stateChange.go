@@ -5,14 +5,19 @@ import (
 	"time"
 )
 
+// Action
 type Action string
 
 const (
-	Set    = "set"
+	// Set sets a document's values in place
+	Set = "set"
+	// Update updates a set of fields on a document
 	Update = "update"
+	// Delete deletes a document
 	Delete = "delete"
 )
 
+// StateChange is a mutation to a set of documents
 type StateChange struct {
 	ctx        context.Context
 	Collection string                    `json:"collection,omitempty"`
