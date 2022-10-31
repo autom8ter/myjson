@@ -2,171 +2,502 @@ package wolverine
 
 import (
 	"context"
-	"fmt"
-	"sync"
-
+	_ "embed"
 	"github.com/autom8ter/machine/v4"
-	"github.com/blevesearch/bleve"
-	"github.com/dgraph-io/badger/v3"
+	"github.com/autom8ter/wolverine/kv"
+	"github.com/autom8ter/wolverine/kv/badger"
 	"github.com/palantir/stacktrace"
-	"github.com/robfig/cron"
-	"github.com/xeipuuv/gojsonschema"
-
-	"github.com/autom8ter/wolverine/internal/prefix"
+	"github.com/samber/lo"
+	"github.com/segmentio/ksuid"
+	"golang.org/x/sync/errgroup"
+	"sort"
+	"time"
 )
 
-type db struct {
-	Logger
-	config      Config
-	kv          *badger.DB
-	fullText    map[string]bleve.Index
-	mu          sync.RWMutex
-	collections map[string]Collection
-	cron        *cron.Cron
-	machine     machine.Machine
+type KVConfig struct {
+	// Provider is the name of the kv provider (badger)
+	Provider string `json:"provider"`
+	// Params are the kv providers params
+	Params map[string]string `json:"params"`
 }
 
-func New(ctx context.Context, cfg Config) (DB, error) {
-	config := &cfg
-	opts := badger.DefaultOptions(config.Path)
-	if config.Path == "inmem" {
-		opts.InMemory = true
-		opts.Dir = ""
-		opts.ValueDir = ""
-	}
-	opts = opts.WithLoggingLevel(badger.ERROR)
-	kv, err := badger.Open(opts)
-	if err != nil {
-		return nil, err
-	}
-	collections := map[string]Collection{
-		"system": {
-			Name: "system",
-		},
-	}
-	fulltext := map[string]bleve.Index{}
-	for _, collection := range config.Collections {
-		collections[collection.Name] = collection
-		for _, i := range collection.Indexes {
-			if i.FullText {
-				indexMapping := bleve.NewIndexMapping()
-				if len(i.Fields) > 0 && i.Fields[0] != "*" {
-					//document := bleve.NewDocumentMapping()
-					//for _, f := range i.Fields {
-					//	disabled := bleve.NewDocumentDisabledMapping()
-					//	document.AddSubDocumentMapping(f, disabled)
-					//}
-					//indexMapping.AddDocumentMapping("index", document)
-				}
+// Config configures a database instance
+type Config struct {
+	KV KVConfig `json:"kv"`
+	// Collections are the json document collections supported by the DB - At least one is required.
+	Collections []*Collection `json:"collections"`
+	// Middlewares are middlewares to apply to the database instance
+	Middlewares []Middleware
+}
 
-				if config.Path == "inmem" {
-					i, err := bleve.NewMemOnly(indexMapping)
-					if err != nil {
-						return nil, err
-					}
-					fulltext[collection.Name] = i
-				} else {
-					path := fmt.Sprintf("%s/search/%s.bleve", config.Path, collection.Name)
-					i, err := bleve.Open(path)
-					if err == nil {
-						fulltext[collection.Name] = i
-					} else {
-						i, err = bleve.New(path, indexMapping)
-						if err != nil {
-							return nil, err
-						}
-						fulltext[collection.Name] = i
-					}
-				}
-			}
-		}
-		if collection.JSONSchema != "" {
-			schema, err := gojsonschema.NewSchema(gojsonschema.NewStringLoader(collection.JSONSchema))
-			if err != nil {
-				return nil, stacktrace.Propagate(err, "")
-			}
-			collection.loadedSchema = schema
-		}
+// DB is an embedded, durable NoSQL database with support for schemas, full text search, and aggregation
+type DB struct {
+	config          Config
+	core            CoreAPI
+	machine         machine.Machine
+	collections     []*DBCollection
+	collectionNames []string
+}
+
+// NewFromCore creates a DB instance from the given core API. This function should only be used if the underlying database
+// engine needs to be swapped out.
+func NewFromCore(ctx context.Context, cfg Config, c CoreAPI) (*DB, error) {
+	if len(cfg.Collections) == 0 {
+		return nil, stacktrace.NewErrorWithCode(ErrTODO, "zero collections configured")
 	}
-	d := &db{
-		config:      *config,
-		kv:          kv,
-		fullText:    fulltext,
-		mu:          sync.RWMutex{},
-		collections: collections,
-		cron:        cron.New(),
-		machine:     machine.New(),
-	}
-	for _, c := range config.CronJobs {
-		if err := d.cron.AddFunc(c.Schedule, func() {
-			c.Function(ctx, d)
-		}); err != nil {
-			return nil, err
-		}
-	}
-	d.Logger = config.Logger
-	if d.Logger == nil {
-		level := "info"
-		if config.Debug {
-			level = "debug"
-		}
-		lgger, err := NewLogger(level, map[string]any{})
-		if err != nil {
-			return nil, err
-		}
-		d.Logger = lgger
-	}
-	if config.ReIndex {
-		if err := d.ReIndex(ctx); err != nil {
-			return nil, fmt.Errorf("failed to reindex: %s", err)
-		}
-	}
-	if config.Migrate {
-		if err := d.Migrate(ctx, config.Migrations); err != nil {
-			return nil, err
-		}
+	d := &DB{
+		config:  cfg,
+		core:    c,
+		machine: machine.New(),
 	}
 
-	d.cron.Start()
+	for _, collection := range cfg.Collections {
+		d.collections = append(d.collections, &DBCollection{
+			schema: collection,
+			db:     d,
+		})
+		d.collectionNames = append(d.collectionNames, collection.Name())
+	}
+
+	if err := d.core.SetCollections(ctx, cfg.Collections); err != nil {
+		return nil, stacktrace.Propagate(err, "failed to set database collections")
+	}
+	sort.Strings(d.collectionNames)
 	return d, nil
 }
 
-func (i Index) prefix(collection string) *prefix.PrefixIndexRef {
-	return prefix.NewPrefixedIndex(collection, i.Fields)
+// New creates a new database instance from the given config
+func New(ctx context.Context, cfg Config) (*DB, error) {
+	var (
+		db  kv.DB
+		err error
+	)
+	switch cfg.KV.Provider {
+	default:
+		db, err = badger.New(cfg.KV.Params["storage_path"])
+	}
+	rcore, err := NewCore(db)
+	if err != nil {
+		return nil, stacktrace.NewErrorWithCode(ErrTODO, "failed to configure core provider")
+	}
+	return NewFromCore(ctx, cfg, rcore)
 }
 
-func chooseIndex(collection Collection, queryFields []string) *prefix.PrefixIndexRef {
-	//sort.Strings(queryFields)
-	var targetIndex = Index{
-		Fields:   []string{"_id"},
-		FullText: false,
+// Core returns the CoreAPI instance powering the database
+func (d *DB) Core() CoreAPI {
+	return d.core
+}
+
+// Close closes the database
+func (d *DB) Close(ctx context.Context) error {
+	return d.core.Close(ctx)
+}
+
+// ReIndex reindexes every collection in the database
+func (d *DB) ReIndex(ctx context.Context) error {
+	egp, ctx := errgroup.WithContext(ctx)
+	for _, c := range d.collections {
+		c := c
+		egp.Go(func() error {
+			return d.Collection(c.schema.Name()).Reindex(ctx)
+		})
 	}
-	for _, index := range collection.Indexes {
-		if len(index.Fields) != len(queryFields) {
-			continue
+	return stacktrace.Propagate(egp.Wait(), "")
+}
+
+// Collection executes the given function on the collection
+func (d *DB) Collection(collection string) *DBCollection {
+	for _, c := range d.collections {
+		if c.schema.Name() == collection {
+			return c
 		}
-		match := true
-		for i, f := range queryFields {
-			if index.Fields[i] != f {
-				match = false
+	}
+	return nil
+}
+
+// RegisteredCollections returns a list of registered collections
+func (d *DB) RegisteredCollections() []string {
+	return d.collectionNames
+}
+
+// HasCollection returns true if the collection is present in the database
+func (d *DB) HasCollection(name string) bool {
+	return lo.Contains(d.collectionNames, name)
+}
+
+// DBCollection is collection of documents in the database with the same schema. !-many collections are supported.
+type DBCollection struct {
+	schema *Collection
+	db     *DB
+}
+
+// DB returns the collections underlying database connection
+func (c *DBCollection) DB() *DB {
+	return c.db
+}
+
+// Schema returns the collecctions schema information
+func (c *DBCollection) Schema() *Collection {
+	return c.schema
+}
+
+func (c *DBCollection) persistStateChange(ctx context.Context, change StateChange) error {
+	return c.db.core.Persist(ctx, c.schema.Name(), change)
+}
+
+// Get gets a single document by id
+func (c *DBCollection) Get(ctx context.Context, id string) (*Document, error) {
+	var doc *Document
+	match, err := c.db.core.Scan(ctx, c.schema.Name(), Scan{
+		Filter: []Where{
+			{
+				Field: c.schema.PrimaryKey(),
+				Op:    Eq,
+				Value: id,
+			},
+		},
+	}, func(d *Document) (bool, error) {
+		if doc == nil {
+			doc = d
+		}
+		return false, nil
+	})
+	if err != nil {
+		return nil, stacktrace.Propagate(err, "")
+	}
+	if doc == nil {
+		return nil, stacktrace.NewErrorWithCode(ErrTODO, "%s not found", id)
+	}
+	if len(match.MatchedFields) == 0 || match.MatchedFields[0] != c.schema.PrimaryKey() {
+		return nil, stacktrace.NewErrorWithCode(ErrTODO, "%s failed to get from primary index", id)
+	}
+	return doc, nil
+}
+
+// QueryPaginate paginates through each page of the query until the handlePage function returns false or there are no more results
+func (c *DBCollection) QueryPaginate(ctx context.Context, query Query, handlePage PageHandler) error {
+	page := query.Page
+	for {
+		results, err := c.Query(ctx, Query{
+			Select:  query.Select,
+			Where:   query.Where,
+			Page:    page,
+			Limit:   query.Limit,
+			OrderBy: query.OrderBy,
+		})
+		if err != nil {
+			return stacktrace.Propagate(err, "failed to query collection: %s", c.schema.Name())
+		}
+		if len(results.Documents) == 0 {
+			return nil
+		}
+		if !handlePage(results) {
+			return nil
+		}
+		page++
+	}
+}
+
+// ChangeStream streams all state changes to the given function
+func (c *DBCollection) ChangeStream(ctx context.Context, fn ChangeStreamHandler) error {
+	return c.db.core.ChangeStream(ctx, c.schema.Name(), fn)
+}
+
+// Create creates a new document - if the documents primary key is unset, it will be set as a sortable unique id
+func (c *DBCollection) Create(ctx context.Context, document *Document) (string, error) {
+	if c.schema.GetPrimaryKey(document) == "" {
+		id := ksuid.New().String()
+		err := c.schema.SetPrimaryKey(document, id)
+		if err != nil {
+			return "", stacktrace.Propagate(err, "")
+		}
+	}
+	return c.schema.GetPrimaryKey(document), stacktrace.Propagate(c.persistStateChange(ctx, StateChange{
+		Collection: c.schema.Name(),
+		Sets:       []*Document{document},
+		Timestamp:  time.Now(),
+	}), "")
+}
+
+// BatchCreate creates 1-many documents. If each documents primary key is unset, it will be set as a sortable unique id.
+func (c *DBCollection) BatchCreate(ctx context.Context, documents []*Document) ([]string, error) {
+	var ids []string
+	for _, document := range documents {
+		if c.schema.GetPrimaryKey(document) == "" {
+			id := ksuid.New().String()
+			err := c.schema.SetPrimaryKey(document, id)
+			if err != nil {
+				return nil, stacktrace.Propagate(err, "")
 			}
 		}
-		if match {
-			targetIndex = index
-		}
+		ids = append(ids, c.schema.GetPrimaryKey(document))
 	}
-	return targetIndex.prefix(collection.Name)
+
+	if err := c.persistStateChange(ctx, StateChange{
+		Collection: c.schema.Name(),
+		Sets:       documents,
+		Timestamp:  time.Now(),
+	}); err != nil {
+		return nil, stacktrace.Propagate(err, "")
+	}
+	return ids, nil
 }
 
-func (d *db) getQueryPrefix(collection string, where []Where) []byte {
-	var whereFields []string
-	var whereValues = map[string]any{}
-	for _, w := range where {
-		if w.Op != "==" && w.Op != "eq" {
-			continue
-		}
-		whereFields = append(whereFields, w.Field)
-		whereValues[w.Field] = w.Value
+// Set overwrites a single document. The documents primary key must be set.
+func (c *DBCollection) Set(ctx context.Context, document *Document) error {
+	return stacktrace.Propagate(c.persistStateChange(ctx, StateChange{
+		Collection: c.schema.Name(),
+		Sets:       []*Document{document},
+		Timestamp:  time.Now(),
+	}), "")
+}
+
+// BatchSet overwrites 1-many documents. The documents primary key must be set.
+func (c *DBCollection) BatchSet(ctx context.Context, batch []*Document) error {
+	return stacktrace.Propagate(c.persistStateChange(ctx, StateChange{
+		Collection: c.schema.Name(),
+		Sets:       batch,
+		Timestamp:  time.Now(),
+	}), "")
+}
+
+// Update patches a single document. The documents primary key must be set.
+func (c *DBCollection) Update(ctx context.Context, id string, update map[string]any) error {
+	return stacktrace.Propagate(c.persistStateChange(ctx, StateChange{
+		Collection: c.schema.Name(),
+		Updates: map[string]map[string]any{
+			id: update,
+		},
+		Timestamp: time.Now(),
+	}), "")
+}
+
+// BatchUpdate patches a 1-many documents. The documents primary key must be set.
+func (c *DBCollection) BatchUpdate(ctx context.Context, batch map[string]map[string]any) error {
+	return stacktrace.Propagate(c.persistStateChange(ctx, StateChange{
+		Collection: c.schema.Name(),
+		Updates:    batch,
+		Timestamp:  time.Now(),
+	}), "")
+}
+
+// Delete deletes a single document by id
+func (c *DBCollection) Delete(ctx context.Context, id string) error {
+	return stacktrace.Propagate(c.persistStateChange(ctx, StateChange{
+		Collection: c.schema.Name(),
+		Deletes:    []string{id},
+		Timestamp:  time.Now(),
+	}), "")
+}
+
+// BatchDelete deletes 1-many documents by id
+func (c *DBCollection) BatchDelete(ctx context.Context, ids []string) error {
+	return stacktrace.Propagate(c.persistStateChange(ctx, StateChange{
+		Collection: c.schema.Name(),
+		Deletes:    ids,
+		Timestamp:  time.Now(),
+	}), "")
+}
+
+// QueryUpdate updates the documents returned from the query
+func (c *DBCollection) QueryUpdate(ctx context.Context, update map[string]any, query Query) error {
+	results, err := c.Query(ctx, query)
+	if err != nil {
+		return stacktrace.Propagate(err, "")
 	}
-	return []byte(chooseIndex(d.collections[collection], whereFields).GetIndex(whereValues))
+	for _, document := range results.Documents {
+		err := document.SetAll(update)
+		if err != nil {
+			return stacktrace.Propagate(err, "")
+		}
+	}
+	return stacktrace.Propagate(c.BatchSet(ctx, results.Documents), "")
+}
+
+// QueryDelete deletes the documents returned from the query
+func (c *DBCollection) QueryDelete(ctx context.Context, query Query) error {
+	results, err := c.Query(ctx, query)
+	if err != nil {
+		return stacktrace.Propagate(err, "")
+	}
+	var ids []string
+	for _, document := range results.Documents {
+		ids = append(ids, c.schema.GetPrimaryKey(document))
+	}
+	return stacktrace.Propagate(c.BatchDelete(ctx, ids), "")
+}
+
+// Aggregate performs aggregations against the collection
+func (c *DBCollection) Aggregate(ctx context.Context, query AggregateQuery) (Page, error) {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	now := time.Now()
+	var results Documents
+	match, err := c.db.core.Scan(ctx, c.schema.Name(), Scan{
+		Filter:  query.Where,
+		Reverse: query.OrderBy.Direction == DESC,
+	}, func(d *Document) (bool, error) {
+		results = append(results, d)
+		return true, nil
+	})
+	if err != nil {
+		return Page{}, stacktrace.Propagate(err, "")
+	}
+	var reduced Documents
+	for _, values := range results.GroupBy(query.GroupBy) {
+		value, err := values.Aggregate(ctx, query.Aggregates)
+		if err != nil {
+			return Page{}, stacktrace.Propagate(err, "")
+		}
+		reduced = append(reduced, value)
+	}
+	reduced = reduced.OrderBy(query.OrderBy)
+	if query.Limit > 0 && query.Page > 0 {
+		reduced = lo.Slice(reduced, query.Limit*query.Page, (query.Limit*query.Page)+query.Limit)
+	}
+	if query.Limit > 0 && len(reduced) > query.Limit {
+		reduced = reduced[:query.Limit]
+	}
+
+	return Page{
+		Documents: reduced.Map(func(t *Document, i int) *Document {
+			toSelect := query.GroupBy
+			for _, a := range query.Aggregates {
+				toSelect = append(toSelect, a.Alias)
+			}
+			err := t.Select(toSelect)
+			if err != nil {
+				//	return Page{}, stacktrace.Propagate(err, "")
+			}
+			return t
+		}),
+		NextPage: query.Page + 1,
+		Count:    len(reduced),
+		Stats: PageStats{
+			ExecutionTime: time.Since(now),
+			IndexMatch:    match,
+		},
+	}, nil
+}
+
+// Reindex the collection
+func (c *DBCollection) Reindex(ctx context.Context) error {
+	meta, ok := GetContext(ctx)
+	if !ok {
+		meta = NewContext(map[string]any{})
+	}
+	meta.Set("_reindexing", true)
+	meta.Set("_internal", true)
+	egp, ctx := errgroup.WithContext(meta.ToContext(ctx))
+	var page int
+	for {
+		results, err := c.Query(ctx, Query{
+			Select:  nil,
+			Where:   nil,
+			Page:    page,
+			Limit:   1000,
+			OrderBy: OrderBy{},
+		})
+		if err != nil {
+			return stacktrace.Propagate(err, "failed to reindex collection: %s", c.schema.Name())
+		}
+		if len(results.Documents) == 0 {
+			break
+		}
+		var toSet []*Document
+		var toDelete []string
+		for _, r := range results.Documents {
+			result, _ := c.Get(ctx, c.schema.GetPrimaryKey(r))
+			if result.Valid() {
+				toSet = append(toSet, result)
+			} else {
+				toDelete = append(toDelete, c.schema.GetPrimaryKey(r))
+				_ = c.Delete(ctx, c.schema.GetPrimaryKey(r))
+			}
+		}
+		if len(toSet) > 0 {
+			egp.Go(func() error {
+				return stacktrace.Propagate(c.BatchSet(ctx, toSet), "")
+			})
+		}
+		if len(toDelete) > 0 {
+			egp.Go(func() error {
+				return stacktrace.Propagate(c.BatchDelete(ctx, toDelete), "")
+			})
+		}
+		page = results.NextPage
+	}
+	if err := egp.Wait(); err != nil {
+		return stacktrace.Propagate(err, "failed to reindex collection: %s", c.schema.Name())
+	}
+	return nil
+}
+
+// Transform executes a transformation which is basically ETL from one collection to another
+func (c *DBCollection) Transform(ctx context.Context, transformation ETL, handler ETLFunc) error {
+	if handler == nil {
+		return stacktrace.NewError("empty transformer")
+	}
+	if transformation.OutputCollection == "" {
+		return stacktrace.NewError("empty output collection")
+	}
+	res, err := c.Query(ctx, transformation.Query)
+	if err != nil {
+		return stacktrace.Propagate(err, "")
+	}
+	res.Documents, err = handler(ctx, res.Documents)
+	if err != nil {
+		return stacktrace.Propagate(err, "")
+	}
+	if len(res.Documents) > 0 {
+		if err := c.db.Collection(transformation.OutputCollection).BatchSet(ctx, res.Documents); err != nil {
+			return stacktrace.Propagate(err, "")
+		}
+	}
+	return nil
+}
+
+// Query queries a list of documents
+func (c *DBCollection) Query(ctx context.Context, query Query) (Page, error) {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	now := time.Now()
+	var results Documents
+	match, err := c.db.core.Scan(ctx, c.schema.Name(), Scan{
+		Filter:  query.Where,
+		Reverse: query.OrderBy.Direction == DESC,
+	}, func(d *Document) (bool, error) {
+		results = append(results, d)
+		return true, nil
+	})
+	if err != nil {
+		return Page{}, stacktrace.Propagate(err, "")
+	}
+	results = results.OrderBy(query.OrderBy)
+
+	if query.Limit > 0 && query.Page > 0 {
+		results = lo.Slice(results, query.Limit*query.Page, (query.Limit*query.Page)+query.Limit)
+	}
+	if query.Limit > 0 && len(results) > query.Limit {
+		results = results[:query.Limit]
+	}
+
+	if len(query.Select) > 0 && query.Select[0] != "*" {
+		for _, result := range results {
+			err := result.Select(query.Select)
+			if err != nil {
+				return Page{}, stacktrace.Propagate(err, "")
+			}
+		}
+	}
+
+	return Page{
+		Documents: results,
+		NextPage:  query.Page + 1,
+		Count:     len(results),
+		Stats: PageStats{
+			ExecutionTime: time.Since(now),
+			IndexMatch:    match,
+		},
+	}, nil
 }
