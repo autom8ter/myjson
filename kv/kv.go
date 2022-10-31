@@ -7,9 +7,9 @@ type DB interface {
 }
 
 type IterOpts struct {
-	Prefix  []byte
-	Seek    []byte
-	Reverse bool
+	Prefix  []byte `json:"prefix"`
+	Seek    []byte `json:"seek"`
+	Reverse bool   `json:"reverse"`
 }
 
 type Tx interface {

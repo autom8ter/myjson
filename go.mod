@@ -60,7 +60,8 @@ require (
 	github.com/qri-io/jsonpointer v0.1.1 // indirect
 	github.com/steveyen/gtreap v0.1.0 // indirect
 	github.com/tidwall/match v1.1.1 // indirect
-	github.com/tidwall/pretty v1.2.0 // indirect
+	github.com/tidwall/pretty v1.2.1 // indirect
+	github.com/wI2L/jsondiff v0.3.0 // indirect
 	github.com/willf/bitset v1.1.11 // indirect
 	go.etcd.io/bbolt v1.3.6 // indirect
 	go.opencensus.io v0.22.5 // indirect

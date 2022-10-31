@@ -6,12 +6,12 @@ import (
 	"github.com/autom8ter/wolverine"
 )
 
-// Middleware is a set of wrapper functions that alter core functionality
+// Middleware is a set of wrapper functions that alter core database functionality
 type Middleware struct {
-	Persist      PersistWare
-	Query        QueryWare
-	ChangeStream ChangeStreamWare
-	Scan         ScanWare
+	Persist        PersistWare
+	ChangeStream   ChangeStreamWare
+	Scan           ScanWare
+	SetCollections SetCollectionsWare
 }
 
 // applies the middleware to the coreWrapper and returns a new Core instance
@@ -24,38 +24,38 @@ func applyCoreMiddleware(c wolverine.CoreAPI, m Middleware) wolverine.CoreAPI {
 	if m.Persist != nil {
 		wrapped.persist = m.Persist(c.Persist)
 	}
-	if m.Query != nil {
-		wrapped.query = m.Query(c.Query)
-	}
 	if m.ChangeStream != nil {
 		wrapped.changeStream = m.ChangeStream(c.ChangeStream)
 	}
 	if m.Scan != nil {
 		wrapped.scan = m.Scan(c.Scan)
 	}
+	if m.SetCollections != nil {
+		wrapped.setCollections = m.SetCollections(c.SetCollections)
+	}
 	return wrapped
 }
 
+// SetCollectionsFunc sets collections in a database
+type SetCollectionsFunc func(ctx context.Context, collections []*wolverine.Collection) error
+
+// SetCollectionsWare wraps a SetCollectionsFunc and returns a new one
+type SetCollectionsWare func(collectionsFunc SetCollectionsFunc) SetCollectionsFunc
+
 // PersistFunc persists changes to a collection
-type PersistFunc func(ctx context.Context, collection *wolverine.Collection, change wolverine.StateChange) error
+type PersistFunc func(ctx context.Context, collection string, change wolverine.StateChange) error
 
 // PersistWare wraps a PersistFunc and returns a new one
 type PersistWare func(PersistFunc) PersistFunc
 
-// QueryFunc queries documents in a collection
-type QueryFunc func(ctx context.Context, collection *wolverine.Collection, query wolverine.Query) (wolverine.Page, error)
-
-// QueryWare wraps a QueryFunc and returns a new one
-type QueryWare func(QueryFunc) QueryFunc
-
 // ScanFunc queries documents in a collection
-type ScanFunc func(ctx context.Context, collection *wolverine.Collection, scan wolverine.Scan, scanner wolverine.ScanFunc) error
+type ScanFunc func(ctx context.Context, collection string, scan wolverine.Scan, scanner wolverine.ScanFunc) (wolverine.IndexMatch, error)
 
 // ScanWare wraps a ScanFunc and returns a new one
 type ScanWare func(ScanFunc) ScanFunc
 
 // ChangeStreamFunc listens to changes in a ccollection
-type ChangeStreamFunc func(ctx context.Context, collection *wolverine.Collection, fn wolverine.ChangeStreamHandler) error
+type ChangeStreamFunc func(ctx context.Context, collection string, fn wolverine.ChangeStreamHandler) error
 
 // ChangeStreamWare wraps a ChangeStreamFunc and returns a new one
 type ChangeStreamWare func(ChangeStreamFunc) ChangeStreamFunc
@@ -64,14 +64,14 @@ type ChangeStreamWare func(ChangeStreamFunc) ChangeStreamFunc
 type CloseFunc func(ctx context.Context) error
 
 type coreWrapper struct {
-	persist      PersistFunc
-	query        QueryFunc
-	scan         ScanFunc
-	changeStream ChangeStreamFunc
-	close        CloseFunc
+	persist        PersistFunc
+	scan           ScanFunc
+	changeStream   ChangeStreamFunc
+	setCollections SetCollectionsFunc
+	close          CloseFunc
 }
 
-func (c coreWrapper) Scan(ctx context.Context, collection *wolverine.Collection, scan wolverine.Scan, scanner wolverine.ScanFunc) error {
+func (c coreWrapper) Scan(ctx context.Context, collection string, scan wolverine.Scan, scanner wolverine.ScanFunc) (wolverine.IndexMatch, error) {
 	return c.scan(ctx, collection, scan, scanner)
 }
 
@@ -82,23 +82,23 @@ func (c coreWrapper) Close(ctx context.Context) error {
 	return c.close(ctx)
 }
 
-func (c coreWrapper) Persist(ctx context.Context, collection *wolverine.Collection, change wolverine.StateChange) error {
+func (c coreWrapper) Persist(ctx context.Context, collection string, change wolverine.StateChange) error {
 	if c.persist == nil {
 		return fmt.Errorf("unimplemented")
 	}
 	return c.persist(ctx, collection, change)
 }
 
-func (c coreWrapper) Query(ctx context.Context, collection *wolverine.Collection, query wolverine.Query) (wolverine.Page, error) {
-	if c.query == nil {
-		return wolverine.Page{}, fmt.Errorf("unimplemented")
-	}
-	return c.query(ctx, collection, query)
-}
-
-func (c coreWrapper) ChangeStream(ctx context.Context, collection *wolverine.Collection, fn wolverine.ChangeStreamHandler) error {
+func (c coreWrapper) ChangeStream(ctx context.Context, collection string, fn wolverine.ChangeStreamHandler) error {
 	if c.changeStream == nil {
 		return fmt.Errorf("unimplemented")
 	}
 	return c.changeStream(ctx, collection, fn)
+}
+
+func (c coreWrapper) SetCollections(ctx context.Context, collections []*wolverine.Collection) error {
+	if c.setCollections == nil {
+		return fmt.Errorf("unimplemented")
+	}
+	return c.setCollections(ctx, collections)
 }

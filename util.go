@@ -1,6 +1,7 @@
 package wolverine
 
 import (
+	"context"
 	"encoding/json"
 	"github.com/mitchellh/mapstructure"
 )
@@ -48,4 +49,13 @@ func Decode(input any, output any) error {
 func JSONString(input any) string {
 	bits, _ := json.Marshal(input)
 	return string(bits)
+}
+
+func isInternalCtx(ctx context.Context) bool {
+	meta, _ := GetContext(ctx)
+	isInternal, ok := meta.Get("_internal")
+	if ok && isInternal == true {
+		return true
+	}
+	return false
 }

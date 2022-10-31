@@ -1,182 +1,107 @@
 package wolverine
 
 import (
-	"encoding/json"
-	"github.com/autom8ter/wolverine/prefix"
+	"context"
 	"github.com/palantir/stacktrace"
 	"github.com/spf13/cast"
-	"gopkg.in/yaml.v3"
-	"io/fs"
-	"io/ioutil"
-	"os"
-	"strings"
+	"reflect"
 )
 
-// Collection is a collection of records of a given type. It is
 type Collection struct {
-	JSONSchema
+	name       string
+	primaryKey string
+	indexes    map[string]Index
+	validators []DocumentValidator
 }
 
-// NewCollection creates a new Collection from the provided JSONSchema
-func NewCollection(schema JSONSchema) *Collection {
-	return &Collection{
-		JSONSchema: schema,
+// DocumentValidator is used to validate all new and updated documents being persisted to a collection
+type DocumentValidator func(ctx context.Context, d *Document) error
+
+// CollectionOpt is an option for configuring a collection
+type CollectionOpt func(c *Collection)
+
+// WithIndex adds an index to the collection
+func WithIndex(indexes ...Index) CollectionOpt {
+	return func(c *Collection) {
+		for _, i := range indexes {
+			c.indexes[i.Name] = i
+		}
 	}
 }
 
-// NewCollectionFromBytes creates a new Collection from the provided JSONSchema bytes
-func NewCollectionFromBytes(jsonSchema []byte) (*Collection, error) {
-	scheme, err := NewJSONSchema(jsonSchema)
+// WithValidator adds a document validator to the collection
+func WithValidator(validator DocumentValidator) CollectionOpt {
+	return func(c *Collection) {
+		c.validators = append(c.validators, validator)
+	}
+}
+
+// NewCollection creates a new collection from the given options. If indexing.PrimaryKey is empty, it will default to _id.
+func NewCollection(name string, primaryKey string, opts ...CollectionOpt) *Collection {
+	c := &Collection{
+		name:       name,
+		primaryKey: primaryKey,
+		indexes:    map[string]Index{},
+	}
+	for _, o := range opts {
+		o(c)
+	}
+	hasPrimary := false
+	for _, i := range c.indexes {
+		if i.Collection == "" {
+			i.Collection = c.name
+		}
+		if i.Primary {
+			hasPrimary = true
+		}
+	}
+	if !hasPrimary {
+		c.indexes["primary_key_idx"] = Index{
+			Collection: c.name,
+			Name:       "primary_key_idx",
+			Fields:     []string{primaryKey},
+			Unique:     true,
+			Primary:    true,
+		}
+	}
+	return c
+}
+
+func (c *Collection) Name() string {
+	return c.name
+}
+
+func (c *Collection) PrimaryKey() string {
+	return c.primaryKey
+}
+
+func (c *Collection) Indexes() []Index {
+	var indexes []Index
+	for _, i := range c.indexes {
+		indexes = append(indexes, i)
+	}
+	return indexes
+}
+
+func (c *Collection) Validate(ctx context.Context, bits []byte) error {
+	if len(c.validators) == 0 {
+		return nil
+	}
+	doc, err := NewDocumentFromBytes(bits)
 	if err != nil {
-		return nil, stacktrace.Propagate(err, "")
+		return stacktrace.Propagate(err, "")
 	}
-	return NewCollection(scheme), nil
-}
-
-// NewCollectionFromBytes creates a new Collection from the provided JSONSchema bytes - it panics on error
-func NewCollectionFromBytesP(jsonSchema []byte) *Collection {
-	scheme, err := NewJSONSchema(jsonSchema)
-	if err != nil {
-		panic(stacktrace.Propagate(err, "failed to parse json schema"))
-	}
-	return NewCollection(scheme)
-}
-
-// LoadCollectionsFromDir loads all yaml/json collections in the specified directory
-func LoadCollectionsFromDir(collectionsDir string) ([]*Collection, error) {
-	var collections []*Collection
-	dir := os.DirFS(collectionsDir)
-	if err := fs.WalkDir(dir, ".", func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
+	for _, validator := range c.validators {
+		if err := validator(ctx, doc); err != nil {
 			return stacktrace.Propagate(err, "")
 		}
-		if d.IsDir() {
-			return nil
-		}
-
-		switch {
-		case strings.HasSuffix(path, ".yaml"):
-			files, err := dir.Open(path)
-			if err != nil {
-				return stacktrace.Propagate(err, "")
-			}
-			f, err := ioutil.ReadAll(files)
-			if err != nil {
-				return stacktrace.Propagate(err, "")
-			}
-			data := map[string]interface{}{}
-			if err := yaml.Unmarshal(f, &data); err != nil {
-				return stacktrace.Propagate(err, "")
-			}
-			jsonData, err := json.Marshal(data)
-			if err != nil {
-				return stacktrace.Propagate(err, "")
-			}
-			schema, err := NewJSONSchema(jsonData)
-			if err != nil {
-				return stacktrace.Propagate(err, "")
-			}
-			collections = append(collections, NewCollection(schema))
-		case strings.HasSuffix(path, ".json"):
-			files, err := dir.Open(path)
-			if err != nil {
-				return stacktrace.Propagate(err, "")
-			}
-			f, err := ioutil.ReadAll(files)
-			if err != nil {
-				return stacktrace.Propagate(err, "")
-			}
-			schema, err := NewJSONSchema(f)
-			if err != nil {
-				return stacktrace.Propagate(err, "")
-			}
-			collections = append(collections, NewCollection(schema))
-		}
-		return nil
-	}); err != nil {
-		return nil, stacktrace.Propagate(err, "")
 	}
-	return collections, nil
-}
-
-// OptimizeIndex selects the optimal index to use given the where/orderby clause
-func (c *Collection) OptimizeIndex(where []Where, order OrderBy) (IndexMatch, error) {
-	var whereFields []string
-	var whereValues = map[string]any{}
-	for _, w := range where {
-		switch w.Op {
-		case "==", Eq:
-			whereFields = append(whereFields, w.Field)
-			whereValues[w.Field] = w.Value
-		}
-	}
-	index, err := c.getIndex(whereFields, order.Field)
-	if err != nil {
-		return IndexMatch{}, stacktrace.Propagate(err, "")
-	}
-	return index, nil
-}
-
-// PrimaryIndex returns a reference to the primary index
-func (c *Collection) PrimaryIndex() *prefix.PrefixIndexRef {
-	return prefix.NewPrefixedIndex(c.Collection(), []string{c.PrimaryKey()})
-}
-
-// GetPrimaryKeyRef gets a reference to the documents primary key in the primary index
-func (c *Collection) GetPrimaryKeyRef(documentID string) ([]byte, error) {
-	if documentID == "" {
-		return nil, stacktrace.NewErrorWithCode(ErrTODO, "empty document id for property: %s", c.PrimaryKey())
-	}
-	return c.PrimaryIndex().GetPrefix(map[string]any{
-		c.PrimaryKey(): documentID,
-	}).Seek([]byte(documentID)), nil
+	return nil
 }
 
 // SetPrimaryKey sets the documents primary key
 func (c *Collection) SetPrimaryKey(d *Document, id string) error {
 	return stacktrace.Propagate(d.Set(c.PrimaryKey(), id), "failed to set primary key")
-}
-
-// GetIndex gets the
-func (c *Collection) getIndex(whereFields []string, orderBy string) (IndexMatch, error) {
-	var (
-		target  *Index
-		matched int
-		ordered bool
-	)
-	indexing := c.Indexing()
-	if !indexing.HasIndexes() {
-		return IndexMatch{
-			Ref:     c.PrimaryIndex(),
-			Fields:  []string{c.PrimaryKey()},
-			Ordered: orderBy == c.PrimaryKey() || orderBy == "",
-		}, nil
-	}
-	for _, index := range indexing.Indexes {
-		isOrdered := index.Fields[0] == orderBy
-		var totalMatched int
-		for i, f := range whereFields {
-			if index.Fields[i] == f {
-				totalMatched++
-			}
-		}
-		if totalMatched > matched || (!ordered && isOrdered) {
-			target = index
-			ordered = isOrdered
-		}
-	}
-	if target != nil && len(target.Fields) > 0 {
-		return IndexMatch{
-			Ref:     prefix.NewPrefixedIndex(c.Collection(), target.Fields),
-			Fields:  target.Fields,
-			Ordered: ordered,
-		}, nil
-	}
-	return IndexMatch{
-		Ref:     c.PrimaryIndex(),
-		Fields:  []string{c.PrimaryKey()},
-		Ordered: orderBy == c.PrimaryKey() || orderBy == "",
-	}, nil
 }
 
 // GetPrimaryKey gets the documents primary key(if it exists)
@@ -185,4 +110,38 @@ func (c *Collection) GetPrimaryKey(d *Document) string {
 		return ""
 	}
 	return cast.ToString(d.Get(c.PrimaryKey()))
+}
+
+type indexDiff struct {
+	toRemove []Index
+	toAdd    []Index
+	toUpdate []Index
+}
+
+func getIndexDiff(this, that map[string]Index) (indexDiff, error) {
+	var (
+		toRemove []Index
+		toAdd    []Index
+		toUpdate []Index
+	)
+	for _, index := range that {
+		if i, ok := this[index.Name]; !ok {
+			toAdd = append(toAdd, i)
+		}
+	}
+
+	for _, current := range this {
+		if i, ok := that[current.Name]; !ok {
+			toRemove = append(toRemove, i)
+		} else {
+			if !reflect.DeepEqual(i.Fields, current.Fields) {
+				toUpdate = append(toUpdate, i)
+			}
+		}
+	}
+	return indexDiff{
+		toRemove: toRemove,
+		toAdd:    toAdd,
+		toUpdate: toUpdate,
+	}, nil
 }

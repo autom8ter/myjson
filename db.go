@@ -14,27 +14,20 @@ import (
 	"time"
 )
 
+type KVConfig struct {
+	// Provider is the name of the kv provider (badger)
+	Provider string `json:"provider"`
+	// Params are the kv providers params
+	Params map[string]string `json:"params"`
+}
+
 // Config configures a database instance
 type Config struct {
-	Provider string            `json:"provider"`
-	Params   map[string]string `json:"params"`
+	KV KVConfig `json:"kv"`
 	// Collections are the json document collections supported by the DB - At least one is required.
 	Collections []*Collection `json:"collections"`
 	// Middlewares are middlewares to apply to the database instance
 	Middlewares []Middleware
-}
-
-// LoadConfig loads a config instance from the specified storeage path and a directory containing the collection schemas
-func LoadConfig(params map[string]string, schemaDir string, middlewares ...Middleware) (Config, error) {
-	collections, err := LoadCollectionsFromDir(schemaDir)
-	if err != nil {
-		return Config{}, stacktrace.Propagate(err, "")
-	}
-	return Config{
-		Params:      params,
-		Collections: collections,
-		Middlewares: middlewares,
-	}, nil
 }
 
 // DB is an embedded, durable NoSQL database with support for schemas, full text search, and aggregation
@@ -63,10 +56,11 @@ func NewFromCore(ctx context.Context, cfg Config, c CoreAPI) (*DB, error) {
 			schema: collection,
 			db:     d,
 		})
-		d.collectionNames = append(d.collectionNames, collection.Collection())
+		d.collectionNames = append(d.collectionNames, collection.Name())
 	}
-	if err := d.ReIndex(ctx); err != nil {
-		return nil, stacktrace.Propagate(err, "failed to reindex")
+
+	if err := d.core.SetCollections(ctx, cfg.Collections); err != nil {
+		return nil, stacktrace.Propagate(err, "failed to set database collections")
 	}
 	sort.Strings(d.collectionNames)
 	return d, nil
@@ -78,11 +72,11 @@ func New(ctx context.Context, cfg Config) (*DB, error) {
 		db  kv.DB
 		err error
 	)
-	switch cfg.Provider {
+	switch cfg.KV.Provider {
 	default:
-		db, err = badger.New(cfg.Params["storage_path"])
+		db, err = badger.New(cfg.KV.Params["storage_path"])
 	}
-	rcore, err := NewCore(db, cfg.Collections)
+	rcore, err := NewCore(db)
 	if err != nil {
 		return nil, stacktrace.NewErrorWithCode(ErrTODO, "failed to configure core provider")
 	}
@@ -105,7 +99,7 @@ func (d *DB) ReIndex(ctx context.Context) error {
 	for _, c := range d.collections {
 		c := c
 		egp.Go(func() error {
-			return d.Collection(c.schema.Collection()).Reindex(ctx)
+			return d.Collection(c.schema.Name()).Reindex(ctx)
 		})
 	}
 	return stacktrace.Propagate(egp.Wait(), "")
@@ -114,7 +108,7 @@ func (d *DB) ReIndex(ctx context.Context) error {
 // Collection executes the given function on the collection
 func (d *DB) Collection(collection string) *DBCollection {
 	for _, c := range d.collections {
-		if c.schema.Collection() == collection {
+		if c.schema.Name() == collection {
 			return c
 		}
 	}
@@ -148,18 +142,13 @@ func (c *DBCollection) Schema() *Collection {
 }
 
 func (c *DBCollection) persistStateChange(ctx context.Context, change StateChange) error {
-	return c.db.core.Persist(ctx, c.schema, change)
-}
-
-// Query queries a list of documents
-func (c *DBCollection) Query(ctx context.Context, query Query) (Page, error) {
-	return c.db.core.Query(ctx, c.schema, query)
+	return c.db.core.Persist(ctx, c.schema.Name(), change)
 }
 
 // Get gets a single document by id
 func (c *DBCollection) Get(ctx context.Context, id string) (*Document, error) {
 	var doc *Document
-	if err := c.db.core.Scan(ctx, c.schema, Scan{
+	match, err := c.db.core.Scan(ctx, c.schema.Name(), Scan{
 		Filter: []Where{
 			{
 				Field: c.schema.PrimaryKey(),
@@ -171,12 +160,16 @@ func (c *DBCollection) Get(ctx context.Context, id string) (*Document, error) {
 		if doc == nil {
 			doc = d
 		}
-		return true, nil
-	}); err != nil {
+		return false, nil
+	})
+	if err != nil {
 		return nil, stacktrace.Propagate(err, "")
 	}
 	if doc == nil {
 		return nil, stacktrace.NewErrorWithCode(ErrTODO, "%s not found", id)
+	}
+	if len(match.MatchedFields) == 0 || match.MatchedFields[0] != c.schema.PrimaryKey() {
+		return nil, stacktrace.NewErrorWithCode(ErrTODO, "%s failed to get from primary index", id)
 	}
 	return doc, nil
 }
@@ -193,7 +186,7 @@ func (c *DBCollection) QueryPaginate(ctx context.Context, query Query, handlePag
 			OrderBy: query.OrderBy,
 		})
 		if err != nil {
-			return stacktrace.Propagate(err, "failed to query collection: %s", c.schema.Collection())
+			return stacktrace.Propagate(err, "failed to query collection: %s", c.schema.Name())
 		}
 		if len(results.Documents) == 0 {
 			return nil
@@ -207,7 +200,7 @@ func (c *DBCollection) QueryPaginate(ctx context.Context, query Query, handlePag
 
 // ChangeStream streams all state changes to the given function
 func (c *DBCollection) ChangeStream(ctx context.Context, fn ChangeStreamHandler) error {
-	return c.db.core.ChangeStream(ctx, c.schema, fn)
+	return c.db.core.ChangeStream(ctx, c.schema.Name(), fn)
 }
 
 // Create creates a new document - if the documents primary key is unset, it will be set as a sortable unique id
@@ -220,7 +213,7 @@ func (c *DBCollection) Create(ctx context.Context, document *Document) (string, 
 		}
 	}
 	return c.schema.GetPrimaryKey(document), stacktrace.Propagate(c.persistStateChange(ctx, StateChange{
-		Collection: c.schema.Collection(),
+		Collection: c.schema.Name(),
 		Sets:       []*Document{document},
 		Timestamp:  time.Now(),
 	}), "")
@@ -241,7 +234,7 @@ func (c *DBCollection) BatchCreate(ctx context.Context, documents []*Document) (
 	}
 
 	if err := c.persistStateChange(ctx, StateChange{
-		Collection: c.schema.Collection(),
+		Collection: c.schema.Name(),
 		Sets:       documents,
 		Timestamp:  time.Now(),
 	}); err != nil {
@@ -253,7 +246,7 @@ func (c *DBCollection) BatchCreate(ctx context.Context, documents []*Document) (
 // Set overwrites a single document. The documents primary key must be set.
 func (c *DBCollection) Set(ctx context.Context, document *Document) error {
 	return stacktrace.Propagate(c.persistStateChange(ctx, StateChange{
-		Collection: c.schema.Collection(),
+		Collection: c.schema.Name(),
 		Sets:       []*Document{document},
 		Timestamp:  time.Now(),
 	}), "")
@@ -262,7 +255,7 @@ func (c *DBCollection) Set(ctx context.Context, document *Document) error {
 // BatchSet overwrites 1-many documents. The documents primary key must be set.
 func (c *DBCollection) BatchSet(ctx context.Context, batch []*Document) error {
 	return stacktrace.Propagate(c.persistStateChange(ctx, StateChange{
-		Collection: c.schema.Collection(),
+		Collection: c.schema.Name(),
 		Sets:       batch,
 		Timestamp:  time.Now(),
 	}), "")
@@ -271,7 +264,7 @@ func (c *DBCollection) BatchSet(ctx context.Context, batch []*Document) error {
 // Update patches a single document. The documents primary key must be set.
 func (c *DBCollection) Update(ctx context.Context, id string, update map[string]any) error {
 	return stacktrace.Propagate(c.persistStateChange(ctx, StateChange{
-		Collection: c.schema.Collection(),
+		Collection: c.schema.Name(),
 		Updates: map[string]map[string]any{
 			id: update,
 		},
@@ -282,7 +275,7 @@ func (c *DBCollection) Update(ctx context.Context, id string, update map[string]
 // BatchUpdate patches a 1-many documents. The documents primary key must be set.
 func (c *DBCollection) BatchUpdate(ctx context.Context, batch map[string]map[string]any) error {
 	return stacktrace.Propagate(c.persistStateChange(ctx, StateChange{
-		Collection: c.schema.Collection(),
+		Collection: c.schema.Name(),
 		Updates:    batch,
 		Timestamp:  time.Now(),
 	}), "")
@@ -291,7 +284,7 @@ func (c *DBCollection) BatchUpdate(ctx context.Context, batch map[string]map[str
 // Delete deletes a single document by id
 func (c *DBCollection) Delete(ctx context.Context, id string) error {
 	return stacktrace.Propagate(c.persistStateChange(ctx, StateChange{
-		Collection: c.schema.Collection(),
+		Collection: c.schema.Name(),
 		Deletes:    []string{id},
 		Timestamp:  time.Now(),
 	}), "")
@@ -300,7 +293,7 @@ func (c *DBCollection) Delete(ctx context.Context, id string) error {
 // BatchDelete deletes 1-many documents by id
 func (c *DBCollection) BatchDelete(ctx context.Context, ids []string) error {
 	return stacktrace.Propagate(c.persistStateChange(ctx, StateChange{
-		Collection: c.schema.Collection(),
+		Collection: c.schema.Name(),
 		Deletes:    ids,
 		Timestamp:  time.Now(),
 	}), "")
@@ -339,18 +332,15 @@ func (c *DBCollection) Aggregate(ctx context.Context, query AggregateQuery) (Pag
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	now := time.Now()
-	index, err := c.schema.OptimizeIndex(query.Where, query.OrderBy)
-	if err != nil {
-		return Page{}, stacktrace.Propagate(err, "")
-	}
 	var results Documents
-	if err := c.db.core.Scan(ctx, c.schema, Scan{
+	match, err := c.db.core.Scan(ctx, c.schema.Name(), Scan{
 		Filter:  query.Where,
 		Reverse: query.OrderBy.Direction == DESC,
 	}, func(d *Document) (bool, error) {
 		results = append(results, d)
 		return true, nil
-	}); err != nil {
+	})
+	if err != nil {
 		return Page{}, stacktrace.Propagate(err, "")
 	}
 	var reduced Documents
@@ -385,7 +375,7 @@ func (c *DBCollection) Aggregate(ctx context.Context, query AggregateQuery) (Pag
 		Count:    len(reduced),
 		Stats: PageStats{
 			ExecutionTime: time.Since(now),
-			IndexMatch:    index,
+			IndexMatch:    match,
 		},
 	}, nil
 }
@@ -409,7 +399,7 @@ func (c *DBCollection) Reindex(ctx context.Context) error {
 			OrderBy: OrderBy{},
 		})
 		if err != nil {
-			return stacktrace.Propagate(err, "failed to reindex collection: %s", c.schema.Collection())
+			return stacktrace.Propagate(err, "failed to reindex collection: %s", c.schema.Name())
 		}
 		if len(results.Documents) == 0 {
 			break
@@ -438,7 +428,7 @@ func (c *DBCollection) Reindex(ctx context.Context) error {
 		page = results.NextPage
 	}
 	if err := egp.Wait(); err != nil {
-		return stacktrace.Propagate(err, "failed to reindex collection: %s", c.schema.Collection())
+		return stacktrace.Propagate(err, "failed to reindex collection: %s", c.schema.Name())
 	}
 	return nil
 }
@@ -465,4 +455,49 @@ func (c *DBCollection) Transform(ctx context.Context, transformation ETL, handle
 		}
 	}
 	return nil
+}
+
+// Query queries a list of documents
+func (c *DBCollection) Query(ctx context.Context, query Query) (Page, error) {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	now := time.Now()
+	var results Documents
+	match, err := c.db.core.Scan(ctx, c.schema.Name(), Scan{
+		Filter:  query.Where,
+		Reverse: query.OrderBy.Direction == DESC,
+	}, func(d *Document) (bool, error) {
+		results = append(results, d)
+		return true, nil
+	})
+	if err != nil {
+		return Page{}, stacktrace.Propagate(err, "")
+	}
+	results = results.OrderBy(query.OrderBy)
+
+	if query.Limit > 0 && query.Page > 0 {
+		results = lo.Slice(results, query.Limit*query.Page, (query.Limit*query.Page)+query.Limit)
+	}
+	if query.Limit > 0 && len(results) > query.Limit {
+		results = results[:query.Limit]
+	}
+
+	if len(query.Select) > 0 && query.Select[0] != "*" {
+		for _, result := range results {
+			err := result.Select(query.Select)
+			if err != nil {
+				return Page{}, stacktrace.Propagate(err, "")
+			}
+		}
+	}
+
+	return Page{
+		Documents: results,
+		NextPage:  query.Page + 1,
+		Count:     len(results),
+		Stats: PageStats{
+			ExecutionTime: time.Since(now),
+			IndexMatch:    match,
+		},
+	}, nil
 }
