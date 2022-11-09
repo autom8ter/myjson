@@ -2,14 +2,22 @@ package badger
 
 import (
 	"github.com/autom8ter/brutus/kv"
+	"github.com/autom8ter/brutus/kv/registry"
 	"github.com/dgraph-io/badger/v3"
+	"github.com/spf13/cast"
 )
+
+func init() {
+	registry.Register("badger", func(params map[string]interface{}) (kv.DB, error) {
+		return open(cast.ToString(params["storeage_path"]))
+	})
+}
 
 type badgerKV struct {
 	db *badger.DB
 }
 
-func New(storagePath string) (kv.DB, error) {
+func open(storagePath string) (kv.DB, error) {
 	opts := badger.DefaultOptions(storagePath)
 	if storagePath == "" {
 		opts.InMemory = true

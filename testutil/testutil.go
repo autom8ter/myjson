@@ -10,6 +10,7 @@ import (
 	"github.com/brianvoe/gofakeit/v6"
 
 	_ "embed"
+	_ "github.com/autom8ter/brutus/kv/badger"
 )
 
 var (
@@ -102,7 +103,7 @@ func TestDB(fn func(ctx context.Context, db *brutus.DB), collections ...*brutus.
 	defer cancel()
 	db, err := brutus.New(ctx, brutus.KVConfig{
 		Provider: "badger",
-		Params: map[string]string{
+		Params: map[string]any{
 			"storage_path": dir,
 		},
 	})

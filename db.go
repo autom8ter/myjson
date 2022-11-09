@@ -4,7 +4,7 @@ import (
 	"context"
 	_ "embed"
 	"github.com/autom8ter/brutus/kv"
-	"github.com/autom8ter/brutus/kv/badger"
+	"github.com/autom8ter/brutus/kv/registry"
 	"github.com/autom8ter/machine/v4"
 	"github.com/palantir/stacktrace"
 	"github.com/samber/lo"
@@ -16,7 +16,7 @@ type KVConfig struct {
 	// Provider is the name of the kv provider (badger)
 	Provider string `json:"provider"`
 	// Params are the kv providers params
-	Params map[string]string `json:"params"`
+	Params map[string]any `json:"params"`
 }
 
 // Config configures a database instance
@@ -51,22 +51,18 @@ badger(default):
 
 */
 func OpenKV(cfg KVConfig) (kv.DB, error) {
-	switch cfg.Provider {
-	default:
-		db, err := badger.New(cfg.Params["storage_path"])
-		return db, stacktrace.PropagateWithCode(err, ErrTODO, "failed to open kv database")
-	}
+	return registry.Open(cfg.Provider, cfg.Params)
 }
 
 // New creates a new database instance from the given config
 func New(ctx context.Context, cfg KVConfig) (*DB, error) {
 	db, err := OpenKV(cfg)
 	if err != nil {
-		return nil, stacktrace.NewErrorWithCode(ErrTODO, "failed to open kv database")
+		return nil, stacktrace.PropagateWithCode(err, ErrTODO, "failed to open kv database")
 	}
 	rcore, err := NewCore(db)
 	if err != nil {
-		return nil, stacktrace.NewErrorWithCode(ErrTODO, "failed to configure core provider")
+		return nil, stacktrace.PropagateWithCode(err, ErrTODO, "failed to configure core provider")
 	}
 	return NewFromCore(ctx, rcore)
 }
@@ -156,8 +152,12 @@ func (d *DB) Create(ctx context.Context, collection string, document *Document) 
 		}
 	}
 	return collect.GetPrimaryKey(document), stacktrace.Propagate(d.persistStateChange(ctx, StateChange{
+		ctx:        nil,
 		Collection: collection,
+		Deletes:    nil,
 		Creates:    []*Document{document},
+		Sets:       nil,
+		Updates:    nil,
 		Timestamp:  time.Now(),
 	}), "")
 }

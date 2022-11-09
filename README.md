@@ -19,33 +19,34 @@ Build powerful, extensible, and feature-rich microservices on top of key/value s
 ## Features:
 
 - [x] JSON document storage engine
-- [x] custom json schema based validation
+- [x] validation hooks
+  - [x] json schema based validation
 - [x] field based querying
-- [x] change streams
 - [x] batch operations (create/set/get/update)
+- [x] query batch operations (create/set/get/update)
 - [x] multi-field indexing
+- [x] unique indexes/constraints
 - [x] select fields
 - [x] order by
 - [x] aggregation (min,max,sum,avg,count)
     - [x] min
     - [x] max
     - [x] count
-    - [ ] avg
     - [x] sum
     - [x] group by
-- [x] query update
-- [x] query delete
 - [x] pagination
 
 ### Extensibility
 
 - [x] Core logic can be wrapped with middlewares for enhanced functionality
-- [x] Change streams available for integration with external systems
+- [ ] Change streams available for integration with external systems
 - [ ] Dedicated extensions library
 
 ### Roadmap
-
-- [ ] unique indexes
+- [ ] change streams
+- [ ] views
+- [ ] materialized views
+- [ ] multi-field order by
 - [ ] external data importer
 - [ ] migrations
 - [ ] better errors & error codes
@@ -56,10 +57,6 @@ Build powerful, extensible, and feature-rich microservices on top of key/value s
 - [ ] 80% test coverage
 - [ ] extensive comments
 - [ ] SQL-like query language
-- [ ] views
-- [ ] materialized views
-- [ ] multi-field order by
-- [ ] distributed (raft)
 
 ## Getting Started
 

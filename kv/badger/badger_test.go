@@ -1,15 +1,14 @@
-package badger_test
+package badger
 
 import (
 	"fmt"
 	"github.com/autom8ter/brutus/kv"
-	"github.com/autom8ter/brutus/kv/badger"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
 
 func Test(t *testing.T) {
-	db, err := badger.New("")
+	db, err := open("")
 	assert.Nil(t, err)
 	data := map[string]string{}
 	for i := 0; i < 10; i++ {

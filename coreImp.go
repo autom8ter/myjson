@@ -459,6 +459,32 @@ func (d *coreImplementation) updateSecondaryIndex(ctx context.Context, txn kv.Ba
 				)
 			}
 		}
+		if idx.Unique && !idx.Primary && change.After != nil {
+			if err := d.kv.Tx(false, func(tx kv.Tx) error {
+				it := tx.NewIterator(kv.IterOpts{
+					Prefix: idx.Seek(change.After.Value()).Path(),
+				})
+				defer it.Close()
+				for it.Valid() {
+					item := it.Item()
+					split := bytes.Split(item.Key(), []byte("\x00"))
+					id := split[len(split)-1]
+					if string(id) != change.DocID {
+						return stacktrace.NewErrorWithCode(ErrTODO, "duplicate value( %s ) found for unique index: %s", change.DocID, idx.Name)
+					}
+					it.Next()
+				}
+				return nil
+			}); err != nil {
+				return stacktrace.PropagateWithCode(
+					err,
+					ErrTODO,
+					"failed to set document %s/%s index references",
+					c.Name(),
+					change.DocID,
+				)
+			}
+		}
 		// only persist ids in secondary index - lookup full document in primary index
 		if err := txn.Set(idx.Seek(change.After.Value()).SetDocumentID(change.DocID).Path(), []byte(change.DocID)); err != nil {
 			return stacktrace.PropagateWithCode(
