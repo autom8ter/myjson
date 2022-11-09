@@ -1,15 +1,14 @@
 package badger
 
-import "github.com/dgraph-io/badger/v3"
-
 type item struct {
-	item *badger.Item
+	key   []byte
+	value func() ([]byte, error)
 }
 
 func (i item) Key() []byte {
-	return i.item.Key()
+	return i.key
 }
 
 func (i item) Value() ([]byte, error) {
-	return i.item.ValueCopy(nil)
+	return i.value()
 }

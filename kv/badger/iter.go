@@ -26,7 +26,12 @@ func (b *badgerIterator) Valid() bool {
 }
 
 func (b *badgerIterator) Item() kv.Item {
-	return &item{item: b.iter.Item()}
+	return &item{
+		key: b.iter.Item().Key(),
+		value: func() ([]byte, error) {
+			return b.iter.Item().ValueCopy(nil)
+		},
+	}
 }
 
 func (b *badgerIterator) Next() {

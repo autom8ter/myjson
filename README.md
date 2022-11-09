@@ -44,8 +44,6 @@ Build powerful, extensible, and feature-rich microservices on top of key/value s
 
 ### Roadmap
 - [ ] change streams
-- [ ] views
-- [ ] materialized views
 - [ ] multi-field order by
 - [ ] external data importer
 - [ ] migrations
