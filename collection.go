@@ -1,4 +1,4 @@
-package wolverine
+package brutus
 
 import (
 	"context"
@@ -9,14 +9,13 @@ import (
 
 // Collection is database collection containing 1-many documents of the same type
 type Collection struct {
-	name       string
-	primaryKey string
-	indexes    map[string]Index
-	validators []DocumentValidator
+	name        string
+	primaryKey  string
+	indexes     map[string]Index
+	validators  []ValidatorHook
+	sideEffects []SideEffectHook
+	whereHooks  []WhereHook
 }
-
-// DocumentValidator is used to validate all new and updated documents being persisted to a collection
-type DocumentValidator func(ctx context.Context, d *Document) error
 
 // CollectionOpt is an option for configuring a collection
 type CollectionOpt func(c *Collection)
@@ -30,10 +29,24 @@ func WithIndex(indexes ...Index) CollectionOpt {
 	}
 }
 
-// WithValidator adds a document validator to the collection
-func WithValidator(validator DocumentValidator) CollectionOpt {
+// WithValidatorHook adds a document validator to the collection (see JSONSchema for an example)
+func WithValidatorHooks(validator ...ValidatorHook) CollectionOpt {
 	return func(c *Collection) {
-		c.validators = append(c.validators, validator)
+		c.validators = append(c.validators, validator...)
+	}
+}
+
+// WithSideEffectBeforeHook adds a side effect to the collections configuration that executes on changes as documents are persisted
+func WithSideEffects(sideEffect ...SideEffectHook) CollectionOpt {
+	return func(c *Collection) {
+		c.sideEffects = append(c.sideEffects, sideEffect...)
+	}
+}
+
+// WithWhereHook adds a wherre effect to the collections configuration that executes on on where clauses before queries are executed.
+func WithWhereHook(whereHook ...WhereHook) CollectionOpt {
+	return func(c *Collection) {
+		c.whereHooks = append(c.whereHooks, whereHook...)
 	}
 }
 
@@ -87,17 +100,27 @@ func (c *Collection) Indexes() []Index {
 	return indexes
 }
 
-// Validate validates the input document - it is used by the CoreAPI to validate changes to documents
-func (c *Collection) Validate(ctx context.Context, d *Document) error {
+// SideAffects applies all of the registered side effects on a change as it is persisted to the database.
+// If an error is returned, the state change(s) will be aborted and rolled back
+func (c *Collection) SideAffects(ctx context.Context, core CoreAPI, change *DocChange) (*DocChange, error) {
+	var err error
+	for _, sideEffect := range c.sideEffects {
+		change, err = sideEffect(ctx, core, change)
+		if err != nil {
+			return nil, stacktrace.Propagate(err, "")
+		}
+	}
+	return change, nil
+}
+
+// Validate validates the document against all registered validation hooks.
+// If an error is returned, the state change(s) will be aborted and rolled back
+func (c *Collection) Validate(ctx context.Context, core CoreAPI, d *DocChange) error {
 	if len(c.validators) == 0 {
 		return nil
 	}
-	doc, err := NewDocumentFromBytes(d.Bytes())
-	if err != nil {
-		return stacktrace.Propagate(err, "")
-	}
 	for _, validator := range c.validators {
-		if err := validator(ctx, doc); err != nil {
+		if err := validator(ctx, core, d); err != nil {
 			return stacktrace.Propagate(err, "")
 		}
 	}

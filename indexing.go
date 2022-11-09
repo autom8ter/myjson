@@ -1,4 +1,4 @@
-package wolverine
+package brutus
 
 import (
 	"bytes"
@@ -22,27 +22,19 @@ type Index struct {
 	Primary bool `json:"primary"`
 }
 
-// IndexMatch is an index matched to a read request
-type IndexMatch struct {
-	// Ref is the matching index
-	Ref Index `json:"ref"`
-	// MatchedFields is the fields that match the index
-	MatchedFields []string `json:"matchedFields"`
-	// IsOrdered returns true if the index delivers results in the order of the query.
-	// If the index order does not match the query order, a full table scan is necessary to retrieve the result set.
-	IsOrdered      bool `json:"isOrdered"`
-	IsPrimaryIndex bool `json:"isPrimaryIndex"`
-	// Values are the original values used to target the index
-	Values map[string]any `json:"values"`
-}
-
 // Prefix is a reference to a prefix within an index
 type Prefix interface {
+	// Append appends a field value to an index prefix
 	Append(field string, value any) Prefix
+	// Path returns the full path of the prefix
 	Path() []byte
-	NextPrefix() []byte
+	// Fields returns the fields contained in the index prefix
 	Fields() []FieldValue
+	// DocumentID returns the document id set as the suffix of the prefix when Path() is called
+	// This allows the index to seek to the position of an individual document
 	DocumentID() string
+	// SetDocumentID sets the document id as the suffix of the prefix when Path() is called
+	// This allows the index to seek to the position of an individual document
 	SetDocumentID(id string) Prefix
 }
 
@@ -54,19 +46,19 @@ type FieldValue struct {
 
 func (i Index) Seek(fields map[string]any) Prefix {
 	fields, _ = flat.Flatten(fields, nil)
-	var prefix = indexPathPrefix{
+	var prefix = Prefix(indexPathPrefix{
 		prefix: [][]byte{
 			[]byte("index"),
 			[]byte(i.Collection),
 			[]byte(i.Name),
 		},
-	}
+	})
 	if i.Fields == nil {
 		return prefix
 	}
 	for _, k := range i.Fields {
 		if v, ok := fields[k]; ok {
-			prefix.Append(k, v)
+			prefix = prefix.Append(k, v)
 		}
 	}
 	return prefix
@@ -80,17 +72,25 @@ type indexPathPrefix struct {
 }
 
 func (p indexPathPrefix) Append(field string, value any) Prefix {
-	p.fields = append(p.fields, []byte(field), encodeIndexValue(value))
-	p.fieldMap = append(p.fieldMap, FieldValue{
+	fields := append(p.fields, []byte(field), encodeIndexValue(value))
+	fieldMap := append(p.fieldMap, FieldValue{
 		Field: field,
 		Value: value,
 	})
-	return p
+	return indexPathPrefix{
+		prefix:   p.prefix,
+		fields:   fields,
+		fieldMap: fieldMap,
+	}
 }
 
 func (p indexPathPrefix) SetDocumentID(id string) Prefix {
-	p.documentID = id
-	return p
+	return indexPathPrefix{
+		prefix:     p.prefix,
+		documentID: id,
+		fields:     p.fields,
+		fieldMap:   p.fieldMap,
+	}
 }
 
 func (p indexPathPrefix) Path() []byte {
@@ -107,24 +107,6 @@ func (i indexPathPrefix) DocumentID() string {
 
 func (i indexPathPrefix) Fields() []FieldValue {
 	return i.fieldMap
-}
-
-// NextPrefix returns the next prefix
-func (p indexPathPrefix) NextPrefix() []byte {
-	k := p.Path()
-	buf := make([]byte, len(k))
-	copy(buf, k)
-	var i int
-	for i = len(k) - 1; i >= 0; i-- {
-		buf[i]++
-		if buf[i] != 0 {
-			break
-		}
-	}
-	if i == -1 {
-		buf = make([]byte, 0)
-	}
-	return buf
 }
 
 func encodeIndexValue(value any) []byte {

@@ -1,4 +1,4 @@
-package wolverine
+package brutus
 
 import "github.com/palantir/stacktrace"
 

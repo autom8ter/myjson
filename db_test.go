@@ -1,13 +1,12 @@
-package wolverine_test
+package brutus_test
 
 import (
 	"context"
-	"github.com/autom8ter/wolverine"
-	"github.com/autom8ter/wolverine/testutil"
+	"github.com/autom8ter/brutus"
+	"github.com/autom8ter/brutus/testutil"
 	"github.com/brianvoe/gofakeit/v6"
 	"github.com/stretchr/testify/assert"
 	"runtime"
-	"sync"
 	"testing"
 	"time"
 )
@@ -20,58 +19,26 @@ func timer() func(t *testing.T) {
 }
 
 func Test(t *testing.T) {
-	t.Run("basic collection checks", func(t *testing.T) {
-		assert.Nil(t, testutil.TestDB(func(ctx context.Context, db *wolverine.DB) {
-			assert.True(t, db.HasCollection("user"))
-			assert.True(t, db.HasCollection("task"))
-			assert.False(t, db.HasCollection("zebras"))
-		}))
-	})
 	t.Run("create", func(t *testing.T) {
-		assert.Nil(t, testutil.TestDB(func(ctx context.Context, db *wolverine.DB) {
-			collection := db.Collection("user")
-			id, err := collection.Create(ctx, testutil.NewUserDoc())
+		assert.Nil(t, testutil.TestDB(func(ctx context.Context, db *brutus.DB) {
+			id, err := db.Create(ctx, "user", testutil.NewUserDoc())
 			assert.Nil(t, err)
-			u, err := collection.Get(ctx, id)
+			u, err := db.Get(ctx, "user", id)
 			assert.Nil(t, err)
 			assert.Equal(t, id, u.GetString("_id"))
 		}))
 	})
 	t.Run("set", func(t *testing.T) {
-		assert.Nil(t, testutil.TestDB(func(ctx context.Context, db *wolverine.DB) {
-			collection := db.Collection("user")
+		assert.Nil(t, testutil.TestDB(func(ctx context.Context, db *brutus.DB) {
 			timer := timer()
 			defer timer(t)
 			for i := 0; i < 10; i++ {
-				assert.Nil(t, collection.Set(ctx, testutil.NewUserDoc()))
+				assert.Nil(t, db.Set(ctx, "user", testutil.NewUserDoc()))
 			}
 		}))
 	})
-	t.Run("change stream", func(t *testing.T) {
-		assert.Nil(t, testutil.TestDB(func(ctx context.Context, db *wolverine.DB) {
-			collection := db.Collection("user")
-			wg := sync.WaitGroup{}
-			changes := 0
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
-				ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
-				defer cancel()
-				assert.Nil(t, collection.ChangeStream(ctx, func(ctx context.Context, change wolverine.StateChange) error {
-					changes++
-					return nil
-				}))
-			}()
-			for i := 0; i < 3; i++ {
-				assert.Nil(t, collection.Set(ctx, testutil.NewUserDoc()))
-			}
-			wg.Wait()
-			assert.Equal(t, 3, changes)
-		}))
-	})
-	assert.Nil(t, testutil.TestDB(func(ctx context.Context, db *wolverine.DB) {
-		collection := db.Collection("user")
-		var usrs []*wolverine.Document
+	assert.Nil(t, testutil.TestDB(func(ctx context.Context, db *brutus.DB) {
+		var usrs []*brutus.Document
 		var ids []string
 		t.Run("batch set", func(t *testing.T) {
 			timer := timer()
@@ -81,13 +48,13 @@ func Test(t *testing.T) {
 				ids = append(ids, usr.GetString("_id"))
 				usrs = append(usrs, usr)
 			}
-			assert.Nil(t, collection.BatchSet(ctx, usrs))
+			assert.Nil(t, db.BatchSet(ctx, "user", usrs))
 		})
 		t.Run("get each", func(t *testing.T) {
 			timer := timer()
 			defer timer(t)
 			for _, u := range usrs {
-				usr, err := collection.Get(ctx, u.GetString("_id"))
+				usr, err := db.Get(ctx, "user", u.GetString("_id"))
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -97,18 +64,16 @@ func Test(t *testing.T) {
 		t.Run("query users account_id > 50", func(t *testing.T) {
 			timer := timer()
 			defer timer(t)
-			results, err := collection.Query(ctx, wolverine.Query{
+			results, err := db.Query(ctx, brutus.Query{
+				From:   "user",
 				Select: []string{"account_id"},
-				Where: []wolverine.Where{
+				Where: []brutus.Where{
 					{
 						Field: "account_id",
 						Op:    ">",
 						Value: 50,
 					},
 				},
-				Page:    0,
-				Limit:   0,
-				OrderBy: wolverine.OrderBy{},
 			})
 			assert.Nil(t, err)
 			assert.Greater(t, len(results.Documents), 1)
@@ -120,18 +85,19 @@ func Test(t *testing.T) {
 		t.Run("query users account_id in 51-60", func(t *testing.T) {
 			timer := timer()
 			defer timer(t)
-			results, err := collection.Query(ctx, wolverine.Query{
+			results, err := db.Query(ctx, brutus.Query{
+				From:   "user",
 				Select: []string{"account_id"},
-				Where: []wolverine.Where{
+				Where: []brutus.Where{
 					{
 						Field: "account_id",
-						Op:    wolverine.In,
+						Op:    brutus.In,
 						Value: []float64{51, 52, 53, 54, 55, 56, 57, 58, 59, 60},
 					},
 				},
 				Page:    0,
 				Limit:   10,
-				OrderBy: wolverine.OrderBy{},
+				OrderBy: brutus.OrderBy{},
 			})
 			assert.Nil(t, err)
 			assert.Greater(t, len(results.Documents), 1)
@@ -143,39 +109,40 @@ func Test(t *testing.T) {
 		t.Run("query all", func(t *testing.T) {
 			timer := timer()
 			defer timer(t)
-			results, err := collection.Query(ctx, wolverine.Query{
+			results, err := db.Query(ctx, brutus.Query{
+				From:    "user",
 				Select:  nil,
 				Page:    0,
 				Limit:   0,
-				OrderBy: wolverine.OrderBy{},
+				OrderBy: brutus.OrderBy{},
 			})
 			assert.Nil(t, err)
 			assert.Equal(t, 100, len(results.Documents))
 			t.Logf("found %v documents in %s", results.Count, results.Stats.ExecutionTime)
 		})
 		t.Run("paginate all", func(t *testing.T) {
-			timer := timer()
-			defer timer(t)
-			pageCount := 0
-			err := collection.QueryPaginate(ctx, wolverine.Query{
-				Page:    0,
-				Limit:   10,
-				OrderBy: wolverine.OrderBy{},
-			}, func(page wolverine.Page) bool {
-				pageCount++
-				return true
-			})
-			assert.Nil(t, err)
-			assert.Equal(t, 10, pageCount)
+			//timer := timer()
+			//defer timer(t)
+			//pageCount := 0
+			//err := collection.QueryPaginate(ctx, brutus.Query{
+			//	Page:    0,
+			//	Limit:   10,
+			//	OrderBy: brutus.OrderBy{},
+			//}, func(page brutus.Page) bool {
+			//	pageCount++
+			//	return true
+			//})
+			//assert.Nil(t, err)
+			//assert.Equal(t, 10, pageCount)
 		})
 		t.Run("update contact.email", func(t *testing.T) {
 			for _, u := range usrs {
 				id := u.GetString("_id")
 				email := gofakeit.Email()
-				assert.Nil(t, collection.Update(ctx, id, map[string]any{
+				assert.Nil(t, db.Update(ctx, "user", id, map[string]any{
 					"contact.email": email,
 				}))
-				doc, err := collection.Get(ctx, id)
+				doc, err := db.Get(ctx, "user", id)
 				assert.Nil(t, err)
 				assert.Equal(t, email, doc.GetString("contact.email"))
 				assert.Equal(t, u.GetString("name"), doc.GetString("name"))
@@ -183,22 +150,23 @@ func Test(t *testing.T) {
 		})
 		t.Run("delete first 50", func(t *testing.T) {
 			for _, id := range ids[:50] {
-				assert.Nil(t, collection.Delete(ctx, id))
+				assert.Nil(t, db.Delete(ctx, "user", id))
 			}
 			for _, id := range ids[:50] {
-				_, err := collection.Get(ctx, id)
+				_, err := db.Get(ctx, "user", id)
 				assert.NotNil(t, err)
 			}
 		})
 		t.Run("query delete all", func(t *testing.T) {
-			assert.Nil(t, collection.QueryDelete(ctx, wolverine.Query{
+			assert.Nil(t, db.QueryDelete(ctx, brutus.Query{
+				From:    "user",
 				Select:  nil,
 				Page:    0,
 				Limit:   0,
-				OrderBy: wolverine.OrderBy{},
+				OrderBy: brutus.OrderBy{},
 			}))
 			for _, id := range ids[50:] {
-				d, err := collection.Get(ctx, id)
+				d, err := db.Get(ctx, "user", id)
 				assert.NotNil(t, err, d)
 			}
 		})
@@ -208,49 +176,47 @@ func Test(t *testing.T) {
 }
 
 func Benchmark(b *testing.B) {
-	// Benchmark/set-12         	      22	  47669475 ns/op	  702120 B/op	    4481 allocs/op
+	// Benchmark/set-12         	    5662	    330875 ns/op	  288072 B/op	    2191 allocs/op
 	b.Run("set", func(b *testing.B) {
 		b.ReportAllocs()
 		doc := testutil.NewUserDoc()
-		assert.Nil(b, testutil.TestDB(func(ctx context.Context, db *wolverine.DB) {
-			collection := db.Collection("user")
+		assert.Nil(b, testutil.TestDB(func(ctx context.Context, db *brutus.DB) {
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				assert.Nil(b, collection.Set(ctx, doc))
+				assert.Nil(b, db.Set(ctx, "user", doc))
 			}
 		}))
 	})
-	// Benchmark/get-12         	  207938	      5389 ns/op	    4228 B/op	      31 allocs/op
+	// Benchmark/get-12         	   52730	     19125 ns/op	   13022 B/op	      98 allocs/op
 	b.Run("get", func(b *testing.B) {
 		b.ReportAllocs()
 		doc := testutil.NewUserDoc()
-		assert.Nil(b, testutil.TestDB(func(ctx context.Context, db *wolverine.DB) {
-			collection := db.Collection("user")
-			assert.Nil(b, collection.Set(ctx, doc))
+		assert.Nil(b, testutil.TestDB(func(ctx context.Context, db *brutus.DB) {
+			assert.Nil(b, db.Set(ctx, "user", doc))
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				_, err := collection.Get(ctx, doc.GetString("_id"))
+				_, err := db.Get(ctx, "user", doc.GetString("_id"))
 				assert.Nil(b, err)
 			}
 		}))
 	})
-	// Benchmark/query-12         	   55064	     20678 ns/op	   15849 B/op	     100 allocs/op
-	b.Run("query", func(b *testing.B) {
+	// Benchmark/query-12       	   44590	     25061 ns/op	   18920 B/op	     131 allocs/op
+	b.Run("query with index", func(b *testing.B) {
 		b.ReportAllocs()
 		doc := testutil.NewUserDoc()
-		assert.Nil(b, testutil.TestDB(func(ctx context.Context, db *wolverine.DB) {
-			collection := db.Collection("user")
-			assert.Nil(b, collection.Set(ctx, doc))
-			var docs []*wolverine.Document
-			for i := 0; i < 100; i++ {
+		assert.Nil(b, testutil.TestDB(func(ctx context.Context, db *brutus.DB) {
+			assert.Nil(b, db.Set(ctx, "user", doc))
+			var docs []*brutus.Document
+			for i := 0; i < 100000; i++ {
 				docs = append(docs, testutil.NewUserDoc())
 			}
-			assert.Nil(b, collection.BatchSet(ctx, docs))
+			assert.Nil(b, db.BatchSet(ctx, "user", docs))
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				results, err := collection.Query(ctx, wolverine.Query{
+				results, err := db.Query(ctx, brutus.Query{
+					From:   "user",
 					Select: nil,
-					Where: []wolverine.Where{
+					Where: []brutus.Where{
 						{
 							Field: "contact.email",
 							Op:    "==",
@@ -259,11 +225,42 @@ func Benchmark(b *testing.B) {
 					},
 					Page:    0,
 					Limit:   10,
-					OrderBy: wolverine.OrderBy{},
+					OrderBy: brutus.OrderBy{},
 				})
 				assert.Nil(b, err)
 				assert.Equal(b, 1, len(results.Documents))
 				assert.Equal(b, "contact.email", results.Stats.IndexMatch.MatchedFields[0])
+			}
+		}))
+	})
+	// Benchmark/query_without_index-12         	   10780	     98709 ns/op	   49977 B/op	     216 allocs/op
+	b.Run("query without index", func(b *testing.B) {
+		b.ReportAllocs()
+		doc := testutil.NewUserDoc()
+		assert.Nil(b, testutil.TestDB(func(ctx context.Context, db *brutus.DB) {
+			assert.Nil(b, db.Set(ctx, "user", doc))
+			var docs []*brutus.Document
+			for i := 0; i < 100000; i++ {
+				docs = append(docs, testutil.NewUserDoc())
+			}
+			assert.Nil(b, db.BatchSet(ctx, "user", docs))
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				_, err := db.Query(ctx, brutus.Query{
+					From:   "user",
+					Select: nil,
+					Where: []brutus.Where{
+						{
+							Field: "name",
+							Op:    brutus.Contains,
+							Value: doc.GetString("John"),
+						},
+					},
+					Page:    0,
+					Limit:   10,
+					OrderBy: brutus.OrderBy{},
+				})
+				assert.Nil(b, err)
 			}
 		}))
 	})
@@ -272,13 +269,13 @@ func Benchmark(b *testing.B) {
 func TestAggregate(t *testing.T) {
 	t.Run("sum age", func(t *testing.T) {
 		var expected = float64(0)
-		var docs wolverine.Documents
+		var docs brutus.Documents
 		for i := 0; i < 5; i++ {
 			u := testutil.NewUserDoc()
 			expected += u.GetFloat("age")
 			docs = append(docs, u)
 		}
-		reduced, err := docs.Aggregate(context.Background(), []wolverine.Aggregate{
+		reduced, err := docs.Aggregate(context.Background(), []brutus.Aggregate{
 			{
 				Field:    "age",
 				Function: "sum",
@@ -289,38 +286,38 @@ func TestAggregate(t *testing.T) {
 		assert.Equal(t, expected, reduced.GetFloat("age_sum"))
 	})
 	t.Run("sum advanced", func(t *testing.T) {
-		assert.Nil(t, testutil.TestDB(func(ctx context.Context, db *wolverine.DB) {
-			collection := db.Collection("user")
-			var usrs wolverine.Documents
+		assert.Nil(t, testutil.TestDB(func(ctx context.Context, db *brutus.DB) {
+			var usrs brutus.Documents
 			ageSum := map[string]float64{}
 			for i := 0; i < 10; i++ {
 				u := testutil.NewUserDoc()
 				ageSum[u.GetString("account_id")] += u.GetFloat("age")
 				usrs = append(usrs, u)
 			}
-			assert.Nil(t, collection.BatchSet(ctx, usrs))
-			query := wolverine.AggregateQuery{
+			assert.Nil(t, db.BatchSet(ctx, "user", usrs))
+			query := brutus.AggregateQuery{
+				From:    "user",
 				GroupBy: []string{"account_id"},
 				//Where:      []schema.Where{
 				//	{
 				//
 				//	},
 				//},
-				Aggregates: []wolverine.Aggregate{
+				Aggregates: []brutus.Aggregate{
 					{
 						Field:    "age",
-						Function: wolverine.SUM,
+						Function: brutus.SUM,
 						Alias:    "age_sum",
 					},
 				},
 				Page:  0,
 				Limit: 0,
-				OrderBy: wolverine.OrderBy{
+				OrderBy: brutus.OrderBy{
 					Field:     "account_id",
-					Direction: wolverine.ASC,
+					Direction: brutus.ASC,
 				},
 			}
-			results, err := collection.Aggregate(ctx, query)
+			results, err := db.Aggregate(ctx, query)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -332,22 +329,4 @@ func TestAggregate(t *testing.T) {
 			}
 		}))
 	})
-}
-
-func TestDBCollection(t *testing.T) {
-	assert.Nil(t, testutil.TestDB(func(ctx context.Context, db *wolverine.DB) {
-		collection := db.Collection("user")
-		t.Run("schema", func(t *testing.T) {
-			assert.NotNil(t, collection.Schema())
-		})
-		t.Run("db", func(t *testing.T) {
-			assert.NotNil(t, collection.DB())
-		})
-		t.Run("schema not empty", func(t *testing.T) {
-			assert.NotEmpty(t, collection.Schema())
-		})
-		t.Run("schema name not empty", func(t *testing.T) {
-			assert.NotEmpty(t, collection.Schema().Name())
-		})
-	}))
 }

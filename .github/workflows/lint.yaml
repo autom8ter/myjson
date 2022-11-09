@@ -6,7 +6,7 @@ on:
     branches:
       - "**"
 #env:
-#  GOPRIVATE: "github.com/wolverine"
+#  GOPRIVATE: "github.com/brutus"
 
 jobs:
   golangci:

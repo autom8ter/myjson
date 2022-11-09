@@ -1,7 +1,8 @@
 package badger
 
 import (
-	"github.com/autom8ter/wolverine/kv"
+	"github.com/autom8ter/brutus/kv"
+	"github.com/autom8ter/brutus/kv/kvutil"
 	"github.com/dgraph-io/badger/v3"
 )
 
@@ -15,6 +16,9 @@ func (b *badgerTx) NewIterator(kopts kv.IterOpts) kv.Iterator {
 	opts.PrefetchSize = 10
 	opts.Prefix = kopts.Prefix
 	opts.Reverse = kopts.Reverse
+	if opts.Reverse && opts.Prefix != nil {
+		opts.Prefix = kvutil.NextPrefix(kopts.Prefix)
+	}
 	iter := b.txn.NewIterator(opts)
 	iter.Rewind()
 	return &badgerIterator{iter: iter, opts: kopts}

@@ -1,4 +1,4 @@
-module github.com/autom8ter/wolverine
+module github.com/autom8ter/brutus
 
 go 1.18
 

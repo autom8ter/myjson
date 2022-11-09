@@ -1,12 +1,14 @@
-package wolverine
+package brutus
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/autom8ter/brutus/kv"
 	"github.com/autom8ter/machine/v4"
-	"github.com/autom8ter/wolverine/kv"
 	"github.com/palantir/stacktrace"
+	"sort"
 	"sync"
 )
 
@@ -49,6 +51,27 @@ func (d *coreImplementation) getPrimaryIndex(collection string) (Index, bool) {
 		}
 	}
 	return Index{}, false
+}
+
+//
+func (d *coreImplementation) GetCollection(ctx context.Context, name string) (*Collection, bool) {
+	c, ok := d.collections.Load(name)
+	if !ok {
+		return nil, false
+	}
+	return c.(*Collection), true
+}
+
+func (d *coreImplementation) GetCollections(ctx context.Context) ([]*Collection, error) {
+	var collections []*Collection
+	d.collections.Range(func(key, value any) bool {
+		collections = append(collections, value.(*Collection))
+		return true
+	})
+	sort.Slice(collections, func(i, j int) bool {
+		return collections[i].name < collections[j].name
+	})
+	return collections, nil
 }
 
 func (d *coreImplementation) SetCollections(ctx context.Context, collections []*Collection) error {
@@ -105,10 +128,10 @@ func (d *coreImplementation) addIndex(ctx context.Context, collection string, in
 		Filter:  nil,
 		Reverse: false,
 	}, func(doc *Document) (bool, error) {
-		if err := d.indexDocument(ctx, batch, collection, &singleChange{
-			action: Set,
-			docId:  doc.GetString(c.PrimaryKey()),
-			after:  doc,
+		if err := d.indexDocument(ctx, batch, collection, &DocChange{
+			Action: Set,
+			DocID:  doc.GetString(c.PrimaryKey()),
+			After:  doc,
 		}); err != nil {
 			return false, stacktrace.Propagate(err, "")
 		}
@@ -137,10 +160,10 @@ func (d *coreImplementation) removeIndex(ctx context.Context, collection string,
 			Filter:  nil,
 			Reverse: false,
 		}, func(doc *Document) (bool, error) {
-			if err := d.updateSecondaryIndex(ctx, batch, collection, index, &singleChange{
-				action: Delete,
-				docId:  doc.GetString(c.PrimaryKey()),
-				before: doc,
+			if err := d.updateSecondaryIndex(ctx, batch, collection, index, &DocChange{
+				Action: Delete,
+				DocID:  doc.GetString(c.PrimaryKey()),
+				Before: doc,
 			}); err != nil {
 				return false, stacktrace.Propagate(err, "")
 			}
@@ -205,24 +228,8 @@ func (d *coreImplementation) getIndexes(collection string) (map[string]Index, er
 	return indexing, nil
 }
 
-func (d *coreImplementation) ChangeStream(ctx context.Context, collection string, fn ChangeStreamHandler) error {
-	return d.machine.Subscribe(ctx, collection, func(ctx context.Context, msg machine.Message) (bool, error) {
-		switch change := msg.Body.(type) {
-		case *StateChange:
-			if err := fn(ctx, *change); err != nil {
-				return false, stacktrace.Propagate(err, "")
-			}
-		case StateChange:
-			if err := fn(ctx, change); err != nil {
-				return false, stacktrace.Propagate(err, "")
-			}
-		}
-		return true, nil
-	})
-}
-
 func (d *coreImplementation) getAllCollection(ctx context.Context, collection string, ids []string) (Documents, error) {
-	_, ok := d.coll(collection)
+	c, ok := d.coll(collection)
 	if !ok {
 		return Documents{}, stacktrace.NewErrorWithCode(ErrTODO, "collection is not registered: %s", collection)
 	}
@@ -233,7 +240,9 @@ func (d *coreImplementation) getAllCollection(ctx context.Context, collection st
 	}
 	if err := d.kv.Tx(false, func(txn kv.Tx) error {
 		for _, id := range ids {
-			value, err := txn.Get(primaryIndex.Seek(nil).SetDocumentID(id).Path())
+			value, err := txn.Get(primaryIndex.Seek(map[string]any{
+				c.primaryKey: id,
+			}).SetDocumentID(id).Path())
 			if err != nil {
 				return stacktrace.Propagate(err, "")
 			}
@@ -255,12 +264,18 @@ func (d *coreImplementation) getCollection(ctx context.Context, collection strin
 	var (
 		document *Document
 	)
+	c, ok := d.coll(collection)
+	if !ok {
+		return nil, stacktrace.NewErrorWithCode(ErrTODO, "collection is not registered: %s", collection)
+	}
 	primaryIndex, ok := d.getPrimaryIndex(collection)
 	if !ok {
 		return nil, stacktrace.NewErrorWithCode(ErrTODO, "collection is missing primary index: %s", collection)
 	}
 	if err := d.kv.Tx(false, func(txn kv.Tx) error {
-		val, err := txn.Get(primaryIndex.Seek(nil).SetDocumentID(id).Path())
+		val, err := txn.Get(primaryIndex.Seek(map[string]any{
+			c.primaryKey: id,
+		}).SetDocumentID(id).Path())
 		if err != nil {
 			return stacktrace.Propagate(err, "")
 		}
@@ -270,7 +285,7 @@ func (d *coreImplementation) getCollection(ctx context.Context, collection strin
 		}
 		return nil
 	}); err != nil {
-		return document, err
+		return document, stacktrace.Propagate(err, "")
 	}
 	return document, nil
 }
@@ -292,11 +307,11 @@ func (d *coreImplementation) Persist(ctx context.Context, collection string, cha
 			if err != nil {
 				return stacktrace.Propagate(err, "")
 			}
-			if err := d.indexDocument(ctx, txn, collection, &singleChange{
-				action: Update,
-				docId:  id,
-				before: before,
-				after:  after,
+			if err := d.indexDocument(ctx, txn, collection, &DocChange{
+				Action: Update,
+				DocID:  id,
+				Before: before,
+				After:  after,
 			}); err != nil {
 				return stacktrace.Propagate(err, "")
 			}
@@ -304,11 +319,32 @@ func (d *coreImplementation) Persist(ctx context.Context, collection string, cha
 	}
 	for _, id := range change.Deletes {
 		before, _ := d.getCollection(ctx, collection, id)
-		if err := d.indexDocument(ctx, txn, collection, &singleChange{
-			action: Delete,
-			docId:  id,
-			before: before,
-			after:  nil,
+		if err := d.indexDocument(ctx, txn, collection, &DocChange{
+			Action: Delete,
+			DocID:  id,
+			Before: before,
+			After:  nil,
+		}); err != nil {
+			return stacktrace.Propagate(err, "")
+		}
+	}
+	for _, after := range change.Creates {
+		if !after.Valid() {
+			return stacktrace.NewErrorWithCode(ErrTODO, "invalid json document")
+		}
+		docID := c.GetPrimaryKey(after)
+		if docID == "" {
+			return stacktrace.NewErrorWithCode(ErrTODO, "document missing primary key %s", c.PrimaryKey())
+		}
+		before, _ := d.getCollection(ctx, collection, docID)
+		if before != nil {
+			return stacktrace.NewErrorWithCode(ErrTODO, "document already exists %s", docID)
+		}
+		if err := d.indexDocument(ctx, txn, collection, &DocChange{
+			Action: Create,
+			DocID:  docID,
+			Before: nil,
+			After:  after,
 		}); err != nil {
 			return stacktrace.Propagate(err, "")
 		}
@@ -317,16 +353,16 @@ func (d *coreImplementation) Persist(ctx context.Context, collection string, cha
 		if !after.Valid() {
 			return stacktrace.NewErrorWithCode(ErrTODO, "invalid json document")
 		}
-		docId := c.GetPrimaryKey(after)
-		if docId == "" {
+		docID := c.GetPrimaryKey(after)
+		if docID == "" {
 			return stacktrace.NewErrorWithCode(ErrTODO, "document missing primary key %s", c.PrimaryKey())
 		}
-		before, _ := d.getCollection(ctx, collection, docId)
-		if err := d.indexDocument(ctx, txn, collection, &singleChange{
-			action: Set,
-			docId:  docId,
-			before: before,
-			after:  after,
+		before, _ := d.getCollection(ctx, collection, docID)
+		if err := d.indexDocument(ctx, txn, collection, &DocChange{
+			Action: Set,
+			DocID:  docID,
+			Before: before,
+			After:  after,
 		}); err != nil {
 			return stacktrace.Propagate(err, "")
 		}
@@ -341,92 +377,96 @@ func (d *coreImplementation) Persist(ctx context.Context, collection string, cha
 	return nil
 }
 
-type singleChange struct {
-	action Action
-	docId  string
-	before *Document
-	after  *Document
-}
-
-func (d *coreImplementation) indexDocument(ctx context.Context, txn kv.Batch, collection string, change *singleChange) error {
+func (d *coreImplementation) indexDocument(ctx context.Context, txn kv.Batch, collection string, change *DocChange) error {
 	c, ok := d.coll(collection)
 	if !ok {
 		return stacktrace.NewErrorWithCode(ErrTODO, "collection is not registered: %s", collection)
 	}
-	if change.docId == "" {
+	if change.DocID == "" {
 		return stacktrace.NewErrorWithCode(ErrTODO, "empty document id")
 	}
+	var err error
 	primaryIndex, ok := d.getPrimaryIndex(collection)
 	if !ok {
 		return stacktrace.NewErrorWithCode(ErrTODO, "collection is missing primary index: %s", collection)
 	}
-
-	for _, i := range c.indexes {
-		if err := d.updateSecondaryIndex(ctx, txn, collection, i, change); err != nil {
-			return stacktrace.PropagateWithCode(err, ErrTODO, "")
+	if change.After != nil {
+		if c.GetPrimaryKey(change.After) != change.DocID {
+			return stacktrace.NewErrorWithCode(ErrTODO, "document id is immutable: %v -> %v", c.GetPrimaryKey(change.After), change.DocID)
 		}
-	}
-	switch change.action {
-	case Delete:
-		if !change.before.Valid() {
-			return stacktrace.NewError("invalid document")
-		}
-		if err := txn.Delete(primaryIndex.Seek(nil).SetDocumentID(change.docId).Path()); err != nil {
-			return stacktrace.Propagate(err, "failed to batch delete documents")
-		}
-	case Set, Update:
-		if c.GetPrimaryKey(change.after) != change.docId {
-			return stacktrace.NewErrorWithCode(ErrTODO, "document id is immutable: %v -> %v", c.GetPrimaryKey(change.after), change.docId)
-		}
-		err := c.Validate(ctx, change.after)
-		if err != nil {
+		if err := c.Validate(ctx, d, change); err != nil {
 			return stacktrace.Propagate(err, "")
 		}
-		if err := txn.Set(primaryIndex.Seek(nil).SetDocumentID(change.docId).Path(), change.after.Bytes()); err != nil {
+	}
+	change, err = c.SideAffects(ctx, d, change)
+	if err != nil {
+		return stacktrace.Propagate(err, "")
+	}
+	switch change.Action {
+	case Delete:
+		if err := txn.Delete(primaryIndex.Seek(map[string]any{
+			c.primaryKey: change.DocID,
+		}).SetDocumentID(change.DocID).Path()); err != nil {
+			return stacktrace.Propagate(err, "failed to batch delete documents")
+		}
+	case Set, Update, Create:
+		if err := txn.Set(primaryIndex.Seek(map[string]any{
+			c.primaryKey: change.DocID,
+		}).SetDocumentID(change.DocID).Path(), change.After.Bytes()); err != nil {
 			return stacktrace.PropagateWithCode(err, ErrTODO, "failed to batch set documents to primary index")
+		}
+	}
+	for _, i := range c.indexes {
+		if i.Primary {
+			continue
+		}
+		if err := d.updateSecondaryIndex(ctx, txn, collection, i, change); err != nil {
+			return stacktrace.PropagateWithCode(err, ErrTODO, "")
 		}
 	}
 	return nil
 }
 
-func (d *coreImplementation) updateSecondaryIndex(ctx context.Context, txn kv.Batch, collection string, idx Index, change *singleChange) error {
-
+func (d *coreImplementation) updateSecondaryIndex(ctx context.Context, txn kv.Batch, collection string, idx Index, change *DocChange) error {
+	if idx.Primary {
+		return nil
+	}
 	c, ok := d.coll(collection)
 	if !ok {
 		return stacktrace.NewErrorWithCode(ErrTODO, "collection is not registered: %s", collection)
 	}
 
-	switch change.action {
+	switch change.Action {
 	case Delete:
-		if err := txn.Delete(idx.Seek(change.before.Value()).SetDocumentID(change.docId).Path()); err != nil {
+		if err := txn.Delete(idx.Seek(change.Before.Value()).SetDocumentID(change.DocID).Path()); err != nil {
 			return stacktrace.PropagateWithCode(
 				err,
 				ErrTODO,
 				"failed to delete document %s/%s index references",
 				c.Name(),
-				change.docId,
+				change.DocID,
 			)
 		}
-	case Set, Update:
-
-		if change.before != nil && change.before.Valid() {
-			if err := txn.Delete(idx.Seek(change.before.Value()).SetDocumentID(change.docId).Path()); err != nil {
+	case Set, Update, Create:
+		if change.Before != nil && change.Before.Valid() {
+			if err := txn.Delete(idx.Seek(change.Before.Value()).SetDocumentID(change.DocID).Path()); err != nil {
 				return stacktrace.PropagateWithCode(
 					err,
 					ErrTODO,
 					"failed to delete document %s/%s index references",
 					c.Name(),
-					change.docId,
+					change.DocID,
 				)
 			}
 		}
-		if err := txn.Set(idx.Seek(change.after.Value()).SetDocumentID(change.docId).Path(), change.after.Bytes()); err != nil {
+		// only persist ids in secondary index - lookup full document in primary index
+		if err := txn.Set(idx.Seek(change.After.Value()).SetDocumentID(change.DocID).Path(), []byte(change.DocID)); err != nil {
 			return stacktrace.PropagateWithCode(
 				err,
 				ErrTODO,
 				"failed to set document %s/%s index references",
 				c.Name(),
-				change.docId,
+				change.DocID,
 			)
 		}
 	}
@@ -454,11 +494,21 @@ func (c *coreImplementation) getReadyIndexes(ctx context.Context, collection str
 }
 
 func (d *coreImplementation) Scan(ctx context.Context, collection string, scan Scan, handlerFunc ScanFunc) (IndexMatch, error) {
-	if !d.hasCollection(ctx, collection) {
+	coll, ok := d.coll(collection)
+	if !ok {
 		return IndexMatch{}, stacktrace.NewErrorWithCode(ErrTODO, "collection is not registered: %s", collection)
 	}
 	if handlerFunc == nil {
 		return IndexMatch{}, stacktrace.NewError("empty scan handler")
+	}
+	if coll.whereHooks != nil {
+		for _, w := range coll.whereHooks {
+			filters, err := w(ctx, d, scan.Filter)
+			if err != nil {
+				return IndexMatch{}, stacktrace.Propagate(err, "")
+			}
+			scan.Filter = filters
+		}
 	}
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -474,21 +524,30 @@ func (d *coreImplementation) Scan(ctx context.Context, collection string, scan S
 			Seek:    nil,
 			Reverse: scan.Reverse,
 		}
-		if scan.Reverse {
-			opts.Prefix = pfx.NextPrefix()
-		}
 		it := txn.NewIterator(opts)
 		defer it.Close()
 		for it.Valid() {
 			item := it.Item()
-			bits, err := item.Value()
-			if err != nil {
-				return stacktrace.Propagate(err, "")
+
+			var document *Document
+			if index.IsPrimaryIndex {
+				bits, err := item.Value()
+				if err != nil {
+					return stacktrace.Propagate(err, "")
+				}
+				document, err = NewDocumentFromBytes(bits)
+				if err != nil {
+					return stacktrace.Propagate(err, "")
+				}
+			} else {
+				split := bytes.Split(item.Key(), []byte("\x00"))
+				id := split[len(split)-1]
+				document, err = d.getCollection(ctx, collection, string(id))
+				if err != nil {
+					return stacktrace.Propagate(err, "")
+				}
 			}
-			document, err := NewDocumentFromBytes(bits)
-			if err != nil {
-				return stacktrace.Propagate(err, "")
-			}
+
 			pass, err := document.Where(scan.Filter)
 			if err != nil {
 				return stacktrace.Propagate(err, "")

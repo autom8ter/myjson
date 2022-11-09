@@ -1,8 +1,8 @@
-package wolverine_test
+package brutus_test
 
 import (
 	"context"
-	"github.com/autom8ter/wolverine"
+	"github.com/autom8ter/brutus"
 	"github.com/spf13/cast"
 	"github.com/stretchr/testify/assert"
 	"testing"
@@ -10,10 +10,10 @@ import (
 
 func TestContext(t *testing.T) {
 	ctx := context.Background()
-	c, ok := wolverine.GetContext(ctx)
+	c, ok := brutus.GetContext(ctx)
 	assert.False(t, ok)
 	assert.NotNil(t, c)
-	c = wolverine.NewContext(map[string]any{
+	c = brutus.NewContext(map[string]any{
 		"testing": true,
 	})
 	v, ok := c.Get("testing")
@@ -32,7 +32,7 @@ func TestContext(t *testing.T) {
 	assert.Nil(t, v)
 
 	ctx = c.ToContext(ctx)
-	c, ok = wolverine.GetContext(ctx)
+	c, ok = brutus.GetContext(ctx)
 	assert.True(t, ok)
 	assert.NotNil(t, c)
 }

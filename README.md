@@ -1,8 +1,8 @@
-# Wolverine
+# Brutus
 
 A framework for building powerful, extensible, and feature-rich microservices on top of key/value storeage
 
-    go get -u github.com/autom8ter/wolverine
+    go get -u github.com/autom8ter/brutus
 
 ## Noteable Libraries
 
@@ -63,7 +63,7 @@ Build powerful, extensible, and feature-rich microservices on top of key/value s
 
 ## Getting Started
 
-    go get -u github.com/autom8ter/wolverine
+    go get -u github.com/autom8ter/brutus
 
 #### Configuring a database instance
 
@@ -93,11 +93,17 @@ WIP
 
 WIP
 
+
+
 ## Contributing
 
 Install Dependencies
 
     go mod download
+
+Checkout Branch
+
+    git checkout -b ${issueNumber}
 
 Run Tests
 

@@ -1,7 +1,7 @@
 package badger
 
 import (
-	"github.com/autom8ter/wolverine/kv"
+	"github.com/autom8ter/brutus/kv"
 	"github.com/dgraph-io/badger/v3"
 )
 

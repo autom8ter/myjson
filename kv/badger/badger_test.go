@@ -2,8 +2,8 @@ package badger_test
 
 import (
 	"fmt"
-	"github.com/autom8ter/wolverine/kv"
-	"github.com/autom8ter/wolverine/kv/badger"
+	"github.com/autom8ter/brutus/kv"
+	"github.com/autom8ter/brutus/kv/badger"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )

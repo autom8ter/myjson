@@ -1,4 +1,4 @@
-package wolverine
+package brutus
 
 // WhereOp is an operator used to compare a value to a records field value in a where clause
 type WhereOp string
@@ -18,7 +18,8 @@ const (
 	Lte WhereOp = "lte"
 	// Contains matches on text containing a substring
 	Contains WhereOp = "contains"
-	In       WhereOp = "in"
+	// In matches on an element being contained in a list
+	In WhereOp = "in"
 )
 
 // Where is field-level filter for database queries
@@ -28,5 +29,5 @@ type Where struct {
 	// Op is an operator used to compare the field against the value.
 	Op WhereOp `json:"op"`
 	// Value is a value to compare against a records field value
-	Value interface{} `json:"value"`
+	Value any `json:"value"`
 }

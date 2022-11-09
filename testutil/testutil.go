@@ -2,7 +2,7 @@ package testutil
 
 import (
 	"context"
-	"github.com/autom8ter/wolverine"
+	"github.com/autom8ter/brutus"
 	"io/ioutil"
 	"os"
 	"time"
@@ -14,48 +14,48 @@ import (
 
 var (
 	//go:embed testdata/task.json
-	taskSchema string
+	TaskSchema string
 	//go:embed testdata/user.json
-	userSchema     string
-	TaskCollection = wolverine.NewCollection("task", "_id",
-		wolverine.WithIndex(wolverine.Index{
+	UserSchema     string
+	TaskCollection = brutus.NewCollection("task", "_id",
+		brutus.WithIndex(brutus.Index{
 			Collection: "task",
 			Name:       "task_user_idx",
 			Fields:     []string{"user"},
 			Unique:     false,
 			Primary:    false,
 		}),
-		wolverine.WithValidator(wolverine.JSONSchema([]byte(taskSchema))),
+		brutus.WithValidatorHooks(brutus.MustJSONSchema([]byte(TaskSchema))),
 	)
-	UserCollection = wolverine.NewCollection("user", "_id",
-		wolverine.WithIndex(wolverine.Index{
+	UserCollection = brutus.NewCollection("user", "_id",
+		brutus.WithIndex(brutus.Index{
 			Collection: "user",
 			Name:       "user_lanaguage_idx",
 			Fields:     []string{"language"},
 			Unique:     false,
 			Primary:    false,
 		}),
-		wolverine.WithIndex(wolverine.Index{
+		brutus.WithIndex(brutus.Index{
 			Collection: "user",
 			Name:       "user_email_idx",
 			Fields:     []string{"contact.email"},
 			Unique:     true,
 			Primary:    false,
 		}),
-		wolverine.WithIndex(wolverine.Index{
+		brutus.WithIndex(brutus.Index{
 			Collection: "user",
 			Name:       "user_account_idx",
 			Fields:     []string{"account_id"},
 			Unique:     false,
 			Primary:    false,
 		}),
-		wolverine.WithValidator(wolverine.JSONSchema([]byte(userSchema))),
+		brutus.WithValidatorHooks(brutus.MustJSONSchema([]byte(UserSchema))),
 	)
-	AllCollections = []*wolverine.Collection{UserCollection, TaskCollection}
+	AllCollections = []*brutus.Collection{UserCollection, TaskCollection}
 )
 
-func NewUserDoc() *wolverine.Document {
-	doc, err := wolverine.NewDocumentFrom(map[string]interface{}{
+func NewUserDoc() *brutus.Document {
+	doc, err := brutus.NewDocumentFrom(map[string]interface{}{
 		"_id":  gofakeit.UUID(),
 		"name": gofakeit.Name(),
 		"contact": map[string]interface{}{
@@ -76,8 +76,8 @@ func NewUserDoc() *wolverine.Document {
 	return doc
 }
 
-func NewTaskDoc(usrID string) *wolverine.Document {
-	doc, err := wolverine.NewDocumentFrom(map[string]interface{}{
+func NewTaskDoc(usrID string) *brutus.Document {
+	doc, err := brutus.NewDocumentFrom(map[string]interface{}{
 		"_id":     gofakeit.UUID(),
 		"user":    usrID,
 		"content": gofakeit.LoremIpsumSentence(5),
@@ -88,7 +88,7 @@ func NewTaskDoc(usrID string) *wolverine.Document {
 	return doc
 }
 
-func TestDB(fn func(ctx context.Context, db *wolverine.DB), collections ...*wolverine.Collection) error {
+func TestDB(fn func(ctx context.Context, db *brutus.DB), collections ...*brutus.Collection) error {
 	if len(collections) == 0 {
 		collections = append(collections, AllCollections...)
 	}
@@ -100,19 +100,19 @@ func TestDB(fn func(ctx context.Context, db *wolverine.DB), collections ...*wolv
 	defer os.RemoveAll(dir)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-
-	db, err := wolverine.New(ctx, wolverine.Config{
-		KV: wolverine.KVConfig{
-			Provider: "badger",
-			Params: map[string]string{
-				"storage_path": dir,
-			},
+	db, err := brutus.New(ctx, brutus.KVConfig{
+		Provider: "badger",
+		Params: map[string]string{
+			"storage_path": dir,
 		},
-		Collections: collections,
 	})
 	if err != nil {
 		return err
 	}
+	if err := db.Core().SetCollections(ctx, collections); err != nil {
+		return err
+	}
+	time.Sleep(1 * time.Second)
 	defer db.Close(ctx)
 	fn(ctx, db)
 	return nil

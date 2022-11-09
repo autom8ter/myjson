@@ -1,4 +1,4 @@
-package wolverine
+package brutus
 
 import (
 	"context"
@@ -9,6 +9,8 @@ import (
 type Action string
 
 const (
+	// Create creates a document
+	Create = "create"
 	// Set sets a document's values in place
 	Set = "set"
 	// Update updates a set of fields on a document
@@ -22,6 +24,7 @@ type StateChange struct {
 	ctx        context.Context
 	Collection string                    `json:"collection,omitempty"`
 	Deletes    []string                  `json:"deletes,omitempty"`
+	Creates    []*Document               `json:"creates,omitempty"`
 	Sets       []*Document               `json:"sets,omitempty"`
 	Updates    map[string]map[string]any `json:"updates,omitempty"`
 	Timestamp  time.Time                 `json:"timestamp,omitempty"`
@@ -35,5 +38,12 @@ func (s StateChange) Context() context.Context {
 	return s.ctx
 }
 
-// ChangeStreamHandler is a function executed on changes to documents which emit events
-type ChangeStreamHandler func(ctx context.Context, change StateChange) error
+// DocChange is a mutation to a single document - it includes the action, the document id, and the before & after state of the document
+// Note: the after value is what's persisted to the database, the before value is what was in the database prior to the change.
+// After will be always null on delete
+type DocChange struct {
+	Action Action
+	DocID  string
+	Before *Document
+	After  *Document
+}

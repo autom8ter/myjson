@@ -1,4 +1,6 @@
-package wolverine
+package brutus
+
+import "github.com/palantir/stacktrace"
 
 // AggFunction is a function used to aggregate against a document field
 type AggFunction string
@@ -22,6 +24,9 @@ type Aggregate struct {
 
 // AggregateQuery is an aggregation query against the NOSQL database
 type AggregateQuery struct {
+	// From is the collection to aggregate
+	From string
+	// GroupBy are the columns to group data by
 	GroupBy []string `json:"group_by"`
 	// Where is a list of where clauses used to filter records
 	Where []Where `json:"where"`
@@ -33,4 +38,11 @@ type AggregateQuery struct {
 	Limit int `json:"limit"`
 	// Order by is the order to return results in. OrderBy requires an index on the field that the query is sorting on.
 	OrderBy OrderBy `json:"order_by"`
+}
+
+func (q AggregateQuery) Validate() error {
+	if q.From == "" {
+		return stacktrace.NewError("empty field: 'from'")
+	}
+	return nil
 }

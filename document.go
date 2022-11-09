@@ -1,4 +1,4 @@
-package wolverine
+package brutus
 
 import (
 	"context"
@@ -12,7 +12,6 @@ import (
 	"io"
 	"sort"
 	"strings"
-	"sync"
 )
 
 // Ref is a reference to a document
@@ -21,17 +20,13 @@ type Ref struct {
 	ID         string `json:"id"`
 }
 
-// Document is a database document with special attributes.
-// required attributes: _id(string), _collection(string)
+// Document is a concurrency safe JSON document
 type Document struct {
 	result gjson.Result
-	mu     sync.RWMutex
 }
 
 // MarshalJSON satisfies the json Marshaler interface
 func (d *Document) MarshalJSON() ([]byte, error) {
-	d.mu.RLock()
-	defer d.mu.RUnlock()
 	return d.Bytes(), nil
 }
 
@@ -46,7 +41,7 @@ func NewDocument() *Document {
 // NewDocumentFromBytes creates a new document from the given json bytes
 func NewDocumentFromBytes(json []byte) (*Document, error) {
 	if !gjson.ValidBytes(json) {
-		return nil, stacktrace.NewError("invalid json")
+		return nil, stacktrace.NewError("invalid json: %s", string(json))
 	}
 	d := &Document{
 		result: gjson.ParseBytes(json),
@@ -69,15 +64,11 @@ func NewDocumentFrom(value any) (*Document, error) {
 
 // Valid returns whether the document is valid
 func (d *Document) Valid() bool {
-	d.mu.RLock()
-	defer d.mu.RUnlock()
 	return gjson.ValidBytes(d.Bytes()) && !d.result.IsArray()
 }
 
 // String returns the document as a json string
 func (d *Document) String() string {
-	d.mu.RLock()
-	defer d.mu.RUnlock()
 	return d.result.Raw
 }
 
@@ -88,15 +79,11 @@ func (d *Document) Bytes() []byte {
 
 // Value returns the document as a map
 func (d *Document) Value() map[string]any {
-	d.mu.RLock()
-	defer d.mu.RUnlock()
 	return cast.ToStringMap(d.result.Value())
 }
 
 // Clone allocates a new document with identical values
 func (d *Document) Clone() *Document {
-	d.mu.RLock()
-	defer d.mu.RUnlock()
 	raw := d.result.Raw
 	return &Document{result: gjson.Parse(raw)}
 }
@@ -124,15 +111,11 @@ func (d *Document) Select(fields []string) error {
 
 // Get gets a field on the document. Get has GJSON syntax support and supports dot notation
 func (d *Document) Get(field string) any {
-	d.mu.RLock()
-	defer d.mu.RUnlock()
 	return d.result.Get(field).Value()
 }
 
 // GetString gets a string field value on the document. Get has GJSON syntax support and supports dot notation
 func (d *Document) GetString(field string) string {
-	d.mu.RLock()
-	defer d.mu.RUnlock()
 	return cast.ToString(d.result.Get(field).Value())
 }
 
@@ -183,8 +166,6 @@ func (d *Document) set(field string, val any) error {
 
 // SetAll sets all fields on the document. Dot notation is supported.
 func (d *Document) SetAll(values map[string]any) error {
-	d.mu.Lock()
-	defer d.mu.Unlock()
 	var err error
 	for k, v := range values {
 		err = d.set(k, v)
@@ -215,8 +196,6 @@ func (d *Document) Del(field string) error {
 
 // Del deletes a field from the document
 func (d *Document) DelAll(fields ...string) error {
-	d.mu.Lock()
-	defer d.mu.Unlock()
 	for _, field := range fields {
 		result, err := sjson.Delete(d.result.Raw, field)
 		if err != nil {

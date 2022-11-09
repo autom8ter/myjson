@@ -1,4 +1,4 @@
-package wolverine
+package brutus
 
 // OrderByDirection indicates whether results should be sorted in ascending or descending order
 type OrderByDirection string
