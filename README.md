@@ -45,6 +45,7 @@ Build powerful, extensible, and feature-rich microservices on top of key/value s
 ### Roadmap
 - [ ] change streams
 - [ ] multi-field order by
+- [ ] multi-field primary key
 - [ ] external data importer
 - [ ] migrations
 - [ ] better errors & error codes

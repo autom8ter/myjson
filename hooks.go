@@ -10,3 +10,6 @@ type SideEffectHook func(ctx context.Context, core CoreAPI, change *DocChange) (
 
 // WhereHook is a hook function triggered before queries/scans are executed. They may be used for a varietey of purposes (ex: query authorization hooks)
 type WhereHook func(ctx context.Context, core CoreAPI, where []Where) ([]Where, error)
+
+// ReadHook is a hook function triggered on each passing result of a read-based request
+type ReadHook func(ctx context.Context, core CoreAPI, document *Document) (*Document, error)

@@ -579,6 +579,12 @@ func (d *coreImplementation) Scan(ctx context.Context, collection string, scan S
 				return stacktrace.Propagate(err, "")
 			}
 			if pass {
+				for _, rhook := range coll.readHooks {
+					document, err = rhook(ctx, d, document)
+					if err != nil {
+						return stacktrace.Propagate(err, "")
+					}
+				}
 				shouldContinue, err := handlerFunc(document)
 				if err != nil {
 					return stacktrace.Propagate(err, "")

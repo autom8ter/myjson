@@ -11,7 +11,7 @@ import (
 
 func init() {
 	registry.Register("badger", func(params map[string]interface{}) (kv.DB, error) {
-		return open(cast.ToString(params["storeage_path"]))
+		return open(cast.ToString(params["storage_path"]))
 	})
 }
 

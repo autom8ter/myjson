@@ -15,12 +15,13 @@ type Collection struct {
 	validators  []ValidatorHook
 	sideEffects []SideEffectHook
 	whereHooks  []WhereHook
+	readHooks   []ReadHook
 }
 
 // CollectionOpt is an option for configuring a collection
 type CollectionOpt func(c *Collection)
 
-// WithIndex adds an index to the collection
+// WithIndex adds 1-many indexes to the collection configuration
 func WithIndex(indexes ...Index) CollectionOpt {
 	return func(c *Collection) {
 		for _, i := range indexes {
@@ -29,17 +30,24 @@ func WithIndex(indexes ...Index) CollectionOpt {
 	}
 }
 
-// WithValidatorHook adds a document validator to the collection (see JSONSchema for an example)
-func WithValidatorHooks(validator ...ValidatorHook) CollectionOpt {
+// WithValidatorHook adds  document validator(s) to the collection (see JSONSchema for an example)
+func WithValidatorHooks(validators ...ValidatorHook) CollectionOpt {
 	return func(c *Collection) {
-		c.validators = append(c.validators, validator...)
+		c.validators = append(c.validators, validators...)
+	}
+}
+
+// WithReadHooks adds document read hook(s) to the collection (see JSONSchema for an example)
+func WithReadHooks(readHooks ...ReadHook) CollectionOpt {
+	return func(c *Collection) {
+		c.readHooks = append(c.readHooks, readHooks...)
 	}
 }
 
 // WithSideEffectBeforeHook adds a side effect to the collections configuration that executes on changes as documents are persisted
-func WithSideEffects(sideEffect ...SideEffectHook) CollectionOpt {
+func WithSideEffects(sideEffects ...SideEffectHook) CollectionOpt {
 	return func(c *Collection) {
-		c.sideEffects = append(c.sideEffects, sideEffect...)
+		c.sideEffects = append(c.sideEffects, sideEffects...)
 	}
 }
 
