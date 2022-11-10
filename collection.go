@@ -108,12 +108,10 @@ func (c *Collection) Indexes() []Index {
 	return indexes
 }
 
-// SideAffects applies all of the registered side effects on a change as it is persisted to the database.
-// If an error is returned, the state change(s) will be aborted and rolled back
-func (c *Collection) SideAffects(ctx context.Context, core CoreAPI, change *DocChange) (*DocChange, error) {
+func (c *Collection) ApplySideEffects(ctx context.Context, db *DB, change *DocChange) (*DocChange, error) {
 	var err error
 	for _, sideEffect := range c.sideEffects {
-		change, err = sideEffect(ctx, core, change)
+		change, err = sideEffect(ctx, db, change)
 		if err != nil {
 			return nil, stacktrace.Propagate(err, "")
 		}
@@ -123,7 +121,7 @@ func (c *Collection) SideAffects(ctx context.Context, core CoreAPI, change *DocC
 
 // Validate validates the document against all registered validation hooks.
 // If an error is returned, the state change(s) will be aborted and rolled back
-func (c *Collection) Validate(ctx context.Context, core CoreAPI, d *DocChange) error {
+func (c *Collection) Validate(ctx context.Context, core *DB, d *DocChange) error {
 	if len(c.validators) == 0 {
 		return nil
 	}

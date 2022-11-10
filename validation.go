@@ -14,7 +14,7 @@ func JSONSchema(schemaContent []byte) (ValidatorHook, error) {
 	if err := json.Unmarshal(schemaContent, schema); err != nil {
 		return nil, stacktrace.Propagate(err, "failed to decode json schema")
 	}
-	return func(ctx context.Context, core CoreAPI, d *DocChange) error {
+	return func(ctx context.Context, _ *DB, d *DocChange) error {
 		switch d.Action {
 		case Update, Create, Set:
 			if d.After != nil {
@@ -27,7 +27,6 @@ func JSONSchema(schemaContent []byte) (ValidatorHook, error) {
 				}
 			}
 		}
-
 		return nil
 	}, nil
 }

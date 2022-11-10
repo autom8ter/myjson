@@ -101,16 +101,16 @@ func TestDB(fn func(ctx context.Context, db *brutus.DB), collections ...*brutus.
 	defer os.RemoveAll(dir)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	db, err := brutus.New(ctx, brutus.KVConfig{
-		Provider: "badger",
-		Params: map[string]any{
-			"storage_path": dir,
+	db, err := brutus.New(ctx, brutus.Config{
+		KV: brutus.KVConfig{
+			Provider: "badger",
+			Params: map[string]any{
+				"storage_path": dir,
+			},
 		},
+		Collections: collections,
 	})
 	if err != nil {
-		return err
-	}
-	if err := db.Core().SetCollections(ctx, collections); err != nil {
 		return err
 	}
 	time.Sleep(1 * time.Second)

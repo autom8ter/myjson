@@ -46,7 +46,7 @@ Build powerful, extensible, and feature-rich microservices on top of pluggable k
 - [ ] change streams
 - [ ] multi-field order by
 - [ ] multi-field primary key
-- [ ] search indexes
+- [ ] search indexing
 - [ ] external data importer
 - [ ] migrations
 - [ ] better errors & error codes

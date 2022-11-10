@@ -9,30 +9,9 @@ import (
 	"github.com/autom8ter/machine/v4"
 	"github.com/palantir/stacktrace"
 	"sort"
-	"sync"
 )
 
-type coreImplementation struct {
-	kv          kv.DB
-	machine     machine.Machine
-	collections sync.Map
-	isBuilding  sync.Map
-	optimizer   Optimizer
-}
-
-// NewCore creates a new CoreAPI instance with the given key value database
-func NewCore(kv kv.DB) (CoreAPI, error) {
-	d := &coreImplementation{
-		kv:          kv,
-		machine:     machine.New(),
-		collections: sync.Map{},
-		optimizer:   defaultOptimizer{},
-		isBuilding:  sync.Map{},
-	}
-	return d, nil
-}
-
-func (d *coreImplementation) coll(collection string) (*Collection, bool) {
+func (d *DB) coll(collection string) (*Collection, bool) {
 	c, ok := d.collections.Load(collection)
 	if !ok {
 		return nil, false
@@ -40,11 +19,7 @@ func (d *coreImplementation) coll(collection string) (*Collection, bool) {
 	return c.(*Collection), true
 }
 
-func (d *coreImplementation) getPrimaryIndex(collection string) (Index, bool) {
-	c, ok := d.coll(collection)
-	if !ok {
-		return Index{}, false
-	}
+func (d *DB) getPrimaryIndex(c *Collection) (Index, bool) {
 	for _, i := range c.indexes {
 		if i.Primary {
 			return i, true
@@ -53,15 +28,7 @@ func (d *coreImplementation) getPrimaryIndex(collection string) (Index, bool) {
 	return Index{}, false
 }
 
-func (d *coreImplementation) GetCollection(ctx context.Context, name string) (*Collection, bool) {
-	c, ok := d.collections.Load(name)
-	if !ok {
-		return nil, false
-	}
-	return c.(*Collection), true
-}
-
-func (d *coreImplementation) GetCollections(ctx context.Context) ([]*Collection, error) {
+func (d *DB) getDocs(ctx context.Context) ([]*Collection, error) {
 	var collections []*Collection
 	d.collections.Range(func(key, value any) bool {
 		collections = append(collections, value.(*Collection))
@@ -73,7 +40,7 @@ func (d *coreImplementation) GetCollections(ctx context.Context) ([]*Collection,
 	return collections, nil
 }
 
-func (d *coreImplementation) SetCollections(ctx context.Context, collections []*Collection) error {
+func (d *DB) setCollections(ctx context.Context, collections []*Collection) error {
 	meta, _ := GetContext(ctx)
 	meta.Set("_internal", true)
 	ctx = meta.ToContext(ctx)
@@ -111,8 +78,7 @@ func (d *coreImplementation) SetCollections(ctx context.Context, collections []*
 	return nil
 }
 
-func (d *coreImplementation) addIndex(ctx context.Context, collection string, index Index) error {
-
+func (d *DB) addIndex(ctx context.Context, collection string, index Index) error {
 	c, ok := d.coll(collection)
 	if !ok {
 		return stacktrace.NewErrorWithCode(ErrTODO, "collection is not registered: %s", collection)
@@ -123,11 +89,10 @@ func (d *coreImplementation) addIndex(ctx context.Context, collection string, in
 	batch := d.kv.Batch()
 	meta, _ := GetContext(ctx)
 	meta.Set("_internal", true)
-	_, err := d.Scan(meta.ToContext(ctx), collection, Scan{
-		Filter:  nil,
-		Reverse: false,
+	_, err := d.Scan(meta.ToContext(ctx), Scan{
+		Where: nil,
 	}, func(doc *Document) (bool, error) {
-		if err := d.indexDocument(ctx, batch, collection, &DocChange{
+		if err := d.indexDocument(ctx, batch, c, &DocChange{
 			Action: Set,
 			DocID:  doc.GetString(c.PrimaryKey()),
 			After:  doc,
@@ -146,7 +111,7 @@ func (d *coreImplementation) addIndex(ctx context.Context, collection string, in
 	return nil
 }
 
-func (d *coreImplementation) removeIndex(ctx context.Context, collection string, index Index) error {
+func (d *DB) removeIndex(ctx context.Context, collection string, index Index) error {
 	c, ok := d.coll(collection)
 	if !ok {
 		return nil
@@ -155,11 +120,10 @@ func (d *coreImplementation) removeIndex(ctx context.Context, collection string,
 	d.collections.Store(collection, c)
 	d.machine.Go(ctx, func(ctx context.Context) error {
 		batch := d.kv.Batch()
-		_, err := d.Scan(ctx, collection, Scan{
-			Filter:  nil,
-			Reverse: false,
+		_, err := d.queryScan(ctx, Scan{
+			From: c.name,
 		}, func(doc *Document) (bool, error) {
-			if err := d.updateSecondaryIndex(ctx, batch, collection, index, &DocChange{
+			if err := d.updateSecondaryIndex(ctx, batch, c, index, &DocChange{
 				Action: Delete,
 				DocID:  doc.GetString(c.PrimaryKey()),
 				Before: doc,
@@ -179,7 +143,8 @@ func (d *coreImplementation) removeIndex(ctx context.Context, collection string,
 	return nil
 }
 
-func (d *coreImplementation) Indexes(ctx context.Context, collection string) []string {
+// Indexes returns a list of collection names that are registered in the collection
+func (d *DB) Indexes(ctx context.Context, collection string) []string {
 	c, ok := d.coll(collection)
 	if !ok {
 		return nil
@@ -188,10 +153,11 @@ func (d *coreImplementation) Indexes(ctx context.Context, collection string) []s
 	for k, _ := range c.indexes {
 		names = append(names, k)
 	}
+	sort.Strings(names)
 	return names
 }
 
-func (d *coreImplementation) setIndexes(collection string, indexes map[string]Index) error {
+func (d *DB) setIndexes(collection string, indexes map[string]Index) error {
 	bits, err := json.Marshal(&indexes)
 	if err != nil {
 		return stacktrace.Propagate(err, "")
@@ -208,7 +174,7 @@ func (d *coreImplementation) setIndexes(collection string, indexes map[string]In
 	return nil
 }
 
-func (d *coreImplementation) getIndexes(collection string) (map[string]Index, error) {
+func (d *DB) getIndexes(collection string) (map[string]Index, error) {
 	var (
 		indexing = map[string]Index{}
 	)
@@ -227,13 +193,13 @@ func (d *coreImplementation) getIndexes(collection string) (map[string]Index, er
 	return indexing, nil
 }
 
-func (d *coreImplementation) getAllCollection(ctx context.Context, collection string, ids []string) (Documents, error) {
+func (d *DB) BatchGet(ctx context.Context, collection string, ids []string) (Documents, error) {
 	c, ok := d.coll(collection)
 	if !ok {
 		return Documents{}, stacktrace.NewErrorWithCode(ErrTODO, "collection is not registered: %s", collection)
 	}
 	var documents []*Document
-	primaryIndex, ok := d.getPrimaryIndex(collection)
+	primaryIndex, ok := d.getPrimaryIndex(c)
 	if !ok {
 		return Documents{}, stacktrace.NewErrorWithCode(ErrTODO, "collection is missing primary index: %s", collection)
 	}
@@ -259,17 +225,14 @@ func (d *coreImplementation) getAllCollection(ctx context.Context, collection st
 	return documents, nil
 }
 
-func (d *coreImplementation) getCollection(ctx context.Context, collection string, id string) (*Document, error) {
+func (d *DB) getDoc(ctx context.Context, c *Collection, id string) (*Document, error) {
 	var (
 		document *Document
+		err      error
 	)
-	c, ok := d.coll(collection)
+	primaryIndex, ok := d.getPrimaryIndex(c)
 	if !ok {
-		return nil, stacktrace.NewErrorWithCode(ErrTODO, "collection is not registered: %s", collection)
-	}
-	primaryIndex, ok := d.getPrimaryIndex(collection)
-	if !ok {
-		return nil, stacktrace.NewErrorWithCode(ErrTODO, "collection is missing primary index: %s", collection)
+		return nil, stacktrace.NewErrorWithCode(ErrTODO, "collection is missing primary index: %s", c.name)
 	}
 	if err := d.kv.Tx(false, func(txn kv.Tx) error {
 		val, err := txn.Get(primaryIndex.Seek(map[string]any{
@@ -286,10 +249,16 @@ func (d *coreImplementation) getCollection(ctx context.Context, collection strin
 	}); err != nil {
 		return document, stacktrace.Propagate(err, "")
 	}
+	for _, read := range c.readHooks {
+		document, err = read(ctx, d, document)
+		if err != nil {
+			return document, stacktrace.Propagate(err, "")
+		}
+	}
 	return document, nil
 }
 
-func (d *coreImplementation) Persist(ctx context.Context, collection string, change StateChange) error {
+func (d *DB) persistStateChange(ctx context.Context, collection string, change StateChange) error {
 	c, ok := d.coll(collection)
 	if !ok {
 		return stacktrace.NewErrorWithCode(ErrTODO, "collection is not registered: %s", collection)
@@ -297,7 +266,7 @@ func (d *coreImplementation) Persist(ctx context.Context, collection string, cha
 	txn := d.kv.Batch()
 	if change.Updates != nil {
 		for id, edit := range change.Updates {
-			before, _ := d.getCollection(ctx, collection, id)
+			before, _ := d.getDoc(ctx, c, id)
 			if !before.Valid() {
 				before = NewDocument()
 			}
@@ -306,7 +275,7 @@ func (d *coreImplementation) Persist(ctx context.Context, collection string, cha
 			if err != nil {
 				return stacktrace.Propagate(err, "")
 			}
-			if err := d.indexDocument(ctx, txn, collection, &DocChange{
+			if err := d.indexDocument(ctx, txn, c, &DocChange{
 				Action: Update,
 				DocID:  id,
 				Before: before,
@@ -317,8 +286,8 @@ func (d *coreImplementation) Persist(ctx context.Context, collection string, cha
 		}
 	}
 	for _, id := range change.Deletes {
-		before, _ := d.getCollection(ctx, collection, id)
-		if err := d.indexDocument(ctx, txn, collection, &DocChange{
+		before, _ := d.Get(ctx, collection, id)
+		if err := d.indexDocument(ctx, txn, c, &DocChange{
 			Action: Delete,
 			DocID:  id,
 			Before: before,
@@ -335,11 +304,11 @@ func (d *coreImplementation) Persist(ctx context.Context, collection string, cha
 		if docID == "" {
 			return stacktrace.NewErrorWithCode(ErrTODO, "document missing primary key %s", c.PrimaryKey())
 		}
-		before, _ := d.getCollection(ctx, collection, docID)
+		before, _ := d.getDoc(ctx, c, docID)
 		if before != nil {
 			return stacktrace.NewErrorWithCode(ErrTODO, "document already exists %s", docID)
 		}
-		if err := d.indexDocument(ctx, txn, collection, &DocChange{
+		if err := d.indexDocument(ctx, txn, c, &DocChange{
 			Action: Create,
 			DocID:  docID,
 			Before: nil,
@@ -356,8 +325,8 @@ func (d *coreImplementation) Persist(ctx context.Context, collection string, cha
 		if docID == "" {
 			return stacktrace.NewErrorWithCode(ErrTODO, "document missing primary key %s", c.PrimaryKey())
 		}
-		before, _ := d.getCollection(ctx, collection, docID)
-		if err := d.indexDocument(ctx, txn, collection, &DocChange{
+		before, _ := d.getDoc(ctx, c, docID)
+		if err := d.indexDocument(ctx, txn, c, &DocChange{
 			Action: Set,
 			DocID:  docID,
 			Before: before,
@@ -376,18 +345,14 @@ func (d *coreImplementation) Persist(ctx context.Context, collection string, cha
 	return nil
 }
 
-func (d *coreImplementation) indexDocument(ctx context.Context, txn kv.Batch, collection string, change *DocChange) error {
-	c, ok := d.coll(collection)
-	if !ok {
-		return stacktrace.NewErrorWithCode(ErrTODO, "collection is not registered: %s", collection)
-	}
+func (d *DB) indexDocument(ctx context.Context, txn kv.Batch, c *Collection, change *DocChange) error {
 	if change.DocID == "" {
 		return stacktrace.NewErrorWithCode(ErrTODO, "empty document id")
 	}
 	var err error
-	primaryIndex, ok := d.getPrimaryIndex(collection)
+	primaryIndex, ok := d.getPrimaryIndex(c)
 	if !ok {
-		return stacktrace.NewErrorWithCode(ErrTODO, "collection is missing primary index: %s", collection)
+		return stacktrace.NewErrorWithCode(ErrTODO, "collection is missing primary index: %s", c.name)
 	}
 	if change.After != nil {
 		if c.GetPrimaryKey(change.After) != change.DocID {
@@ -397,7 +362,7 @@ func (d *coreImplementation) indexDocument(ctx context.Context, txn kv.Batch, co
 			return stacktrace.Propagate(err, "")
 		}
 	}
-	change, err = c.SideAffects(ctx, d, change)
+	change, err = c.ApplySideEffects(ctx, d, change)
 	if err != nil {
 		return stacktrace.Propagate(err, "")
 	}
@@ -419,20 +384,16 @@ func (d *coreImplementation) indexDocument(ctx context.Context, txn kv.Batch, co
 		if i.Primary {
 			continue
 		}
-		if err := d.updateSecondaryIndex(ctx, txn, collection, i, change); err != nil {
+		if err := d.updateSecondaryIndex(ctx, txn, c, i, change); err != nil {
 			return stacktrace.PropagateWithCode(err, ErrTODO, "")
 		}
 	}
 	return nil
 }
 
-func (d *coreImplementation) updateSecondaryIndex(ctx context.Context, txn kv.Batch, collection string, idx Index, change *DocChange) error {
+func (d *DB) updateSecondaryIndex(ctx context.Context, txn kv.Batch, c *Collection, idx Index, change *DocChange) error {
 	if idx.Primary {
 		return nil
-	}
-	c, ok := d.coll(collection)
-	if !ok {
-		return stacktrace.NewErrorWithCode(ErrTODO, "collection is not registered: %s", collection)
 	}
 
 	switch change.Action {
@@ -498,19 +459,15 @@ func (d *coreImplementation) updateSecondaryIndex(ctx context.Context, txn kv.Ba
 	return nil
 }
 
-func (d *coreImplementation) hasCollection(ctx context.Context, collection string) bool {
+func (d *DB) hasCollection(ctx context.Context, collection string) bool {
 	_, ok := d.coll(collection)
 	return ok
 }
 
-func (c *coreImplementation) getReadyIndexes(ctx context.Context, collection string) map[string]Index {
+func (c *DB) getReadyIndexes(ctx context.Context, coll *Collection) map[string]Index {
 	var indexes = map[string]Index{}
-	coll, ok := c.coll(collection)
-	if !ok {
-		return map[string]Index{}
-	}
 	for _, i := range coll.indexes {
-		if val, ok := c.isBuilding.Load(fmt.Sprintf("%s/%s", collection, i.Name)); ok && val == true {
+		if val, ok := c.isBuilding.Load(fmt.Sprintf("%s/%s", coll.name, i.Name)); ok && val == true {
 			continue
 		}
 		indexes[i.Name] = i
@@ -518,27 +475,27 @@ func (c *coreImplementation) getReadyIndexes(ctx context.Context, collection str
 	return indexes
 }
 
-func (d *coreImplementation) Scan(ctx context.Context, collection string, scan Scan, handlerFunc ScanFunc) (IndexMatch, error) {
-	coll, ok := d.coll(collection)
-	if !ok {
-		return IndexMatch{}, stacktrace.NewErrorWithCode(ErrTODO, "collection is not registered: %s", collection)
-	}
+func (d *DB) queryScan(ctx context.Context, scan Scan, handlerFunc ScanFunc) (IndexMatch, error) {
 	if handlerFunc == nil {
 		return IndexMatch{}, stacktrace.NewError("empty scan handler")
 	}
+	coll, ok := d.coll(scan.From)
+	if !ok {
+		return IndexMatch{}, stacktrace.NewError("unsupported collection: %s", scan.From)
+	}
 	if coll.whereHooks != nil {
 		for _, w := range coll.whereHooks {
-			filters, err := w(ctx, d, scan.Filter)
+			filters, err := w(ctx, d, scan.Where)
 			if err != nil {
 				return IndexMatch{}, stacktrace.Propagate(err, "")
 			}
-			scan.Filter = filters
+			scan.Where = filters
 		}
 	}
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	var index IndexMatch
-	index, err := d.optimizer.BestIndex(d.getReadyIndexes(ctx, collection), scan.Filter, OrderBy{})
+	index, err := d.optimizer.BestIndex(d.getReadyIndexes(ctx, coll), scan.Where, OrderBy{})
 	if err != nil {
 		return IndexMatch{}, stacktrace.Propagate(err, "")
 	}
@@ -547,7 +504,7 @@ func (d *coreImplementation) Scan(ctx context.Context, collection string, scan S
 		opts := kv.IterOpts{
 			Prefix:  pfx.Path(),
 			Seek:    nil,
-			Reverse: scan.Reverse,
+			Reverse: index.IsOrdered && scan.OrderBy.Direction == DESC,
 		}
 		it := txn.NewIterator(opts)
 		defer it.Close()
@@ -567,13 +524,13 @@ func (d *coreImplementation) Scan(ctx context.Context, collection string, scan S
 			} else {
 				split := bytes.Split(item.Key(), []byte("\x00"))
 				id := split[len(split)-1]
-				document, err = d.getCollection(ctx, collection, string(id))
+				document, err = d.getDoc(ctx, coll, string(id))
 				if err != nil {
 					return stacktrace.Propagate(err, "")
 				}
 			}
 
-			pass, err := document.Where(scan.Filter)
+			pass, err := document.Where(scan.Where)
 			if err != nil {
 				return stacktrace.Propagate(err, "")
 			}
@@ -599,8 +556,4 @@ func (d *coreImplementation) Scan(ctx context.Context, collection string, scan S
 		return index, stacktrace.Propagate(err, "")
 	}
 	return index, nil
-}
-
-func (d *coreImplementation) Close(ctx context.Context) error {
-	return stacktrace.Propagate(d.kv.Close(), "")
 }
