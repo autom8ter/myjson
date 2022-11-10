@@ -2,6 +2,7 @@ package brutus
 
 import (
 	"github.com/palantir/stacktrace"
+	"github.com/samber/lo"
 )
 
 // Optimizer selects the best index from a set of indexes based on a query
@@ -35,53 +36,45 @@ func (o defaultOptimizer) BestIndex(indexes map[string]Index, where []Where, ord
 
 	values := indexableFields(where, order)
 	var (
-		target  Index
+		i = IndexMatch{
+			Values: values,
+		}
 		primary Index
-		matched []string
-		ordered bool
 	)
 	for _, index := range indexes {
 		if len(index.Fields) == 0 {
 			continue
 		}
-		if index.Primary {
-			primary = index
+		var matchedFields []string
+		if index.Fields[0] == order.Field {
+			matchedFields = append(matchedFields, order.Field)
 		}
-
-		isOrdered := index.Fields[0] == order.Field
-		var totalMatched []string
 		for i, field := range index.Fields {
 			if len(where) > i {
 				if field == where[i].Field {
-					totalMatched = append(totalMatched, field)
+					matchedFields = append(matchedFields, field)
 				}
 			}
 		}
-		if len(totalMatched) > len(matched) || (!ordered && isOrdered) {
-			target = index
-			ordered = isOrdered
-			matched = totalMatched
+		matchedFields = lo.Uniq(matchedFields)
+		if (len(matchedFields) > len(i.MatchedFields)) ||
+			(len(matchedFields) == len(i.MatchedFields) && index.Fields[0] == order.Field) {
+			i.Ref = index
+			i.IsOrdered = index.Fields[0] == order.Field || index.Primary
+			i.MatchedFields = matchedFields
+		}
+		if index.Primary {
+			primary = index
 		}
 	}
-	if target.Primary {
-		ordered = true
+	if len(i.MatchedFields) > 0 {
+		return i, nil
 	}
-	if len(target.Fields) > 0 {
-		return IndexMatch{
-			Ref:            target,
-			MatchedFields:  matched,
-			IsOrdered:      ordered,
-			Values:         values,
-			IsPrimaryIndex: target.Primary,
-		}, nil
-	}
-	if len(primary.Fields) == 0 {
-		return IndexMatch{}, stacktrace.NewErrorWithCode(ErrTODO, "missing primary key index")
-	}
+
 	return IndexMatch{
 		Ref:            primary,
 		MatchedFields:  []string{primary.Fields[0]},
-		IsOrdered:      order.Field == primary.Fields[0] || order.Field == "",
+		IsOrdered:      false,
 		Values:         values,
 		IsPrimaryIndex: true,
 	}, nil

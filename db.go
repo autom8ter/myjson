@@ -46,9 +46,9 @@ func NewFromCore(ctx context.Context, c CoreAPI) (*DB, error) {
 /*
 OpenKV opens a kv database. supported providers:
 badger(default):
-  params:
-	storage_path: string (leave empty for in-memory)
 
+	  params:
+		storage_path: string (leave empty for in-memory)
 */
 func OpenKV(cfg KVConfig) (kv.DB, error) {
 	return registry.Open(cfg.Provider, cfg.Params)

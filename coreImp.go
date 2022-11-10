@@ -53,7 +53,6 @@ func (d *coreImplementation) getPrimaryIndex(collection string) (Index, bool) {
 	return Index{}, false
 }
 
-//
 func (d *coreImplementation) GetCollection(ctx context.Context, name string) (*Collection, bool) {
 	c, ok := d.collections.Load(name)
 	if !ok {

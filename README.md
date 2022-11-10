@@ -4,48 +4,49 @@ A framework for building powerful, extensible, and feature-rich microservices on
 
     go get -u github.com/autom8ter/brutus
 
-## Noteable Libraries
-
-- [gjson](github.com/tidwall/gjson) - json extraction utilities
-- [sjson](github.com/tidwall/sjson) - json mutation utilities
-- [lo](github.com/samber/lo) - generics
-- [machine](github.com/autom8ter/machine/v4) - in-memory publish/subscribe functionality
-- [jsonschema](github.com/qri-io/jsonschema) - json schema support
 
 ## Use Case
 
-Build powerful, extensible, and feature-rich microservices on top of key/value storeage
+Build powerful, extensible, and feature-rich microservices on top of pluggable key/value storage providers
 
 ## Features:
 
 - [x] JSON document storage engine
-- [x] validation hooks
-  - [x] json schema based validation
+  - built on top of pluggable key/value storage
 - [x] field based querying
 - [x] batch operations (create/set/get/update)
 - [x] query batch operations (create/set/get/update)
 - [x] multi-field indexing
+- [x] pluggable optimizer
 - [x] unique indexes/constraints
 - [x] select fields
 - [x] order by
-- [x] aggregation (min,max,sum,avg,count)
+- [x] aggregation (min,max,sum,count)
     - [x] min
     - [x] max
     - [x] count
     - [x] sum
     - [x] group by
 - [x] pagination
+- [x] hook-based functions
+  - [x] validation hooks (on write)
+    - [x] json schema based validation
+  - [x] read hooks (on read)
+  - [x] sideEffect Hooks (on write)
+
 
 ### Extensibility
 
-- [x] Core logic can be wrapped with middlewares for enhanced functionality
+- [x] Core logic can be extended with functional hooks
 - [ ] Change streams available for integration with external systems
 - [ ] Dedicated extensions library
 
 ### Roadmap
+
 - [ ] change streams
 - [ ] multi-field order by
 - [ ] multi-field primary key
+- [ ] search indexes
 - [ ] external data importer
 - [ ] migrations
 - [ ] better errors & error codes
