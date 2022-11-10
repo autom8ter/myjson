@@ -120,4 +120,16 @@ func TestOptimizer(t *testing.T) {
 		assert.Equal(t, false, i.IsPrimaryIndex)
 		assert.Equal(t, "account_id", i.MatchedFields[0])
 	})
+	t.Run("select secondary index (multi-field partial match (!=))", func(t *testing.T) {
+		i, err := o.BestIndex(indexes, []Where{
+			{
+				Field: "account_id",
+				Op:    "!=",
+				Value: 1,
+			},
+		}, OrderBy{})
+		assert.Nil(t, err)
+		assert.Equal(t, true, i.IsPrimaryIndex)
+		assert.NotEqual(t, "account_id", i.MatchedFields[0])
+	})
 }

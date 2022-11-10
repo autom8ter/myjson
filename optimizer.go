@@ -54,7 +54,7 @@ func (o defaultOptimizer) BestIndex(indexes map[string]Index, where []Where, ord
 		}
 		for i, field := range index.Fields {
 			if len(where) > i {
-				if field == where[i].Field {
+				if field == where[i].Field && (where[i].Op == "eq" || where[i].Op == "==") {
 					matchedFields = append(matchedFields, field)
 				}
 			}

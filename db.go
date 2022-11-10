@@ -372,6 +372,7 @@ func (d *DB) Scan(ctx context.Context, scan Scan, handlerFunc ScanFunc) (IndexMa
 	return d.queryScan(ctx, coll, scan, handlerFunc)
 }
 
+// Close closes the database
 func (d *DB) Close(ctx context.Context) error {
 	return stacktrace.Propagate(d.kv.Close(), "")
 }
