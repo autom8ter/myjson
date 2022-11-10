@@ -55,22 +55,22 @@ func (d *DB) setCollections(ctx context.Context, collections []*Collection) erro
 			return stacktrace.Propagate(err, "")
 		}
 		for _, update := range diff.toUpdate {
-			if err := d.removeIndex(ctx, c.name, update); err != nil {
+			if err := d.removeIndex(ctx, c, update); err != nil {
 				return stacktrace.Propagate(err, "")
 			}
 		}
 		for _, toUpdate := range diff.toUpdate {
-			if err := d.addIndex(ctx, c.name, toUpdate); err != nil {
+			if err := d.addIndex(ctx, c, toUpdate); err != nil {
 				return stacktrace.Propagate(err, "")
 			}
 		}
 		for _, toDelete := range diff.toRemove {
-			if err := d.removeIndex(ctx, c.name, toDelete); err != nil {
+			if err := d.removeIndex(ctx, c, toDelete); err != nil {
 				return stacktrace.Propagate(err, "")
 			}
 		}
 		for _, toAdd := range diff.toAdd {
-			if err := d.addIndex(ctx, c.name, toAdd); err != nil {
+			if err := d.addIndex(ctx, c, toAdd); err != nil {
 				return stacktrace.Propagate(err, "")
 			}
 		}
@@ -78,18 +78,15 @@ func (d *DB) setCollections(ctx context.Context, collections []*Collection) erro
 	return nil
 }
 
-func (d *DB) addIndex(ctx context.Context, collection string, index Index) error {
-	c, ok := d.coll(collection)
-	if !ok {
-		return stacktrace.NewErrorWithCode(ErrTODO, "collection is not registered: %s", collection)
-	}
-	d.isBuilding.Store(fmt.Sprintf("%s/%s", collection, index.Name), true)
+func (d *DB) addIndex(ctx context.Context, c *Collection, index Index) error {
+	d.isBuilding.Store(fmt.Sprintf("%s/%s", c.name, index.Name), true)
 	c.indexes[index.Name] = index
-	d.collections.Store(collection, c)
+	d.collections.Store(c.name, c)
 	batch := d.kv.Batch()
 	meta, _ := GetContext(ctx)
 	meta.Set("_internal", true)
 	_, err := d.Scan(meta.ToContext(ctx), Scan{
+		From:  c.name,
 		Where: nil,
 	}, func(doc *Document) (bool, error) {
 		if err := d.indexDocument(ctx, batch, c, &DocChange{
@@ -104,23 +101,19 @@ func (d *DB) addIndex(ctx context.Context, collection string, index Index) error
 	if err != nil {
 		return err
 	}
-	d.isBuilding.Store(fmt.Sprintf("%s/%s", collection, index.Name), false)
-	if err := d.setIndexes(collection, c.indexes); err != nil {
+	d.isBuilding.Store(fmt.Sprintf("%s/%s", c.name, index.Name), false)
+	if err := d.persistIndexes(c); err != nil {
 		return stacktrace.Propagate(err, "")
 	}
 	return nil
 }
 
-func (d *DB) removeIndex(ctx context.Context, collection string, index Index) error {
-	c, ok := d.coll(collection)
-	if !ok {
-		return nil
-	}
+func (d *DB) removeIndex(ctx context.Context, c *Collection, index Index) error {
 	delete(c.indexes, index.Name)
-	d.collections.Store(collection, c)
+	d.collections.Store(c.name, c)
 	d.machine.Go(ctx, func(ctx context.Context) error {
 		batch := d.kv.Batch()
-		_, err := d.queryScan(ctx, Scan{
+		_, err := d.queryScan(ctx, c, Scan{
 			From: c.name,
 		}, func(doc *Document) (bool, error) {
 			if err := d.updateSecondaryIndex(ctx, batch, c, index, &DocChange{
@@ -137,7 +130,7 @@ func (d *DB) removeIndex(ctx context.Context, collection string, index Index) er
 		}
 		return nil
 	})
-	if err := d.setIndexes(collection, c.indexes); err != nil {
+	if err := d.persistIndexes(c); err != nil {
 		return stacktrace.Propagate(err, "")
 	}
 	return nil
@@ -157,13 +150,13 @@ func (d *DB) Indexes(ctx context.Context, collection string) []string {
 	return names
 }
 
-func (d *DB) setIndexes(collection string, indexes map[string]Index) error {
-	bits, err := json.Marshal(&indexes)
+func (d *DB) persistIndexes(collection *Collection) error {
+	bits, err := json.Marshal(&collection.indexes)
 	if err != nil {
 		return stacktrace.Propagate(err, "")
 	}
 	if err := d.kv.Tx(true, func(tx kv.Tx) error {
-		err := tx.Set([]byte(fmt.Sprintf("internal.indexing.%s", collection)), bits)
+		err := tx.Set([]byte(fmt.Sprintf("internal.indexing.%s", collection.name)), bits)
 		if err != nil {
 			return stacktrace.Propagate(err, "")
 		}
@@ -475,13 +468,9 @@ func (c *DB) getReadyIndexes(ctx context.Context, coll *Collection) map[string]I
 	return indexes
 }
 
-func (d *DB) queryScan(ctx context.Context, scan Scan, handlerFunc ScanFunc) (IndexMatch, error) {
+func (d *DB) queryScan(ctx context.Context, coll *Collection, scan Scan, handlerFunc ScanFunc) (IndexMatch, error) {
 	if handlerFunc == nil {
 		return IndexMatch{}, stacktrace.NewError("empty scan handler")
-	}
-	coll, ok := d.coll(scan.From)
-	if !ok {
-		return IndexMatch{}, stacktrace.NewError("unsupported collection: %s", scan.From)
 	}
 	if coll.whereHooks != nil {
 		for _, w := range coll.whereHooks {

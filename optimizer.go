@@ -45,6 +45,9 @@ func (o defaultOptimizer) BestIndex(indexes map[string]Index, where []Where, ord
 		if len(index.Fields) == 0 {
 			continue
 		}
+		if index.Primary {
+			primary = index
+		}
 		var matchedFields []string
 		if index.Fields[0] == order.Field {
 			matchedFields = append(matchedFields, order.Field)
@@ -62,10 +65,9 @@ func (o defaultOptimizer) BestIndex(indexes map[string]Index, where []Where, ord
 			i.Ref = index
 			i.IsOrdered = index.Fields[0] == order.Field || index.Primary
 			i.MatchedFields = matchedFields
+			i.IsPrimaryIndex = index.Primary
 		}
-		if index.Primary {
-			primary = index
-		}
+
 	}
 	if len(i.MatchedFields) > 0 {
 		return i, nil
@@ -74,7 +76,7 @@ func (o defaultOptimizer) BestIndex(indexes map[string]Index, where []Where, ord
 	return IndexMatch{
 		Ref:            primary,
 		MatchedFields:  []string{primary.Fields[0]},
-		IsOrdered:      false,
+		IsOrdered:      true,
 		Values:         values,
 		IsPrimaryIndex: true,
 	}, nil

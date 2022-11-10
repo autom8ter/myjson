@@ -248,11 +248,15 @@ func (d *DB) Aggregate(ctx context.Context, query AggregateQuery) (Page, error) 
 	if err := query.Validate(); err != nil {
 		return Page{}, nil
 	}
+	coll, ok := d.coll(query.From)
+	if !ok {
+		return Page{}, stacktrace.NewError("unsupported collection: %s", query.From)
+	}
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	now := time.Now()
 	var results Documents
-	match, err := d.queryScan(ctx, Scan{
+	match, err := d.queryScan(ctx, coll, Scan{
 		From:    query.From,
 		Where:   query.Where,
 		OrderBy: query.OrderBy,
@@ -308,10 +312,13 @@ func (d *DB) Query(ctx context.Context, query Query) (Page, error) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	now := time.Now()
-
+	coll, ok := d.coll(query.From)
+	if !ok {
+		return Page{}, stacktrace.NewError("unsupported collection: %s", query.From)
+	}
 	var results Documents
 	fullScan := true
-	match, err := d.queryScan(ctx, Scan{
+	match, err := d.queryScan(ctx, coll, Scan{
 		From:    query.From,
 		Where:   query.Where,
 		OrderBy: query.OrderBy,
@@ -358,7 +365,11 @@ func (d *DB) Query(ctx context.Context, query Query) (Page, error) {
 // results will not be ordered unless an index supporting the order by(s) was found by the optimizer
 // Query should be used when order is more important than performance/resource-usage
 func (d *DB) Scan(ctx context.Context, scan Scan, handlerFunc ScanFunc) (IndexMatch, error) {
-	return d.queryScan(ctx, scan, handlerFunc)
+	coll, ok := d.coll(scan.From)
+	if !ok {
+		return IndexMatch{}, stacktrace.NewError("unsupported collection: %s", scan.From)
+	}
+	return d.queryScan(ctx, coll, scan, handlerFunc)
 }
 
 func (d *DB) Close(ctx context.Context) error {

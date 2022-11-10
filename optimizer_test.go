@@ -53,8 +53,8 @@ func TestOptimizer(t *testing.T) {
 			},
 		}, OrderBy{})
 		assert.Nil(t, err)
-		assert.Equal(t, "_id", i.MatchedFields[0])
-		assert.Equal(t, true, i.IsPrimaryIndex)
+		assert.Equal(t, true, i.IsPrimaryIndex, i.MatchedFields)
+		assert.Equal(t, "_id", i.MatchedFields[0], i.MatchedFields)
 	})
 	t.Run("select secondary index order by", func(t *testing.T) {
 		i, err := o.BestIndex(indexes, []Where{}, OrderBy{
