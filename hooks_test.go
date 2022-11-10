@@ -12,7 +12,8 @@ func TestJSONSchema(t *testing.T) {
 	t.Run("json schema validation - success", func(t *testing.T) {
 		validator, err := brutus.JSONSchema([]byte(testutil.UserSchema))
 		assert.Nil(t, err)
-		assert.Nil(t, validator(context.Background(), nil, &brutus.DocChange{
+		assert.Nil(t, validator.Valid())
+		assert.Nil(t, validator.Func(context.Background(), nil, &brutus.DocChange{
 			Action: brutus.Set,
 			DocID:  "",
 			Before: nil,
@@ -25,7 +26,7 @@ func TestJSONSchema(t *testing.T) {
 
 		validator, err := brutus.JSONSchema([]byte(testutil.UserSchema))
 		assert.Nil(t, err)
-		assert.NotNil(t, validator(context.Background(), nil, &brutus.DocChange{
+		assert.NotNil(t, validator.Func(context.Background(), nil, &brutus.DocChange{
 			Action: brutus.Set,
 			DocID:  "",
 			Before: nil,

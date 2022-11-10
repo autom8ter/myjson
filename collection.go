@@ -108,10 +108,31 @@ func (c *Collection) Indexes() []Index {
 	return indexes
 }
 
-func (c *Collection) ApplySideEffects(ctx context.Context, db *DB, change *DocChange) (*DocChange, error) {
+func (c *Collection) applyWhereHooks(ctx context.Context, db *DB, where []Where) ([]Where, error) {
+	var err error
+	for _, whereHook := range c.whereHooks {
+		where, err = whereHook.Func(ctx, db, where)
+		if err != nil {
+			return nil, stacktrace.Propagate(err, "")
+		}
+	}
+	return where, nil
+}
+
+func (c *Collection) applyReadHooks(ctx context.Context, db *DB, doc *Document) (*Document, error) {
+	var err error
+	for _, readHook := range c.readHooks {
+		doc, err = readHook.Func(ctx, db, doc)
+		if err != nil {
+			return nil, stacktrace.Propagate(err, "")
+		}
+	}
+	return doc, nil
+}
+func (c *Collection) applySideEffectHooks(ctx context.Context, db *DB, change *DocChange) (*DocChange, error) {
 	var err error
 	for _, sideEffect := range c.sideEffects {
-		change, err = sideEffect(ctx, db, change)
+		change, err = sideEffect.Func(ctx, db, change)
 		if err != nil {
 			return nil, stacktrace.Propagate(err, "")
 		}
@@ -119,14 +140,12 @@ func (c *Collection) ApplySideEffects(ctx context.Context, db *DB, change *DocCh
 	return change, nil
 }
 
-// Validate validates the document against all registered validation hooks.
-// If an error is returned, the state change(s) will be aborted and rolled back
-func (c *Collection) Validate(ctx context.Context, core *DB, d *DocChange) error {
+func (c *Collection) applyValidationHooks(ctx context.Context, db *DB, d *DocChange) error {
 	if len(c.validators) == 0 {
 		return nil
 	}
 	for _, validator := range c.validators {
-		if err := validator(ctx, core, d); err != nil {
+		if err := validator.Func(ctx, db, d); err != nil {
 			return stacktrace.Propagate(err, "")
 		}
 	}

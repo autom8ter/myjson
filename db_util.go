@@ -242,11 +242,9 @@ func (d *DB) getDoc(ctx context.Context, c *Collection, id string) (*Document, e
 	}); err != nil {
 		return document, stacktrace.Propagate(err, "")
 	}
-	for _, read := range c.readHooks {
-		document, err = read(ctx, d, document)
-		if err != nil {
-			return document, stacktrace.Propagate(err, "")
-		}
+	document, err = c.applyReadHooks(ctx, d, document)
+	if err != nil {
+		return document, stacktrace.Propagate(err, "")
 	}
 	return document, nil
 }
@@ -351,11 +349,11 @@ func (d *DB) indexDocument(ctx context.Context, txn kv.Batch, c *Collection, cha
 		if c.GetPrimaryKey(change.After) != change.DocID {
 			return stacktrace.NewErrorWithCode(ErrTODO, "document id is immutable: %v -> %v", c.GetPrimaryKey(change.After), change.DocID)
 		}
-		if err := c.Validate(ctx, d, change); err != nil {
+		if err := c.applyValidationHooks(ctx, d, change); err != nil {
 			return stacktrace.Propagate(err, "")
 		}
 	}
-	change, err = c.ApplySideEffects(ctx, d, change)
+	change, err = c.applySideEffectHooks(ctx, d, change)
 	if err != nil {
 		return stacktrace.Propagate(err, "")
 	}
@@ -472,18 +470,15 @@ func (d *DB) queryScan(ctx context.Context, coll *Collection, scan Scan, handler
 	if handlerFunc == nil {
 		return IndexMatch{}, stacktrace.NewError("empty scan handler")
 	}
+	var err error
 	if coll.whereHooks != nil {
-		for _, w := range coll.whereHooks {
-			filters, err := w(ctx, d, scan.Where)
-			if err != nil {
-				return IndexMatch{}, stacktrace.Propagate(err, "")
-			}
-			scan.Where = filters
+		scan.Where, err = coll.applyWhereHooks(ctx, d, scan.Where)
+		if err != nil {
+			return IndexMatch{}, stacktrace.Propagate(err, "")
 		}
 	}
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	var index IndexMatch
 	index, err := d.optimizer.BestIndex(d.getReadyIndexes(ctx, coll), scan.Where, OrderBy{})
 	if err != nil {
 		return IndexMatch{}, stacktrace.Propagate(err, "")
@@ -524,11 +519,9 @@ func (d *DB) queryScan(ctx context.Context, coll *Collection, scan Scan, handler
 				return stacktrace.Propagate(err, "")
 			}
 			if pass {
-				for _, rhook := range coll.readHooks {
-					document, err = rhook(ctx, d, document)
-					if err != nil {
-						return stacktrace.Propagate(err, "")
-					}
+				document, err = coll.applyReadHooks(ctx, d, document)
+				if err != nil {
+					return stacktrace.Propagate(err, "")
 				}
 				shouldContinue, err := handlerFunc(document)
 				if err != nil {
