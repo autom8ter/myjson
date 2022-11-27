@@ -12,5 +12,5 @@ type Scan struct {
 	// Where filters out records that don't pass the where clause(s)
 	Where []Where `json:"filter"`
 	// OrderBy
-	OrderBy OrderBy `json:"order_by"`
+	OrderBy []OrderBy `json:"order_by"`
 }

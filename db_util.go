@@ -488,7 +488,7 @@ func (d *DB) queryScan(ctx context.Context, coll *Collection, scan Scan, handler
 		opts := kv.IterOpts{
 			Prefix:  pfx.Path(),
 			Seek:    nil,
-			Reverse: index.IsOrdered && scan.OrderBy.Direction == DESC,
+			Reverse: index.IsOrdered && len(scan.OrderBy) > 0 && scan.OrderBy[0].Direction == DESC,
 		}
 		it := txn.NewIterator(opts)
 		defer it.Close()

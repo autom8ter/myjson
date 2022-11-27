@@ -95,9 +95,8 @@ func Test(t *testing.T) {
 						Value: []float64{51, 52, 53, 54, 55, 56, 57, 58, 59, 60},
 					},
 				},
-				Page:    0,
-				Limit:   10,
-				OrderBy: gokvkit.OrderBy{},
+				Page:  0,
+				Limit: 10,
 			})
 			assert.Nil(t, err)
 			assert.Greater(t, len(results.Documents), 1)
@@ -110,11 +109,10 @@ func Test(t *testing.T) {
 			timer := timer()
 			defer timer(t)
 			results, err := db.Query(ctx, gokvkit.Query{
-				From:    "user",
-				Select:  []gokvkit.SelectField{{Field: "*"}},
-				Page:    0,
-				Limit:   0,
-				OrderBy: gokvkit.OrderBy{},
+				From:   "user",
+				Select: []gokvkit.SelectField{{Field: "*"}},
+				Page:   0,
+				Limit:  0,
 			})
 			assert.Nil(t, err)
 			assert.Equal(t, 100, len(results.Documents))
@@ -127,7 +125,7 @@ func Test(t *testing.T) {
 			//err := collection.QueryPaginate(ctx, gokvkit.Query{
 			//	Page:    0,
 			//	Limit:   10,
-			//	OrderBy: gokvkit.OrderBy{},
+			//
 			//}, func(page gokvkit.Page) bool {
 			//	pageCount++
 			//	return true
@@ -159,11 +157,10 @@ func Test(t *testing.T) {
 		})
 		t.Run("query delete all", func(t *testing.T) {
 			assert.Nil(t, db.QueryDelete(ctx, gokvkit.Query{
-				From:    "user",
-				Select:  []gokvkit.SelectField{{Field: "*"}},
-				Page:    0,
-				Limit:   0,
-				OrderBy: gokvkit.OrderBy{},
+				From:   "user",
+				Select: []gokvkit.SelectField{{Field: "*"}},
+				Page:   0,
+				Limit:  0,
 			}))
 			for _, id := range ids[50:] {
 				d, err := db.Get(ctx, "user", id)
@@ -223,9 +220,8 @@ func Benchmark(b *testing.B) {
 							Value: doc.GetString("contact.email"),
 						},
 					},
-					Page:    0,
-					Limit:   10,
-					OrderBy: gokvkit.OrderBy{},
+					Page:  0,
+					Limit: 10,
 				})
 				assert.Nil(b, err)
 				assert.Equal(b, 1, len(results.Documents))
@@ -256,9 +252,8 @@ func Benchmark(b *testing.B) {
 							Value: doc.GetString("John"),
 						},
 					},
-					Page:    0,
-					Limit:   10,
-					OrderBy: gokvkit.OrderBy{},
+					Page:  0,
+					Limit: 10,
 				})
 				assert.Nil(b, err)
 			}
@@ -315,9 +310,11 @@ func TestAggregate(t *testing.T) {
 				},
 				Page:  0,
 				Limit: 0,
-				OrderBy: gokvkit.OrderBy{
-					Field:     "account_id",
-					Direction: gokvkit.ASC,
+				OrderBy: []gokvkit.OrderBy{
+					{
+						Field:     "account_id",
+						Direction: gokvkit.ASC,
+					},
 				},
 			}
 			results, err := db.Query(ctx, query)

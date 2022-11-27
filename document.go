@@ -314,10 +314,12 @@ func (documents Documents) Reduce(reducer func(accumulated, next *Document, i in
 }
 
 // OrderBy orders the documents by the OrderBy clause
-func (d Documents) OrderBy(orderBy OrderBy) Documents {
-	if orderBy.Field == "" {
+func (d Documents) OrderBy(orderBys []OrderBy) Documents {
+	if len(orderBys) == 0 {
 		return d
 	}
+	// TODO: support more than one order by
+	orderBy := orderBys[0]
 	if orderBy.Direction == DESC {
 		sort.Slice(d, func(i, j int) bool {
 			return compareField(orderBy.Field, d[i], d[j])
