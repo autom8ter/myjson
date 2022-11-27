@@ -479,7 +479,7 @@ func (d *DB) queryScan(ctx context.Context, coll *Collection, scan Scan, handler
 	}
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	index, err := d.optimizer.BestIndex(d.getReadyIndexes(ctx, coll), scan.Where, OrderBy{})
+	index, err := d.optimizer.BestIndex(d.getReadyIndexes(ctx, coll), scan.Where)
 	if err != nil {
 		return IndexMatch{}, stacktrace.Propagate(err, "")
 	}
@@ -488,7 +488,7 @@ func (d *DB) queryScan(ctx context.Context, coll *Collection, scan Scan, handler
 		opts := kv.IterOpts{
 			Prefix:  pfx.Path(),
 			Seek:    nil,
-			Reverse: index.IsOrdered && len(scan.OrderBy) > 0 && scan.OrderBy[0].Direction == DESC,
+			Reverse: false,
 		}
 		it := txn.NewIterator(opts)
 		defer it.Close()

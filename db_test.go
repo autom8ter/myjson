@@ -261,6 +261,155 @@ func Benchmark(b *testing.B) {
 	})
 }
 
+func TestIndexing1(t *testing.T) {
+	t.Run("matching unique index (contact.email)", func(t *testing.T) {
+		assert.Nil(t, testutil.TestDB(func(ctx context.Context, db *gokvkit.DB) {
+			var docs gokvkit.Documents
+			for i := 0; i < 5; i++ {
+				docs = append(docs, testutil.NewUserDoc())
+			}
+			assert.Nil(t, db.BatchSet(ctx, "user", docs))
+			page, err := db.Query(ctx, gokvkit.Query{
+				From: "user",
+				Select: []gokvkit.SelectField{
+					{
+						Field: "contact.email",
+					},
+				},
+				Where: []gokvkit.Where{
+					{
+						Field: "contact.email",
+						Op:    "==",
+						Value: docs[0].Get("contact.email"),
+					},
+				},
+			})
+			assert.Nil(t, err)
+			assert.Equal(t, 1, page.Count)
+			assert.Equal(t, page.Documents[0].Get("contact.email"), docs[0].Get("contact.email"))
+			assert.Equal(t, "contact.email", page.Stats.IndexMatch.MatchedFields[0])
+			assert.Equal(t, false, page.Stats.IndexMatch.IsPrimaryIndex)
+			assert.Equal(t, "contact.email", page.Stats.IndexMatch.Ref.Fields[0])
+		}))
+		assert.Nil(t, testutil.TestDB(func(ctx context.Context, db *gokvkit.DB) {
+			var docs gokvkit.Documents
+			for i := 0; i < 5; i++ {
+				docs = append(docs, testutil.NewUserDoc())
+			}
+			assert.Nil(t, db.BatchSet(ctx, "user", docs))
+			page, err := db.Query(ctx, gokvkit.Query{
+				From: "user",
+				Select: []gokvkit.SelectField{
+					{
+						Field: "name",
+					},
+				},
+				Where: []gokvkit.Where{
+					{
+						Field: "contact.email",
+						Op:    "==",
+						Value: docs[0].Get("contact.email"),
+					},
+				},
+			})
+			assert.Nil(t, err)
+			assert.Equal(t, 1, page.Count)
+			assert.Equal(t, "contact.email", page.Stats.IndexMatch.MatchedFields[0])
+
+			assert.Equal(t, false, page.Stats.IndexMatch.IsPrimaryIndex)
+			assert.Equal(t, "contact.email", page.Stats.IndexMatch.Ref.Fields[0])
+		}))
+	})
+	t.Run("non-matching (name)", func(t *testing.T) {
+		assert.Nil(t, testutil.TestDB(func(ctx context.Context, db *gokvkit.DB) {
+			var docs gokvkit.Documents
+			for i := 0; i < 5; i++ {
+				docs = append(docs, testutil.NewUserDoc())
+			}
+			assert.Nil(t, db.BatchSet(ctx, "user", docs))
+			page, err := db.Query(ctx, gokvkit.Query{
+				From: "user",
+				Select: []gokvkit.SelectField{
+					{
+						Field: "name",
+					},
+				},
+				Where: []gokvkit.Where{
+					{
+						Field: "name",
+						Op:    gokvkit.Contains,
+						Value: docs[0].Get("name"),
+					},
+				},
+			})
+			assert.Nil(t, err)
+			assert.Equal(t, 1, page.Count)
+			assert.Equal(t, page.Documents[0].Get("name"), docs[0].Get("name"))
+			assert.Equal(t, []string{}, page.Stats.IndexMatch.MatchedFields)
+
+			assert.Equal(t, true, page.Stats.IndexMatch.IsPrimaryIndex)
+		}))
+	})
+	t.Run("matching primary (_id)", func(t *testing.T) {
+		assert.Nil(t, testutil.TestDB(func(ctx context.Context, db *gokvkit.DB) {
+			var docs gokvkit.Documents
+			for i := 0; i < 5; i++ {
+				docs = append(docs, testutil.NewUserDoc())
+			}
+			assert.Nil(t, db.BatchSet(ctx, "user", docs))
+			page, err := db.Query(ctx, gokvkit.Query{
+				From: "user",
+				Select: []gokvkit.SelectField{
+					{
+						Field: "_id",
+					},
+				},
+				Where: []gokvkit.Where{
+					{
+						Field: "_id",
+						Op:    gokvkit.Eq,
+						Value: docs[0].Get("_id"),
+					},
+				},
+			})
+			assert.Nil(t, err)
+			assert.Equal(t, 1, page.Count)
+			assert.Equal(t, page.Documents[0].Get("_id"), docs[0].Get("_id"))
+			assert.Equal(t, []string{"_id"}, page.Stats.IndexMatch.MatchedFields)
+
+			assert.Equal(t, true, page.Stats.IndexMatch.IsPrimaryIndex)
+		}))
+		assert.Nil(t, testutil.TestDB(func(ctx context.Context, db *gokvkit.DB) {
+			var docs gokvkit.Documents
+			for i := 0; i < 5; i++ {
+				docs = append(docs, testutil.NewUserDoc())
+			}
+			assert.Nil(t, db.BatchSet(ctx, "user", docs))
+			page, err := db.Query(ctx, gokvkit.Query{
+				From: "user",
+				Select: []gokvkit.SelectField{
+					{
+						Field: "_id",
+					},
+				},
+				Where: []gokvkit.Where{
+					{
+						Field: "_id",
+						Op:    gokvkit.Contains,
+						Value: docs[0].Get("_id"),
+					},
+				},
+			})
+			assert.Nil(t, err)
+			assert.Equal(t, 1, page.Count)
+			assert.Equal(t, page.Documents[0].Get("_id"), docs[0].Get("_id"))
+			assert.Equal(t, []string{}, page.Stats.IndexMatch.MatchedFields)
+
+			assert.Equal(t, true, page.Stats.IndexMatch.IsPrimaryIndex)
+		}))
+	})
+}
+
 func TestAggregate(t *testing.T) {
 	t.Run("sum age", func(t *testing.T) {
 		var expected = float64(0)

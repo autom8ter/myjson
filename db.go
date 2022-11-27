@@ -254,9 +254,8 @@ func (d *DB) aggregate(ctx context.Context, query Query) (Page, error) {
 	now := time.Now()
 	var results Documents
 	match, err := d.queryScan(ctx, coll, Scan{
-		From:    query.From,
-		Where:   query.Where,
-		OrderBy: query.OrderBy,
+		From:  query.From,
+		Where: query.Where,
 	}, func(d *Document) (bool, error) {
 		results = append(results, d)
 		return true, nil
@@ -312,9 +311,8 @@ func (d *DB) Query(ctx context.Context, query Query) (Page, error) {
 	var results Documents
 	fullScan := true
 	match, err := d.queryScan(ctx, coll, Scan{
-		From:    query.From,
-		Where:   query.Where,
-		OrderBy: query.OrderBy,
+		From:  query.From,
+		Where: query.Where,
 	}, func(d *Document) (bool, error) {
 		results = append(results, d)
 		if query.Page == 0 && len(query.OrderBy) == 0 && query.Limit > 0 && len(results) >= query.Limit {
