@@ -1,4 +1,4 @@
-package brutus
+package gokvkit
 
 import (
 	"github.com/palantir/stacktrace"

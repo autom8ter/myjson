@@ -1,11 +1,11 @@
-package brutus
+package gokvkit
 
 import (
 	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/autom8ter/brutus/kv"
+	"github.com/autom8ter/gokvkit/kv"
 	"github.com/autom8ter/machine/v4"
 	"github.com/palantir/stacktrace"
 	"sort"

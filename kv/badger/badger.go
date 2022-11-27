@@ -1,11 +1,9 @@
 package badger
 
 import (
-	"context"
-	"github.com/autom8ter/brutus/kv"
-	"github.com/autom8ter/brutus/kv/registry"
+	"github.com/autom8ter/gokvkit/kv"
+	"github.com/autom8ter/gokvkit/kv/registry"
 	"github.com/dgraph-io/badger/v3"
-	"github.com/dgraph-io/badger/v3/pb"
 	"github.com/spf13/cast"
 )
 
@@ -54,34 +52,4 @@ func (b *badgerKV) Close() error {
 		return err
 	}
 	return b.db.Close()
-}
-
-func (b *badgerKV) Stream(ctx context.Context, prefix []byte, handler kv.StreamHandler) error {
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-	err := b.db.Subscribe(ctx, func(list *badger.KVList) error {
-		var items []kv.Item
-		for _, l := range list.Kv {
-			items = append(items, &item{
-				key: l.Key,
-				value: func() ([]byte, error) {
-					return l.Value, nil
-				},
-			})
-		}
-		continu, err := handler(ctx, items)
-		if err != nil {
-			return err
-		}
-		if !continu {
-			cancel()
-		}
-		return nil
-	}, []pb.Match{{
-		Prefix: prefix,
-	}})
-	if err.Error() == "context canceled" {
-		return nil
-	}
-	return err
 }

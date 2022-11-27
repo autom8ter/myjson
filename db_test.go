@@ -1,9 +1,9 @@
-package brutus_test
+package gokvkit_test
 
 import (
 	"context"
-	"github.com/autom8ter/brutus"
-	"github.com/autom8ter/brutus/testutil"
+	"github.com/autom8ter/gokvkit"
+	"github.com/autom8ter/gokvkit/testutil"
 	"github.com/brianvoe/gofakeit/v6"
 	"github.com/stretchr/testify/assert"
 	"runtime"
@@ -20,7 +20,7 @@ func timer() func(t *testing.T) {
 
 func Test(t *testing.T) {
 	t.Run("create", func(t *testing.T) {
-		assert.Nil(t, testutil.TestDB(func(ctx context.Context, db *brutus.DB) {
+		assert.Nil(t, testutil.TestDB(func(ctx context.Context, db *gokvkit.DB) {
 			id, err := db.Create(ctx, "user", testutil.NewUserDoc())
 			assert.Nil(t, err)
 			u, err := db.Get(ctx, "user", id)
@@ -29,7 +29,7 @@ func Test(t *testing.T) {
 		}))
 	})
 	t.Run("set", func(t *testing.T) {
-		assert.Nil(t, testutil.TestDB(func(ctx context.Context, db *brutus.DB) {
+		assert.Nil(t, testutil.TestDB(func(ctx context.Context, db *gokvkit.DB) {
 			timer := timer()
 			defer timer(t)
 			for i := 0; i < 10; i++ {
@@ -37,8 +37,8 @@ func Test(t *testing.T) {
 			}
 		}))
 	})
-	assert.Nil(t, testutil.TestDB(func(ctx context.Context, db *brutus.DB) {
-		var usrs []*brutus.Document
+	assert.Nil(t, testutil.TestDB(func(ctx context.Context, db *gokvkit.DB) {
+		var usrs []*gokvkit.Document
 		var ids []string
 		t.Run("batch set", func(t *testing.T) {
 			timer := timer()
@@ -64,10 +64,10 @@ func Test(t *testing.T) {
 		t.Run("query users account_id > 50", func(t *testing.T) {
 			timer := timer()
 			defer timer(t)
-			results, err := db.Query(ctx, brutus.Query{
+			results, err := db.Query(ctx, gokvkit.Query{
 				From:   "user",
-				Select: []string{"account_id"},
-				Where: []brutus.Where{
+				Select: []gokvkit.SelectField{{Field: "account_id"}},
+				Where: []gokvkit.Where{
 					{
 						Field: "account_id",
 						Op:    ">",
@@ -85,19 +85,19 @@ func Test(t *testing.T) {
 		t.Run("query users account_id in 51-60", func(t *testing.T) {
 			timer := timer()
 			defer timer(t)
-			results, err := db.Query(ctx, brutus.Query{
+			results, err := db.Query(ctx, gokvkit.Query{
 				From:   "user",
-				Select: []string{"account_id"},
-				Where: []brutus.Where{
+				Select: []gokvkit.SelectField{{Field: "account_id"}},
+				Where: []gokvkit.Where{
 					{
 						Field: "account_id",
-						Op:    brutus.In,
+						Op:    gokvkit.In,
 						Value: []float64{51, 52, 53, 54, 55, 56, 57, 58, 59, 60},
 					},
 				},
 				Page:    0,
 				Limit:   10,
-				OrderBy: brutus.OrderBy{},
+				OrderBy: gokvkit.OrderBy{},
 			})
 			assert.Nil(t, err)
 			assert.Greater(t, len(results.Documents), 1)
@@ -109,12 +109,12 @@ func Test(t *testing.T) {
 		t.Run("query all", func(t *testing.T) {
 			timer := timer()
 			defer timer(t)
-			results, err := db.Query(ctx, brutus.Query{
+			results, err := db.Query(ctx, gokvkit.Query{
 				From:    "user",
-				Select:  nil,
+				Select:  []gokvkit.SelectField{{Field: "*"}},
 				Page:    0,
 				Limit:   0,
-				OrderBy: brutus.OrderBy{},
+				OrderBy: gokvkit.OrderBy{},
 			})
 			assert.Nil(t, err)
 			assert.Equal(t, 100, len(results.Documents))
@@ -124,11 +124,11 @@ func Test(t *testing.T) {
 			//timer := timer()
 			//defer timer(t)
 			//pageCount := 0
-			//err := collection.QueryPaginate(ctx, brutus.Query{
+			//err := collection.QueryPaginate(ctx, gokvkit.Query{
 			//	Page:    0,
 			//	Limit:   10,
-			//	OrderBy: brutus.OrderBy{},
-			//}, func(page brutus.Page) bool {
+			//	OrderBy: gokvkit.OrderBy{},
+			//}, func(page gokvkit.Page) bool {
 			//	pageCount++
 			//	return true
 			//})
@@ -158,12 +158,12 @@ func Test(t *testing.T) {
 			}
 		})
 		t.Run("query delete all", func(t *testing.T) {
-			assert.Nil(t, db.QueryDelete(ctx, brutus.Query{
+			assert.Nil(t, db.QueryDelete(ctx, gokvkit.Query{
 				From:    "user",
-				Select:  nil,
+				Select:  []gokvkit.SelectField{{Field: "*"}},
 				Page:    0,
 				Limit:   0,
-				OrderBy: brutus.OrderBy{},
+				OrderBy: gokvkit.OrderBy{},
 			}))
 			for _, id := range ids[50:] {
 				d, err := db.Get(ctx, "user", id)
@@ -180,7 +180,7 @@ func Benchmark(b *testing.B) {
 	b.Run("set", func(b *testing.B) {
 		b.ReportAllocs()
 		doc := testutil.NewUserDoc()
-		assert.Nil(b, testutil.TestDB(func(ctx context.Context, db *brutus.DB) {
+		assert.Nil(b, testutil.TestDB(func(ctx context.Context, db *gokvkit.DB) {
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
 				assert.Nil(b, db.Set(ctx, "user", doc))
@@ -191,7 +191,7 @@ func Benchmark(b *testing.B) {
 	b.Run("get", func(b *testing.B) {
 		b.ReportAllocs()
 		doc := testutil.NewUserDoc()
-		assert.Nil(b, testutil.TestDB(func(ctx context.Context, db *brutus.DB) {
+		assert.Nil(b, testutil.TestDB(func(ctx context.Context, db *gokvkit.DB) {
 			assert.Nil(b, db.Set(ctx, "user", doc))
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
@@ -204,19 +204,19 @@ func Benchmark(b *testing.B) {
 	b.Run("query with index", func(b *testing.B) {
 		b.ReportAllocs()
 		doc := testutil.NewUserDoc()
-		assert.Nil(b, testutil.TestDB(func(ctx context.Context, db *brutus.DB) {
+		assert.Nil(b, testutil.TestDB(func(ctx context.Context, db *gokvkit.DB) {
 			assert.Nil(b, db.Set(ctx, "user", doc))
-			var docs []*brutus.Document
+			var docs []*gokvkit.Document
 			for i := 0; i < 100000; i++ {
 				docs = append(docs, testutil.NewUserDoc())
 			}
 			assert.Nil(b, db.BatchSet(ctx, "user", docs))
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				results, err := db.Query(ctx, brutus.Query{
+				results, err := db.Query(ctx, gokvkit.Query{
 					From:   "user",
 					Select: nil,
-					Where: []brutus.Where{
+					Where: []gokvkit.Where{
 						{
 							Field: "contact.email",
 							Op:    "==",
@@ -225,7 +225,7 @@ func Benchmark(b *testing.B) {
 					},
 					Page:    0,
 					Limit:   10,
-					OrderBy: brutus.OrderBy{},
+					OrderBy: gokvkit.OrderBy{},
 				})
 				assert.Nil(b, err)
 				assert.Equal(b, 1, len(results.Documents))
@@ -237,28 +237,28 @@ func Benchmark(b *testing.B) {
 	b.Run("query without index", func(b *testing.B) {
 		b.ReportAllocs()
 		doc := testutil.NewUserDoc()
-		assert.Nil(b, testutil.TestDB(func(ctx context.Context, db *brutus.DB) {
+		assert.Nil(b, testutil.TestDB(func(ctx context.Context, db *gokvkit.DB) {
 			assert.Nil(b, db.Set(ctx, "user", doc))
-			var docs []*brutus.Document
+			var docs []*gokvkit.Document
 			for i := 0; i < 100000; i++ {
 				docs = append(docs, testutil.NewUserDoc())
 			}
 			assert.Nil(b, db.BatchSet(ctx, "user", docs))
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				_, err := db.Query(ctx, brutus.Query{
+				_, err := db.Query(ctx, gokvkit.Query{
 					From:   "user",
 					Select: nil,
-					Where: []brutus.Where{
+					Where: []gokvkit.Where{
 						{
 							Field: "name",
-							Op:    brutus.Contains,
+							Op:    gokvkit.Contains,
 							Value: doc.GetString("John"),
 						},
 					},
 					Page:    0,
 					Limit:   10,
-					OrderBy: brutus.OrderBy{},
+					OrderBy: gokvkit.OrderBy{},
 				})
 				assert.Nil(b, err)
 			}
@@ -269,25 +269,25 @@ func Benchmark(b *testing.B) {
 func TestAggregate(t *testing.T) {
 	t.Run("sum age", func(t *testing.T) {
 		var expected = float64(0)
-		var docs brutus.Documents
+		var docs gokvkit.Documents
 		for i := 0; i < 5; i++ {
 			u := testutil.NewUserDoc()
 			expected += u.GetFloat("age")
 			docs = append(docs, u)
 		}
-		reduced, err := docs.Aggregate(context.Background(), []brutus.Aggregate{
+		reduced, err := docs.Aggregate(context.Background(), []gokvkit.SelectField{
 			{
 				Field:    "age",
 				Function: "sum",
-				Alias:    "age_sum",
+				As:       "age_sum",
 			},
 		})
 		assert.Nil(t, err)
 		assert.Equal(t, expected, reduced.GetFloat("age_sum"))
 	})
 	t.Run("sum advanced", func(t *testing.T) {
-		assert.Nil(t, testutil.TestDB(func(ctx context.Context, db *brutus.DB) {
-			var usrs brutus.Documents
+		assert.Nil(t, testutil.TestDB(func(ctx context.Context, db *gokvkit.DB) {
+			var usrs gokvkit.Documents
 			ageSum := map[string]float64{}
 			for i := 0; i < 10; i++ {
 				u := testutil.NewUserDoc()
@@ -295,7 +295,7 @@ func TestAggregate(t *testing.T) {
 				usrs = append(usrs, u)
 			}
 			assert.Nil(t, db.BatchSet(ctx, "user", usrs))
-			query := brutus.AggregateQuery{
+			query := gokvkit.Query{
 				From:    "user",
 				GroupBy: []string{"account_id"},
 				//Where:      []schema.Where{
@@ -303,21 +303,24 @@ func TestAggregate(t *testing.T) {
 				//
 				//	},
 				//},
-				Aggregates: []brutus.Aggregate{
+				Select: []gokvkit.SelectField{
+					{
+						Field: "account_id",
+					},
 					{
 						Field:    "age",
-						Function: brutus.SUM,
-						Alias:    "age_sum",
+						Function: gokvkit.SUM,
+						As:       "age_sum",
 					},
 				},
 				Page:  0,
 				Limit: 0,
-				OrderBy: brutus.OrderBy{
+				OrderBy: gokvkit.OrderBy{
 					Field:     "account_id",
-					Direction: brutus.ASC,
+					Direction: gokvkit.ASC,
 				},
 			}
-			results, err := db.Aggregate(ctx, query)
+			results, err := db.Query(ctx, query)
 			if err != nil {
 				t.Fatal(err)
 			}

@@ -1,12 +1,10 @@
 package badger
 
 import (
-	"context"
 	"fmt"
-	"github.com/autom8ter/brutus/kv"
+	"github.com/autom8ter/gokvkit/kv"
 	"github.com/stretchr/testify/assert"
 	"testing"
-	"time"
 )
 
 func Test(t *testing.T) {
@@ -67,26 +65,6 @@ func Test(t *testing.T) {
 			}
 			assert.Equal(t, len(data), i)
 			return nil
-		}))
-	})
-	t.Run("stream", func(t *testing.T) {
-		go func() {
-			time.Sleep(1 * time.Second)
-			assert.Nil(t, db.Tx(true, func(tx kv.Tx) error {
-				for k, v := range data {
-					assert.Nil(t, tx.Set([]byte(k), []byte(v)))
-				}
-				return nil
-			}))
-		}()
-		assert.Nil(t, db.Stream(context.Background(), []byte(""), func(ctx context.Context, items []kv.Item) (bool, error) {
-			for _, i := range items {
-				t.Log(string(i.Key()))
-				if string(i.Key()) == fmt.Sprint(len(data)-1) {
-					return false, nil
-				}
-			}
-			return true, nil
 		}))
 	})
 }

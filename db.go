@@ -1,10 +1,10 @@
-package brutus
+package gokvkit
 
 import (
 	"context"
 	_ "embed"
-	"github.com/autom8ter/brutus/kv"
-	"github.com/autom8ter/brutus/kv/registry"
+	"github.com/autom8ter/gokvkit/kv"
+	"github.com/autom8ter/gokvkit/kv/registry"
 	"github.com/autom8ter/machine/v4"
 	"github.com/palantir/stacktrace"
 	"github.com/samber/lo"
@@ -243,11 +243,8 @@ func (d *DB) QueryDelete(ctx context.Context, query Query) error {
 	return stacktrace.Propagate(d.BatchDelete(ctx, query.From, ids), "")
 }
 
-// Aggregate performs aggregations against the collection
-func (d *DB) Aggregate(ctx context.Context, query AggregateQuery) (Page, error) {
-	if err := query.Validate(); err != nil {
-		return Page{}, nil
-	}
+// aggregate performs aggregations against the collection
+func (d *DB) aggregate(ctx context.Context, query Query) (Page, error) {
 	coll, ok := d.coll(query.From)
 	if !ok {
 		return Page{}, stacktrace.NewError("unsupported collection: %s", query.From)
@@ -269,7 +266,7 @@ func (d *DB) Aggregate(ctx context.Context, query AggregateQuery) (Page, error) 
 	}
 	var reduced Documents
 	for _, values := range results.GroupBy(query.GroupBy) {
-		value, err := values.Aggregate(ctx, query.Aggregates)
+		value, err := values.Aggregate(ctx, query.Select)
 		if err != nil {
 			return Page{}, stacktrace.Propagate(err, "")
 		}
@@ -285,14 +282,7 @@ func (d *DB) Aggregate(ctx context.Context, query AggregateQuery) (Page, error) 
 
 	return Page{
 		Documents: reduced.Map(func(t *Document, i int) *Document {
-			toSelect := query.GroupBy
-			for _, a := range query.Aggregates {
-				toSelect = append(toSelect, a.Alias)
-			}
-			err := t.Select(toSelect)
-			if err != nil {
-				//	return Page{}, stacktrace.Propagate(err, "")
-			}
+			t.Select(query.Select)
 			return t
 		}),
 		NextPage: query.Page + 1,
@@ -307,7 +297,10 @@ func (d *DB) Aggregate(ctx context.Context, query AggregateQuery) (Page, error) 
 // Query queries a list of documents
 func (d *DB) Query(ctx context.Context, query Query) (Page, error) {
 	if err := query.Validate(); err != nil {
-		return Page{}, nil
+		return Page{}, stacktrace.Propagate(err, "")
+	}
+	if query.isAggregate() {
+		return d.aggregate(ctx, query)
 	}
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -342,7 +335,7 @@ func (d *DB) Query(ctx context.Context, query Query) (Page, error) {
 		results = results[:query.Limit]
 	}
 
-	if len(query.Select) > 0 && query.Select[0] != "*" {
+	if len(query.Select) > 0 && query.Select[0].Field != "*" {
 		for _, result := range results {
 			err := result.Select(query.Select)
 			if err != nil {

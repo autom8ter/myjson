@@ -1,8 +1,9 @@
-package brutus
+package gokvkit
 
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"github.com/mitchellh/mapstructure"
 )
 
@@ -58,4 +59,11 @@ func isInternalCtx(ctx context.Context) bool {
 		return true
 	}
 	return false
+}
+
+func defaultAs(function Function, field string) string {
+	if function != "" {
+		return fmt.Sprintf("%s_%s", function, field)
+	}
+	return field
 }

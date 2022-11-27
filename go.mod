@@ -1,4 +1,4 @@
-module github.com/autom8ter/brutus
+module github.com/autom8ter/gokvkit
 
 go 1.18
 

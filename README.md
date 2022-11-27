@@ -2,7 +2,7 @@
 
 A framework for building powerful, extensible, and feature-rich microservices on top of key/value storeage
 
-    go get -u github.com/autom8ter/brutus
+    go get -u github.com/autom8ter/gokvkit
 
 
 ## Use Case
@@ -60,7 +60,7 @@ Build powerful, extensible, and feature-rich microservices on top of pluggable k
 
 ## Getting Started
 
-    go get -u github.com/autom8ter/brutus
+    go get -u github.com/autom8ter/gokvkit
 
 #### Configuring a database instance
 

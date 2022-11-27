@@ -1,4 +1,4 @@
-package brutus
+package gokvkit
 
 import (
 	"context"
@@ -89,8 +89,8 @@ func (d *Document) Clone() *Document {
 }
 
 // Select returns the document with only the selected fields populated
-func (d *Document) Select(fields []string) error {
-	if len(fields) == 0 || fields[0] == "*" {
+func (d *Document) Select(fields []SelectField) error {
+	if len(fields) == 0 || fields[0].Field == "*" {
 		return nil
 	}
 	var (
@@ -99,7 +99,10 @@ func (d *Document) Select(fields []string) error {
 
 	patch := map[string]interface{}{}
 	for _, f := range fields {
-		patch[f] = d.Get(f)
+		if f.As == "" {
+			f.As = defaultAs(f.Function, f.Field)
+		}
+		patch[f.As] = d.Get(f.Field)
 	}
 	err := selected.SetAll(patch)
 	if err != nil {
@@ -328,7 +331,7 @@ func (d Documents) OrderBy(orderBy OrderBy) Documents {
 }
 
 // Aggregate reduces the documents with the input aggregates
-func (d Documents) Aggregate(ctx context.Context, aggregates []Aggregate) (*Document, error) {
+func (d Documents) Aggregate(ctx context.Context, aggregates []SelectField) (*Document, error) {
 	var (
 		aggregated *Document
 	)
@@ -337,10 +340,16 @@ func (d Documents) Aggregate(ctx context.Context, aggregates []Aggregate) (*Docu
 			aggregated = next
 		}
 		for _, agg := range aggregates {
-			if agg.Alias == "" {
-				return nil, stacktrace.NewError("empty aggregate alias: %s/%s", agg.Field, agg.Function)
+			if agg.As == "" {
+				agg.As = defaultAs(agg.Function, agg.Field)
 			}
-			current := aggregated.GetFloat(agg.Alias)
+			if !agg.Function.IsAggregate() {
+				if err := aggregated.Set(agg.As, aggregated.Get(agg.Field)); err != nil {
+					return nil, stacktrace.Propagate(err, "")
+				}
+				continue
+			}
+			current := aggregated.GetFloat(agg.As)
 			switch agg.Function {
 			case COUNT:
 				current++
@@ -357,7 +366,7 @@ func (d Documents) Aggregate(ctx context.Context, aggregates []Aggregate) (*Docu
 			default:
 				return nil, stacktrace.NewError("unsupported aggregate function: %s/%s", agg.Field, agg.Function)
 			}
-			if err := aggregated.Set(agg.Alias, current); err != nil {
+			if err := aggregated.Set(agg.As, current); err != nil {
 				return nil, stacktrace.Propagate(err, "")
 			}
 		}

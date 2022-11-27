@@ -1,4 +1,4 @@
-package brutus
+package gokvkit
 
 import (
 	"github.com/brianvoe/gofakeit/v6"

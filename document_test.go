@@ -1,9 +1,9 @@
-package brutus_test
+package gokvkit_test
 
 import (
 	"encoding/json"
-	"github.com/autom8ter/brutus"
-	"github.com/autom8ter/brutus/testutil"
+	"github.com/autom8ter/gokvkit"
+	"github.com/autom8ter/gokvkit/testutil"
 	"github.com/brianvoe/gofakeit/v6"
 	"github.com/stretchr/testify/assert"
 	"testing"
@@ -31,7 +31,7 @@ func TestDocument(t *testing.T) {
 		Name: "john smith",
 		Age:  50,
 	}
-	r, err := brutus.NewDocumentFrom(&usr)
+	r, err := gokvkit.NewDocumentFrom(&usr)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -54,7 +54,7 @@ func TestDocument(t *testing.T) {
 	})
 	t.Run("merge", func(t *testing.T) {
 		usr2 := user{ID: usr.ID, Contact: contact{Email: gofakeit.Email()}, Name: "john smith"}
-		r2, err := brutus.NewDocumentFrom(&usr2)
+		r2, err := gokvkit.NewDocumentFrom(&usr2)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -64,9 +64,9 @@ func TestDocument(t *testing.T) {
 		assert.Equal(t, usr.Contact.Phone, r.GetString("contact.phone"))
 	})
 	t.Run("valid", func(t *testing.T) {
-		r := brutus.NewDocument()
+		r := gokvkit.NewDocument()
 		assert.Equal(t, true, r.Valid())
-		r, err := brutus.NewDocumentFrom([]any{1})
+		r, err := gokvkit.NewDocumentFrom([]any{1})
 		assert.NotNil(t, err)
 	})
 	t.Run("clone", func(t *testing.T) {
@@ -83,13 +83,13 @@ func TestDocument(t *testing.T) {
 		assert.Equal(t, r.String(), string(r.Bytes()))
 	})
 	t.Run("new from bytes", func(t *testing.T) {
-		n, err := brutus.NewDocumentFromBytes(r.Bytes())
+		n, err := gokvkit.NewDocumentFromBytes(r.Bytes())
 		assert.Nil(t, err)
 		assert.Equal(t, r.String(), string(n.Bytes()))
 	})
 	t.Run("select", func(t *testing.T) {
 		before := r.Get("contact.email")
-		err := r.Select([]string{"contact.email"})
+		err := r.Select([]gokvkit.SelectField{{Field: "contact.email"}})
 		assert.Nil(t, err)
 		after := r.Get("contact.email")
 		assert.Equal(t, before, after)
@@ -108,11 +108,11 @@ func TestDocument(t *testing.T) {
 	})
 
 	t.Run("where", func(t *testing.T) {
-		r, err = brutus.NewDocumentFrom(&usr)
+		r, err = gokvkit.NewDocumentFrom(&usr)
 		if err != nil {
 			t.Fatal(err)
 		}
-		pass, err := r.Where([]brutus.Where{
+		pass, err := r.Where([]gokvkit.Where{
 			{
 				Field: "contact.email",
 				Op:    "==",
@@ -122,17 +122,17 @@ func TestDocument(t *testing.T) {
 		assert.Nil(t, err)
 		assert.True(t, pass)
 
-		pass, err = r.Where([]brutus.Where{
+		pass, err = r.Where([]gokvkit.Where{
 			{
 				Field: "contact.email",
-				Op:    brutus.Contains,
+				Op:    gokvkit.Contains,
 				Value: email,
 			},
 		})
 		assert.Nil(t, err)
 		assert.True(t, pass)
 
-		pass, err = r.Where([]brutus.Where{
+		pass, err = r.Where([]gokvkit.Where{
 			{
 				Field: "contact.email",
 				Op:    "==",
@@ -142,7 +142,7 @@ func TestDocument(t *testing.T) {
 		assert.Nil(t, err)
 		assert.False(t, pass)
 
-		pass, err = r.Where([]brutus.Where{
+		pass, err = r.Where([]gokvkit.Where{
 			{
 				Field: "contact.email",
 				Op:    "!=",
@@ -152,7 +152,7 @@ func TestDocument(t *testing.T) {
 		assert.Nil(t, err)
 		assert.True(t, pass)
 
-		pass, err = r.Where([]brutus.Where{
+		pass, err = r.Where([]gokvkit.Where{
 			{
 				Field: "age",
 				Op:    ">",
@@ -162,7 +162,7 @@ func TestDocument(t *testing.T) {
 		assert.Nil(t, err)
 		assert.True(t, pass)
 
-		pass, err = r.Where([]brutus.Where{
+		pass, err = r.Where([]gokvkit.Where{
 			{
 				Field: "age",
 				Op:    ">=",
@@ -172,7 +172,7 @@ func TestDocument(t *testing.T) {
 		assert.Nil(t, err)
 		assert.True(t, pass)
 
-		pass, err = r.Where([]brutus.Where{
+		pass, err = r.Where([]gokvkit.Where{
 			{
 				Field: "age",
 				Op:    ">=",
@@ -182,7 +182,7 @@ func TestDocument(t *testing.T) {
 		assert.Nil(t, err)
 		assert.False(t, pass)
 
-		pass, err = r.Where([]brutus.Where{
+		pass, err = r.Where([]gokvkit.Where{
 			{
 				Field: "age",
 				Op:    "<",
@@ -192,7 +192,7 @@ func TestDocument(t *testing.T) {
 		assert.Nil(t, err)
 		assert.True(t, pass)
 
-		pass, err = r.Where([]brutus.Where{
+		pass, err = r.Where([]gokvkit.Where{
 			{
 				Field: "age",
 				Op:    "<=",
@@ -202,7 +202,7 @@ func TestDocument(t *testing.T) {
 		assert.Nil(t, err)
 		assert.True(t, pass)
 
-		pass, err = r.Where([]brutus.Where{
+		pass, err = r.Where([]gokvkit.Where{
 			{
 				Field: "age",
 				Op:    "<=",
@@ -212,7 +212,7 @@ func TestDocument(t *testing.T) {
 		assert.Nil(t, err)
 		assert.True(t, pass)
 
-		pass, err = r.Where([]brutus.Where{
+		pass, err = r.Where([]gokvkit.Where{
 			{
 				Field: "age",
 				Op:    ">=",
@@ -222,17 +222,17 @@ func TestDocument(t *testing.T) {
 		assert.Nil(t, err)
 		assert.True(t, pass)
 
-		pass, err = r.Where([]brutus.Where{
+		pass, err = r.Where([]gokvkit.Where{
 			{
 				Field: "age",
-				Op:    brutus.In,
+				Op:    gokvkit.In,
 				Value: []float64{50},
 			},
 		})
 		assert.Nil(t, err)
 		assert.True(t, pass)
 
-		pass, err = r.Where([]brutus.Where{
+		pass, err = r.Where([]gokvkit.Where{
 			{
 				Field: "age",
 				Op:    "<",
@@ -242,7 +242,7 @@ func TestDocument(t *testing.T) {
 		assert.Nil(t, err)
 		assert.False(t, pass)
 
-		pass, err = r.Where([]brutus.Where{
+		pass, err = r.Where([]gokvkit.Where{
 			{
 				Field: "age",
 				Op:    "8",
@@ -253,12 +253,12 @@ func TestDocument(t *testing.T) {
 		assert.False(t, pass)
 	})
 	t.Run("results", func(t *testing.T) {
-		var docs = []*brutus.Document{
+		var docs = []*gokvkit.Document{
 			testutil.NewUserDoc(),
 			testutil.NewUserDoc(),
 			testutil.NewUserDoc(),
 		}
-		result := brutus.Page{
+		result := gokvkit.Page{
 			Documents: docs,
 			NextPage:  0,
 		}

@@ -1,15 +1,11 @@
 package kv
 
-import "context"
-
 // DB is a key value database implementation
 type DB interface {
 	// Tx executes the given function against a database transaction
 	Tx(isUpdate bool, fn func(Tx) error) error
 	// Batch returns a batch kv writer
 	Batch() Batch
-	// Stream streams changes with the given key prefix to the stream handler function
-	Stream(ctx context.Context, prefix []byte, handler StreamHandler) error
 	// Close closes the key value database
 	Close() error
 }
@@ -66,5 +62,10 @@ type Batch interface {
 	Delete(key []byte) error
 }
 
-// StreamHandler is a callback function that handles changes to key value pairs
-type StreamHandler func(ctx context.Context, items []Item) (bool, error)
+// KVConfig configures a key value database from the given provider
+type KVConfig struct {
+	// Provider is the name of the kv provider (badger)
+	Provider string `json:"provider"`
+	// Params are the kv providers params
+	Params map[string]any `json:"params"`
+}

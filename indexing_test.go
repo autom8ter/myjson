@@ -1,15 +1,15 @@
-package brutus_test
+package gokvkit_test
 
 import (
 	"bytes"
-	"github.com/autom8ter/brutus"
-	"github.com/autom8ter/brutus/testutil"
+	"github.com/autom8ter/gokvkit"
+	"github.com/autom8ter/gokvkit/testutil"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
 
 func TestIndexing(t *testing.T) {
-	i := &brutus.Index{
+	i := &gokvkit.Index{
 		Collection: "user",
 		Name:       "user_account_email_idx",
 		Fields:     []string{"account_id", "contact.email"},

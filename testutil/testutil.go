@@ -2,7 +2,7 @@ package testutil
 
 import (
 	"context"
-	"github.com/autom8ter/brutus"
+	"github.com/autom8ter/gokvkit"
 	"io/ioutil"
 	"os"
 	"time"
@@ -10,7 +10,7 @@ import (
 	"github.com/brianvoe/gofakeit/v6"
 
 	_ "embed"
-	_ "github.com/autom8ter/brutus/kv/badger"
+	_ "github.com/autom8ter/gokvkit/kv/badger"
 )
 
 var (
@@ -18,45 +18,45 @@ var (
 	TaskSchema string
 	//go:embed testdata/user.json
 	UserSchema     string
-	TaskCollection = brutus.NewCollection("task", "_id",
-		brutus.WithIndex(brutus.Index{
+	TaskCollection = gokvkit.NewCollection("task", "_id",
+		gokvkit.WithIndex(gokvkit.Index{
 			Collection: "task",
 			Name:       "task_user_idx",
 			Fields:     []string{"user"},
 			Unique:     false,
 			Primary:    false,
 		}),
-		brutus.WithValidatorHooks(brutus.MustJSONSchema([]byte(TaskSchema))),
+		gokvkit.WithValidatorHooks(gokvkit.MustJSONSchema([]byte(TaskSchema))),
 	)
-	UserCollection = brutus.NewCollection("user", "_id",
-		brutus.WithIndex(brutus.Index{
+	UserCollection = gokvkit.NewCollection("user", "_id",
+		gokvkit.WithIndex(gokvkit.Index{
 			Collection: "user",
 			Name:       "user_lanaguage_idx",
 			Fields:     []string{"language"},
 			Unique:     false,
 			Primary:    false,
 		}),
-		brutus.WithIndex(brutus.Index{
+		gokvkit.WithIndex(gokvkit.Index{
 			Collection: "user",
 			Name:       "user_email_idx",
 			Fields:     []string{"contact.email"},
 			Unique:     true,
 			Primary:    false,
 		}),
-		brutus.WithIndex(brutus.Index{
+		gokvkit.WithIndex(gokvkit.Index{
 			Collection: "user",
 			Name:       "user_account_idx",
 			Fields:     []string{"account_id"},
 			Unique:     false,
 			Primary:    false,
 		}),
-		brutus.WithValidatorHooks(brutus.MustJSONSchema([]byte(UserSchema))),
+		gokvkit.WithValidatorHooks(gokvkit.MustJSONSchema([]byte(UserSchema))),
 	)
-	AllCollections = []*brutus.Collection{UserCollection, TaskCollection}
+	AllCollections = []*gokvkit.Collection{UserCollection, TaskCollection}
 )
 
-func NewUserDoc() *brutus.Document {
-	doc, err := brutus.NewDocumentFrom(map[string]interface{}{
+func NewUserDoc() *gokvkit.Document {
+	doc, err := gokvkit.NewDocumentFrom(map[string]interface{}{
 		"_id":  gofakeit.UUID(),
 		"name": gofakeit.Name(),
 		"contact": map[string]interface{}{
@@ -77,8 +77,8 @@ func NewUserDoc() *brutus.Document {
 	return doc
 }
 
-func NewTaskDoc(usrID string) *brutus.Document {
-	doc, err := brutus.NewDocumentFrom(map[string]interface{}{
+func NewTaskDoc(usrID string) *gokvkit.Document {
+	doc, err := gokvkit.NewDocumentFrom(map[string]interface{}{
 		"_id":     gofakeit.UUID(),
 		"user":    usrID,
 		"content": gofakeit.LoremIpsumSentence(5),
@@ -89,7 +89,7 @@ func NewTaskDoc(usrID string) *brutus.Document {
 	return doc
 }
 
-func TestDB(fn func(ctx context.Context, db *brutus.DB), collections ...*brutus.Collection) error {
+func TestDB(fn func(ctx context.Context, db *gokvkit.DB), collections ...*gokvkit.Collection) error {
 	if len(collections) == 0 {
 		collections = append(collections, AllCollections...)
 	}
@@ -101,8 +101,8 @@ func TestDB(fn func(ctx context.Context, db *brutus.DB), collections ...*brutus.
 	defer os.RemoveAll(dir)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	db, err := brutus.New(ctx, brutus.Config{
-		KV: brutus.KVConfig{
+	db, err := gokvkit.New(ctx, gokvkit.Config{
+		KV: gokvkit.KVConfig{
 			Provider: "badger",
 			Params: map[string]any{
 				"storage_path": dir,

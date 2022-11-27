@@ -1,7 +1,7 @@
 package registry
 
 import (
-	"github.com/autom8ter/brutus/kv"
+	"github.com/autom8ter/gokvkit/kv"
 	"github.com/palantir/stacktrace"
 )
 

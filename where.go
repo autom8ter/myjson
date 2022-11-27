@@ -1,4 +1,4 @@
-package brutus
+package gokvkit
 
 // WhereOp is an operator used to compare a value to a records field value in a where clause
 type WhereOp string

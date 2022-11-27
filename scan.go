@@ -1,4 +1,4 @@
-package brutus
+package gokvkit
 
 // ScanFunc returns false to stop scanning and an error if one occurred
 type ScanFunc func(d *Document) (bool, error)
