@@ -2,6 +2,7 @@ package testutil
 
 import (
 	"context"
+	"fmt"
 	"github.com/autom8ter/gokvkit"
 	"io/ioutil"
 	"os"
@@ -60,7 +61,7 @@ func NewUserDoc() *gokvkit.Document {
 		"_id":  gofakeit.UUID(),
 		"name": gofakeit.Name(),
 		"contact": map[string]interface{}{
-			"email": gofakeit.Email(),
+			"email": fmt.Sprintf("%v.%s", gofakeit.IntRange(0, 100), gofakeit.Email()),
 		},
 		"account_id":      gofakeit.IntRange(0, 100),
 		"language":        gofakeit.Language(),

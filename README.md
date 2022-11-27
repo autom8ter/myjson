@@ -82,11 +82,7 @@ WIP
 
 WIP
 
-#### Streaming documents from a collection
-
-WIP
-
-#### Streaeming documents from a collection
+#### Adding hooks to a collection
 
 WIP
 

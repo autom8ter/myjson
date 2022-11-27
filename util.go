@@ -1,7 +1,6 @@
 package gokvkit
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"github.com/mitchellh/mapstructure"
@@ -19,13 +18,6 @@ func compareField(field string, i, j *Document) bool {
 		return iFieldVal.String() > jFieldVal.String()
 	default:
 		return JSONString(iFieldVal.Value()) > JSONString(jFieldVal.Value())
-	}
-}
-
-// MustDecode decodes the input into the output based on json tags - it panics on error
-func MustDecode(input any, output any) {
-	if err := Decode(input, output); err != nil {
-		panic(err)
 	}
 }
 
@@ -50,15 +42,6 @@ func Decode(input any, output any) error {
 func JSONString(input any) string {
 	bits, _ := json.Marshal(input)
 	return string(bits)
-}
-
-func isInternalCtx(ctx context.Context) bool {
-	meta, _ := GetContext(ctx)
-	isInternal, ok := meta.Get("_internal")
-	if ok && isInternal == true {
-		return true
-	}
-	return false
 }
 
 func defaultAs(function Function, field string) string {

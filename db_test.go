@@ -212,7 +212,7 @@ func Benchmark(b *testing.B) {
 			for i := 0; i < b.N; i++ {
 				results, err := db.Query(ctx, gokvkit.Query{
 					From:   "user",
-					Select: nil,
+					Select: []gokvkit.SelectField{{Field: "*"}},
 					Where: []gokvkit.Where{
 						{
 							Field: "contact.email",
@@ -244,7 +244,7 @@ func Benchmark(b *testing.B) {
 			for i := 0; i < b.N; i++ {
 				_, err := db.Query(ctx, gokvkit.Query{
 					From:   "user",
-					Select: nil,
+					Select: []gokvkit.SelectField{{Field: "*"}},
 					Where: []gokvkit.Where{
 						{
 							Field: "name",
