@@ -165,6 +165,21 @@ func (c *Collection) GetPrimaryKey(d *Document) string {
 	return cast.ToString(d.Get(c.PrimaryKey()))
 }
 
+// ReadHooks returns the collections registered read hooks which execute on each document returned from a query
+func (c *Collection) ReadHooks() []ReadHook {
+	return c.readHooks
+}
+
+// WhereHooks returns the collections registered where hooks which execute on all queries
+func (c *Collection) WhereHooks() []WhereHook {
+	return c.whereHooks
+}
+
+// SideEffectHooks returns the collections registered side effect hooks which execute on all state changes
+func (c *Collection) SideEffectHooks() []SideEffectHook {
+	return c.sideEffects
+}
+
 type indexDiff struct {
 	toRemove []Index
 	toAdd    []Index
@@ -197,4 +212,33 @@ func getIndexDiff(this, that map[string]Index) (indexDiff, error) {
 		toAdd:    toAdd,
 		toUpdate: toUpdate,
 	}, nil
+}
+
+// Validate validates the collection's configuration
+func (c *Collection) Validate() error {
+	if c.name == "" {
+		return stacktrace.NewError("collection: empty name")
+	}
+	for _, h := range c.readHooks {
+		if err := h.Valid(); err != nil {
+			return stacktrace.Propagate(err, "")
+		}
+	}
+	for _, h := range c.sideEffects {
+		if err := h.Valid(); err != nil {
+			return stacktrace.Propagate(err, "")
+		}
+	}
+	for _, h := range c.readHooks {
+		if err := h.Valid(); err != nil {
+			return stacktrace.Propagate(err, "")
+		}
+	}
+	if c.primaryKey == "" {
+		return stacktrace.NewError("collection: empty primary key")
+	}
+	if len(c.indexes) == 0 {
+		return stacktrace.NewError("collection: zero indexes")
+	}
+	return nil
 }

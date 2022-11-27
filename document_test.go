@@ -266,6 +266,38 @@ func TestDocument(t *testing.T) {
 		assert.Nil(t, err)
 		t.Log(string(bits))
 	})
+	t.Run("documents - for each", func(t *testing.T) {
+		var docs = gokvkit.Documents{
+			testutil.NewUserDoc(),
+			testutil.NewUserDoc(),
+			testutil.NewUserDoc(),
+		}
+		count := 0
+		docs.ForEach(func(next *gokvkit.Document, i int) {
+			count++
+		})
+		assert.Equal(t, 3, count)
+	})
+	t.Run("documents - filter", func(t *testing.T) {
+		var docs = gokvkit.Documents{
+			testutil.NewUserDoc(),
+			testutil.NewUserDoc(),
+			testutil.NewUserDoc(),
+		}
+		docs = docs.Filter(func(document *gokvkit.Document, i int) bool {
+			return document.String() != docs[0].String()
+		})
+		assert.Equal(t, 2, len(docs))
+	})
+	t.Run("documents - slice", func(t *testing.T) {
+		var docs = gokvkit.Documents{
+			testutil.NewUserDoc(),
+			testutil.NewUserDoc(),
+			testutil.NewUserDoc(),
+		}
+		docs = docs.Slice(1, 3)
+		assert.Equal(t, 2, len(docs))
+	})
 }
 
 func BenchmarkDocument(b *testing.B) {

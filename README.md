@@ -109,3 +109,7 @@ Run Benchmarks
 Lint Repository
 
     golangci-lint run
+
+Check Coverage
+
+    go tool cover -func=coverage.out

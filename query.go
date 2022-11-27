@@ -15,6 +15,56 @@ type SelectField struct {
 	As string `json:"as"`
 }
 
+// OrderByDirection indicates whether results should be sorted in ascending or descending order
+type OrderByDirection string
+
+const (
+	// ASC indicates ascending order
+	ASC OrderByDirection = "ASC"
+	// DESC indicates descending order
+	DESC OrderByDirection = "DESC"
+)
+
+// OrderBy orders the result set by a given field in a given direction
+type OrderBy struct {
+	// Field is the field to sort on
+	Field string `json:"field"`
+	// Direction is the sort direction
+	Direction OrderByDirection `json:"direction"`
+}
+
+// WhereOp is an operator used to compare a value to a records field value in a where clause
+type WhereOp string
+
+const (
+	// Eq matches on equality
+	Eq WhereOp = "eq"
+	// Neq matches on inequality
+	Neq WhereOp = "neq"
+	// Gt matches on greater than
+	Gt WhereOp = "gt"
+	// Gte matches on greater than or equal to
+	Gte WhereOp = "gte"
+	// Lt matches on less than
+	Lt WhereOp = "lt"
+	// Lte matches on greater than or equal to
+	Lte WhereOp = "lte"
+	// Contains matches on text containing a substring
+	Contains WhereOp = "contains"
+	// In matches on an element being contained in a list
+	In WhereOp = "in"
+)
+
+// Where is field-level filter for database queries
+type Where struct {
+	// Field is a field to compare against records field. For full text search, wrap the field in search(field1,field2,field3) and use a search operator
+	Field string `json:"field"`
+	// Op is an operator used to compare the field against the value.
+	Op WhereOp `json:"op"`
+	// Value is a value to compare against a records field value
+	Value any `json:"value"`
+}
+
 // Query is a query against the NOSQL database - it does not support full text search
 type Query struct {
 	// From is the collection to query
@@ -34,13 +84,12 @@ type Query struct {
 }
 
 func (q Query) isAggregate() bool {
-	isAggregate := false
 	for _, a := range q.Select {
 		if a.Function != "" && a.Function.IsAggregate() {
-			isAggregate = true
+			return true
 		}
 	}
-	return isAggregate
+	return false
 }
 
 // Validate validates the query and returns a validation error if one exists

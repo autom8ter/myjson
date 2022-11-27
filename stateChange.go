@@ -5,7 +5,7 @@ import (
 	"time"
 )
 
-// Action
+// Action is an action that causes a mutation to the database
 type Action string
 
 const (
@@ -42,8 +42,8 @@ func (s StateChange) Context() context.Context {
 // Note: the after value is what's persisted to the database, the before value is what was in the database prior to the change.
 // After will be always null on delete
 type DocChange struct {
-	Action Action
-	DocID  string
-	Before *Document
-	After  *Document
+	Action Action    `json:"action"`
+	DocID  string    `json:"docID"`
+	Before *Document `json:"before"`
+	After  *Document `json:"after"`
 }

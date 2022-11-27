@@ -22,6 +22,7 @@ func Test(t *testing.T) {
 			return nil
 		}))
 	})
+
 	t.Run("get", func(t *testing.T) {
 		assert.Nil(t, db.Tx(false, func(tx kv.Tx) error {
 			for k, v := range data {
@@ -64,6 +65,37 @@ func Test(t *testing.T) {
 				iter.Next()
 			}
 			assert.Equal(t, len(data), i)
+			return nil
+		}))
+	})
+	t.Run("delete", func(t *testing.T) {
+		assert.Nil(t, db.Tx(true, func(tx kv.Tx) error {
+			for k, _ := range data {
+				assert.Nil(t, tx.Delete([]byte(k)))
+			}
+			for k, _ := range data {
+				_, err := tx.Get([]byte(k))
+				assert.NotNil(t, err)
+			}
+			return nil
+		}))
+	})
+	t.Run("batch set then delete", func(t *testing.T) {
+		batch := db.Batch()
+		for k, v := range data {
+			assert.Nil(t, batch.Set([]byte(k), []byte(v)))
+		}
+		assert.Nil(t, batch.Flush())
+		batch2 := db.Batch()
+		for k, _ := range data {
+			assert.Nil(t, batch2.Delete([]byte(k)))
+		}
+		assert.Nil(t, batch2.Flush())
+		assert.Nil(t, db.Tx(false, func(tx kv.Tx) error {
+			for k, _ := range data {
+				_, err := tx.Get([]byte(k))
+				assert.NotNil(t, err)
+			}
 			return nil
 		}))
 	})

@@ -471,11 +471,9 @@ func (d *DB) queryScan(ctx context.Context, coll *Collection, scan Scan, handler
 		return IndexMatch{}, stacktrace.NewError("empty scan handler")
 	}
 	var err error
-	if coll.whereHooks != nil {
-		scan.Where, err = coll.applyWhereHooks(ctx, d, scan.Where)
-		if err != nil {
-			return IndexMatch{}, stacktrace.Propagate(err, "")
-		}
+	scan.Where, err = coll.applyWhereHooks(ctx, d, scan.Where)
+	if err != nil {
+		return IndexMatch{}, stacktrace.Propagate(err, "")
 	}
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()

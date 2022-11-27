@@ -308,9 +308,9 @@ func (documents Documents) Map(mapper func(t *Document, i int) *Document) Docume
 	return lo.Map[*Document, *Document](documents, mapper)
 }
 
-// Reduce applies the reducer function to the documents and returns a single document
-func (documents Documents) Reduce(reducer func(accumulated, next *Document, i int) *Document) *Document {
-	return lo.Reduce[*Document](documents, reducer, NewDocument())
+// ForEach applies the function to each document in the documents
+func (documents Documents) ForEach(fn func(next *Document, i int)) {
+	lo.ForEach[*Document](documents, fn)
 }
 
 // OrderBy orders the documents by the OrderBy clause

@@ -2,6 +2,7 @@ package gokvkit_test
 
 import (
 	"context"
+	"encoding/json"
 	"github.com/autom8ter/gokvkit"
 	"github.com/spf13/cast"
 	"github.com/stretchr/testify/assert"
@@ -25,6 +26,11 @@ func TestContext(t *testing.T) {
 	assert.False(t, cast.ToBool(v))
 	assert.NotNil(t, c.Map())
 	assert.True(t, c.Exists("testing"))
+	bits, err := json.Marshal(c)
+	assert.Nil(t, err)
+	assert.Equal(t, "{\"testing\":false}", string(bits))
+	assert.Equal(t, "{\"testing\":false}", c.String())
+
 	c.Del("testing")
 
 	v, ok = c.Get("testing")
@@ -35,4 +41,7 @@ func TestContext(t *testing.T) {
 	c, ok = gokvkit.GetContext(ctx)
 	assert.True(t, ok)
 	assert.NotNil(t, c)
+
+	assert.Nil(t, json.Unmarshal(bits, c))
+	assert.True(t, c.Exists("testing"))
 }
