@@ -320,16 +320,74 @@ func (d Documents) OrderBy(orderBys []OrderBy) Documents {
 	}
 	// TODO: support more than one order by
 	orderBy := orderBys[0]
+
 	if orderBy.Direction == DESC {
 		sort.Slice(d, func(i, j int) bool {
-			return compareField(orderBy.Field, d[i], d[j])
+			index := 1
+			if d[i].Get(orderBy.Field) != d[j].Get(orderBy.Field) {
+				return compareField(orderBy.Field, d[i], d[j])
+			}
+			for index < len(orderBys) {
+				order := orderBys[index]
+				if d[i].Get(order.Field) != d[j].Get(order.Field) {
+					return compareField(order.Field, d[i], d[j])
+				}
+				if d[i].Get(order.Field) != d[j].Get(order.Field) {
+					if order.Direction == DESC {
+						if d[i].Get(orderBy.Field) != d[j].Get(orderBy.Field) {
+							return compareField(orderBy.Field, d[i], d[j])
+						}
+					} else {
+						if d[i].Get(orderBy.Field) != d[j].Get(orderBy.Field) {
+							return !compareField(orderBy.Field, d[i], d[j])
+						}
+					}
+				}
+				index++
+			}
+			return false
 		})
 	} else {
 		sort.Slice(d, func(i, j int) bool {
-			return !compareField(orderBy.Field, d[i], d[j])
+			index := 1
+			if d[i].Get(orderBy.Field) != d[j].Get(orderBy.Field) {
+				return !compareField(orderBy.Field, d[i], d[j])
+			}
+			for index < len(orderBys) {
+				order := orderBys[index]
+				if d[i].Get(order.Field) != d[j].Get(order.Field) {
+					return !compareField(order.Field, d[i], d[j])
+				}
+				if d[i].Get(order.Field) != d[j].Get(order.Field) {
+					if order.Direction == DESC {
+						if d[i].Get(orderBy.Field) != d[j].Get(orderBy.Field) {
+							return compareField(orderBy.Field, d[i], d[j])
+						}
+					} else {
+						if d[i].Get(orderBy.Field) != d[j].Get(orderBy.Field) {
+							return !compareField(orderBy.Field, d[i], d[j])
+						}
+					}
+				}
+				index++
+			}
+			return false
+
 		})
 	}
 	return d
+}
+
+func sortDesc(field string, d Documents) {
+	sort.Slice(d, func(i, j int) bool {
+		return compareField(field, d[i], d[j])
+	})
+}
+
+func sortAsc(field string, d Documents) {
+	sort.Slice(d, func(i, j int) bool {
+		return !compareField(field, d[i], d[j])
+	})
 }
 
 // Aggregate reduces the documents with the input aggregates

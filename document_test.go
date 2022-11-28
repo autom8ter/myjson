@@ -298,6 +298,32 @@ func TestDocument(t *testing.T) {
 		docs = docs.Slice(1, 3)
 		assert.Equal(t, 2, len(docs))
 	})
+	t.Run("documents - orderBy", func(t *testing.T) {
+		var docs gokvkit.Documents
+		for i := 0; i < 100; i++ {
+			doc := testutil.NewUserDoc()
+			assert.Nil(t, doc.Set("account_id", gofakeit.IntRange(1, 5)))
+			docs = append(docs, doc)
+		}
+		docs = docs.OrderBy([]gokvkit.OrderBy{
+			{
+				Field:     "account_id",
+				Direction: gokvkit.DESC,
+			},
+			{
+				Field:     "age",
+				Direction: gokvkit.DESC,
+			},
+		})
+		docs.ForEach(func(next *gokvkit.Document, i int) {
+			if len(docs) > i+1 {
+				assert.GreaterOrEqual(t, next.GetFloat("account_id"), docs[i+1].GetFloat("account_id"), i)
+				if next.GetFloat("account_id") == docs[i+1].GetFloat("account_id") {
+					assert.GreaterOrEqual(t, next.GetFloat("age"), docs[i+1].GetFloat("age"), i)
+				}
+			}
+		})
+	})
 }
 
 func BenchmarkDocument(b *testing.B) {

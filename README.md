@@ -20,7 +20,7 @@ Build powerful, extensible, and feature-rich microservices on top of pluggable k
 - [x] pluggable optimizer
 - [x] unique indexes/constraints
 - [x] select fields
-- [x] order by
+- [x] multi-field order by
 - [x] aggregation (min,max,sum,count)
     - [x] min
     - [x] max
@@ -43,8 +43,7 @@ Build powerful, extensible, and feature-rich microservices on top of pluggable k
 
 ### Roadmap
 
-- [ ] change streams
-- [ ] multi-field order by
+- [x] 
 - [ ] multi-field primary key
 - [ ] search indexing
 - [ ] external data importer
@@ -55,8 +54,6 @@ Build powerful, extensible, and feature-rich microservices on top of pluggable k
 - [ ] benchmarks
 - [ ] examples
 - [ ] 80% test coverage
-- [ ] extensive comments
-- [ ] SQL-like query language
 
 ## Getting Started
 
