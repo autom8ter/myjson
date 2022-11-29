@@ -7,12 +7,12 @@ import (
 
 // Optimizer selects the best index from a set of indexes based on where clauses
 type Optimizer interface {
-	// BestIndex selects the optimal index to use based on the given where clauses
-	BestIndex(indexes map[string]Index, where []Where) (IndexMatch, error)
+	// Optimize selects the optimal index to use based on the given where clauses
+	Optimize(indexes map[string]Index, where []Where) (OptimizerResult, error)
 }
 
-// IndexMatch is an index matched to a read request
-type IndexMatch struct {
+// OptimizerResult is the output of a query optimizer
+type OptimizerResult struct {
 	// Ref is the matching index
 	Ref Index `json:"ref"`
 	// MatchedFields is the fields that match the index
@@ -25,15 +25,14 @@ type IndexMatch struct {
 
 type defaultOptimizer struct{}
 
-// BestIndex selects the optimal index to use given the where/orderby clause
-func (o defaultOptimizer) BestIndex(indexes map[string]Index, where []Where) (IndexMatch, error) {
+func (o defaultOptimizer) Optimize(indexes map[string]Index, where []Where) (OptimizerResult, error) {
 	if len(indexes) == 0 {
-		return IndexMatch{}, stacktrace.NewErrorWithCode(ErrTODO, "zero configured indexes")
+		return OptimizerResult{}, stacktrace.NewErrorWithCode(ErrTODO, "zero configured indexes")
 	}
 
 	values := indexableFields(where)
 	var (
-		i = IndexMatch{
+		i = OptimizerResult{
 			Values: values,
 		}
 		primary Index
@@ -65,7 +64,7 @@ func (o defaultOptimizer) BestIndex(indexes map[string]Index, where []Where) (In
 	if len(i.MatchedFields) > 0 {
 		return i, nil
 	}
-	return IndexMatch{
+	return OptimizerResult{
 		Ref:            primary,
 		MatchedFields:  []string{},
 		Values:         values,

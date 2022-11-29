@@ -466,20 +466,20 @@ func (c *DB) getReadyIndexes(ctx context.Context, coll *Collection) map[string]I
 	return indexes
 }
 
-func (d *DB) queryScan(ctx context.Context, coll *Collection, scan Scan, handlerFunc ScanFunc) (IndexMatch, error) {
+func (d *DB) queryScan(ctx context.Context, coll *Collection, scan Scan, handlerFunc ScanFunc) (OptimizerResult, error) {
 	if handlerFunc == nil {
-		return IndexMatch{}, stacktrace.NewError("empty scan handler")
+		return OptimizerResult{}, stacktrace.NewError("empty scan handler")
 	}
 	var err error
 	scan.Where, err = coll.applyWhereHooks(ctx, d, scan.Where)
 	if err != nil {
-		return IndexMatch{}, stacktrace.Propagate(err, "")
+		return OptimizerResult{}, stacktrace.Propagate(err, "")
 	}
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	index, err := d.optimizer.BestIndex(d.getReadyIndexes(ctx, coll), scan.Where)
+	index, err := d.optimizer.Optimize(d.getReadyIndexes(ctx, coll), scan.Where)
 	if err != nil {
-		return IndexMatch{}, stacktrace.Propagate(err, "")
+		return OptimizerResult{}, stacktrace.Propagate(err, "")
 	}
 	pfx := index.Ref.Seek(index.Values)
 	if err := d.kv.Tx(false, func(txn kv.Tx) error {

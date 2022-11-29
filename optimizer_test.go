@@ -32,7 +32,7 @@ func TestOptimizer(t *testing.T) {
 		},
 	}
 	t.Run("select secondary index", func(t *testing.T) {
-		i, err := o.BestIndex(indexes, []Where{
+		i, err := o.Optimize(indexes, []Where{
 			{
 				Field: "email",
 				Op:    "==",
@@ -45,7 +45,7 @@ func TestOptimizer(t *testing.T) {
 	})
 
 	t.Run("select primary index", func(t *testing.T) {
-		i, err := o.BestIndex(indexes, []Where{
+		i, err := o.Optimize(indexes, []Where{
 			{
 				Field: "_id",
 				Op:    "==",
@@ -58,7 +58,7 @@ func TestOptimizer(t *testing.T) {
 	})
 
 	t.Run("select secondary index (multi-field)", func(t *testing.T) {
-		i, err := o.BestIndex(indexes, []Where{
+		i, err := o.Optimize(indexes, []Where{
 			{
 				Field: "account_id",
 				Op:    "==",
@@ -76,7 +76,7 @@ func TestOptimizer(t *testing.T) {
 		assert.Equal(t, "language", i.MatchedFields[1])
 	})
 	t.Run("select secondary index (multi-field wrong order)", func(t *testing.T) {
-		i, err := o.BestIndex(indexes, []Where{
+		i, err := o.Optimize(indexes, []Where{
 			{
 				Field: "language",
 				Op:    "==",
@@ -92,7 +92,7 @@ func TestOptimizer(t *testing.T) {
 		assert.Equal(t, true, i.IsPrimaryIndex)
 	})
 	t.Run("select secondary index (multi-field partial match)", func(t *testing.T) {
-		i, err := o.BestIndex(indexes, []Where{
+		i, err := o.Optimize(indexes, []Where{
 			{
 				Field: "account_id",
 				Op:    "==",
@@ -104,7 +104,7 @@ func TestOptimizer(t *testing.T) {
 		assert.Equal(t, "account_id", i.MatchedFields[0])
 	})
 	t.Run("select secondary index (multi-field partial match (!=))", func(t *testing.T) {
-		i, err := o.BestIndex(indexes, []Where{
+		i, err := o.Optimize(indexes, []Where{
 			{
 				Field: "account_id",
 				Op:    "!=",

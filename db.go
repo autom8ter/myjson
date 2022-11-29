@@ -78,30 +78,6 @@ func (d *DB) Get(ctx context.Context, collection string, id string) (*Document, 
 	return d.getDoc(ctx, collect, id)
 }
 
-// QueryPaginate paginates through each page of the query until the handlePage function returns false or there are no more results
-func (d *DB) QueryPaginate(ctx context.Context, query Query, handlePage PageHandler) error {
-	page := query.Page
-	for {
-		results, err := d.Query(ctx, Query{
-			Select:  query.Select,
-			Where:   query.Where,
-			Page:    page,
-			Limit:   query.Limit,
-			OrderBy: query.OrderBy,
-		})
-		if err != nil {
-			return stacktrace.Propagate(err, "failed to query collection: %s", query.From)
-		}
-		if len(results.Documents) == 0 {
-			return nil
-		}
-		if !handlePage(results) {
-			return nil
-		}
-		page++
-	}
-}
-
 // Create creates a new document - if the documents primary key is unset, it will be set as a sortable unique id
 func (d *DB) Create(ctx context.Context, collection string, document *Document) (string, error) {
 	collect, ok := d.coll(collection)
@@ -287,8 +263,8 @@ func (d *DB) aggregate(ctx context.Context, query Query) (Page, error) {
 		NextPage: query.Page + 1,
 		Count:    len(reduced),
 		Stats: PageStats{
-			ExecutionTime: time.Since(now),
-			IndexMatch:    match,
+			ExecutionTime:   time.Since(now),
+			OptimizerResult: match,
 		},
 	}, nil
 }
@@ -346,8 +322,8 @@ func (d *DB) Query(ctx context.Context, query Query) (Page, error) {
 		NextPage:  query.Page + 1,
 		Count:     len(results),
 		Stats: PageStats{
-			ExecutionTime: time.Since(now),
-			IndexMatch:    match,
+			ExecutionTime:   time.Since(now),
+			OptimizerResult: match,
 		},
 	}, nil
 }
@@ -355,10 +331,10 @@ func (d *DB) Query(ctx context.Context, query Query) (Page, error) {
 // Scan scans the optimal index for a collection's documents passing its filters.
 // results will not be ordered unless an index supporting the order by(s) was found by the optimizer
 // Query should be used when order is more important than performance/resource-usage
-func (d *DB) Scan(ctx context.Context, scan Scan, handlerFunc ScanFunc) (IndexMatch, error) {
+func (d *DB) Scan(ctx context.Context, scan Scan, handlerFunc ScanFunc) (OptimizerResult, error) {
 	coll, ok := d.coll(scan.From)
 	if !ok {
-		return IndexMatch{}, stacktrace.NewError("unsupported collection: %s", scan.From)
+		return OptimizerResult{}, stacktrace.NewError("unsupported collection: %s", scan.From)
 	}
 	return d.queryScan(ctx, coll, scan, handlerFunc)
 }
