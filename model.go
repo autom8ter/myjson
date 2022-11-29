@@ -1,10 +1,27 @@
 package gokvkit
 
 import (
+	"context"
 	"github.com/palantir/stacktrace"
 	"github.com/samber/lo"
 	"time"
 )
+
+// KVConfig configures a key value database from the given provider
+type KVConfig struct {
+	// Provider is the name of the kv provider (badger)
+	Provider string `json:"provider"`
+	// Params are the kv providers params
+	Params map[string]any `json:"params"`
+}
+
+// Config configures a database instance
+type Config struct {
+	// KV is the key value configuration
+	KV KVConfig `json:"kv"`
+	// Collections are the json document collections supported by the DB - At least one is required.
+	Collections []*Collection `json:"collections"`
+}
 
 // SelectField selects a field to return in a queries result set
 type SelectField struct {
@@ -198,4 +215,155 @@ func (q *QueryBuilder) Limit(limit int) *QueryBuilder {
 func (q *QueryBuilder) GroupBy(groups ...string) *QueryBuilder {
 	q.query.GroupBy = append(q.query.GroupBy, groups...)
 	return q
+}
+
+// OptimizerResult is the output of a query optimizer
+type OptimizerResult struct {
+	// Ref is the matching index
+	Ref Index `json:"ref"`
+	// MatchedFields is the fields that match the index
+	MatchedFields []string `json:"matchedFields"`
+	// IsPrimaryIndex indicates whether the primary index was selected
+	IsPrimaryIndex bool `json:"isPrimaryIndex"`
+	// Values are the original values used to target the index
+	Values map[string]any `json:"values"`
+}
+
+// ScanFunc returns false to stop scanning and an error if one occurred
+type ScanFunc func(d *Document) (bool, error)
+
+// Scan scans the optimal index for documents passing its filters.
+// results will not be ordered unless an index supporting the order by(s) was found by the optimizer
+// Query should be used when order is more important than performance/resource-usage
+type Scan struct {
+	// From is the collection to scan
+	From string `json:"from"`
+	// Where filters out records that don't pass the where clause(s)
+	Where []Where `json:"filter"`
+}
+
+// Action is an action that causes a mutation to the database
+type Action string
+
+const (
+	// Create creates a document
+	Create = "create"
+	// Set sets a document's values in place
+	Set = "set"
+	// Update updates a set of fields on a document
+	Update = "update"
+	// Delete deletes a document
+	Delete = "delete"
+)
+
+// StateChange is a mutation to a set of documents
+type StateChange struct {
+	Metadata   *Metadata                 `json:"metadata,omitempty"`
+	Collection string                    `json:"collection,omitempty"`
+	Deletes    []string                  `json:"deletes,omitempty"`
+	Creates    []*Document               `json:"creates,omitempty"`
+	Sets       []*Document               `json:"sets,omitempty"`
+	Updates    map[string]map[string]any `json:"updates,omitempty"`
+	Timestamp  time.Time                 `json:"timestamp,omitempty"`
+}
+
+// DocChange is a mutation to a single document - it includes the action, the document id, and the before & after state of the document
+// Note: the after value is what's persisted to the database, the before value is what was in the database prior to the change.
+// After will be always null on delete
+type DocChange struct {
+	Action Action    `json:"action"`
+	DocID  string    `json:"docID"`
+	Before *Document `json:"before"`
+	After  *Document `json:"after"`
+}
+
+// Function is a function that is applied against a document field
+type Function string
+
+const (
+	// SUM returns the sum of an array of values
+	SUM Function = "sum"
+	// MAX returns the maximum value in an array of values
+	MAX Function = "max"
+	// MIN returns the minimum value in an array of values
+	MIN Function = "min"
+	// COUNT returns the count of an array of values
+	COUNT Function = "count"
+)
+
+func (f Function) IsAggregate() bool {
+	switch f {
+	case SUM, MAX, MIN, COUNT:
+		return true
+	default:
+		return false
+	}
+}
+
+// ValidatorHook is a hook function used to validate all new and updated documents being persisted to a collection
+type ValidatorHook struct {
+	Name string
+	Func func(ctx context.Context, db *DB, change *DocChange) error
+}
+
+// Valid returns nil if the hook is valid
+func (v ValidatorHook) Valid() error {
+	if v.Name == "" {
+		return stacktrace.NewError("empty hook name")
+	}
+	if v.Func == nil {
+		return stacktrace.NewError("empty hook function")
+	}
+	return nil
+}
+
+// SideEffectHook is a hook function triggered whenever a document changes
+type SideEffectHook struct {
+	Name string
+	Func func(ctx context.Context, db *DB, change *DocChange) (*DocChange, error)
+}
+
+// Valid returns nil if the hook is valid
+func (v SideEffectHook) Valid() error {
+	if v.Name == "" {
+		return stacktrace.NewError("empty hook name")
+	}
+	if v.Func == nil {
+		return stacktrace.NewError("empty hook function")
+	}
+	return nil
+}
+
+// WhereHook is a hook function triggered before queries/scans are executed. They may be used for a varietey of purposes (ex: query authorization hooks)
+type WhereHook struct {
+	Name string
+	Func func(ctx context.Context, db *DB, where []Where) ([]Where, error)
+}
+
+// Valid returns nil if the hook is valid
+func (v WhereHook) Valid() error {
+	if v.Name == "" {
+		return stacktrace.NewError("empty hook name")
+	}
+	if v.Func == nil {
+		return stacktrace.NewError("empty hook function")
+	}
+	return nil
+}
+
+// ReadHook is a hook function triggered on each passing result of a read-based request
+type ReadHook struct {
+	Name string
+	Func func(ctx context.Context, db *DB, document *Document) (*Document, error)
+}
+
+// Valid returns nil if the hook is valid
+func (v ReadHook) Valid() error {
+	if v.Name == "" {
+		return stacktrace.NewError("empty hook name")
+	}
+	if v.Func == nil {
+		return stacktrace.NewError("empty hook function")
+	}
+	return nil
 }

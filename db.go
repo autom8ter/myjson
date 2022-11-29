@@ -13,22 +13,6 @@ import (
 	"time"
 )
 
-// KVConfig configures a key value database from the given provider
-type KVConfig struct {
-	// Provider is the name of the kv provider (badger)
-	Provider string `json:"provider"`
-	// Params are the kv providers params
-	Params map[string]any `json:"params"`
-}
-
-// Config configures a database instance
-type Config struct {
-	// KV is the key value configuration
-	KV KVConfig `json:"kv"`
-	// Collections are the json document collections supported by the DB - At least one is required.
-	Collections []*Collection `json:"collections"`
-}
-
 // DB is an embedded, durable NoSQL database with support for schemas, indexing, and aggregation
 type DB struct {
 	config      Config
@@ -91,8 +75,9 @@ func (d *DB) Create(ctx context.Context, collection string, document *Document) 
 			return "", stacktrace.Propagate(err, "")
 		}
 	}
+	md, _ := GetMetadata(ctx)
 	return collect.GetPrimaryKey(document), stacktrace.Propagate(d.persistStateChange(ctx, collection, StateChange{
-		ctx:        nil,
+		Metadata:   md,
 		Collection: collection,
 		Deletes:    nil,
 		Creates:    []*Document{document},
@@ -119,10 +104,14 @@ func (d *DB) BatchCreate(ctx context.Context, collection string, documents []*Do
 		}
 		ids = append(ids, collect.GetPrimaryKey(document))
 	}
-
+	md, _ := GetMetadata(ctx)
 	if err := d.persistStateChange(ctx, collection, StateChange{
+		Metadata:   md,
 		Collection: collection,
+		Deletes:    nil,
 		Creates:    documents,
+		Sets:       nil,
+		Updates:    nil,
 		Timestamp:  time.Now(),
 	}); err != nil {
 		return nil, stacktrace.Propagate(err, "")
@@ -132,26 +121,37 @@ func (d *DB) BatchCreate(ctx context.Context, collection string, documents []*Do
 
 // Set overwrites a single document. The documents primary key must be set.
 func (d *DB) Set(ctx context.Context, collection string, document *Document) error {
+	md, _ := GetMetadata(ctx)
 	return stacktrace.Propagate(d.persistStateChange(ctx, collection, StateChange{
+		Metadata:   md,
 		Collection: collection,
+		Deletes:    nil,
+		Creates:    nil,
 		Sets:       []*Document{document},
+		Updates:    nil,
 		Timestamp:  time.Now(),
 	}), "")
 }
 
 // BatchSet overwrites 1-many documents. The documents primary key must be set.
 func (d *DB) BatchSet(ctx context.Context, collection string, batch []*Document) error {
-
+	md, _ := GetMetadata(ctx)
 	return stacktrace.Propagate(d.persistStateChange(ctx, collection, StateChange{
+		Metadata:   md,
 		Collection: collection,
+		Deletes:    nil,
+		Creates:    nil,
 		Sets:       batch,
+		Updates:    nil,
 		Timestamp:  time.Now(),
 	}), "")
 }
 
 // Update patches a single document. The documents primary key must be set.
 func (d *DB) Update(ctx context.Context, collection string, id string, update map[string]any) error {
+	md, _ := GetMetadata(ctx)
 	return stacktrace.Propagate(d.persistStateChange(ctx, collection, StateChange{
+		Metadata:   md,
 		Collection: collection,
 		Updates: map[string]map[string]any{
 			id: update,
@@ -162,8 +162,13 @@ func (d *DB) Update(ctx context.Context, collection string, id string, update ma
 
 // BatchUpdate patches a 1-many documents. The documents primary key must be set.
 func (d *DB) BatchUpdate(ctx context.Context, collection string, batch map[string]map[string]any) error {
+	md, _ := GetMetadata(ctx)
 	return stacktrace.Propagate(d.persistStateChange(ctx, collection, StateChange{
+		Metadata:   md,
 		Collection: collection,
+		Deletes:    nil,
+		Creates:    nil,
+		Sets:       nil,
 		Updates:    batch,
 		Timestamp:  time.Now(),
 	}), "")
@@ -171,16 +176,23 @@ func (d *DB) BatchUpdate(ctx context.Context, collection string, batch map[strin
 
 // Delete deletes a single document by id
 func (d *DB) Delete(ctx context.Context, collection string, id string) error {
+	md, _ := GetMetadata(ctx)
 	return stacktrace.Propagate(d.persistStateChange(ctx, collection, StateChange{
+		Metadata:   md,
 		Collection: collection,
 		Deletes:    []string{id},
+		Creates:    nil,
+		Sets:       nil,
+		Updates:    nil,
 		Timestamp:  time.Now(),
 	}), "")
 }
 
 // BatchDelete deletes 1-many documents by id
 func (d *DB) BatchDelete(ctx context.Context, collection string, ids []string) error {
+	md, _ := GetMetadata(ctx)
 	return stacktrace.Propagate(d.persistStateChange(ctx, collection, StateChange{
+		Metadata:   md,
 		Collection: collection,
 		Deletes:    ids,
 		Timestamp:  time.Now(),

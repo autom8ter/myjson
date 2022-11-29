@@ -58,7 +58,7 @@ func TestCollection(t *testing.T) {
 		c := gokvkit.NewCollection("user", "_id", gokvkit.WithWhereHook(gokvkit.WhereHook{
 			Name: "account_id_hook",
 			Func: func(ctx context.Context, db *gokvkit.DB, where []gokvkit.Where) ([]gokvkit.Where, error) {
-				contxt, _ := gokvkit.GetContext(ctx)
+				contxt, _ := gokvkit.GetMetadata(ctx)
 				accID, _ := contxt.Get("account_id")
 				if accID != "" {
 					where = append(where, gokvkit.Where{

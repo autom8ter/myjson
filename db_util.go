@@ -41,7 +41,7 @@ func (d *DB) getDocs(ctx context.Context) ([]*Collection, error) {
 }
 
 func (d *DB) setCollections(ctx context.Context, collections []*Collection) error {
-	meta, _ := GetContext(ctx)
+	meta, _ := GetMetadata(ctx)
 	meta.Set("_internal", true)
 	ctx = meta.ToContext(ctx)
 	for _, c := range collections {
@@ -83,7 +83,7 @@ func (d *DB) addIndex(ctx context.Context, c *Collection, index Index) error {
 	c.indexes[index.Name] = index
 	d.collections.Store(c.name, c)
 	batch := d.kv.Batch()
-	meta, _ := GetContext(ctx)
+	meta, _ := GetMetadata(ctx)
 	meta.Set("_internal", true)
 	_, err := d.Scan(meta.ToContext(ctx), Scan{
 		From:  c.name,

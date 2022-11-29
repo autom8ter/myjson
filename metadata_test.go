@@ -11,10 +11,10 @@ import (
 
 func TestContext(t *testing.T) {
 	ctx := context.Background()
-	c, ok := gokvkit.GetContext(ctx)
+	c, ok := gokvkit.GetMetadata(ctx)
 	assert.False(t, ok)
 	assert.NotNil(t, c)
-	c = gokvkit.NewContext(map[string]any{
+	c = gokvkit.NewMetadata(map[string]any{
 		"testing": true,
 	})
 	v, ok := c.Get("testing")
@@ -38,7 +38,7 @@ func TestContext(t *testing.T) {
 	assert.Nil(t, v)
 
 	ctx = c.ToContext(ctx)
-	c, ok = gokvkit.GetContext(ctx)
+	c, ok = gokvkit.GetMetadata(ctx)
 	assert.True(t, ok)
 	assert.NotNil(t, c)
 

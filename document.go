@@ -378,18 +378,6 @@ func (d Documents) OrderBy(orderBys []OrderBy) Documents {
 	return d
 }
 
-func sortDesc(field string, d Documents) {
-	sort.Slice(d, func(i, j int) bool {
-		return compareField(field, d[i], d[j])
-	})
-}
-
-func sortAsc(field string, d Documents) {
-	sort.Slice(d, func(i, j int) bool {
-		return !compareField(field, d[i], d[j])
-	})
-}
-
 // Aggregate reduces the documents with the input aggregates
 func (d Documents) Aggregate(ctx context.Context, aggregates []SelectField) (*Document, error) {
 	var (
