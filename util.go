@@ -1,9 +1,11 @@
 package gokvkit
 
 import (
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"github.com/mitchellh/mapstructure"
+	"github.com/spf13/cast"
 )
 
 func compareField(field string, i, j *Document) bool {
@@ -49,4 +51,26 @@ func defaultAs(function Function, field string) string {
 		return fmt.Sprintf("%s_%s", function, field)
 	}
 	return field
+}
+
+func encodeIndexValue(value any) []byte {
+	if value == nil {
+		return []byte("")
+	}
+	switch value := value.(type) {
+	case bool:
+		return encodeIndexValue(cast.ToString(value))
+	case string:
+		return []byte(value)
+	case int, int64, int32, float64, float32, uint64, uint32, uint16:
+		buf := make([]byte, 8)
+		binary.BigEndian.PutUint64(buf, cast.ToUint64(value))
+		return buf
+	default:
+		bits, _ := json.Marshal(value)
+		if len(bits) == 0 {
+			bits = []byte(cast.ToString(value))
+		}
+		return bits
+	}
 }

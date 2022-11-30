@@ -437,8 +437,9 @@ func TestAggregate(t *testing.T) {
 				u := testutil.NewUserDoc()
 				ageSum[u.GetString("account_id")] += u.GetFloat("age")
 				usrs = append(usrs, u)
+				assert.Nil(t, db.Set(ctx, "user", u))
 			}
-			assert.Nil(t, db.BatchSet(ctx, "user", usrs))
+
 			query := gokvkit.Query{
 				From:    "user",
 				GroupBy: []string{"account_id"},

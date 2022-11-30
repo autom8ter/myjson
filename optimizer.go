@@ -17,7 +17,6 @@ func (o defaultOptimizer) Optimize(indexes map[string]Index, where []Where) (Opt
 	if len(indexes) == 0 {
 		return OptimizerResult{}, stacktrace.NewErrorWithCode(ErrTODO, "zero configured indexes")
 	}
-
 	values := indexableFields(where)
 	var (
 		i = OptimizerResult{

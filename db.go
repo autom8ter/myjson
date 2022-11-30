@@ -3,6 +3,7 @@ package gokvkit
 import (
 	"context"
 	_ "embed"
+	"github.com/autom8ter/gokvkit/internal/safe"
 	"github.com/autom8ter/gokvkit/kv"
 	"github.com/autom8ter/gokvkit/kv/registry"
 	"github.com/autom8ter/machine/v4"
@@ -15,12 +16,16 @@ import (
 
 // DB is an embedded, durable NoSQL database with support for schemas, indexing, and aggregation
 type DB struct {
-	config      Config
+	sync.RWMutex
+	config      KVConfig
 	kv          kv.DB
 	machine     machine.Machine
-	collections sync.Map
-	isBuilding  sync.Map
+	collections *safe.Map[CollectionConfig]
 	optimizer   Optimizer
+	validators  *safe.Map[[]ValidatorHook]
+	sideEffects *safe.Map[[]SideEffectHook]
+	whereHooks  *safe.Map[[]WhereHook]
+	readHooks   *safe.Map[[]ReadHook]
 }
 
 /*
@@ -35,8 +40,8 @@ func OpenKV(cfg KVConfig) (kv.DB, error) {
 }
 
 // New creates a new database instance from the given config
-func New(ctx context.Context, cfg Config) (*DB, error) {
-	db, err := OpenKV(cfg.KV)
+func New(ctx context.Context, cfg KVConfig, opts ...DBOpt) (*DB, error) {
+	db, err := OpenKV(cfg)
 	if err != nil {
 		return nil, stacktrace.PropagateWithCode(err, ErrTODO, "failed to open kv database")
 	}
@@ -44,39 +49,93 @@ func New(ctx context.Context, cfg Config) (*DB, error) {
 		config:      cfg,
 		kv:          db,
 		machine:     machine.New(),
-		collections: sync.Map{},
-		isBuilding:  sync.Map{},
+		collections: safe.NewMap(map[string]CollectionConfig{}),
 		optimizer:   defaultOptimizer{},
+		validators:  safe.NewMap(map[string][]ValidatorHook{}),
+		sideEffects: safe.NewMap(map[string][]SideEffectHook{}),
+		whereHooks:  safe.NewMap(map[string][]WhereHook{}),
+		readHooks:   safe.NewMap(map[string][]ReadHook{}),
 	}
-	if err := d.setCollections(ctx, cfg.Collections); err != nil {
-		return nil, stacktrace.Propagate(err, "")
+	coll, err := d.getPersistedCollections()
+	if err != nil {
+		return nil, stacktrace.PropagateWithCode(err, ErrTODO, "failed to get existing collections")
+	}
+	d.collections = coll
+	for _, o := range opts {
+		o(d)
 	}
 	return d, nil
 }
 
-func (d *DB) Get(ctx context.Context, collection string, id string) (*Document, error) {
-	collect, ok := d.coll(collection)
-	if !ok {
-		return nil, stacktrace.NewError("unsupported collection: %s", collection)
+// Get gets a single document by id
+func (d *DB) Get(ctx context.Context, collection, id string) (*Document, error) {
+	var (
+		document *Document
+		err      error
+	)
+	primaryIndex := d.primaryIndex(collection)
+	if err := d.kv.Tx(false, func(txn kv.Tx) error {
+		val, err := txn.Get(primaryIndex.Seek(map[string]any{
+			d.primaryKey(collection): id,
+		}).SetDocumentID(id).Path())
+		if err != nil {
+			return stacktrace.Propagate(err, "")
+		}
+		document, err = NewDocumentFromBytes(val)
+		if err != nil {
+			return stacktrace.Propagate(err, "")
+		}
+		return nil
+	}); err != nil {
+		return document, stacktrace.Propagate(err, "")
 	}
-	return d.getDoc(ctx, collect, id)
+	document, err = d.applyReadHooks(ctx, collection, document)
+	if err != nil {
+		return document, stacktrace.Propagate(err, "")
+	}
+	return document, nil
+}
+
+// Get gets 1-many document by id(s)
+func (d *DB) BatchGet(ctx context.Context, collection string, ids []string) (Documents, error) {
+	var documents []*Document
+	primaryIndex := d.primaryIndex(collection)
+	if err := d.kv.Tx(false, func(txn kv.Tx) error {
+		for _, id := range ids {
+			value, err := txn.Get(primaryIndex.Seek(map[string]any{
+				d.primaryKey(collection): id,
+			}).SetDocumentID(id).Path())
+			if err != nil {
+				return stacktrace.Propagate(err, "")
+			}
+
+			document, err := NewDocumentFromBytes(value)
+			if err != nil {
+				return stacktrace.Propagate(err, "")
+			}
+			documents = append(documents, document)
+		}
+		return nil
+	}); err != nil {
+		return documents, err
+	}
+	return documents, nil
 }
 
 // Create creates a new document - if the documents primary key is unset, it will be set as a sortable unique id
 func (d *DB) Create(ctx context.Context, collection string, document *Document) (string, error) {
-	collect, ok := d.coll(collection)
-	if !ok {
+	if !d.hasCollection(collection) {
 		return "", stacktrace.NewError("unsupported collection: %s", collection)
 	}
-	if collect.GetPrimaryKey(document) == "" {
+	if d.getPrimaryKey(collection, document) == "" {
 		id := ksuid.New().String()
-		err := collect.SetPrimaryKey(document, id)
+		err := d.setPrimaryKey(collection, document, id)
 		if err != nil {
 			return "", stacktrace.Propagate(err, "")
 		}
 	}
 	md, _ := GetMetadata(ctx)
-	return collect.GetPrimaryKey(document), stacktrace.Propagate(d.persistStateChange(ctx, collection, StateChange{
+	return d.getPrimaryKey(collection, document), stacktrace.Propagate(d.persistStateChange(ctx, collection, StateChange{
 		Metadata:   md,
 		Collection: collection,
 		Deletes:    nil,
@@ -89,20 +148,20 @@ func (d *DB) Create(ctx context.Context, collection string, document *Document) 
 
 // BatchCreate creates 1-many documents. If each documents primary key is unset, it will be set as a sortable unique id.
 func (d *DB) BatchCreate(ctx context.Context, collection string, documents []*Document) ([]string, error) {
-	collect, ok := d.coll(collection)
-	if !ok {
+
+	if !d.hasCollection(collection) {
 		return nil, stacktrace.NewError("unsupported collection: %s", collection)
 	}
 	var ids []string
 	for _, document := range documents {
-		if collect.GetPrimaryKey(document) == "" {
+		if d.getPrimaryKey(collection, document) == "" {
 			id := ksuid.New().String()
-			err := collect.SetPrimaryKey(document, id)
+			err := d.setPrimaryKey(collection, document, id)
 			if err != nil {
 				return nil, stacktrace.Propagate(err, "")
 			}
 		}
-		ids = append(ids, collect.GetPrimaryKey(document))
+		ids = append(ids, d.getPrimaryKey(collection, document))
 	}
 	md, _ := GetMetadata(ctx)
 	if err := d.persistStateChange(ctx, collection, StateChange{
@@ -216,8 +275,8 @@ func (d *DB) QueryUpdate(ctx context.Context, update map[string]any, query Query
 
 // QueryDelete deletes the documents returned from the query
 func (d *DB) QueryDelete(ctx context.Context, query Query) error {
-	collect, ok := d.coll(query.From)
-	if !ok {
+
+	if !d.hasCollection(query.From) {
 		return stacktrace.NewError("unsupported collection: %s", query.From)
 	}
 	results, err := d.Query(ctx, query)
@@ -226,22 +285,21 @@ func (d *DB) QueryDelete(ctx context.Context, query Query) error {
 	}
 	var ids []string
 	for _, document := range results.Documents {
-		ids = append(ids, collect.GetPrimaryKey(document))
+		ids = append(ids, d.getPrimaryKey(query.From, document))
 	}
 	return stacktrace.Propagate(d.BatchDelete(ctx, query.From, ids), "")
 }
 
 // aggregate performs aggregations against the collection
 func (d *DB) aggregate(ctx context.Context, query Query) (Page, error) {
-	coll, ok := d.coll(query.From)
-	if !ok {
+	if !d.hasCollection(query.From) {
 		return Page{}, stacktrace.NewError("unsupported collection: %s", query.From)
 	}
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	now := time.Now()
 	var results Documents
-	match, err := d.queryScan(ctx, coll, Scan{
+	match, err := d.queryScan(ctx, Scan{
 		From:  query.From,
 		Where: query.Where,
 	}, func(d *Document) (bool, error) {
@@ -292,13 +350,13 @@ func (d *DB) Query(ctx context.Context, query Query) (Page, error) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	now := time.Now()
-	coll, ok := d.coll(query.From)
-	if !ok {
+
+	if !d.hasCollection(query.From) {
 		return Page{}, stacktrace.NewError("unsupported collection: %s", query.From)
 	}
 	var results Documents
 	fullScan := true
-	match, err := d.queryScan(ctx, coll, Scan{
+	match, err := d.queryScan(ctx, Scan{
 		From:  query.From,
 		Where: query.Where,
 	}, func(d *Document) (bool, error) {
@@ -344,11 +402,10 @@ func (d *DB) Query(ctx context.Context, query Query) (Page, error) {
 // results will not be ordered unless an index supporting the order by(s) was found by the optimizer
 // Query should be used when order is more important than performance/resource-usage
 func (d *DB) Scan(ctx context.Context, scan Scan, handlerFunc ScanFunc) (OptimizerResult, error) {
-	coll, ok := d.coll(scan.From)
-	if !ok {
+	if !d.hasCollection(scan.From) {
 		return OptimizerResult{}, stacktrace.NewError("unsupported collection: %s", scan.From)
 	}
-	return d.queryScan(ctx, coll, scan, handlerFunc)
+	return d.queryScan(ctx, scan, handlerFunc)
 }
 
 // Close closes the database

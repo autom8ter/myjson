@@ -7,6 +7,12 @@ import (
 	"time"
 )
 
+// CollectionConfig holds configuration parameters for setting a collection(s) runtime configuration
+type CollectionConfig struct {
+	Name    string           `json:"name"`
+	Indexes map[string]Index `json:"indexes"`
+}
+
 // KVConfig configures a key value database from the given provider
 type KVConfig struct {
 	// Provider is the name of the kv provider (badger)
@@ -19,8 +25,6 @@ type KVConfig struct {
 type Config struct {
 	// KV is the key value configuration
 	KV KVConfig `json:"kv"`
-	// Collections are the json document collections supported by the DB - At least one is required.
-	Collections []*Collection `json:"collections"`
 }
 
 // SelectField selects a field to return in a queries result set
@@ -271,10 +275,11 @@ type StateChange struct {
 // Note: the after value is what's persisted to the database, the before value is what was in the database prior to the change.
 // After will be always null on delete
 type DocChange struct {
-	Action Action    `json:"action"`
-	DocID  string    `json:"docID"`
-	Before *Document `json:"before"`
-	After  *Document `json:"after"`
+	Collection string    `json:"collection"`
+	Action     Action    `json:"action"`
+	DocID      string    `json:"docID"`
+	Before     *Document `json:"before"`
+	After      *Document `json:"after"`
 }
 
 // Function is a function that is applied against a document field

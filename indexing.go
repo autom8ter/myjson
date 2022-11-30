@@ -2,10 +2,14 @@ package gokvkit
 
 import (
 	"bytes"
-	"encoding/binary"
+	"context"
 	"encoding/json"
+	"fmt"
+	"github.com/autom8ter/gokvkit/internal/safe"
+	"github.com/autom8ter/gokvkit/kv"
 	"github.com/nqd/flat"
-	"github.com/spf13/cast"
+	"github.com/palantir/stacktrace"
+	"reflect"
 )
 
 // Index is a database index used to optimize queries against a collection
@@ -20,6 +24,8 @@ type Index struct {
 	Unique bool `json:"unique"`
 	// Unique indicates that it's a primary index
 	Primary bool `json:"primary"`
+	// IsBuilding indicates that the index is currently building
+	IsBuilding bool `json:"isBuilding"`
 }
 
 // Prefix is a reference to a prefix within an index
@@ -109,24 +115,170 @@ func (i indexPathPrefix) Fields() []FieldValue {
 	return i.fieldMap
 }
 
-func encodeIndexValue(value any) []byte {
-	if value == nil {
-		return []byte("")
-	}
-	switch value := value.(type) {
-	case bool:
-		return encodeIndexValue(cast.ToString(value))
-	case string:
-		return []byte(value)
-	case int, int64, int32, float64, float32, uint64, uint32, uint16:
-		buf := make([]byte, 8)
-		binary.BigEndian.PutUint64(buf, cast.ToUint64(value))
-		return buf
-	default:
-		bits, _ := json.Marshal(value)
-		if len(bits) == 0 {
-			bits = []byte(cast.ToString(value))
+type indexDiff struct {
+	toRemove []Index
+	toAdd    []Index
+	toUpdate []Index
+}
+
+func getIndexDiff(after, before map[string]Index) (indexDiff, error) {
+	var (
+		toRemove []Index
+		toAdd    []Index
+		toUpdate []Index
+	)
+	for _, index := range after {
+		if _, ok := before[index.Name]; !ok {
+			toAdd = append(toAdd, index)
 		}
-		return bits
 	}
+
+	for _, current := range before {
+		if _, ok := after[current.Name]; !ok {
+			toRemove = append(toRemove, current)
+		} else {
+			if !reflect.DeepEqual(current.Fields, current.Fields) {
+				toUpdate = append(toUpdate, current)
+			}
+		}
+	}
+	return indexDiff{
+		toRemove: toRemove,
+		toAdd:    toAdd,
+		toUpdate: toUpdate,
+	}, nil
+}
+
+func (d *DB) addIndex(ctx context.Context, collection string, index Index) error {
+	if index.Name == "" {
+		return stacktrace.NewError("%s - empty index name", collection)
+	}
+	if index.Collection == "" {
+		index.Collection = collection
+	}
+	index.IsBuilding = true
+	d.collections.SetFunc(collection, func(c CollectionConfig) CollectionConfig {
+		c.Indexes[index.Name] = index
+		return c
+	})
+	batch := d.kv.Batch()
+	meta, _ := GetMetadata(ctx)
+	meta.Set("_internal", true)
+	if !index.Primary {
+		_, err := d.Scan(meta.ToContext(ctx), Scan{
+			From:  collection,
+			Where: nil,
+		}, func(doc *Document) (bool, error) {
+			if err := d.indexDocument(ctx, batch, &DocChange{
+				Collection: collection,
+				Action:     Set,
+				DocID:      doc.GetString(d.primaryKey(collection)),
+				After:      doc,
+			}); err != nil {
+				return false, stacktrace.Propagate(err, "")
+			}
+			return true, nil
+		})
+		if err != nil {
+			return stacktrace.Propagate(err, "%s - %s", collection, index.Name)
+		}
+	}
+	index.IsBuilding = false
+	d.collections.SetFunc(collection, func(c CollectionConfig) CollectionConfig {
+		c.Indexes[index.Name] = index
+		return c
+	})
+	return nil
+}
+
+func (d *DB) removeIndex(ctx context.Context, collection string, index Index) error {
+	d.collections.SetFunc(collection, func(c CollectionConfig) CollectionConfig {
+		delete(c.Indexes, index.Name)
+		return c
+	})
+	batch := d.kv.Batch()
+	_, err := d.queryScan(ctx, Scan{
+		From: collection,
+	}, func(doc *Document) (bool, error) {
+		if err := d.updateSecondaryIndex(ctx, batch, index, &DocChange{
+			Collection: collection,
+			Action:     Delete,
+			DocID:      doc.GetString(d.primaryKey(collection)),
+			Before:     doc,
+		}); err != nil {
+			return false, stacktrace.Propagate(err, "")
+		}
+		return true, nil
+	})
+	if err != nil {
+		return stacktrace.Propagate(err, "")
+	}
+	return nil
+}
+
+func (d *DB) persistIndexes(collection string) error {
+	val := d.collections.Get(collection)
+	bits, err := json.Marshal(&val)
+	if err != nil {
+		return stacktrace.Propagate(err, "")
+	}
+	if err := d.kv.Tx(true, func(tx kv.Tx) error {
+		err := tx.Set([]byte(fmt.Sprintf("internal.indexing.%s", collection)), bits)
+		if err != nil {
+			return stacktrace.Propagate(err, "")
+		}
+		return nil
+	}); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (d *DB) getPersistedCollections() (*safe.Map[CollectionConfig], error) {
+	var (
+		collections = safe.NewMap(map[string]CollectionConfig{})
+	)
+	if err := d.kv.Tx(false, func(tx kv.Tx) error {
+		i := tx.NewIterator(kv.IterOpts{
+			Prefix: []byte("internal.indexing."),
+		})
+		defer i.Close()
+		for i.Valid() {
+			item := i.Item()
+			var cfg CollectionConfig
+			bits, err := item.Value()
+			if err != nil {
+				return stacktrace.Propagate(err, "")
+			}
+			err = json.Unmarshal(bits, &cfg)
+			if err != nil {
+				return stacktrace.Propagate(err, "")
+			}
+			collections.Set(cfg.Name, cfg)
+			i.Next()
+		}
+		return nil
+	}); err != nil {
+		return nil, stacktrace.Propagate(err, "")
+	}
+	return collections, nil
+}
+
+func (d *DB) getPersistedCollection(collection string) (CollectionConfig, error) {
+	var cfg CollectionConfig
+	if err := d.kv.Tx(false, func(tx kv.Tx) error {
+		bits, err := tx.Get([]byte(fmt.Sprintf("internal.indexing.%s", collection)))
+		if err != nil {
+			return stacktrace.Propagate(err, "")
+		}
+		err = json.Unmarshal(bits, &cfg)
+		if err != nil {
+			return stacktrace.Propagate(err, "")
+		}
+		return nil
+	}); err != nil {
+		return cfg, stacktrace.Propagate(err, "")
+	}
+	return cfg, nil
 }

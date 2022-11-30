@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/autom8ter/gokvkit"
+	"github.com/palantir/stacktrace"
 	"io/ioutil"
 	"os"
 	"time"
@@ -19,41 +20,57 @@ var (
 	TaskSchema string
 	//go:embed testdata/user.json
 	UserSchema     string
-	TaskCollection = gokvkit.NewCollection("task", "_id",
-		gokvkit.WithIndex(gokvkit.Index{
-			Collection: "task",
-			Name:       "task_user_idx",
-			Fields:     []string{"user"},
-			Unique:     false,
-			Primary:    false,
-		}),
-		gokvkit.WithValidatorHooks(gokvkit.MustJSONSchema([]byte(TaskSchema))),
-	)
-	UserCollection = gokvkit.NewCollection("user", "_id",
-		gokvkit.WithIndex(gokvkit.Index{
-			Collection: "user",
-			Name:       "user_lanaguage_idx",
-			Fields:     []string{"language"},
-			Unique:     false,
-			Primary:    false,
-		}),
-		gokvkit.WithIndex(gokvkit.Index{
-			Collection: "user",
-			Name:       "user_email_idx",
-			Fields:     []string{"contact.email"},
-			Unique:     true,
-			Primary:    false,
-		}),
-		gokvkit.WithIndex(gokvkit.Index{
-			Collection: "user",
-			Name:       "user_account_idx",
-			Fields:     []string{"account_id"},
-			Unique:     false,
-			Primary:    false,
-		}),
-		gokvkit.WithValidatorHooks(gokvkit.MustJSONSchema([]byte(UserSchema))),
-	)
-	AllCollections = []*gokvkit.Collection{UserCollection, TaskCollection}
+	TaskCollection = gokvkit.CollectionConfig{
+		Name: "task",
+		Indexes: map[string]gokvkit.Index{
+			"primary": {
+				Collection: "task",
+				Name:       "primary",
+				Fields:     []string{"_id"},
+				Primary:    true,
+			},
+			"user": {
+				Collection: "task",
+				Name:       "task_user_idx",
+				Fields:     []string{"user"},
+				Unique:     false,
+				Primary:    false,
+			},
+		},
+	}
+	UserCollection = gokvkit.CollectionConfig{
+		Name: "user",
+		Indexes: map[string]gokvkit.Index{
+			"primary_idx": {
+				Collection: "user",
+				Name:       "primary_idx",
+				Fields:     []string{"_id"},
+				Primary:    true,
+			},
+			"user_lanaguage_idx": {
+				Collection: "user",
+				Name:       "user_lanaguage_idx",
+				Fields:     []string{"language"},
+				Unique:     false,
+				Primary:    false,
+			},
+			"user_email_idx": {
+				Collection: "user",
+				Name:       "user_email_idx",
+				Fields:     []string{"contact.email"},
+				Unique:     true,
+				Primary:    false,
+			},
+			"user_account_idx": {
+				Collection: "user",
+				Name:       "user_account_idx",
+				Fields:     []string{"account_id"},
+				Unique:     false,
+				Primary:    false,
+			},
+		},
+	}
+	AllCollections = []gokvkit.CollectionConfig{UserCollection, TaskCollection}
 )
 
 func NewUserDoc() *gokvkit.Document {
@@ -90,10 +107,8 @@ func NewTaskDoc(usrID string) *gokvkit.Document {
 	return doc
 }
 
-func TestDB(fn func(ctx context.Context, db *gokvkit.DB), collections ...*gokvkit.Collection) error {
-	if len(collections) == 0 {
-		collections = append(collections, AllCollections...)
-	}
+func TestDB(fn func(ctx context.Context, db *gokvkit.DB), collections ...gokvkit.CollectionConfig) error {
+	collections = append(collections, AllCollections...)
 	os.MkdirAll("tmp", 0700)
 	dir, err := ioutil.TempDir("./tmp", "")
 	if err != nil {
@@ -102,17 +117,28 @@ func TestDB(fn func(ctx context.Context, db *gokvkit.DB), collections ...*gokvki
 	defer os.RemoveAll(dir)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	db, err := gokvkit.New(ctx, gokvkit.Config{
-		KV: gokvkit.KVConfig{
-			Provider: "badger",
-			Params: map[string]any{
-				"storage_path": dir,
-			},
+	db, err := gokvkit.New(ctx, gokvkit.KVConfig{
+		Provider: "badger",
+		Params: map[string]any{
+			"storage_path": dir,
 		},
-		Collections: collections,
-	})
+	},
+		gokvkit.WithValidatorHooks(map[string][]gokvkit.ValidatorHook{
+			"user": {
+				gokvkit.MustJSONSchema([]byte(UserSchema)),
+			},
+			"task": {
+				gokvkit.MustJSONSchema([]byte(TaskSchema)),
+			},
+		}),
+	)
 	if err != nil {
 		return err
+	}
+	for _, c := range collections {
+		if err := db.ConfigureCollection(ctx, c); err != nil {
+			return stacktrace.Propagate(err, "")
+		}
 	}
 	time.Sleep(1 * time.Second)
 	defer db.Close(ctx)

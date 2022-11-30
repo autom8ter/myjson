@@ -4,241 +4,141 @@ import (
 	"context"
 	"github.com/palantir/stacktrace"
 	"github.com/spf13/cast"
-	"reflect"
 )
 
-// Collection is database collection containing 1-many documents of the same type
-type Collection struct {
-	name        string
-	primaryKey  string
-	indexes     map[string]Index
-	validators  []ValidatorHook
-	sideEffects []SideEffectHook
-	whereHooks  []WhereHook
-	readHooks   []ReadHook
-}
+// ConfigureCollection overwrites a single database collection configuration
+func (d *DB) ConfigureCollection(ctx context.Context, collection CollectionConfig) error {
+	meta, _ := GetMetadata(ctx)
+	meta.Set("_internal", true)
+	ctx = meta.ToContext(ctx)
+	if collection.Name == "" {
+		return stacktrace.NewError("a collection name is required")
+	}
+	if collection.Indexes == nil && len(collection.Indexes) < 1 {
+		return stacktrace.NewError("%s: at least one collection is required", collection.Name)
+	}
+	var (
+		hasPrimary  = 0
+		primary     Index
+		primaryName string
+	)
+	for name, v := range collection.Indexes {
+		v.Collection = collection.Name
+		v.Name = name
+		if v.Primary {
+			primary = v
+			primaryName = name
+			hasPrimary++
+		}
+		if name == "" {
+			return stacktrace.NewError("%s: empty index name", collection.Name)
+		}
+		collection.Indexes[name] = v
+	}
+	if hasPrimary > 1 {
+		return stacktrace.NewError("%s: only a single primary index is supported", collection.Name)
+	}
+	existing, _ := d.getPersistedCollection(collection.Name)
 
-// CollectionOpt is an option for configuring a collection
-type CollectionOpt func(c *Collection)
+	if existing.Name == "" {
+		existing.Name = collection.Name
+		existing.Indexes = map[string]Index{}
+	}
 
-// WithIndex adds 1-many indexes to the collection configuration
-func WithIndex(indexes ...Index) CollectionOpt {
-	return func(c *Collection) {
-		for _, i := range indexes {
-			c.indexes[i.Name] = i
+	var (
+		existingHasPrimary = 0
+	)
+
+	for _, v := range existing.Indexes {
+		if v.Primary {
+			existingHasPrimary++
 		}
 	}
-}
-
-// WithValidatorHook adds  document validator(s) to the collection (see JSONSchema for an example)
-func WithValidatorHooks(validators ...ValidatorHook) CollectionOpt {
-	return func(c *Collection) {
-		c.validators = append(c.validators, validators...)
-	}
-}
-
-// WithReadHooks adds document read hook(s) to the collection (see JSONSchema for an example)
-func WithReadHooks(readHooks ...ReadHook) CollectionOpt {
-	return func(c *Collection) {
-		c.readHooks = append(c.readHooks, readHooks...)
-	}
-}
-
-// WithSideEffectBeforeHook adds a side effect to the collections configuration that executes on changes as documents are persisted
-func WithSideEffects(sideEffects ...SideEffectHook) CollectionOpt {
-	return func(c *Collection) {
-		c.sideEffects = append(c.sideEffects, sideEffects...)
-	}
-}
-
-// WithWhereHook adds a wherre effect to the collections configuration that executes on on where clauses before queries are executed.
-func WithWhereHook(whereHook ...WhereHook) CollectionOpt {
-	return func(c *Collection) {
-		c.whereHooks = append(c.whereHooks, whereHook...)
-	}
-}
-
-// NewCollection creates a new collection from the given options. If indexing.PrimaryKey is empty, it will default to _id.
-func NewCollection(name string, primaryKey string, opts ...CollectionOpt) *Collection {
-	c := &Collection{
-		name:       name,
-		primaryKey: primaryKey,
-		indexes:    map[string]Index{},
-	}
-	for _, o := range opts {
-		o(c)
-	}
-	hasPrimary := false
-	for _, i := range c.indexes {
-		if i.Collection == "" {
-			i.Collection = c.name
-		}
-		if i.Primary {
-			hasPrimary = true
+	switch {
+	case existingHasPrimary > 1:
+		return stacktrace.NewError("%s: only a single primary index is supported", collection.Name)
+	case hasPrimary == 0 && existingHasPrimary == 0:
+		return stacktrace.NewError("%s: a primary index is required", collection.Name)
+	case existingHasPrimary == 0 && hasPrimary == 1:
+		existing.Indexes[primaryName] = primary
+		d.collections.Set(collection.Name, existing)
+		if err := d.persistIndexes(collection.Name); err != nil {
+			return stacktrace.Propagate(err, "")
 		}
 	}
-	if !hasPrimary {
-		c.indexes["primary_key_idx"] = Index{
-			Collection: c.name,
-			Name:       "primary_key_idx",
-			Fields:     []string{primaryKey},
-			Unique:     true,
-			Primary:    true,
+
+	diff, err := getIndexDiff(collection.Indexes, existing.Indexes)
+	if err != nil {
+		return stacktrace.Propagate(err, "")
+	}
+	for _, update := range diff.toUpdate {
+		if err := d.removeIndex(ctx, collection.Name, update); err != nil {
+			return stacktrace.Propagate(err, "")
+		}
+		if err := d.addIndex(ctx, collection.Name, update); err != nil {
+			return stacktrace.Propagate(err, "")
 		}
 	}
-	return c
+	for _, toDelete := range diff.toRemove {
+		if err := d.removeIndex(ctx, collection.Name, toDelete); err != nil {
+			return stacktrace.Propagate(err, "")
+		}
+	}
+	for _, toAdd := range diff.toAdd {
+		if err := d.addIndex(ctx, collection.Name, toAdd); err != nil {
+			return stacktrace.Propagate(err, "")
+		}
+	}
+	if err := d.persistIndexes(collection.Name); err != nil {
+		return stacktrace.Propagate(err, "")
+	}
+	return nil
 }
 
-// Name returns the collections name
-func (c *Collection) Name() string {
-	return c.name
+// Indexes returns a list of indexes that are registered in the collection
+func (d *DB) Indexes(collection string) map[string]Index {
+	return d.collections.Get(collection).Indexes
+}
+
+// Collections returns a list of collection names that are registered in the collection
+func (d *DB) Collections() []string {
+	var names []string
+	d.collections.RangeR(func(key string, c CollectionConfig) bool {
+		names = append(names, c.Name)
+		return true
+	})
+	return names
 }
 
 // PrimaryKey returns the collections primary key
-func (c *Collection) PrimaryKey() string {
-	return c.primaryKey
+func (d *DB) primaryKey(collection string) string {
+	fields := d.primaryIndex(collection).Fields
+	return fields[0]
 }
 
-// Indexes returns the collections configured indexes
-func (c *Collection) Indexes() []Index {
-	var indexes []Index
-	for _, i := range c.indexes {
-		indexes = append(indexes, i)
-	}
-	return indexes
+func (d *DB) hasCollection(collection string) bool {
+	return d.collections.Exists(collection)
 }
 
-func (c *Collection) applyWhereHooks(ctx context.Context, db *DB, where []Where) ([]Where, error) {
-	var err error
-	for _, whereHook := range c.whereHooks {
-		where, err = whereHook.Func(ctx, db, where)
-		if err != nil {
-			return nil, stacktrace.Propagate(err, "")
-		}
-	}
-	return where, nil
-}
-
-func (c *Collection) applyReadHooks(ctx context.Context, db *DB, doc *Document) (*Document, error) {
-	var err error
-	for _, readHook := range c.readHooks {
-		doc, err = readHook.Func(ctx, db, doc)
-		if err != nil {
-			return nil, stacktrace.Propagate(err, "")
-		}
-	}
-	return doc, nil
-}
-func (c *Collection) applySideEffectHooks(ctx context.Context, db *DB, change *DocChange) (*DocChange, error) {
-	var err error
-	for _, sideEffect := range c.sideEffects {
-		change, err = sideEffect.Func(ctx, db, change)
-		if err != nil {
-			return nil, stacktrace.Propagate(err, "")
-		}
-	}
-	return change, nil
-}
-
-func (c *Collection) applyValidationHooks(ctx context.Context, db *DB, d *DocChange) error {
-	if len(c.validators) == 0 {
-		return nil
-	}
-	for _, validator := range c.validators {
-		if err := validator.Func(ctx, db, d); err != nil {
-			return stacktrace.Propagate(err, "")
-		}
-	}
-	return nil
-}
-
-// SetPrimaryKey sets the documents primary key
-func (c *Collection) SetPrimaryKey(d *Document, id string) error {
-	return stacktrace.Propagate(d.Set(c.PrimaryKey(), id), "failed to set primary key")
-}
-
-// GetPrimaryKey gets the documents primary key(if it exists)
-func (c *Collection) GetPrimaryKey(d *Document) string {
+func (d *DB) getPrimaryKey(collection string, doc *Document) string {
 	if d == nil {
 		return ""
 	}
-	return cast.ToString(d.Get(c.PrimaryKey()))
+	pkey := d.primaryKey(collection)
+	return cast.ToString(doc.GetString(pkey))
 }
 
-// ReadHooks returns the collections registered read hooks which execute on each document returned from a query
-func (c *Collection) ReadHooks() []ReadHook {
-	return c.readHooks
+func (d *DB) setPrimaryKey(collection string, doc *Document, id string) error {
+	pkey := d.primaryKey(collection)
+	return stacktrace.Propagate(doc.Set(pkey, id), "failed to set primary key")
 }
 
-// WhereHooks returns the collections registered where hooks which execute on all queries
-func (c *Collection) WhereHooks() []WhereHook {
-	return c.whereHooks
-}
-
-// SideEffectHooks returns the collections registered side effect hooks which execute on all state changes
-func (c *Collection) SideEffectHooks() []SideEffectHook {
-	return c.sideEffects
-}
-
-type indexDiff struct {
-	toRemove []Index
-	toAdd    []Index
-	toUpdate []Index
-}
-
-func getIndexDiff(this, that map[string]Index) (indexDiff, error) {
-	var (
-		toRemove []Index
-		toAdd    []Index
-		toUpdate []Index
-	)
-	for _, index := range that {
-		if i, ok := this[index.Name]; !ok {
-			toAdd = append(toAdd, i)
+func (d *DB) primaryIndex(collection string) Index {
+	indexes := d.collections.Get(collection).Indexes
+	for _, index := range indexes {
+		if index.Primary {
+			return index
 		}
 	}
-
-	for _, current := range this {
-		if i, ok := that[current.Name]; !ok {
-			toRemove = append(toRemove, i)
-		} else {
-			if !reflect.DeepEqual(i.Fields, current.Fields) {
-				toUpdate = append(toUpdate, i)
-			}
-		}
-	}
-	return indexDiff{
-		toRemove: toRemove,
-		toAdd:    toAdd,
-		toUpdate: toUpdate,
-	}, nil
-}
-
-// Validate validates the collection's configuration
-func (c *Collection) Validate() error {
-	if c.name == "" {
-		return stacktrace.NewError("collection: empty name")
-	}
-	for _, h := range c.readHooks {
-		if err := h.Valid(); err != nil {
-			return stacktrace.Propagate(err, "")
-		}
-	}
-	for _, h := range c.sideEffects {
-		if err := h.Valid(); err != nil {
-			return stacktrace.Propagate(err, "")
-		}
-	}
-	for _, h := range c.readHooks {
-		if err := h.Valid(); err != nil {
-			return stacktrace.Propagate(err, "")
-		}
-	}
-	if c.primaryKey == "" {
-		return stacktrace.NewError("collection: empty primary key")
-	}
-	if len(c.indexes) == 0 {
-		return stacktrace.NewError("collection: zero indexes")
-	}
-	return nil
+	return Index{}
 }
