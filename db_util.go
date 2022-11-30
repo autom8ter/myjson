@@ -4,94 +4,91 @@ import (
 	"bytes"
 	"context"
 	"github.com/autom8ter/gokvkit/kv"
-	"github.com/autom8ter/machine/v4"
 	"github.com/palantir/stacktrace"
 )
 
-func (d *DB) persistStateChange(ctx context.Context, collection string, change StateChange) error {
+func (d *DB) persistStateChange(ctx context.Context, changes map[string]*StateChange) error {
 	txn := d.kv.Batch()
-	if change.Updates != nil {
-		for id, edit := range change.Updates {
-			before, _ := d.Get(ctx, collection, id)
-			if !before.Valid() {
-				before = NewDocument()
+	for collection, change := range changes {
+		if change.Updates != nil {
+			for id, edit := range change.Updates {
+				before, _ := d.Get(ctx, collection, id)
+				if !before.Valid() {
+					before = NewDocument()
+				}
+				after := before.Clone()
+				err := after.SetAll(edit)
+				if err != nil {
+					return stacktrace.Propagate(err, "")
+				}
+				if err := d.indexDocument(ctx, txn, &DocChange{
+					Collection: collection,
+					Action:     Update,
+					DocID:      id,
+					Before:     before,
+					After:      after,
+				}); err != nil {
+					return stacktrace.Propagate(err, "")
+				}
 			}
-			after := before.Clone()
-			err := after.SetAll(edit)
-			if err != nil {
+		}
+		for _, id := range change.Deletes {
+			before, _ := d.Get(ctx, collection, id)
+			if err := d.indexDocument(ctx, txn, &DocChange{
+				Collection: collection,
+				Action:     Delete,
+				DocID:      id,
+				Before:     before,
+				After:      nil,
+			}); err != nil {
 				return stacktrace.Propagate(err, "")
+			}
+		}
+		for _, after := range change.Creates {
+			if !after.Valid() {
+				return stacktrace.NewErrorWithCode(ErrTODO, "invalid json document")
+			}
+			docID := d.getPrimaryKey(collection, after)
+			if docID == "" {
+				return stacktrace.NewErrorWithCode(ErrTODO, "document missing primary key %s", d.primaryKey(collection))
+			}
+			before, _ := d.Get(ctx, collection, docID)
+			if before != nil {
+				return stacktrace.NewErrorWithCode(ErrTODO, "document already exists %s", docID)
 			}
 			if err := d.indexDocument(ctx, txn, &DocChange{
 				Collection: collection,
-				Action:     Update,
-				DocID:      id,
+				Action:     Create,
+				DocID:      docID,
+				Before:     nil,
+				After:      after,
+			}); err != nil {
+				return stacktrace.Propagate(err, "")
+			}
+		}
+		for _, after := range change.Sets {
+			if !after.Valid() {
+				return stacktrace.NewErrorWithCode(ErrTODO, "invalid json document")
+			}
+			docID := d.getPrimaryKey(collection, after)
+			if docID == "" {
+				return stacktrace.NewErrorWithCode(ErrTODO, "document missing primary key %s", d.primaryKey(collection))
+			}
+			before, _ := d.Get(ctx, collection, docID)
+			if err := d.indexDocument(ctx, txn, &DocChange{
+				Collection: collection,
+				Action:     Set,
+				DocID:      docID,
 				Before:     before,
 				After:      after,
 			}); err != nil {
 				return stacktrace.Propagate(err, "")
 			}
 		}
-	}
-	for _, id := range change.Deletes {
-		before, _ := d.Get(ctx, collection, id)
-		if err := d.indexDocument(ctx, txn, &DocChange{
-			Collection: collection,
-			Action:     Delete,
-			DocID:      id,
-			Before:     before,
-			After:      nil,
-		}); err != nil {
-			return stacktrace.Propagate(err, "")
+		if err := txn.Flush(); err != nil {
+			return stacktrace.Propagate(err, "failed to batch collection documents")
 		}
 	}
-	for _, after := range change.Creates {
-		if !after.Valid() {
-			return stacktrace.NewErrorWithCode(ErrTODO, "invalid json document")
-		}
-		docID := d.getPrimaryKey(collection, after)
-		if docID == "" {
-			return stacktrace.NewErrorWithCode(ErrTODO, "document missing primary key %s", d.primaryKey(collection))
-		}
-		before, _ := d.Get(ctx, collection, docID)
-		if before != nil {
-			return stacktrace.NewErrorWithCode(ErrTODO, "document already exists %s", docID)
-		}
-		if err := d.indexDocument(ctx, txn, &DocChange{
-			Collection: collection,
-			Action:     Create,
-			DocID:      docID,
-			Before:     nil,
-			After:      after,
-		}); err != nil {
-			return stacktrace.Propagate(err, "")
-		}
-	}
-	for _, after := range change.Sets {
-		if !after.Valid() {
-			return stacktrace.NewErrorWithCode(ErrTODO, "invalid json document")
-		}
-		docID := d.getPrimaryKey(collection, after)
-		if docID == "" {
-			return stacktrace.NewErrorWithCode(ErrTODO, "document missing primary key %s", d.primaryKey(collection))
-		}
-		before, _ := d.Get(ctx, collection, docID)
-		if err := d.indexDocument(ctx, txn, &DocChange{
-			Collection: collection,
-			Action:     Set,
-			DocID:      docID,
-			Before:     before,
-			After:      after,
-		}); err != nil {
-			return stacktrace.Propagate(err, "")
-		}
-	}
-	if err := txn.Flush(); err != nil {
-		return stacktrace.Propagate(err, "failed to batch collection documents")
-	}
-	d.machine.Publish(ctx, machine.Message{
-		Channel: change.Collection,
-		Body:    change,
-	})
 	return nil
 }
 

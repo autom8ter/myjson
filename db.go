@@ -9,7 +9,6 @@ import (
 	"github.com/autom8ter/machine/v4"
 	"github.com/palantir/stacktrace"
 	"github.com/samber/lo"
-	"github.com/segmentio/ksuid"
 	"sync"
 	"time"
 )
@@ -67,6 +66,24 @@ func New(ctx context.Context, cfg KVConfig, opts ...DBOpt) (*DB, error) {
 	return d, nil
 }
 
+// NewTx returns a new transaction. a transaction must call Commit method in order to persist changes
+func (d *DB) NewTx() Tx {
+	return &transaction{db: d, changes: map[string]*StateChange{}}
+}
+
+// Tx executs the given function against a new transaction.
+// if the function returns an error, all changes will be rolled back.
+// otherwise, the changes will be commited to the database
+func (d *DB) Tx(ctx context.Context, fn TxFunc) error {
+	tx := d.NewTx()
+	err := fn(ctx, tx)
+	if err != nil {
+		tx.Rollback(ctx)
+		return stacktrace.Propagate(err, "rolled back transaction")
+	}
+	return stacktrace.Propagate(tx.Commit(ctx), "failed to commit transaction")
+}
+
 // Get gets a single document by id
 func (d *DB) Get(ctx context.Context, collection, id string) (*Document, error) {
 	var (
@@ -87,7 +104,7 @@ func (d *DB) Get(ctx context.Context, collection, id string) (*Document, error) 
 		}
 		return nil
 	}); err != nil {
-		return document, stacktrace.Propagate(err, "")
+		return nil, stacktrace.Propagate(err, "")
 	}
 	document, err = d.applyReadHooks(ctx, collection, document)
 	if err != nil {
@@ -120,174 +137,6 @@ func (d *DB) BatchGet(ctx context.Context, collection string, ids []string) (Doc
 		return documents, err
 	}
 	return documents, nil
-}
-
-// Create creates a new document - if the documents primary key is unset, it will be set as a sortable unique id
-func (d *DB) Create(ctx context.Context, collection string, document *Document) (string, error) {
-	if !d.hasCollection(collection) {
-		return "", stacktrace.NewError("unsupported collection: %s", collection)
-	}
-	if d.getPrimaryKey(collection, document) == "" {
-		id := ksuid.New().String()
-		err := d.setPrimaryKey(collection, document, id)
-		if err != nil {
-			return "", stacktrace.Propagate(err, "")
-		}
-	}
-	md, _ := GetMetadata(ctx)
-	return d.getPrimaryKey(collection, document), stacktrace.Propagate(d.persistStateChange(ctx, collection, StateChange{
-		Metadata:   md,
-		Collection: collection,
-		Deletes:    nil,
-		Creates:    []*Document{document},
-		Sets:       nil,
-		Updates:    nil,
-		Timestamp:  time.Now(),
-	}), "")
-}
-
-// BatchCreate creates 1-many documents. If each documents primary key is unset, it will be set as a sortable unique id.
-func (d *DB) BatchCreate(ctx context.Context, collection string, documents []*Document) ([]string, error) {
-
-	if !d.hasCollection(collection) {
-		return nil, stacktrace.NewError("unsupported collection: %s", collection)
-	}
-	var ids []string
-	for _, document := range documents {
-		if d.getPrimaryKey(collection, document) == "" {
-			id := ksuid.New().String()
-			err := d.setPrimaryKey(collection, document, id)
-			if err != nil {
-				return nil, stacktrace.Propagate(err, "")
-			}
-		}
-		ids = append(ids, d.getPrimaryKey(collection, document))
-	}
-	md, _ := GetMetadata(ctx)
-	if err := d.persistStateChange(ctx, collection, StateChange{
-		Metadata:   md,
-		Collection: collection,
-		Deletes:    nil,
-		Creates:    documents,
-		Sets:       nil,
-		Updates:    nil,
-		Timestamp:  time.Now(),
-	}); err != nil {
-		return nil, stacktrace.Propagate(err, "")
-	}
-	return ids, nil
-}
-
-// Set overwrites a single document. The documents primary key must be set.
-func (d *DB) Set(ctx context.Context, collection string, document *Document) error {
-	md, _ := GetMetadata(ctx)
-	return stacktrace.Propagate(d.persistStateChange(ctx, collection, StateChange{
-		Metadata:   md,
-		Collection: collection,
-		Deletes:    nil,
-		Creates:    nil,
-		Sets:       []*Document{document},
-		Updates:    nil,
-		Timestamp:  time.Now(),
-	}), "")
-}
-
-// BatchSet overwrites 1-many documents. The documents primary key must be set.
-func (d *DB) BatchSet(ctx context.Context, collection string, batch []*Document) error {
-	md, _ := GetMetadata(ctx)
-	return stacktrace.Propagate(d.persistStateChange(ctx, collection, StateChange{
-		Metadata:   md,
-		Collection: collection,
-		Deletes:    nil,
-		Creates:    nil,
-		Sets:       batch,
-		Updates:    nil,
-		Timestamp:  time.Now(),
-	}), "")
-}
-
-// Update patches a single document. The documents primary key must be set.
-func (d *DB) Update(ctx context.Context, collection string, id string, update map[string]any) error {
-	md, _ := GetMetadata(ctx)
-	return stacktrace.Propagate(d.persistStateChange(ctx, collection, StateChange{
-		Metadata:   md,
-		Collection: collection,
-		Updates: map[string]map[string]any{
-			id: update,
-		},
-		Timestamp: time.Now(),
-	}), "")
-}
-
-// BatchUpdate patches a 1-many documents. The documents primary key must be set.
-func (d *DB) BatchUpdate(ctx context.Context, collection string, batch map[string]map[string]any) error {
-	md, _ := GetMetadata(ctx)
-	return stacktrace.Propagate(d.persistStateChange(ctx, collection, StateChange{
-		Metadata:   md,
-		Collection: collection,
-		Deletes:    nil,
-		Creates:    nil,
-		Sets:       nil,
-		Updates:    batch,
-		Timestamp:  time.Now(),
-	}), "")
-}
-
-// Delete deletes a single document by id
-func (d *DB) Delete(ctx context.Context, collection string, id string) error {
-	md, _ := GetMetadata(ctx)
-	return stacktrace.Propagate(d.persistStateChange(ctx, collection, StateChange{
-		Metadata:   md,
-		Collection: collection,
-		Deletes:    []string{id},
-		Creates:    nil,
-		Sets:       nil,
-		Updates:    nil,
-		Timestamp:  time.Now(),
-	}), "")
-}
-
-// BatchDelete deletes 1-many documents by id
-func (d *DB) BatchDelete(ctx context.Context, collection string, ids []string) error {
-	md, _ := GetMetadata(ctx)
-	return stacktrace.Propagate(d.persistStateChange(ctx, collection, StateChange{
-		Metadata:   md,
-		Collection: collection,
-		Deletes:    ids,
-		Timestamp:  time.Now(),
-	}), "")
-}
-
-// QueryUpdate updates the documents returned from the query
-func (d *DB) QueryUpdate(ctx context.Context, update map[string]any, query Query) error {
-	results, err := d.Query(ctx, query)
-	if err != nil {
-		return stacktrace.Propagate(err, "")
-	}
-	for _, document := range results.Documents {
-		err := document.SetAll(update)
-		if err != nil {
-			return stacktrace.Propagate(err, "")
-		}
-	}
-	return stacktrace.Propagate(d.BatchSet(ctx, query.From, results.Documents), "")
-}
-
-// QueryDelete deletes the documents returned from the query
-func (d *DB) QueryDelete(ctx context.Context, query Query) error {
-
-	if !d.hasCollection(query.From) {
-		return stacktrace.NewError("unsupported collection: %s", query.From)
-	}
-	results, err := d.Query(ctx, query)
-	if err != nil {
-		return stacktrace.Propagate(err, "")
-	}
-	var ids []string
-	for _, document := range results.Documents {
-		ids = append(ids, d.getPrimaryKey(query.From, document))
-	}
-	return stacktrace.Propagate(d.BatchDelete(ctx, query.From, ids), "")
 }
 
 // aggregate performs aggregations against the collection

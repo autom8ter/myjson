@@ -4,7 +4,6 @@ A framework for building powerful, extensible, and feature-rich microservices on
 
     go get -u github.com/autom8ter/gokvkit
 
-
 ## Use Case
 
 Build stateful, extensible, and feature-rich programs on top of pluggable key/value storage providers
@@ -12,8 +11,9 @@ Build stateful, extensible, and feature-rich programs on top of pluggable key/va
 ## Features:
 
 - [x] JSON document storage engine
-  - built on top of pluggable key/value storage
+    - built on top of pluggable key/value storage
 - [x] field based querying
+- [x] transactions
 - [x] batch operations (create/set/get/update)
 - [x] query batch operations (create/set/get/update)
 - [x] multi-field indexing
@@ -29,12 +29,13 @@ Build stateful, extensible, and feature-rich programs on top of pluggable key/va
     - [x] group by
 - [x] pagination
 - [x] hook-based functions
-  - [x] validation hooks (on write)
-    - [x] json schema based validation
-  - [x] read hooks (on read)
-  - [x] sideEffect Hooks (on write)
+    - [x] validation hooks (on write)
+        - [x] json schema based validation
+    - [x] read hooks (on read)
+    - [x] sideEffect Hooks (on write)
 
 ### Flexibility
+
 - [x] Run in memory for ease of testing
 - [x] Run in local storage when persistance is needed (badger provider)
 - [ ] Run against a distributed key value store when scalability/stateless AND persistance is needed (tikv provider)
@@ -43,14 +44,15 @@ Build stateful, extensible, and feature-rich programs on top of pluggable key/va
 ### Extensibility
 
 - [x] Core logic can be extended with functional hooks
-  - [x] validation hooks (on write)
-    - [x] json schema based validation
-  - [x] read hooks (on each document read)
-  - [x] sideEffect hooks (on write)
-  - [x] where hooks (on query)
+    - [x] validation hooks (on write)
+        - [x] json schema based validation
+    - [x] read hooks (on each document read)
+    - [x] sideEffect hooks (on write)
+    - [x] where hooks (on query)
 - [ ] Dedicated extensions library
 
 ### Performance
+
 - [x] Secondary Indexes drastically improve performance and reduce likelihood of full table scans
 
 ## Getting Started
@@ -81,10 +83,8 @@ WIP
 
 WIP
 
-
 ### Beta Roadmap
 
-- [ ] transactions
 - [ ] 80% test coverage
 - [ ] better errors & error codes
 - [ ] 80% test coverage
@@ -99,7 +99,6 @@ WIP
 - [ ] multi-field primary key
 - [ ] search indexing
 - [ ] external data importer
-
 
 ## Contributing
 
