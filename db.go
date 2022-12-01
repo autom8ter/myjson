@@ -68,7 +68,7 @@ func New(ctx context.Context, cfg KVConfig, opts ...DBOpt) (*DB, error) {
 
 // NewTx returns a new transaction. a transaction must call Commit method in order to persist changes
 func (d *DB) NewTx() Tx {
-	return &transaction{db: d, changes: map[string]*StateChange{}}
+	return &transaction{db: d}
 }
 
 // Tx executs the given function against a new transaction.

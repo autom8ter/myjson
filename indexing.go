@@ -10,6 +10,7 @@ import (
 	"github.com/nqd/flat"
 	"github.com/palantir/stacktrace"
 	"reflect"
+	"time"
 )
 
 // Index is a database index used to optimize queries against a collection
@@ -169,11 +170,11 @@ func (d *DB) addIndex(ctx context.Context, collection string, index Index) error
 			From:  collection,
 			Where: nil,
 		}, func(doc *Document) (bool, error) {
-			if err := d.indexDocument(ctx, batch, &DocChange{
+			if err := d.setDocument(ctx, batch, &Command{
 				Collection: collection,
-				Action:     Set,
+				Action:     SetDocument,
 				DocID:      doc.GetString(d.primaryKey(collection)),
-				After:      doc,
+				Change:     doc,
 			}); err != nil {
 				return false, stacktrace.Propagate(err, "")
 			}
@@ -182,6 +183,9 @@ func (d *DB) addIndex(ctx context.Context, collection string, index Index) error
 		if err != nil {
 			return stacktrace.Propagate(err, "%s - %s", collection, index.Name)
 		}
+	}
+	if err := batch.Flush(); err != nil {
+		return stacktrace.Propagate(err, "%s - %s", collection, index.Name)
 	}
 	index.IsBuilding = false
 	d.collections.SetFunc(collection, func(c CollectionConfig) CollectionConfig {
@@ -200,11 +204,14 @@ func (d *DB) removeIndex(ctx context.Context, collection string, index Index) er
 	_, err := d.queryScan(ctx, Scan{
 		From: collection,
 	}, func(doc *Document) (bool, error) {
-		if err := d.updateSecondaryIndex(ctx, batch, index, &DocChange{
+		md, _ := GetMetadata(ctx)
+		if err := d.updateSecondaryIndex(ctx, batch, index, &Command{
 			Collection: collection,
-			Action:     Delete,
+			Action:     DeleteDocument,
 			DocID:      doc.GetString(d.primaryKey(collection)),
 			Before:     doc,
+			Timestamp:  time.Now(),
+			Metadata:   md,
 		}); err != nil {
 			return false, stacktrace.Propagate(err, "")
 		}

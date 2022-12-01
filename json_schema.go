@@ -17,11 +17,11 @@ func JSONSchema(schemaContent []byte) (ValidatorHook, error) {
 	}
 	return ValidatorHook{
 		Name: fmt.Sprintf("%s.jsonschema", gjson.Get(string(schemaContent), "title").String()),
-		Func: func(ctx context.Context, _ *DB, d *DocChange) error {
-			switch d.Action {
-			case Update, Create, Set:
-				if d.After != nil {
-					kerrs, err := schema.ValidateBytes(ctx, d.After.Bytes())
+		Func: func(ctx context.Context, _ *DB, command *Command) error {
+			switch command.Action {
+			case UpdateDocument, CreateDocument, SetDocument:
+				if command.Change != nil {
+					kerrs, err := schema.ValidateBytes(ctx, command.Change.Bytes())
 					if err != nil {
 						return err
 					}

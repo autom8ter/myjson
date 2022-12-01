@@ -22,14 +22,19 @@ type IterOpts struct {
 
 // Tx is a database transaction interface
 type Tx interface {
-	// Get gets the specified key in the database(if it exists)
-	Get(key []byte) ([]byte, error)
-	// Set sets the specified key/value in the database
-	Set(key, value []byte) error
-	// Delete deletes the specified key from the database
-	Delete(key []byte) error
+	// Getter gets the specified key in the database(if it exists)
+	Getter
+	// Setter sets specified key/value in the database
+	Setter
+	// Deleter deletes specified key from the database
+	Deleter
 	// NewIterator creates a new iterator
 	NewIterator(opts IterOpts) Iterator
+}
+
+// Getter gets the specified key in the database(if it exists)
+type Getter interface {
+	Get(key []byte) ([]byte, error)
 }
 
 // Iterator is a key value database iterator. Keys should be sorted lexicographically.
@@ -54,12 +59,30 @@ type Item interface {
 	Value() ([]byte, error)
 }
 
+// Setter sets specified key/value in the database
+type Setter interface {
+	Set(key, value []byte) error
+}
+
+// Deleter deletes specified keys from the database
+type Deleter interface {
+	Delete(key []byte) error
+}
+
+// Mutator executes mutations against the database
+type Mutator interface {
+	Setter
+	Deleter
+}
+
 // Batch is a batch write operation for persisting 1-many changes to the database
 type Batch interface {
 	// Flush flushes the batch to the database - it should be called after all Set(s)/Delete(s)
 	Flush() error
-	Set(key, value []byte) error
-	Delete(key []byte) error
+	// Setter sets specified key/value in the database
+	Setter
+	// Deleter deletes specified keys from the database
+	Deleter
 }
 
 // KVConfig configures a key value database from the given provider

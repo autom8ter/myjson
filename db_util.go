@@ -4,179 +4,202 @@ import (
 	"bytes"
 	"context"
 	"github.com/autom8ter/gokvkit/kv"
+	"github.com/nqd/flat"
 	"github.com/palantir/stacktrace"
+	"github.com/segmentio/ksuid"
+	"time"
 )
 
-func (d *DB) persistStateChange(ctx context.Context, changes map[string]*StateChange) error {
-	txn := d.kv.Batch()
-	for collection, change := range changes {
-		if change.Updates != nil {
-			for id, edit := range change.Updates {
-				before, _ := d.Get(ctx, collection, id)
-				if !before.Valid() {
-					before = NewDocument()
-				}
-				after := before.Clone()
-				err := after.SetAll(edit)
-				if err != nil {
-					return stacktrace.Propagate(err, "")
-				}
-				if err := d.indexDocument(ctx, txn, &DocChange{
-					Collection: collection,
-					Action:     Update,
-					DocID:      id,
-					Before:     before,
-					After:      after,
-				}); err != nil {
-					return stacktrace.Propagate(err, "")
-				}
-			}
-		}
-		for _, id := range change.Deletes {
-			before, _ := d.Get(ctx, collection, id)
-			if err := d.indexDocument(ctx, txn, &DocChange{
-				Collection: collection,
-				Action:     Delete,
-				DocID:      id,
-				Before:     before,
-				After:      nil,
-			}); err != nil {
-				return stacktrace.Propagate(err, "")
-			}
-		}
-		for _, after := range change.Creates {
-			if !after.Valid() {
-				return stacktrace.NewErrorWithCode(ErrTODO, "invalid json document")
-			}
-			docID := d.getPrimaryKey(collection, after)
-			if docID == "" {
-				return stacktrace.NewErrorWithCode(ErrTODO, "document missing primary key %s", d.primaryKey(collection))
-			}
-			before, _ := d.Get(ctx, collection, docID)
-			if before != nil {
-				return stacktrace.NewErrorWithCode(ErrTODO, "document already exists %s", docID)
-			}
-			if err := d.indexDocument(ctx, txn, &DocChange{
-				Collection: collection,
-				Action:     Create,
-				DocID:      docID,
-				Before:     nil,
-				After:      after,
-			}); err != nil {
-				return stacktrace.Propagate(err, "")
-			}
-		}
-		for _, after := range change.Sets {
-			if !after.Valid() {
-				return stacktrace.NewErrorWithCode(ErrTODO, "invalid json document")
-			}
-			docID := d.getPrimaryKey(collection, after)
-			if docID == "" {
-				return stacktrace.NewErrorWithCode(ErrTODO, "document missing primary key %s", d.primaryKey(collection))
-			}
-			before, _ := d.Get(ctx, collection, docID)
-			if err := d.indexDocument(ctx, txn, &DocChange{
-				Collection: collection,
-				Action:     Set,
-				DocID:      docID,
-				Before:     before,
-				After:      after,
-			}); err != nil {
-				return stacktrace.Propagate(err, "")
-			}
-		}
-		if err := txn.Flush(); err != nil {
-			return stacktrace.Propagate(err, "failed to batch collection documents")
-		}
-	}
-	return nil
-}
+const batchThreshold = 10
 
-func (d *DB) indexDocument(ctx context.Context, txn kv.Batch, change *DocChange) error {
-	if change.DocID == "" {
-		return stacktrace.NewErrorWithCode(ErrTODO, "empty document id")
+func (d *DB) updateDocument(ctx context.Context, mutator kv.Mutator, command *Command) error {
+	if err := command.validate(); err != nil {
+		return stacktrace.Propagate(err, "")
 	}
-	var err error
-	primaryIndex := d.primaryIndex(change.Collection)
-
-	if change.After != nil {
-		if d.getPrimaryKey(change.Collection, change.After) != change.DocID {
-			return stacktrace.NewErrorWithCode(ErrTODO, "document id is immutable: %v -> %v", d.getPrimaryKey(change.Collection, change.After), change.DocID)
-		}
-		if err := d.applyValidationHooks(ctx, change); err != nil {
-			return stacktrace.Propagate(err, "")
-		}
-	}
-	change, err = d.applySideEffectHooks(ctx, change)
+	primaryIndex := d.primaryIndex(command.Collection)
+	after := command.Before.Clone()
+	flattened, err := flat.Flatten(command.Change.Value(), nil)
 	if err != nil {
 		return stacktrace.Propagate(err, "")
 	}
-	switch change.Action {
-	case Delete:
-		if err := txn.Delete(primaryIndex.Seek(map[string]any{
-			d.primaryKey(change.Collection): change.DocID,
-		}).SetDocumentID(change.DocID).Path()); err != nil {
-			return stacktrace.Propagate(err, "failed to batch delete documents")
-		}
-	case Set, Update, Create:
-		if err := txn.Set(primaryIndex.Seek(map[string]any{
-			d.primaryKey(change.Collection): change.DocID,
-		}).SetDocumentID(change.DocID).Path(), change.After.Bytes()); err != nil {
-			return stacktrace.PropagateWithCode(err, ErrTODO, "failed to batch set documents to primary index")
+	err = after.SetAll(flattened)
+	if err != nil {
+		return stacktrace.Propagate(err, "")
+	}
+	command.Change = after
+	if err := d.applyValidationHooks(ctx, command); err != nil {
+		return stacktrace.Propagate(err, "")
+	}
+	command, err = d.applySideEffectHooks(ctx, command)
+	if err != nil {
+		return stacktrace.Propagate(err, "")
+	}
+	if err := d.applyValidationHooks(ctx, command); err != nil {
+		return stacktrace.Propagate(err, "")
+	}
+	if err := mutator.Set(primaryIndex.Seek(map[string]any{
+		d.primaryKey(command.Collection): command.DocID,
+	}).SetDocumentID(command.DocID).Path(), command.Change.Bytes()); err != nil {
+		return stacktrace.PropagateWithCode(err, ErrTODO, "failed to batch set documents to primary index")
+	}
+	return nil
+}
+
+func (d *DB) deleteDocument(ctx context.Context, mutator kv.Mutator, command *Command) error {
+	if err := command.validate(); err != nil {
+		return stacktrace.Propagate(err, "")
+	}
+	primaryIndex := d.primaryIndex(command.Collection)
+	if err := d.applyValidationHooks(ctx, command); err != nil {
+		return stacktrace.Propagate(err, "")
+	}
+	command, err := d.applySideEffectHooks(ctx, command)
+	if err != nil {
+		return stacktrace.Propagate(err, "")
+	}
+	if err := d.applyValidationHooks(ctx, command); err != nil {
+		return stacktrace.Propagate(err, "")
+	}
+	if err := mutator.Delete(primaryIndex.Seek(map[string]any{
+		d.primaryKey(command.Collection): command.DocID,
+	}).SetDocumentID(command.DocID).Path()); err != nil {
+		return stacktrace.Propagate(err, "failed to batch delete documents")
+	}
+	return nil
+}
+
+func (d *DB) createDocument(ctx context.Context, mutator kv.Mutator, command *Command) error {
+	primaryIndex := d.primaryIndex(command.Collection)
+	if command.DocID == "" {
+		command.DocID = ksuid.New().String()
+		if err := d.setPrimaryKey(command.Collection, command.Change, command.DocID); err != nil {
+			return stacktrace.Propagate(err, "")
 		}
 	}
+	if err := command.validate(); err != nil {
+		return stacktrace.Propagate(err, "")
+	}
+	if err := d.applyValidationHooks(ctx, command); err != nil {
+		return stacktrace.Propagate(err, "")
+	}
+	command, err := d.applySideEffectHooks(ctx, command)
+	if err != nil {
+		return stacktrace.Propagate(err, "")
+	}
+	if err := d.applyValidationHooks(ctx, command); err != nil {
+		return stacktrace.Propagate(err, "")
+	}
+	if err := mutator.Set(primaryIndex.Seek(map[string]any{
+		d.primaryKey(command.Collection): command.DocID,
+	}).SetDocumentID(command.DocID).Path(), command.Change.Bytes()); err != nil {
+		return stacktrace.PropagateWithCode(err, ErrTODO, "failed to batch set documents to primary index")
+	}
+	return nil
+}
 
-	for _, i := range d.collections.Get(change.Collection).Indexes {
-		if i.Primary {
-			continue
+func (d *DB) setDocument(ctx context.Context, mutator kv.Mutator, command *Command) error {
+	if err := command.validate(); err != nil {
+		return stacktrace.Propagate(err, "")
+	}
+	primaryIndex := d.primaryIndex(command.Collection)
+	if err := d.applyValidationHooks(ctx, command); err != nil {
+		return stacktrace.Propagate(err, "")
+	}
+	command, err := d.applySideEffectHooks(ctx, command)
+	if err != nil {
+		return stacktrace.Propagate(err, "")
+	}
+	if err := d.applyValidationHooks(ctx, command); err != nil {
+		return stacktrace.Propagate(err, "")
+	}
+	if err := mutator.Set(primaryIndex.Seek(map[string]any{
+		d.primaryKey(command.Collection): command.DocID,
+	}).SetDocumentID(command.DocID).Path(), command.Change.Bytes()); err != nil {
+		return stacktrace.PropagateWithCode(err, ErrTODO, "failed to batch set documents to primary index")
+	}
+	return nil
+}
+
+func (d *DB) persistStateChange(ctx context.Context, mutator kv.Mutator, commands []*Command) error {
+	for _, command := range commands {
+		if command.Timestamp.IsZero() {
+			command.Timestamp = time.Now()
 		}
-		if err := d.updateSecondaryIndex(ctx, txn, i, change); err != nil {
-			return stacktrace.PropagateWithCode(err, ErrTODO, "")
+		before, _ := d.Get(ctx, command.Collection, command.DocID)
+		if before == nil || !before.Valid() {
+			before = NewDocument()
+		}
+		command.Before = before
+		switch command.Action {
+		case UpdateDocument:
+			if err := d.updateDocument(ctx, mutator, command); err != nil {
+				return stacktrace.Propagate(err, "")
+			}
+		case CreateDocument:
+			if err := d.createDocument(ctx, mutator, command); err != nil {
+				return stacktrace.Propagate(err, "")
+			}
+		case DeleteDocument:
+			if err := d.deleteDocument(ctx, mutator, command); err != nil {
+				return stacktrace.Propagate(err, "")
+			}
+		case SetDocument:
+			if err := d.setDocument(ctx, mutator, command); err != nil {
+				return stacktrace.Propagate(err, "")
+			}
+		}
+		for _, i := range d.collections.Get(command.Collection).Indexes {
+			if i.Primary {
+				continue
+			}
+			if err := d.updateSecondaryIndex(ctx, mutator, i, command); err != nil {
+				return stacktrace.PropagateWithCode(err, ErrTODO, "")
+			}
 		}
 	}
 	return nil
 }
 
-func (d *DB) updateSecondaryIndex(ctx context.Context, txn kv.Batch, idx Index, change *DocChange) error {
+func (d *DB) updateSecondaryIndex(ctx context.Context, mutator kv.Mutator, idx Index, command *Command) error {
 	if idx.Primary {
 		return nil
 	}
 
-	switch change.Action {
-	case Delete:
-		if err := txn.Delete(idx.Seek(change.Before.Value()).SetDocumentID(change.DocID).Path()); err != nil {
+	switch command.Action {
+	case DeleteDocument:
+		if err := mutator.Delete(idx.Seek(command.Before.Value()).SetDocumentID(command.DocID).Path()); err != nil {
 			return stacktrace.PropagateWithCode(
 				err,
 				ErrTODO,
 				"failed to delete document %s/%s index references",
-				change.Collection,
-				change.DocID,
+				command.Collection,
+				command.DocID,
 			)
 		}
-	case Set, Update, Create:
-		if change.Before != nil && change.Before.Valid() {
-			if err := txn.Delete(idx.Seek(change.Before.Value()).SetDocumentID(change.DocID).Path()); err != nil {
+	case SetDocument, UpdateDocument, CreateDocument:
+		if command.Before != nil && command.Before.Valid() {
+			if err := mutator.Delete(idx.Seek(command.Before.Value()).SetDocumentID(command.DocID).Path()); err != nil {
 				return stacktrace.PropagateWithCode(
 					err,
 					ErrTODO,
 					"failed to delete document %s/%s index references",
-					change.Collection,
-					change.DocID,
+					command.Collection,
+					command.DocID,
 				)
 			}
 		}
-		if idx.Unique && !idx.Primary && change.After != nil {
+		if idx.Unique && !idx.Primary && command.Change != nil {
 			if err := d.kv.Tx(false, func(tx kv.Tx) error {
 				it := tx.NewIterator(kv.IterOpts{
-					Prefix: idx.Seek(change.After.Value()).Path(),
+					Prefix: idx.Seek(command.Change.Value()).Path(),
 				})
 				defer it.Close()
 				for it.Valid() {
 					item := it.Item()
 					split := bytes.Split(item.Key(), []byte("\x00"))
 					id := split[len(split)-1]
-					if string(id) != change.DocID {
-						return stacktrace.NewErrorWithCode(ErrTODO, "duplicate value( %s ) found for unique index: %s", change.DocID, idx.Name)
+					if string(id) != command.DocID {
+						return stacktrace.NewErrorWithCode(ErrTODO, "duplicate value( %s ) found for unique index: %s", command.DocID, idx.Name)
 					}
 					it.Next()
 				}
@@ -186,19 +209,19 @@ func (d *DB) updateSecondaryIndex(ctx context.Context, txn kv.Batch, idx Index, 
 					err,
 					ErrTODO,
 					"failed to set document %s/%s index references",
-					change.Collection,
-					change.DocID,
+					command.Collection,
+					command.DocID,
 				)
 			}
 		}
 		// only persist ids in secondary index - lookup full document in primary index
-		if err := txn.Set(idx.Seek(change.After.Value()).SetDocumentID(change.DocID).Path(), []byte(change.DocID)); err != nil {
+		if err := mutator.Set(idx.Seek(command.Change.Value()).SetDocumentID(command.DocID).Path(), []byte(command.DocID)); err != nil {
 			return stacktrace.PropagateWithCode(
 				err,
 				ErrTODO,
 				"failed to set document %s/%s index references",
-				change.Collection,
-				change.DocID,
+				command.Collection,
+				command.DocID,
 			)
 		}
 	}
@@ -309,20 +332,20 @@ func (d *DB) applyReadHooks(ctx context.Context, collection string, doc *Documen
 	}
 	return doc, nil
 }
-func (d *DB) applySideEffectHooks(ctx context.Context, change *DocChange) (*DocChange, error) {
+func (d *DB) applySideEffectHooks(ctx context.Context, command *Command) (*Command, error) {
 	var err error
-	for _, sideEffect := range d.sideEffects.Get(change.Collection) {
-		change, err = sideEffect.Func(ctx, d, change)
+	for _, sideEffect := range d.sideEffects.Get(command.Collection) {
+		command, err = sideEffect.Func(ctx, d, command)
 		if err != nil {
 			return nil, stacktrace.Propagate(err, "")
 		}
 	}
-	return change, nil
+	return command, nil
 }
 
-func (d *DB) applyValidationHooks(ctx context.Context, doc *DocChange) error {
-	for _, validator := range d.validators.Get(doc.Collection) {
-		if err := validator.Func(ctx, d, doc); err != nil {
+func (d *DB) applyValidationHooks(ctx context.Context, command *Command) error {
+	for _, validator := range d.validators.Get(command.Collection) {
+		if err := validator.Func(ctx, d, command); err != nil {
 			return stacktrace.Propagate(err, "")
 		}
 	}

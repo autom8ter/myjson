@@ -13,11 +13,11 @@ func TestJSONSchema(t *testing.T) {
 		validator, err := gokvkit.JSONSchema([]byte(testutil.UserSchema))
 		assert.Nil(t, err)
 		assert.Nil(t, validator.Valid())
-		assert.Nil(t, validator.Func(context.Background(), nil, &gokvkit.DocChange{
-			Action: gokvkit.Set,
+		assert.Nil(t, validator.Func(context.Background(), nil, &gokvkit.Command{
+			Action: gokvkit.SetDocument,
 			DocID:  "",
 			Before: nil,
-			After:  testutil.NewUserDoc(),
+			Change: testutil.NewUserDoc(),
 		}))
 	})
 	t.Run("json schema validation - fail", func(t *testing.T) {
@@ -26,11 +26,11 @@ func TestJSONSchema(t *testing.T) {
 
 		validator, err := gokvkit.JSONSchema([]byte(testutil.UserSchema))
 		assert.Nil(t, err)
-		assert.NotNil(t, validator.Func(context.Background(), nil, &gokvkit.DocChange{
-			Action: gokvkit.Set,
+		assert.NotNil(t, validator.Func(context.Background(), nil, &gokvkit.Command{
+			Action: gokvkit.SetDocument,
 			DocID:  "",
 			Before: nil,
-			After:  gokvkit.NewDocument(),
+			Change: gokvkit.NewDocument(),
 		}))
 	})
 }

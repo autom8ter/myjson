@@ -250,36 +250,61 @@ type Scan struct {
 type Action string
 
 const (
-	// Create creates a document
-	Create = "create"
-	// Set sets a document's values in place
-	Set = "set"
-	// Update updates a set of fields on a document
-	Update = "update"
-	// Delete deletes a document
-	Delete = "delete"
+	// CreateDocument creates a document
+	CreateDocument = "createDocument"
+	// SetDocument sets a document's values in place
+	SetDocument = "setDocument"
+	// UpdateDocument updates a set of fields on a document
+	UpdateDocument = "updateDocument"
+	// DeleteDocument deletes a document
+	DeleteDocument = "deleteDocument"
 )
 
-// StateChange is a mutation to a set of documents
-type StateChange struct {
-	Metadata   *Metadata                 `json:"metadata,omitempty"`
-	Collection string                    `json:"collection,omitempty"`
-	Deletes    []string                  `json:"deletes,omitempty"`
-	Creates    []*Document               `json:"creates,omitempty"`
-	Sets       []*Document               `json:"sets,omitempty"`
-	Updates    map[string]map[string]any `json:"updates,omitempty"`
-	Timestamp  time.Time                 `json:"timestamp,omitempty"`
+// Command is a command executed against the database that causes a change in state
+type Command struct {
+	// Target collection
+	Collection string `json:"collection"`
+	// Action taking place
+	Action Action `json:"action"`
+	// DocID is the document being changed
+	DocID string `json:"docID"`
+	// Before is the document before the change
+	Before *Document `json:"valueBefore"`
+	// Change is the value after the change
+	Change *Document `json:"value"`
+	// Timestamp is the timestamp of the change
+	Timestamp time.Time `json:"timestamp"`
+	// Metadata is the context metadata at the time of the commands execution
+	Metadata *Metadata `json:"metadata"`
 }
 
-// DocChange is a mutation to a single document - it includes the action, the document id, and the before & after state of the document
-// Note: the after value is what's persisted to the database, the before value is what was in the database prior to the change.
-// After will be always null on delete
-type DocChange struct {
-	Collection string    `json:"collection"`
-	Action     Action    `json:"action"`
-	DocID      string    `json:"docID"`
-	Before     *Document `json:"before"`
-	After      *Document `json:"after"`
+func (c *Command) validate() error {
+	if c.Collection == "" {
+		return stacktrace.NewError("command: empty command.collection")
+	}
+	if c.Metadata == nil {
+		return stacktrace.NewError("command: empty command.metadata")
+	}
+	if c.Timestamp.IsZero() {
+		return stacktrace.NewError("command: empty command.timestamp")
+	}
+	if c.DocID == "" {
+		return stacktrace.NewError("command: empty command.docID")
+	}
+	switch c.Action {
+	case SetDocument, UpdateDocument, CreateDocument:
+		if c.Change == nil {
+			return stacktrace.NewError("command: empty command.change")
+		}
+	case DeleteDocument:
+		if c.Before == nil {
+			return stacktrace.NewError("command: empty command.before")
+		}
+	default:
+		return stacktrace.NewError("command: unsupported command.action: %s", c.Action)
+	}
+
+	return nil
 }
 
 // Function is a function that is applied against a document field
@@ -308,7 +333,7 @@ func (f Function) IsAggregate() bool {
 // ValidatorHook is a hook function used to validate all new and updated documents being persisted to a collection
 type ValidatorHook struct {
 	Name string
-	Func func(ctx context.Context, db *DB, change *DocChange) error
+	Func func(ctx context.Context, db *DB, command *Command) error
 }
 
 // Valid returns nil if the hook is valid
@@ -325,7 +350,7 @@ func (v ValidatorHook) Valid() error {
 // SideEffectHook is a hook function triggered whenever a document changes
 type SideEffectHook struct {
 	Name string
-	Func func(ctx context.Context, db *DB, change *DocChange) (*DocChange, error)
+	Func func(ctx context.Context, db *DB, command *Command) (*Command, error)
 }
 
 // Valid returns nil if the hook is valid
