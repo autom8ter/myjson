@@ -20,6 +20,9 @@ type collectionSchema struct {
 }
 
 func newCollectionSchema(schemaContent []byte) (*collectionSchema, error) {
+	if len(schemaContent) == 0 {
+		return nil, stacktrace.NewError("empty schema content")
+	}
 	schema := &jsonschema.Schema{}
 	if err := json.Unmarshal(schemaContent, schema); err != nil {
 		return nil, stacktrace.Propagate(err, "failed to decode json schema")

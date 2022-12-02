@@ -1,0 +1,92 @@
+{
+  "type": "object",
+  "collection": "user",
+  "required": [
+    "_id",
+    "name",
+    "age",
+    "contact",
+    "gender",
+    "account_id"
+  ],
+  "properties": {
+    "_id": {
+      "type": "string",
+      "description": "The user's id."
+    },
+    "name": {
+      "type": "string",
+      "description": "The user's name."
+    },
+    "contact": {
+      "type": "object",
+      "properties": {
+        "email": {
+          "type": "string",
+          "description": "The user's email."
+        }
+      }
+    },
+    "age": {
+      "description": "Age in years which must be equal to or greater than zero.",
+      "type": "integer",
+      "minimum": 0
+    },
+    "account_id": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "language": {
+      "type": "string",
+      "description": "The user's first language."
+    },
+    "gender": {
+      "type": "string",
+      "description": "The user's gender.",
+      "enum": [
+        "male",
+        "female"
+      ]
+    },
+    "timestamp": {
+      "type": "string"
+    },
+    "annotations": {
+      "type": "object"
+    }
+  },
+  "indexing": {
+    "primary_idx": {
+      "name": "primary_idx",
+      "unique": true,
+      "primary": true,
+      "fields": [
+        "_id"
+      ]
+    },
+    "language_idx": {
+      "name": "language_idx",
+      "unique": false,
+      "primary": false,
+      "fields": [
+        "language"
+      ]
+    },
+    "email_idx": {
+      "name": "email_idx",
+      "unique": true,
+      "primary": false,
+      "fields": [
+        "contact.email"
+      ]
+    },
+    "account_idx": {
+      "name": "account_idx",
+      "unique": false,
+      "primary": false,
+      "fields": [
+        "account_id"
+      ]
+    }
+  }
+}

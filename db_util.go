@@ -27,14 +27,7 @@ func (d *DB) updateDocument(ctx context.Context, mutator kv.Mutator, command *Co
 		return stacktrace.Propagate(err, "")
 	}
 	command.Change = after
-	if err := d.applyValidationHooks(ctx, command); err != nil {
-		return stacktrace.Propagate(err, "")
-	}
-	command, err = d.applySideEffectHooks(ctx, command)
-	if err != nil {
-		return stacktrace.Propagate(err, "")
-	}
-	if err := d.applyValidationHooks(ctx, command); err != nil {
+	if err := d.applyPersistHooks(ctx, command); err != nil {
 		return stacktrace.Propagate(err, "")
 	}
 	if err := mutator.Set(primaryIndex.seekPrefix(map[string]any{
@@ -50,14 +43,7 @@ func (d *DB) deleteDocument(ctx context.Context, mutator kv.Mutator, command *Co
 		return stacktrace.Propagate(err, "")
 	}
 	primaryIndex := d.primaryIndex(command.Collection)
-	if err := d.applyValidationHooks(ctx, command); err != nil {
-		return stacktrace.Propagate(err, "")
-	}
-	command, err := d.applySideEffectHooks(ctx, command)
-	if err != nil {
-		return stacktrace.Propagate(err, "")
-	}
-	if err := d.applyValidationHooks(ctx, command); err != nil {
+	if err := d.applyPersistHooks(ctx, command); err != nil {
 		return stacktrace.Propagate(err, "")
 	}
 	if err := mutator.Delete(primaryIndex.seekPrefix(map[string]any{
@@ -79,14 +65,7 @@ func (d *DB) createDocument(ctx context.Context, mutator kv.Mutator, command *Co
 	if err := command.validate(); err != nil {
 		return stacktrace.Propagate(err, "")
 	}
-	if err := d.applyValidationHooks(ctx, command); err != nil {
-		return stacktrace.Propagate(err, "")
-	}
-	command, err := d.applySideEffectHooks(ctx, command)
-	if err != nil {
-		return stacktrace.Propagate(err, "")
-	}
-	if err := d.applyValidationHooks(ctx, command); err != nil {
+	if err := d.applyPersistHooks(ctx, command); err != nil {
 		return stacktrace.Propagate(err, "")
 	}
 	if err := mutator.Set(primaryIndex.seekPrefix(map[string]any{
@@ -102,14 +81,7 @@ func (d *DB) setDocument(ctx context.Context, mutator kv.Mutator, command *Comma
 		return stacktrace.Propagate(err, "")
 	}
 	primaryIndex := d.primaryIndex(command.Collection)
-	if err := d.applyValidationHooks(ctx, command); err != nil {
-		return stacktrace.Propagate(err, "")
-	}
-	command, err := d.applySideEffectHooks(ctx, command)
-	if err != nil {
-		return stacktrace.Propagate(err, "")
-	}
-	if err := d.applyValidationHooks(ctx, command); err != nil {
+	if err := d.applyPersistHooks(ctx, command); err != nil {
 		return stacktrace.Propagate(err, "")
 	}
 	if err := mutator.Set(primaryIndex.seekPrefix(map[string]any{
@@ -124,6 +96,10 @@ func (d *DB) persistStateChange(ctx context.Context, mutator kv.Mutator, command
 	for _, command := range commands {
 		if command.Timestamp.IsZero() {
 			command.Timestamp = time.Now()
+		}
+		if command.Metadata == nil {
+			md, _ := GetMetadata(ctx)
+			command.Metadata = md
 		}
 		before, _ := d.Get(ctx, command.Collection, command.DocID)
 		if before == nil || !before.Valid() {
@@ -332,20 +308,9 @@ func (d *DB) applyReadHooks(ctx context.Context, collection string, doc *Documen
 	}
 	return doc, nil
 }
-func (d *DB) applySideEffectHooks(ctx context.Context, command *Command) (*Command, error) {
-	var err error
-	for _, sideEffect := range d.sideEffects.Get(command.Collection) {
-		command, err = sideEffect.Func(ctx, d, command)
-		if err != nil {
-			return nil, stacktrace.Propagate(err, "")
-		}
-	}
-	return command, nil
-}
-
-func (d *DB) applyValidationHooks(ctx context.Context, command *Command) error {
-	for _, validator := range d.validators.Get(command.Collection) {
-		if err := validator.Func(ctx, d, command); err != nil {
+func (d *DB) applyPersistHooks(ctx context.Context, command *Command) error {
+	for _, sideEffect := range d.persistHooks.Get(command.Collection) {
+		if err := sideEffect.Func(ctx, d, command); err != nil {
 			return stacktrace.Propagate(err, "")
 		}
 	}

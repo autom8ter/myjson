@@ -67,10 +67,12 @@ func TestDB(fn func(ctx context.Context, db *gokvkit.DB), collections ...[]byte)
 	defer os.RemoveAll(dir)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	db, err := gokvkit.New(ctx, gokvkit.KVConfig{
-		Provider: "badger",
-		Params: map[string]any{
-			"storage_path": dir,
+	db, err := gokvkit.New(ctx, gokvkit.Config{
+		KV: gokvkit.KVConfig{
+			Provider: "badger",
+			Params: map[string]any{
+				"storage_path": dir,
+			},
 		},
 	})
 	if err != nil {

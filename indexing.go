@@ -171,10 +171,12 @@ func (d *DB) addIndex(ctx context.Context, collection string, index Index) error
 			Where: nil,
 		}, func(doc *Document) (bool, error) {
 			if err := d.setDocument(ctx, batch, &Command{
+				Metadata:   meta,
 				Collection: collection,
 				Action:     SetDocument,
 				DocID:      doc.GetString(d.primaryKey(collection)),
 				Change:     doc,
+				Timestamp:  time.Now(),
 			}); err != nil {
 				return false, stacktrace.Propagate(err, "")
 			}
@@ -256,11 +258,13 @@ func (d *DB) getPersistedCollections() (*safe.Map[*collectionSchema], error) {
 			if err != nil {
 				return stacktrace.Propagate(err, "")
 			}
-			cfg, err := newCollectionSchema(bits)
-			if err != nil {
-				return stacktrace.Propagate(err, "")
+			if len(bits) > 0 {
+				cfg, err := newCollectionSchema(bits)
+				if err != nil {
+					return stacktrace.Propagate(err, "")
+				}
+				collections.Set(cfg.collection, cfg)
 			}
-			collections.Set(cfg.collection, cfg)
 			i.Next()
 		}
 		return nil

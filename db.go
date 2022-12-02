@@ -16,15 +16,15 @@ import (
 // DB is an embedded, durable NoSQL database with support for schemas, indexing, and aggregation
 type DB struct {
 	sync.RWMutex
-	config      KVConfig
-	kv          kv.DB
-	machine     machine.Machine
-	collections *safe.Map[*collectionSchema]
-	optimizer   Optimizer
-	validators  *safe.Map[[]ValidatorHook]
-	sideEffects *safe.Map[[]SideEffectHook]
-	whereHooks  *safe.Map[[]WhereHook]
-	readHooks   *safe.Map[[]ReadHook]
+	config       Config
+	kv           kv.DB
+	machine      machine.Machine
+	collections  *safe.Map[*collectionSchema]
+	optimizer    Optimizer
+	initHooks    *safe.Map[OnInit]
+	persistHooks *safe.Map[[]OnPersist]
+	whereHooks   *safe.Map[[]OnWhere]
+	readHooks    *safe.Map[[]OnRead]
 }
 
 /*
@@ -39,21 +39,21 @@ func OpenKV(cfg KVConfig) (kv.DB, error) {
 }
 
 // New creates a new database instance from the given config
-func New(ctx context.Context, cfg KVConfig, opts ...DBOpt) (*DB, error) {
-	db, err := OpenKV(cfg)
+func New(ctx context.Context, cfg Config, opts ...DBOpt) (*DB, error) {
+	db, err := OpenKV(cfg.KV)
 	if err != nil {
 		return nil, stacktrace.PropagateWithCode(err, ErrTODO, "failed to open kv database")
 	}
 	d := &DB{
-		config:      cfg,
-		kv:          db,
-		machine:     machine.New(),
-		collections: safe.NewMap(map[string]*collectionSchema{}),
-		optimizer:   defaultOptimizer{},
-		validators:  safe.NewMap(map[string][]ValidatorHook{}),
-		sideEffects: safe.NewMap(map[string][]SideEffectHook{}),
-		whereHooks:  safe.NewMap(map[string][]WhereHook{}),
-		readHooks:   safe.NewMap(map[string][]ReadHook{}),
+		config:       cfg,
+		kv:           db,
+		machine:      machine.New(),
+		collections:  safe.NewMap(map[string]*collectionSchema{}),
+		optimizer:    defaultOptimizer{},
+		initHooks:    safe.NewMap(map[string]OnInit{}),
+		persistHooks: safe.NewMap(map[string][]OnPersist{}),
+		whereHooks:   safe.NewMap(map[string][]OnWhere{}),
+		readHooks:    safe.NewMap(map[string][]OnRead{}),
 	}
 	coll, err := d.getPersistedCollections()
 	if err != nil {
@@ -63,7 +63,14 @@ func New(ctx context.Context, cfg KVConfig, opts ...DBOpt) (*DB, error) {
 	for _, o := range opts {
 		o(d)
 	}
-	return d, nil
+	d.initHooks.RangeR(func(key string, h OnInit) bool {
+		if err = h.Func(ctx, d); err != nil {
+			err = stacktrace.Propagate(err, "")
+			return false
+		}
+		return true
+	})
+	return d, err
 }
 
 // NewTx returns a new transaction. a transaction must call Commit method in order to persist changes
