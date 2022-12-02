@@ -7,12 +7,6 @@ import (
 	"time"
 )
 
-// CollectionConfig holds configuration parameters for setting a collection(s) runtime configuration
-type CollectionConfig struct {
-	Name    string           `json:"name"`
-	Indexes map[string]Index `json:"indexes"`
-}
-
 // KVConfig configures a key value database from the given provider
 type KVConfig struct {
 	// Provider is the name of the kv provider (badger)

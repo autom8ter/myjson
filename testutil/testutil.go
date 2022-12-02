@@ -20,57 +20,7 @@ var (
 	TaskSchema string
 	//go:embed testdata/user.json
 	UserSchema     string
-	TaskCollection = gokvkit.CollectionConfig{
-		Name: "task",
-		Indexes: map[string]gokvkit.Index{
-			"primary": {
-				Collection: "task",
-				Name:       "primary",
-				Fields:     []string{"_id"},
-				Primary:    true,
-			},
-			"user": {
-				Collection: "task",
-				Name:       "task_user_idx",
-				Fields:     []string{"user"},
-				Unique:     false,
-				Primary:    false,
-			},
-		},
-	}
-	UserCollection = gokvkit.CollectionConfig{
-		Name: "user",
-		Indexes: map[string]gokvkit.Index{
-			"primary_idx": {
-				Collection: "user",
-				Name:       "primary_idx",
-				Fields:     []string{"_id"},
-				Primary:    true,
-			},
-			"user_lanaguage_idx": {
-				Collection: "user",
-				Name:       "user_lanaguage_idx",
-				Fields:     []string{"language"},
-				Unique:     false,
-				Primary:    false,
-			},
-			"user_email_idx": {
-				Collection: "user",
-				Name:       "user_email_idx",
-				Fields:     []string{"contact.email"},
-				Unique:     true,
-				Primary:    false,
-			},
-			"user_account_idx": {
-				Collection: "user",
-				Name:       "user_account_idx",
-				Fields:     []string{"account_id"},
-				Unique:     false,
-				Primary:    false,
-			},
-		},
-	}
-	AllCollections = []gokvkit.CollectionConfig{UserCollection, TaskCollection}
+	AllCollections = [][]byte{[]byte(UserSchema), []byte(TaskSchema)}
 )
 
 func NewUserDoc() *gokvkit.Document {
@@ -107,7 +57,7 @@ func NewTaskDoc(usrID string) *gokvkit.Document {
 	return doc
 }
 
-func TestDB(fn func(ctx context.Context, db *gokvkit.DB), collections ...gokvkit.CollectionConfig) error {
+func TestDB(fn func(ctx context.Context, db *gokvkit.DB), collections ...[]byte) error {
 	collections = append(collections, AllCollections...)
 	os.MkdirAll("tmp", 0700)
 	dir, err := ioutil.TempDir("./tmp", "")
@@ -122,16 +72,7 @@ func TestDB(fn func(ctx context.Context, db *gokvkit.DB), collections ...gokvkit
 		Params: map[string]any{
 			"storage_path": dir,
 		},
-	},
-		gokvkit.WithValidatorHooks(map[string][]gokvkit.ValidatorHook{
-			"user": {
-				gokvkit.MustJSONSchema([]byte(UserSchema)),
-			},
-			"task": {
-				gokvkit.MustJSONSchema([]byte(TaskSchema)),
-			},
-		}),
-	)
+	})
 	if err != nil {
 		return err
 	}

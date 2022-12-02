@@ -148,7 +148,7 @@ func (d *DB) persistStateChange(ctx context.Context, mutator kv.Mutator, command
 				return stacktrace.Propagate(err, "")
 			}
 		}
-		for _, i := range d.collections.Get(command.Collection).Indexes {
+		for _, i := range d.collections.Get(command.Collection).indexing {
 			if i.Primary {
 				continue
 			}
@@ -230,7 +230,7 @@ func (d *DB) updateSecondaryIndex(ctx context.Context, mutator kv.Mutator, idx I
 
 func (d *DB) getReadyIndexes(ctx context.Context, collection string) map[string]Index {
 	var indexes = map[string]Index{}
-	for _, i := range d.collections.Get(collection).Indexes {
+	for _, i := range d.collections.Get(collection).indexing {
 		if i.IsBuilding {
 			continue
 		}

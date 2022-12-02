@@ -1,22 +1,6 @@
 {
-  "$id": "https://example.com/task.schema.json",
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "task",
   "type": "object",
-  "@collection": "task",
-  "@primaryKey": "_id",
-  "@indexing": {
-    "searchEnabled": false,
-    "indexes": [
-      {
-        "fields": [
-          "user"
-        ]
-      }
-    ]
-  },
-  "@flags": {},
-  "@annotations": {},
+  "collection": "task",
   "required": [
     "_id",
     "user",
@@ -34,6 +18,24 @@
     "content": {
       "type": "string",
       "description": "The content of the task"
+    }
+  },
+  "indexing": {
+    "primary_idx": {
+      "name": "primary_idx",
+      "unique": true,
+      "primary": true,
+      "fields": [
+        "_id"
+      ]
+    },
+    "user_idx": {
+      "name": "user_idx",
+      "unique": false,
+      "primary": false,
+      "fields": [
+        "user"
+      ]
     }
   }
 }

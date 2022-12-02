@@ -3,7 +3,6 @@ package gokvkit
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
 	"github.com/autom8ter/gokvkit/internal/safe"
 	"github.com/autom8ter/gokvkit/kv"
@@ -158,8 +157,8 @@ func (d *DB) addIndex(ctx context.Context, collection string, index Index) error
 		index.Collection = collection
 	}
 	index.IsBuilding = true
-	d.collections.SetFunc(collection, func(c CollectionConfig) CollectionConfig {
-		c.Indexes[index.Name] = index
+	d.collections.SetFunc(collection, func(c *collectionSchema) *collectionSchema {
+		c.indexing[index.Name] = index
 		return c
 	})
 	batch := d.kv.Batch()
@@ -189,16 +188,16 @@ func (d *DB) addIndex(ctx context.Context, collection string, index Index) error
 		return stacktrace.Propagate(err, "%s - %s", collection, index.Name)
 	}
 	index.IsBuilding = false
-	d.collections.SetFunc(collection, func(c CollectionConfig) CollectionConfig {
-		c.Indexes[index.Name] = index
+	d.collections.SetFunc(collection, func(c *collectionSchema) *collectionSchema {
+		c.indexing[index.Name] = index
 		return c
 	})
 	return nil
 }
 
 func (d *DB) removeIndex(ctx context.Context, collection string, index Index) error {
-	d.collections.SetFunc(collection, func(c CollectionConfig) CollectionConfig {
-		delete(c.Indexes, index.Name)
+	d.collections.SetFunc(collection, func(c *collectionSchema) *collectionSchema {
+		delete(c.indexing, index.Name)
 		return c
 	})
 	batch := d.kv.Batch()
@@ -229,12 +228,8 @@ func (d *DB) removeIndex(ctx context.Context, collection string, index Index) er
 
 func (d *DB) persistIndexes(collection string) error {
 	val := d.collections.Get(collection)
-	bits, err := json.Marshal(&val)
-	if err != nil {
-		return stacktrace.Propagate(err, "")
-	}
 	if err := d.kv.Tx(true, func(tx kv.Tx) error {
-		err := tx.Set([]byte(fmt.Sprintf("internal.indexing.%s", collection)), bits)
+		err := tx.Set([]byte(fmt.Sprintf("internal.indexing.%s", collection)), []byte(val.raw.Raw))
 		if err != nil {
 			return stacktrace.Propagate(err, "")
 		}
@@ -242,13 +237,12 @@ func (d *DB) persistIndexes(collection string) error {
 	}); err != nil {
 		return err
 	}
-
 	return nil
 }
 
-func (d *DB) getPersistedCollections() (*safe.Map[CollectionConfig], error) {
+func (d *DB) getPersistedCollections() (*safe.Map[*collectionSchema], error) {
 	var (
-		collections = safe.NewMap(map[string]CollectionConfig{})
+		collections = safe.NewMap(map[string]*collectionSchema{})
 	)
 	if err := d.kv.Tx(false, func(tx kv.Tx) error {
 		i := tx.NewIterator(kv.IterOpts{
@@ -257,16 +251,16 @@ func (d *DB) getPersistedCollections() (*safe.Map[CollectionConfig], error) {
 		defer i.Close()
 		for i.Valid() {
 			item := i.Item()
-			var cfg CollectionConfig
+
 			bits, err := item.Value()
 			if err != nil {
 				return stacktrace.Propagate(err, "")
 			}
-			err = json.Unmarshal(bits, &cfg)
+			cfg, err := newCollectionSchema(bits)
 			if err != nil {
 				return stacktrace.Propagate(err, "")
 			}
-			collections.Set(cfg.Name, cfg)
+			collections.Set(cfg.collection, cfg)
 			i.Next()
 		}
 		return nil
@@ -276,20 +270,23 @@ func (d *DB) getPersistedCollections() (*safe.Map[CollectionConfig], error) {
 	return collections, nil
 }
 
-func (d *DB) getPersistedCollection(collection string) (CollectionConfig, error) {
-	var cfg CollectionConfig
+func (d *DB) getPersistedCollection(collection string) (*collectionSchema, error) {
+	var cfg *collectionSchema
 	if err := d.kv.Tx(false, func(tx kv.Tx) error {
 		bits, err := tx.Get([]byte(fmt.Sprintf("internal.indexing.%s", collection)))
 		if err != nil {
 			return stacktrace.Propagate(err, "")
 		}
-		err = json.Unmarshal(bits, &cfg)
+		cfg, err = newCollectionSchema(bits)
 		if err != nil {
 			return stacktrace.Propagate(err, "")
 		}
 		return nil
 	}); err != nil {
 		return cfg, stacktrace.Propagate(err, "")
+	}
+	if cfg == nil {
+		return nil, stacktrace.NewError("collection not found")
 	}
 	return cfg, nil
 }

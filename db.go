@@ -19,7 +19,7 @@ type DB struct {
 	config      KVConfig
 	kv          kv.DB
 	machine     machine.Machine
-	collections *safe.Map[CollectionConfig]
+	collections *safe.Map[*collectionSchema]
 	optimizer   Optimizer
 	validators  *safe.Map[[]ValidatorHook]
 	sideEffects *safe.Map[[]SideEffectHook]
@@ -48,7 +48,7 @@ func New(ctx context.Context, cfg KVConfig, opts ...DBOpt) (*DB, error) {
 		config:      cfg,
 		kv:          db,
 		machine:     machine.New(),
-		collections: safe.NewMap(map[string]CollectionConfig{}),
+		collections: safe.NewMap(map[string]*collectionSchema{}),
 		optimizer:   defaultOptimizer{},
 		validators:  safe.NewMap(map[string][]ValidatorHook{}),
 		sideEffects: safe.NewMap(map[string][]SideEffectHook{}),
