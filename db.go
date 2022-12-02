@@ -92,7 +92,7 @@ func (d *DB) Get(ctx context.Context, collection, id string) (*Document, error) 
 	)
 	primaryIndex := d.primaryIndex(collection)
 	if err := d.kv.Tx(false, func(txn kv.Tx) error {
-		val, err := txn.Get(primaryIndex.Seek(map[string]any{
+		val, err := txn.Get(primaryIndex.seekPrefix(map[string]any{
 			d.primaryKey(collection): id,
 		}).SetDocumentID(id).Path())
 		if err != nil {
@@ -119,7 +119,7 @@ func (d *DB) BatchGet(ctx context.Context, collection string, ids []string) (Doc
 	primaryIndex := d.primaryIndex(collection)
 	if err := d.kv.Tx(false, func(txn kv.Tx) error {
 		for _, id := range ids {
-			value, err := txn.Get(primaryIndex.Seek(map[string]any{
+			value, err := txn.Get(primaryIndex.seekPrefix(map[string]any{
 				d.primaryKey(collection): id,
 			}).SetDocumentID(id).Path())
 			if err != nil {

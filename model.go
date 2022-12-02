@@ -258,6 +258,8 @@ const (
 	UpdateDocument = "updateDocument"
 	// DeleteDocument deletes a document
 	DeleteDocument = "deleteDocument"
+	// ReIndexDocuments
+	ReIndexDocuments = "reindexDocuments"
 )
 
 // Command is a command executed against the database that causes a change in state
@@ -292,7 +294,7 @@ func (c *Command) validate() error {
 		return stacktrace.NewError("command: empty command.docID")
 	}
 	switch c.Action {
-	case SetDocument, UpdateDocument, CreateDocument:
+	case SetDocument, UpdateDocument, CreateDocument, ReIndexDocuments:
 		if c.Change == nil {
 			return stacktrace.NewError("command: empty command.change")
 		}

@@ -1,23 +1,24 @@
-package gokvkit_test
+package gokvkit
 
 import (
 	"bytes"
-	"github.com/autom8ter/gokvkit"
-	"github.com/autom8ter/gokvkit/testutil"
+	"fmt"
+	"github.com/brianvoe/gofakeit/v6"
 	"github.com/stretchr/testify/assert"
 	"testing"
+	"time"
 )
 
 func TestIndexing(t *testing.T) {
-	i := &gokvkit.Index{
+	i := &Index{
 		Collection: "user",
 		Name:       "user_account_email_idx",
 		Fields:     []string{"account_id", "contact.email"},
 		Unique:     true,
 		Primary:    false,
 	}
-	u := testutil.NewUserDoc()
-	prefix := i.Seek(u.Value())
+	u := newUserDoc()
+	prefix := i.seekPrefix(u.Value())
 	t.Log(string(prefix.Path()))
 	t.Run("fields", func(t *testing.T) {
 		fields := prefix.Fields()
@@ -39,4 +40,26 @@ func TestIndexing(t *testing.T) {
 		assert.Equal(t, "english", prefix.Fields()[len(prefix.Fields())-1].Value)
 	})
 
+}
+
+func newUserDoc() *Document {
+	doc, err := NewDocumentFrom(map[string]interface{}{
+		"_id":  gofakeit.UUID(),
+		"name": gofakeit.Name(),
+		"contact": map[string]interface{}{
+			"email": fmt.Sprintf("%v.%s", gofakeit.IntRange(0, 100), gofakeit.Email()),
+		},
+		"account_id":      gofakeit.IntRange(0, 100),
+		"language":        gofakeit.Language(),
+		"birthday_month":  gofakeit.Month(),
+		"favorite_number": gofakeit.Second(),
+		"gender":          gofakeit.Gender(),
+		"age":             gofakeit.IntRange(0, 100),
+		"timestamp":       gofakeit.DateRange(time.Now().Truncate(7200*time.Hour), time.Now()),
+		"annotations":     gofakeit.Map(),
+	})
+	if err != nil {
+		panic(err)
+	}
+	return doc
 }

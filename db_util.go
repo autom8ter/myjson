@@ -37,7 +37,7 @@ func (d *DB) updateDocument(ctx context.Context, mutator kv.Mutator, command *Co
 	if err := d.applyValidationHooks(ctx, command); err != nil {
 		return stacktrace.Propagate(err, "")
 	}
-	if err := mutator.Set(primaryIndex.Seek(map[string]any{
+	if err := mutator.Set(primaryIndex.seekPrefix(map[string]any{
 		d.primaryKey(command.Collection): command.DocID,
 	}).SetDocumentID(command.DocID).Path(), command.Change.Bytes()); err != nil {
 		return stacktrace.PropagateWithCode(err, ErrTODO, "failed to batch set documents to primary index")
@@ -60,7 +60,7 @@ func (d *DB) deleteDocument(ctx context.Context, mutator kv.Mutator, command *Co
 	if err := d.applyValidationHooks(ctx, command); err != nil {
 		return stacktrace.Propagate(err, "")
 	}
-	if err := mutator.Delete(primaryIndex.Seek(map[string]any{
+	if err := mutator.Delete(primaryIndex.seekPrefix(map[string]any{
 		d.primaryKey(command.Collection): command.DocID,
 	}).SetDocumentID(command.DocID).Path()); err != nil {
 		return stacktrace.Propagate(err, "failed to batch delete documents")
@@ -89,7 +89,7 @@ func (d *DB) createDocument(ctx context.Context, mutator kv.Mutator, command *Co
 	if err := d.applyValidationHooks(ctx, command); err != nil {
 		return stacktrace.Propagate(err, "")
 	}
-	if err := mutator.Set(primaryIndex.Seek(map[string]any{
+	if err := mutator.Set(primaryIndex.seekPrefix(map[string]any{
 		d.primaryKey(command.Collection): command.DocID,
 	}).SetDocumentID(command.DocID).Path(), command.Change.Bytes()); err != nil {
 		return stacktrace.PropagateWithCode(err, ErrTODO, "failed to batch set documents to primary index")
@@ -112,7 +112,7 @@ func (d *DB) setDocument(ctx context.Context, mutator kv.Mutator, command *Comma
 	if err := d.applyValidationHooks(ctx, command); err != nil {
 		return stacktrace.Propagate(err, "")
 	}
-	if err := mutator.Set(primaryIndex.Seek(map[string]any{
+	if err := mutator.Set(primaryIndex.seekPrefix(map[string]any{
 		d.primaryKey(command.Collection): command.DocID,
 	}).SetDocumentID(command.DocID).Path(), command.Change.Bytes()); err != nil {
 		return stacktrace.PropagateWithCode(err, ErrTODO, "failed to batch set documents to primary index")
@@ -167,7 +167,7 @@ func (d *DB) updateSecondaryIndex(ctx context.Context, mutator kv.Mutator, idx I
 
 	switch command.Action {
 	case DeleteDocument:
-		if err := mutator.Delete(idx.Seek(command.Before.Value()).SetDocumentID(command.DocID).Path()); err != nil {
+		if err := mutator.Delete(idx.seekPrefix(command.Before.Value()).SetDocumentID(command.DocID).Path()); err != nil {
 			return stacktrace.PropagateWithCode(
 				err,
 				ErrTODO,
@@ -178,7 +178,7 @@ func (d *DB) updateSecondaryIndex(ctx context.Context, mutator kv.Mutator, idx I
 		}
 	case SetDocument, UpdateDocument, CreateDocument:
 		if command.Before != nil && command.Before.Valid() {
-			if err := mutator.Delete(idx.Seek(command.Before.Value()).SetDocumentID(command.DocID).Path()); err != nil {
+			if err := mutator.Delete(idx.seekPrefix(command.Before.Value()).SetDocumentID(command.DocID).Path()); err != nil {
 				return stacktrace.PropagateWithCode(
 					err,
 					ErrTODO,
@@ -191,7 +191,7 @@ func (d *DB) updateSecondaryIndex(ctx context.Context, mutator kv.Mutator, idx I
 		if idx.Unique && !idx.Primary && command.Change != nil {
 			if err := d.kv.Tx(false, func(tx kv.Tx) error {
 				it := tx.NewIterator(kv.IterOpts{
-					Prefix: idx.Seek(command.Change.Value()).Path(),
+					Prefix: idx.seekPrefix(command.Change.Value()).Path(),
 				})
 				defer it.Close()
 				for it.Valid() {
@@ -215,7 +215,7 @@ func (d *DB) updateSecondaryIndex(ctx context.Context, mutator kv.Mutator, idx I
 			}
 		}
 		// only persist ids in secondary index - lookup full document in primary index
-		if err := mutator.Set(idx.Seek(command.Change.Value()).SetDocumentID(command.DocID).Path(), []byte(command.DocID)); err != nil {
+		if err := mutator.Set(idx.seekPrefix(command.Change.Value()).SetDocumentID(command.DocID).Path(), []byte(command.DocID)); err != nil {
 			return stacktrace.PropagateWithCode(
 				err,
 				ErrTODO,
@@ -254,7 +254,7 @@ func (d *DB) queryScan(ctx context.Context, scan Scan, handlerFunc ScanFunc) (Op
 	if err != nil {
 		return OptimizerResult{}, stacktrace.Propagate(err, "")
 	}
-	pfx := index.Ref.Seek(index.Values)
+	pfx := index.Ref.seekPrefix(index.Values)
 	if err := d.kv.Tx(false, func(txn kv.Tx) error {
 		opts := kv.IterOpts{
 			Prefix:  pfx.Path(),

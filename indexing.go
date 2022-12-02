@@ -29,10 +29,10 @@ type Index struct {
 	IsBuilding bool `json:"isBuilding"`
 }
 
-// Prefix is a reference to a prefix within an index
-type Prefix interface {
+// indexPrefix is a reference to a prefix within an index
+type indexPrefix interface {
 	// Append appends a field value to an index prefix
-	Append(field string, value any) Prefix
+	Append(field string, value any) indexPrefix
 	// Path returns the full path of the prefix
 	Path() []byte
 	// Fields returns the fields contained in the index prefix
@@ -42,7 +42,7 @@ type Prefix interface {
 	DocumentID() string
 	// SetDocumentID sets the document id as the suffix of the prefix when Path() is called
 	// This allows the index to seek to the position of an individual document
-	SetDocumentID(id string) Prefix
+	SetDocumentID(id string) indexPrefix
 }
 
 // FieldValue is a key value pair
@@ -51,9 +51,9 @@ type FieldValue struct {
 	Value any    `json:"value"`
 }
 
-func (i Index) Seek(fields map[string]any) Prefix {
+func (i Index) seekPrefix(fields map[string]any) indexPrefix {
 	fields, _ = flat.Flatten(fields, nil)
-	var prefix = Prefix(indexPathPrefix{
+	var prefix = indexPrefix(indexPathPrefix{
 		prefix: [][]byte{
 			[]byte("index"),
 			[]byte(i.Collection),
@@ -78,7 +78,7 @@ type indexPathPrefix struct {
 	fieldMap   []FieldValue
 }
 
-func (p indexPathPrefix) Append(field string, value any) Prefix {
+func (p indexPathPrefix) Append(field string, value any) indexPrefix {
 	fields := append(p.fields, []byte(field), encodeIndexValue(value))
 	fieldMap := append(p.fieldMap, FieldValue{
 		Field: field,
@@ -91,7 +91,7 @@ func (p indexPathPrefix) Append(field string, value any) Prefix {
 	}
 }
 
-func (p indexPathPrefix) SetDocumentID(id string) Prefix {
+func (p indexPathPrefix) SetDocumentID(id string) indexPrefix {
 	return indexPathPrefix{
 		prefix:     p.prefix,
 		documentID: id,
@@ -165,6 +165,7 @@ func (d *DB) addIndex(ctx context.Context, collection string, index Index) error
 	batch := d.kv.Batch()
 	meta, _ := GetMetadata(ctx)
 	meta.Set("_internal", true)
+	meta.Set("_reindex", true)
 	if !index.Primary {
 		_, err := d.Scan(meta.ToContext(ctx), Scan{
 			From:  collection,
@@ -201,6 +202,9 @@ func (d *DB) removeIndex(ctx context.Context, collection string, index Index) er
 		return c
 	})
 	batch := d.kv.Batch()
+	meta, _ := GetMetadata(ctx)
+	meta.Set("_internal", true)
+	meta.Set("_reindex", true)
 	_, err := d.queryScan(ctx, Scan{
 		From: collection,
 	}, func(doc *Document) (bool, error) {

@@ -3,30 +3,6 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "user",
   "type": "object",
-  "@collection": "user",
-  "@primaryKey": "_id",
-  "@indexing": {
-    "searchEnabled": true,
-    "indexes": [
-      {
-        "fields": [
-          "contact.email"
-        ]
-      },
-      {
-        "fields": [
-          "account_id"
-        ]
-      },
-      {
-        "fields": [
-          "language"
-        ]
-      }
-    ]
-  },
-  "@flags": {},
-  "@annotations": {},
   "required": [
     "_id",
     "name",
