@@ -8,9 +8,9 @@ import (
 )
 
 var (
-	//go:embed testutil/testdata/task.json
+	//go:embed testutil/testdata/task.yaml
 	taskSchema string
-	//go:embed testutil/testdata/user.json
+	//go:embed testutil/testdata/user.yaml
 	userSchema string
 )
 

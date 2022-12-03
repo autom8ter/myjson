@@ -25,6 +25,7 @@ type DB struct {
 	persistHooks *safe.Map[[]OnPersist]
 	whereHooks   *safe.Map[[]OnWhere]
 	readHooks    *safe.Map[[]OnRead]
+	router       *safe.Router
 }
 
 /*
@@ -54,6 +55,7 @@ func New(ctx context.Context, cfg Config, opts ...DBOpt) (*DB, error) {
 		persistHooks: safe.NewMap(map[string][]OnPersist{}),
 		whereHooks:   safe.NewMap(map[string][]OnWhere{}),
 		readHooks:    safe.NewMap(map[string][]OnRead{}),
+		router:       safe.NewRouter(),
 	}
 	coll, err := d.getPersistedCollections()
 	if err != nil {

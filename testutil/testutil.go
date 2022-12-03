@@ -16,9 +16,9 @@ import (
 )
 
 var (
-	//go:embed testdata/task.json
+	//go:embed testdata/task.yaml
 	TaskSchema string
-	//go:embed testdata/user.json
+	//go:embed testdata/user.yaml
 	UserSchema     string
 	AllCollections = [][]byte{[]byte(UserSchema), []byte(TaskSchema)}
 )

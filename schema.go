@@ -8,9 +8,11 @@ import (
 	"github.com/qri-io/jsonschema"
 	"github.com/spf13/cast"
 	"github.com/tidwall/gjson"
+	"gopkg.in/yaml.v2"
 )
 
 type collectionSchema struct {
+	yamlRaw    []byte
 	collection string
 	indexing   map[string]Index
 	required   []string
@@ -23,14 +25,27 @@ func newCollectionSchema(schemaContent []byte) (*collectionSchema, error) {
 	if len(schemaContent) == 0 {
 		return nil, stacktrace.NewError("empty schema content")
 	}
-	schema := &jsonschema.Schema{}
-	if err := json.Unmarshal(schemaContent, schema); err != nil {
+	var (
+		schema = &jsonschema.Schema{}
+	)
+	var body map[interface{}]interface{}
+	if err := yaml.Unmarshal(schemaContent, &body); err != nil {
+		return nil, stacktrace.Propagate(err, "failed to decode json schema from yaml")
+	}
+	jsonContent, err := json.Marshal(convertMap(body))
+	if err != nil {
+		return nil, stacktrace.Propagate(err, "")
+	}
+	if err := json.Unmarshal(jsonContent, schema); err != nil {
 		return nil, stacktrace.Propagate(err, "failed to decode json schema")
 	}
+
 	var c = &collectionSchema{
-		schema: schema,
+		schema:  schema,
+		yamlRaw: schemaContent,
 	}
-	r := gjson.ParseBytes(schemaContent)
+	r := gjson.ParseBytes(jsonContent)
+
 	if !r.Get("collection").Exists() {
 		return nil, stacktrace.NewError("schema does not have 'collection' property")
 	}
@@ -83,4 +98,17 @@ func (j *collectionSchema) validateCommand(ctx context.Context, command *Command
 		}
 	}
 	return nil
+}
+
+func convertMap(m map[interface{}]interface{}) map[string]interface{} {
+	res := map[string]interface{}{}
+	for k, v := range m {
+		switch v2 := v.(type) {
+		case map[interface{}]interface{}:
+			res[fmt.Sprint(k)] = convertMap(v2)
+		default:
+			res[fmt.Sprint(k)] = v
+		}
+	}
+	return res
 }

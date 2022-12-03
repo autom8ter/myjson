@@ -8,6 +8,7 @@ import (
 	"github.com/autom8ter/gokvkit/kv"
 	"github.com/nqd/flat"
 	"github.com/palantir/stacktrace"
+	"net/http"
 	"reflect"
 	"time"
 )
@@ -271,6 +272,12 @@ func (d *DB) getPersistedCollections() (*safe.Map[*collectionSchema], error) {
 	}); err != nil {
 		return nil, stacktrace.Propagate(err, "")
 	}
+	collections.RangeR(func(key string, c *collectionSchema) bool {
+		d.router.Set(c.collection, "query", http.MethodPost, queryHandler(c.collection, d))
+		d.router.Set(c.collection, "command", http.MethodPost, commandHandler(c.collection, d))
+		d.router.Set(c.collection, "schema", http.MethodPut, schemaHandler(c.collection, d))
+		return true
+	})
 	return collections, nil
 }
 

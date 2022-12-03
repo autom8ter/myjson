@@ -1,0 +1,29 @@
+type: object
+collection: task
+required:
+  - _id
+  - user
+  - content
+properties:
+  _id:
+    type: string
+    description: The user's id.
+  user:
+    type: string
+    description: The id of the user who owns the task
+  content:
+    type: string
+    description: The content of the task
+indexing:
+  primary_idx:
+    name: primary_idx
+    unique: true
+    primary: true
+    fields:
+      - _id
+  user_idx:
+    name: user_idx
+    unique: false
+    primary: false
+    fields:
+      - user

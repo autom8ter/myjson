@@ -4,6 +4,7 @@ import (
 	"context"
 	"github.com/palantir/stacktrace"
 	"github.com/spf13/cast"
+	"net/http"
 )
 
 // ConfigureCollection overwrites a single database collection configuration
@@ -80,6 +81,9 @@ func (d *DB) ConfigureCollection(ctx context.Context, collectionSchemaBytes []by
 	if err := d.persistIndexes(collection.collection); err != nil {
 		return stacktrace.Propagate(err, "")
 	}
+	d.router.Set(collection.collection, "query", http.MethodPost, queryHandler(collection.collection, d))
+	d.router.Set(collection.collection, "command", http.MethodPost, commandHandler(collection.collection, d))
+	d.router.Set(collection.collection, "schema", http.MethodPut, schemaHandler(collection.collection, d))
 	return nil
 }
 
@@ -106,6 +110,10 @@ func (d *DB) primaryKey(collection string) string {
 
 func (d *DB) hasCollection(collection string) bool {
 	return d.collections.Exists(collection)
+}
+
+func (d *DB) getCollectionSchema(collection string) ([]byte, bool) {
+	return []byte(d.collections.Get(collection).raw.Raw), d.hasCollection(collection)
 }
 
 func (d *DB) getPrimaryKey(collection string, doc *Document) string {
