@@ -11,6 +11,8 @@ import (
 
 // Tx is a database transaction interface
 type Tx interface {
+	// Query executes a query against the database
+	Query(ctx context.Context, query model.QueryJson) (model.Page, error)
 	// Create creates a new document - if the documents primary key is unset, it will be set as a sortable unique id
 	Create(ctx context.Context, collection string, document *model.Document) (string, error)
 	// Update updates a value in the database
@@ -37,15 +39,36 @@ type transaction struct {
 func (t *transaction) Commit(ctx context.Context) error {
 	if len(t.commands) >= batchThreshold {
 		batch := t.db.kv.Batch()
+		for _, c := range t.commands {
+			if err := t.db.applyPersistHooks(ctx, t, c, true); err != nil {
+				return stacktrace.Propagate(err, "")
+			}
+		}
 		if err := t.db.persistStateChange(ctx, batch, t.commands); err != nil {
 			return stacktrace.Propagate(err, "")
+		}
+		for _, c := range t.commands {
+			if err := t.db.applyPersistHooks(ctx, t, c, false); err != nil {
+				return stacktrace.Propagate(err, "")
+			}
 		}
 		return stacktrace.Propagate(batch.Flush(), "")
 	}
 	if err := t.db.kv.Tx(true, func(tx kv.Tx) error {
+		for _, c := range t.commands {
+			if err := t.db.applyPersistHooks(ctx, t, c, true); err != nil {
+				return stacktrace.Propagate(err, "")
+			}
+		}
 		if err := t.db.persistStateChange(ctx, tx, t.commands); err != nil {
 			return stacktrace.Propagate(err, "")
 		}
+		for _, c := range t.commands {
+			if err := t.db.applyPersistHooks(ctx, t, c, false); err != nil {
+				return stacktrace.Propagate(err, "")
+			}
+		}
+
 		return nil
 	}); err != nil {
 		return stacktrace.Propagate(err, "")
@@ -130,4 +153,8 @@ func (t *transaction) Delete(ctx context.Context, collection string, id string) 
 		Metadata:   md,
 	})
 	return nil
+}
+
+func (t *transaction) Query(ctx context.Context, query model.QueryJson) (model.Page, error) {
+	return t.db.Query(ctx, query)
 }

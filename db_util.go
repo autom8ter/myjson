@@ -28,16 +28,10 @@ func (d *DB) updateDocument(ctx context.Context, mutator kv.Mutator, command *mo
 		return stacktrace.Propagate(err, "")
 	}
 	command.After = after
-	if err := d.applyPersistHooks(ctx, command, true); err != nil {
-		return stacktrace.Propagate(err, "")
-	}
 	if err := mutator.Set(primaryIndex.SeekPrefix(map[string]any{
 		d.primaryKey(command.Collection): command.DocID,
 	}).SetDocumentID(command.DocID).Path(), command.After.Bytes()); err != nil {
 		return stacktrace.PropagateWithCode(err, ErrTODO, "failed to batch set documents to primary index")
-	}
-	if err := d.applyPersistHooks(ctx, command, false); err != nil {
-		return stacktrace.Propagate(err, "")
 	}
 	return nil
 }
@@ -47,16 +41,10 @@ func (d *DB) deleteDocument(ctx context.Context, mutator kv.Mutator, command *mo
 		return stacktrace.Propagate(err, "")
 	}
 	primaryIndex := d.primaryIndex(command.Collection)
-	if err := d.applyPersistHooks(ctx, command, true); err != nil {
-		return stacktrace.Propagate(err, "")
-	}
 	if err := mutator.Delete(primaryIndex.SeekPrefix(map[string]any{
 		d.primaryKey(command.Collection): command.DocID,
 	}).SetDocumentID(command.DocID).Path()); err != nil {
 		return stacktrace.Propagate(err, "failed to batch delete documents")
-	}
-	if err := d.applyPersistHooks(ctx, command, false); err != nil {
-		return stacktrace.Propagate(err, "")
 	}
 	return nil
 }
@@ -72,16 +60,10 @@ func (d *DB) createDocument(ctx context.Context, mutator kv.Mutator, command *mo
 	if err := command.Validate(); err != nil {
 		return stacktrace.Propagate(err, "")
 	}
-	if err := d.applyPersistHooks(ctx, command, true); err != nil {
-		return stacktrace.Propagate(err, "")
-	}
 	if err := mutator.Set(primaryIndex.SeekPrefix(map[string]any{
 		d.primaryKey(command.Collection): command.DocID,
 	}).SetDocumentID(command.DocID).Path(), command.After.Bytes()); err != nil {
 		return stacktrace.PropagateWithCode(err, ErrTODO, "failed to batch set documents to primary index")
-	}
-	if err := d.applyPersistHooks(ctx, command, false); err != nil {
-		return stacktrace.Propagate(err, "")
 	}
 
 	return nil
@@ -92,16 +74,10 @@ func (d *DB) setDocument(ctx context.Context, mutator kv.Mutator, command *model
 		return stacktrace.Propagate(err, "")
 	}
 	primaryIndex := d.primaryIndex(command.Collection)
-	if err := d.applyPersistHooks(ctx, command, true); err != nil {
-		return stacktrace.Propagate(err, "")
-	}
 	if err := mutator.Set(primaryIndex.SeekPrefix(map[string]any{
 		d.primaryKey(command.Collection): command.DocID,
 	}).SetDocumentID(command.DocID).Path(), command.After.Bytes()); err != nil {
 		return stacktrace.PropagateWithCode(err, ErrTODO, "failed to batch set documents to primary index")
-	}
-	if err := d.applyPersistHooks(ctx, command, false); err != nil {
-		return stacktrace.Propagate(err, "")
 	}
 	return nil
 }
@@ -322,10 +298,10 @@ func (d *DB) applyReadHooks(ctx context.Context, collection string, doc *model.D
 	}
 	return doc, nil
 }
-func (d *DB) applyPersistHooks(ctx context.Context, command *model.Command, before bool) error {
+func (d *DB) applyPersistHooks(ctx context.Context, tx Tx, command *model.Command, before bool) error {
 	for _, sideEffect := range d.persistHooks.Get(command.Collection) {
 		if sideEffect.Before == before {
-			if err := sideEffect.Func(ctx, d, command); err != nil {
+			if err := sideEffect.Func(ctx, tx, command); err != nil {
 				return stacktrace.Propagate(err, "")
 			}
 		}

@@ -13,7 +13,7 @@ type OnPersist struct {
 	// Before indicates whether the hook should execute before or after the command is persisted
 	Before bool
 	// Func is the function to execute
-	Func func(ctx context.Context, db *DB, command *model.Command) error
+	Func func(ctx context.Context, tx Tx, command *model.Command) error
 }
 
 // Valid returns nil if the hook is valid

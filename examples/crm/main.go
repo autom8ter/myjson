@@ -72,9 +72,9 @@ func (c *CRM) Serve(ctx context.Context, port int) error {
 	return http.ListenAndServe(fmt.Sprintf(":%v", port), c.db.Handler())
 }
 
-func cascadeDelete(ctx context.Context, db *gokvkit.DB, command *model.Command) error {
+func cascadeDelete(ctx context.Context, tx gokvkit.Tx, command *model.Command) error {
 	if command.Action == model.Delete {
-		results, err := db.Query(ctx, gokvkit.NewQueryBuilder().From("task").Where(model.QueryJsonWhereElem{
+		results, err := tx.Query(ctx, gokvkit.NewQueryBuilder().From("task").Where(model.QueryJsonWhereElem{
 			Field: "user",
 			Op:    "==",
 			Value: command.DocID,
@@ -83,9 +83,7 @@ func cascadeDelete(ctx context.Context, db *gokvkit.DB, command *model.Command) 
 			return err
 		}
 		for _, result := range results.Documents {
-			err = db.Tx(ctx, func(ctx context.Context, tx gokvkit.Tx) error {
-				return tx.Delete(ctx, "task", result.GetString("_id"))
-			})
+			err = tx.Delete(ctx, "task", result.GetString("_id"))
 			if err != nil {
 				return err
 			}
