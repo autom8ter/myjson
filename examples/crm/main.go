@@ -6,19 +6,22 @@ import (
 	"fmt"
 	"github.com/autom8ter/gokvkit"
 	_ "github.com/autom8ter/gokvkit/kv/badger"
+	"github.com/autom8ter/gokvkit/model"
 	"github.com/autom8ter/gokvkit/testutil"
 	"net/http"
+	"os"
 )
 
 var (
-	//go:embed schemas/task.json
+	//go:embed schemas/task.yaml
 	taskSchema string
-	//go:embed schemas/user.json
+	//go:embed schemas/user.yaml
 	userSchema string
 )
 
 func main() {
-	c, err := newCRM(context.Background(), "./tmp")
+	os.MkdirAll("./tmp/crm", 0700)
+	c, err := newCRM(context.Background(), "./tmp/crm")
 	if err != nil {
 		panic(err)
 	}
@@ -69,9 +72,9 @@ func (c *CRM) Serve(ctx context.Context, port int) error {
 	return http.ListenAndServe(fmt.Sprintf(":%v", port), c.db.Handler())
 }
 
-func cascadeDelete(ctx context.Context, db *gokvkit.DB, command *gokvkit.Command) error {
-	if command.Action == gokvkit.DeleteDocument {
-		results, err := db.Query(ctx, gokvkit.NewQueryBuilder().From("task").Where(gokvkit.Where{
+func cascadeDelete(ctx context.Context, db *gokvkit.DB, command *model.Command) error {
+	if command.Action == model.Delete {
+		results, err := db.Query(ctx, gokvkit.NewQueryBuilder().From("task").Where(model.QueryJsonWhereElem{
 			Field: "user",
 			Op:    "==",
 			Value: command.DocID,

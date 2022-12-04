@@ -1,6 +1,7 @@
 package gokvkit
 
 import (
+	"github.com/autom8ter/gokvkit/model"
 	"github.com/palantir/stacktrace"
 	"github.com/samber/lo"
 )
@@ -8,21 +9,21 @@ import (
 // Optimizer selects the best index from a set of indexes based on where clauses
 type Optimizer interface {
 	// Optimize selects the optimal index to use based on the given where clauses
-	Optimize(indexes map[string]Index, where []Where) (OptimizerResult, error)
+	Optimize(indexes map[string]model.Index, where []model.QueryJsonWhereElem) (model.OptimizerResult, error)
 }
 
 type defaultOptimizer struct{}
 
-func (o defaultOptimizer) Optimize(indexes map[string]Index, where []Where) (OptimizerResult, error) {
+func (o defaultOptimizer) Optimize(indexes map[string]model.Index, where []model.QueryJsonWhereElem) (model.OptimizerResult, error) {
 	if len(indexes) == 0 {
-		return OptimizerResult{}, stacktrace.NewErrorWithCode(ErrTODO, "zero configured indexes")
+		return model.OptimizerResult{}, stacktrace.NewErrorWithCode(ErrTODO, "zero configured indexes")
 	}
 	values := indexableFields(where)
 	var (
-		i = OptimizerResult{
+		i = model.OptimizerResult{
 			Values: values,
 		}
-		primary Index
+		primary model.Index
 	)
 	for _, index := range indexes {
 		if len(index.Fields) == 0 {
@@ -34,7 +35,7 @@ func (o defaultOptimizer) Optimize(indexes map[string]Index, where []Where) (Opt
 		var matchedFields []string
 		for i, field := range index.Fields {
 			if len(where) > i {
-				if field == where[i].Field && (where[i].Op == Eq || where[i].Op == "==") {
+				if field == where[i].Field && where[i].Op == model.QueryJsonWhereElemOpEq {
 					matchedFields = append(matchedFields, field)
 				}
 			}
@@ -51,7 +52,7 @@ func (o defaultOptimizer) Optimize(indexes map[string]Index, where []Where) (Opt
 	if len(i.MatchedFields) > 0 {
 		return i, nil
 	}
-	return OptimizerResult{
+	return model.OptimizerResult{
 		Ref:            primary,
 		MatchedFields:  []string{},
 		Values:         values,
@@ -59,11 +60,11 @@ func (o defaultOptimizer) Optimize(indexes map[string]Index, where []Where) (Opt
 	}, nil
 }
 
-func indexableFields(where []Where) map[string]any {
+func indexableFields(where []model.QueryJsonWhereElem) map[string]any {
 	var whereFields []string
 	var whereValues = map[string]any{}
 	for _, w := range where {
-		if w.Op != "==" && w.Op != Eq {
+		if w.Op != "==" && w.Op != model.QueryJsonWhereElemOpEq {
 			continue
 		}
 		whereFields = append(whereFields, w.Field)

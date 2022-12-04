@@ -2,6 +2,7 @@ package gokvkit
 
 import (
 	"context"
+	"github.com/autom8ter/gokvkit/model"
 	"github.com/palantir/stacktrace"
 	"github.com/spf13/cast"
 	"net/http"
@@ -9,14 +10,14 @@ import (
 
 // ConfigureCollection overwrites a single database collection configuration
 func (d *DB) ConfigureCollection(ctx context.Context, collectionSchemaBytes []byte) error {
-	meta, _ := GetMetadata(ctx)
+	meta, _ := model.GetMetadata(ctx)
 	meta.Set("_internal", true)
 	ctx = meta.ToContext(ctx)
 	collection, err := newCollectionSchema(collectionSchemaBytes)
 
 	var (
 		hasPrimary = 0
-		primary    Index
+		primary    model.Index
 	)
 	for _, v := range collection.indexing {
 		v.Collection = collection.collection
@@ -31,7 +32,7 @@ func (d *DB) ConfigureCollection(ctx context.Context, collectionSchemaBytes []by
 	existing, _ := d.getPersistedCollection(collection.collection)
 
 	if existing == nil {
-		existing = &collectionSchema{collection: collection.collection, indexing: map[string]Index{}}
+		existing = &collectionSchema{collection: collection.collection, indexing: map[string]model.Index{}}
 	}
 
 	var (
@@ -88,7 +89,7 @@ func (d *DB) ConfigureCollection(ctx context.Context, collectionSchemaBytes []by
 }
 
 // Indexes returns a list of indexes that are registered in the collection
-func (d *DB) Indexes(collection string) map[string]Index {
+func (d *DB) Indexes(collection string) map[string]model.Index {
 	return d.collections.Get(collection).indexing
 }
 
@@ -116,7 +117,7 @@ func (d *DB) getCollectionSchema(collection string) ([]byte, bool) {
 	return []byte(d.collections.Get(collection).raw.Raw), d.hasCollection(collection)
 }
 
-func (d *DB) getPrimaryKey(collection string, doc *Document) string {
+func (d *DB) getPrimaryKey(collection string, doc *model.Document) string {
 	if d == nil {
 		return ""
 	}
@@ -124,17 +125,17 @@ func (d *DB) getPrimaryKey(collection string, doc *Document) string {
 	return cast.ToString(doc.GetString(pkey))
 }
 
-func (d *DB) setPrimaryKey(collection string, doc *Document, id string) error {
+func (d *DB) setPrimaryKey(collection string, doc *model.Document, id string) error {
 	pkey := d.primaryKey(collection)
 	return stacktrace.Propagate(doc.Set(pkey, id), "failed to set primary key")
 }
 
-func (d *DB) primaryIndex(collection string) Index {
+func (d *DB) primaryIndex(collection string) model.Index {
 	indexes := d.collections.Get(collection).indexing
 	for _, index := range indexes {
 		if index.Primary {
 			return index
 		}
 	}
-	return Index{}
+	return model.Index{}
 }

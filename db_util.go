@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"github.com/autom8ter/gokvkit/kv"
+	"github.com/autom8ter/gokvkit/model"
 	"github.com/nqd/flat"
 	"github.com/palantir/stacktrace"
 	"github.com/segmentio/ksuid"
@@ -12,13 +13,13 @@ import (
 
 const batchThreshold = 10
 
-func (d *DB) updateDocument(ctx context.Context, mutator kv.Mutator, command *Command) error {
-	if err := command.validate(); err != nil {
+func (d *DB) updateDocument(ctx context.Context, mutator kv.Mutator, command *model.Command) error {
+	if err := command.Validate(); err != nil {
 		return stacktrace.Propagate(err, "")
 	}
 	primaryIndex := d.primaryIndex(command.Collection)
 	after := command.Before.Clone()
-	flattened, err := flat.Flatten(command.Change.Value(), nil)
+	flattened, err := flat.Flatten(command.After.Value(), nil)
 	if err != nil {
 		return stacktrace.Propagate(err, "")
 	}
@@ -26,100 +27,113 @@ func (d *DB) updateDocument(ctx context.Context, mutator kv.Mutator, command *Co
 	if err != nil {
 		return stacktrace.Propagate(err, "")
 	}
-	command.Change = after
-	if err := d.applyPersistHooks(ctx, command); err != nil {
+	command.After = after
+	if err := d.applyPersistHooks(ctx, command, true); err != nil {
 		return stacktrace.Propagate(err, "")
 	}
-	if err := mutator.Set(primaryIndex.seekPrefix(map[string]any{
+	if err := mutator.Set(primaryIndex.SeekPrefix(map[string]any{
 		d.primaryKey(command.Collection): command.DocID,
-	}).SetDocumentID(command.DocID).Path(), command.Change.Bytes()); err != nil {
+	}).SetDocumentID(command.DocID).Path(), command.After.Bytes()); err != nil {
 		return stacktrace.PropagateWithCode(err, ErrTODO, "failed to batch set documents to primary index")
+	}
+	if err := d.applyPersistHooks(ctx, command, false); err != nil {
+		return stacktrace.Propagate(err, "")
 	}
 	return nil
 }
 
-func (d *DB) deleteDocument(ctx context.Context, mutator kv.Mutator, command *Command) error {
-	if err := command.validate(); err != nil {
+func (d *DB) deleteDocument(ctx context.Context, mutator kv.Mutator, command *model.Command) error {
+	if err := command.Validate(); err != nil {
 		return stacktrace.Propagate(err, "")
 	}
 	primaryIndex := d.primaryIndex(command.Collection)
-	if err := d.applyPersistHooks(ctx, command); err != nil {
+	if err := d.applyPersistHooks(ctx, command, true); err != nil {
 		return stacktrace.Propagate(err, "")
 	}
-	if err := mutator.Delete(primaryIndex.seekPrefix(map[string]any{
+	if err := mutator.Delete(primaryIndex.SeekPrefix(map[string]any{
 		d.primaryKey(command.Collection): command.DocID,
 	}).SetDocumentID(command.DocID).Path()); err != nil {
 		return stacktrace.Propagate(err, "failed to batch delete documents")
 	}
+	if err := d.applyPersistHooks(ctx, command, false); err != nil {
+		return stacktrace.Propagate(err, "")
+	}
 	return nil
 }
 
-func (d *DB) createDocument(ctx context.Context, mutator kv.Mutator, command *Command) error {
+func (d *DB) createDocument(ctx context.Context, mutator kv.Mutator, command *model.Command) error {
 	primaryIndex := d.primaryIndex(command.Collection)
 	if command.DocID == "" {
 		command.DocID = ksuid.New().String()
-		if err := d.setPrimaryKey(command.Collection, command.Change, command.DocID); err != nil {
+		if err := d.setPrimaryKey(command.Collection, command.After, command.DocID); err != nil {
 			return stacktrace.Propagate(err, "")
 		}
 	}
-	if err := command.validate(); err != nil {
+	if err := command.Validate(); err != nil {
 		return stacktrace.Propagate(err, "")
 	}
-	if err := d.applyPersistHooks(ctx, command); err != nil {
+	if err := d.applyPersistHooks(ctx, command, true); err != nil {
 		return stacktrace.Propagate(err, "")
 	}
-	if err := mutator.Set(primaryIndex.seekPrefix(map[string]any{
+	if err := mutator.Set(primaryIndex.SeekPrefix(map[string]any{
 		d.primaryKey(command.Collection): command.DocID,
-	}).SetDocumentID(command.DocID).Path(), command.Change.Bytes()); err != nil {
+	}).SetDocumentID(command.DocID).Path(), command.After.Bytes()); err != nil {
 		return stacktrace.PropagateWithCode(err, ErrTODO, "failed to batch set documents to primary index")
 	}
+	if err := d.applyPersistHooks(ctx, command, false); err != nil {
+		return stacktrace.Propagate(err, "")
+	}
+
 	return nil
 }
 
-func (d *DB) setDocument(ctx context.Context, mutator kv.Mutator, command *Command) error {
-	if err := command.validate(); err != nil {
+func (d *DB) setDocument(ctx context.Context, mutator kv.Mutator, command *model.Command) error {
+	if err := command.Validate(); err != nil {
 		return stacktrace.Propagate(err, "")
 	}
 	primaryIndex := d.primaryIndex(command.Collection)
-	if err := d.applyPersistHooks(ctx, command); err != nil {
+	if err := d.applyPersistHooks(ctx, command, true); err != nil {
 		return stacktrace.Propagate(err, "")
 	}
-	if err := mutator.Set(primaryIndex.seekPrefix(map[string]any{
+	if err := mutator.Set(primaryIndex.SeekPrefix(map[string]any{
 		d.primaryKey(command.Collection): command.DocID,
-	}).SetDocumentID(command.DocID).Path(), command.Change.Bytes()); err != nil {
+	}).SetDocumentID(command.DocID).Path(), command.After.Bytes()); err != nil {
 		return stacktrace.PropagateWithCode(err, ErrTODO, "failed to batch set documents to primary index")
+	}
+	if err := d.applyPersistHooks(ctx, command, false); err != nil {
+		return stacktrace.Propagate(err, "")
 	}
 	return nil
 }
 
-func (d *DB) persistStateChange(ctx context.Context, mutator kv.Mutator, commands []*Command) error {
+func (d *DB) persistStateChange(ctx context.Context, mutator kv.Mutator, commands []*model.Command) error {
 	for _, command := range commands {
 		if command.Timestamp.IsZero() {
 			command.Timestamp = time.Now()
 		}
 		if command.Metadata == nil {
-			md, _ := GetMetadata(ctx)
+			md, _ := model.GetMetadata(ctx)
 			command.Metadata = md
 		}
 		before, _ := d.Get(ctx, command.Collection, command.DocID)
 		if before == nil || !before.Valid() {
-			before = NewDocument()
+			before = model.NewDocument()
 		}
 		command.Before = before
 		switch command.Action {
-		case UpdateDocument:
+		case model.Update:
 			if err := d.updateDocument(ctx, mutator, command); err != nil {
 				return stacktrace.Propagate(err, "")
 			}
-		case CreateDocument:
+		case model.Create:
 			if err := d.createDocument(ctx, mutator, command); err != nil {
 				return stacktrace.Propagate(err, "")
 			}
-		case DeleteDocument:
+		case model.Delete:
 			if err := d.deleteDocument(ctx, mutator, command); err != nil {
 				return stacktrace.Propagate(err, "")
 			}
-		case SetDocument:
+		case model.Set:
 			if err := d.setDocument(ctx, mutator, command); err != nil {
 				return stacktrace.Propagate(err, "")
 			}
@@ -136,14 +150,14 @@ func (d *DB) persistStateChange(ctx context.Context, mutator kv.Mutator, command
 	return nil
 }
 
-func (d *DB) updateSecondaryIndex(ctx context.Context, mutator kv.Mutator, idx Index, command *Command) error {
+func (d *DB) updateSecondaryIndex(ctx context.Context, mutator kv.Mutator, idx model.Index, command *model.Command) error {
 	if idx.Primary {
 		return nil
 	}
 
 	switch command.Action {
-	case DeleteDocument:
-		if err := mutator.Delete(idx.seekPrefix(command.Before.Value()).SetDocumentID(command.DocID).Path()); err != nil {
+	case model.Delete:
+		if err := mutator.Delete(idx.SeekPrefix(command.Before.Value()).SetDocumentID(command.DocID).Path()); err != nil {
 			return stacktrace.PropagateWithCode(
 				err,
 				ErrTODO,
@@ -152,9 +166,9 @@ func (d *DB) updateSecondaryIndex(ctx context.Context, mutator kv.Mutator, idx I
 				command.DocID,
 			)
 		}
-	case SetDocument, UpdateDocument, CreateDocument:
-		if command.Before != nil && command.Before.Valid() {
-			if err := mutator.Delete(idx.seekPrefix(command.Before.Value()).SetDocumentID(command.DocID).Path()); err != nil {
+	case model.Set, model.Update, model.Create:
+		if command.Before != nil {
+			if err := mutator.Delete(idx.SeekPrefix(command.Before.Value()).SetDocumentID(command.DocID).Path()); err != nil {
 				return stacktrace.PropagateWithCode(
 					err,
 					ErrTODO,
@@ -164,10 +178,10 @@ func (d *DB) updateSecondaryIndex(ctx context.Context, mutator kv.Mutator, idx I
 				)
 			}
 		}
-		if idx.Unique && !idx.Primary && command.Change != nil {
+		if idx.Unique && !idx.Primary && command.After != nil {
 			if err := d.kv.Tx(false, func(tx kv.Tx) error {
 				it := tx.NewIterator(kv.IterOpts{
-					Prefix: idx.seekPrefix(command.Change.Value()).Path(),
+					Prefix: idx.SeekPrefix(command.After.Value()).Path(),
 				})
 				defer it.Close()
 				for it.Valid() {
@@ -191,7 +205,7 @@ func (d *DB) updateSecondaryIndex(ctx context.Context, mutator kv.Mutator, idx I
 			}
 		}
 		// only persist ids in secondary index - lookup full document in primary index
-		if err := mutator.Set(idx.seekPrefix(command.Change.Value()).SetDocumentID(command.DocID).Path(), []byte(command.DocID)); err != nil {
+		if err := mutator.Set(idx.SeekPrefix(command.After.Value()).SetDocumentID(command.DocID).Path(), []byte(command.DocID)); err != nil {
 			return stacktrace.PropagateWithCode(
 				err,
 				ErrTODO,
@@ -204,8 +218,8 @@ func (d *DB) updateSecondaryIndex(ctx context.Context, mutator kv.Mutator, idx I
 	return nil
 }
 
-func (d *DB) getReadyIndexes(ctx context.Context, collection string) map[string]Index {
-	var indexes = map[string]Index{}
+func (d *DB) getReadyIndexes(ctx context.Context, collection string) map[string]model.Index {
+	var indexes = map[string]model.Index{}
 	for _, i := range d.collections.Get(collection).indexing {
 		if i.IsBuilding {
 			continue
@@ -215,22 +229,22 @@ func (d *DB) getReadyIndexes(ctx context.Context, collection string) map[string]
 	return indexes
 }
 
-func (d *DB) queryScan(ctx context.Context, scan Scan, handlerFunc ScanFunc) (OptimizerResult, error) {
+func (d *DB) queryScan(ctx context.Context, scan model.Scan, handlerFunc model.ScanFunc) (model.OptimizerResult, error) {
 	if handlerFunc == nil {
-		return OptimizerResult{}, stacktrace.NewError("empty scan handler")
+		return model.OptimizerResult{}, stacktrace.NewError("empty scan handler")
 	}
 	var err error
 	scan.Where, err = d.applyWhereHooks(ctx, scan.From, scan.Where)
 	if err != nil {
-		return OptimizerResult{}, stacktrace.Propagate(err, "")
+		return model.OptimizerResult{}, stacktrace.Propagate(err, "")
 	}
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	index, err := d.optimizer.Optimize(d.getReadyIndexes(ctx, scan.From), scan.Where)
 	if err != nil {
-		return OptimizerResult{}, stacktrace.Propagate(err, "")
+		return model.OptimizerResult{}, stacktrace.Propagate(err, "")
 	}
-	pfx := index.Ref.seekPrefix(index.Values)
+	pfx := index.Ref.SeekPrefix(index.Values)
 	if err := d.kv.Tx(false, func(txn kv.Tx) error {
 		opts := kv.IterOpts{
 			Prefix:  pfx.Path(),
@@ -242,13 +256,13 @@ func (d *DB) queryScan(ctx context.Context, scan Scan, handlerFunc ScanFunc) (Op
 		for it.Valid() {
 			item := it.Item()
 
-			var document *Document
+			var document *model.Document
 			if index.IsPrimaryIndex {
 				bits, err := item.Value()
 				if err != nil {
 					return stacktrace.Propagate(err, "")
 				}
-				document, err = NewDocumentFromBytes(bits)
+				document, err = model.NewDocumentFromBytes(bits)
 				if err != nil {
 					return stacktrace.Propagate(err, "")
 				}
@@ -287,7 +301,7 @@ func (d *DB) queryScan(ctx context.Context, scan Scan, handlerFunc ScanFunc) (Op
 	return index, nil
 }
 
-func (d *DB) applyWhereHooks(ctx context.Context, collection string, where []Where) ([]Where, error) {
+func (d *DB) applyWhereHooks(ctx context.Context, collection string, where []model.QueryJsonWhereElem) ([]model.QueryJsonWhereElem, error) {
 	var err error
 	for _, whereHook := range d.whereHooks.Get(collection) {
 		where, err = whereHook.Func(ctx, d, where)
@@ -298,7 +312,7 @@ func (d *DB) applyWhereHooks(ctx context.Context, collection string, where []Whe
 	return where, nil
 }
 
-func (d *DB) applyReadHooks(ctx context.Context, collection string, doc *Document) (*Document, error) {
+func (d *DB) applyReadHooks(ctx context.Context, collection string, doc *model.Document) (*model.Document, error) {
 	var err error
 	for _, readHook := range d.readHooks.Get(collection) {
 		doc, err = readHook.Func(ctx, d, doc)
@@ -308,10 +322,12 @@ func (d *DB) applyReadHooks(ctx context.Context, collection string, doc *Documen
 	}
 	return doc, nil
 }
-func (d *DB) applyPersistHooks(ctx context.Context, command *Command) error {
+func (d *DB) applyPersistHooks(ctx context.Context, command *model.Command, before bool) error {
 	for _, sideEffect := range d.persistHooks.Get(command.Collection) {
-		if err := sideEffect.Func(ctx, d, command); err != nil {
-			return stacktrace.Propagate(err, "")
+		if sideEffect.Before == before {
+			if err := sideEffect.Func(ctx, d, command); err != nil {
+				return stacktrace.Propagate(err, "")
+			}
 		}
 	}
 	return nil

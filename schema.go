@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/autom8ter/gokvkit/internal/util"
+	"github.com/autom8ter/gokvkit/model"
 	"github.com/palantir/stacktrace"
 	"github.com/qri-io/jsonschema"
 	"github.com/spf13/cast"
@@ -14,7 +16,7 @@ import (
 type collectionSchema struct {
 	yamlRaw    []byte
 	collection string
-	indexing   map[string]Index
+	indexing   map[string]model.Index
 	required   []string
 	properties map[string]any
 	schema     *jsonschema.Schema
@@ -32,7 +34,7 @@ func newCollectionSchema(schemaContent []byte) (*collectionSchema, error) {
 	if err := yaml.Unmarshal(schemaContent, &body); err != nil {
 		return nil, stacktrace.Propagate(err, "failed to decode json schema from yaml")
 	}
-	jsonContent, err := json.Marshal(convertMap(body))
+	jsonContent, err := json.Marshal(util.ConvertMap(body))
 	if err != nil {
 		return nil, stacktrace.Propagate(err, "")
 	}
@@ -60,7 +62,7 @@ func newCollectionSchema(schemaContent []byte) (*collectionSchema, error) {
 	if !r.Get("indexing").IsObject() {
 		return nil, stacktrace.NewError("'indexing' property must be an object")
 	}
-	if err := Decode(r.Get("indexing").Value(), &c.indexing); err != nil {
+	if err := util.Decode(r.Get("indexing").Value(), &c.indexing); err != nil {
 		return nil, stacktrace.Propagate(err, "")
 	}
 	c.properties = cast.ToStringMap(r.Get("collection").Value())
@@ -84,31 +86,15 @@ func (j *collectionSchema) UnmarshalJSON(bytes []byte) error {
 	return nil
 }
 
-func (j *collectionSchema) validateCommand(ctx context.Context, command *Command) error {
+func (j *collectionSchema) validateCommand(ctx context.Context, command *model.Command) error {
 	switch command.Action {
-	case UpdateDocument, CreateDocument, SetDocument:
-		if command.Change != nil {
-			kerrs, err := j.schema.ValidateBytes(ctx, command.Change.Bytes())
-			if err != nil {
-				return stacktrace.Propagate(err, "")
-			}
-			if len(kerrs) > 0 {
-				return fmt.Errorf(JSONString(&kerrs))
+	case model.Update, model.Create, model.Set:
+		if command.After != nil {
+			kerrs := j.schema.Validate(ctx, command.After).Errs
+			if kerrs != nil && len(*kerrs) > 0 {
+				return fmt.Errorf(util.JSONString(&kerrs))
 			}
 		}
 	}
 	return nil
-}
-
-func convertMap(m map[interface{}]interface{}) map[string]interface{} {
-	res := map[string]interface{}{}
-	for k, v := range m {
-		switch v2 := v.(type) {
-		case map[interface{}]interface{}:
-			res[fmt.Sprint(k)] = convertMap(v2)
-		default:
-			res[fmt.Sprint(k)] = v
-		}
-	}
-	return res
 }

@@ -1,8 +1,9 @@
-package gokvkit
+package model
 
 import (
 	"context"
 	"encoding/json"
+	"github.com/autom8ter/gokvkit/internal/util"
 	flat2 "github.com/nqd/flat"
 	"github.com/palantir/stacktrace"
 	"github.com/samber/lo"
@@ -89,7 +90,7 @@ func (d *Document) Clone() *Document {
 }
 
 // Select returns the document with only the selected fields populated
-func (d *Document) Select(fields []SelectField) error {
+func (d *Document) Select(fields []QueryJsonSelectElem) error {
 	if len(fields) == 0 || fields[0].Field == "*" {
 		return nil
 	}
@@ -99,10 +100,12 @@ func (d *Document) Select(fields []SelectField) error {
 
 	patch := map[string]interface{}{}
 	for _, f := range fields {
-		if f.As == "" {
-			f.As = defaultAs(f.Function, f.Field)
+		if !util.IsNil(f.As) && *f.As == "" {
+			if !util.IsNil(f.Aggregate) {
+				f.As = util.ToPtr(defaultAs(*f.Aggregate, f.Field))
+			}
 		}
-		patch[f.As] = d.Get(f.Field)
+		patch[*f.As] = d.Get(f.Field)
 	}
 	err := selected.SetAll(patch)
 	if err != nil {
@@ -210,34 +213,34 @@ func (d *Document) DelAll(fields ...string) error {
 }
 
 // Where executes the where clauses against the document and returns true if it passes the clauses
-func (d *Document) Where(wheres []Where) (bool, error) {
+func (d *Document) Where(wheres []QueryJsonWhereElem) (bool, error) {
 	for _, w := range wheres {
 		switch w.Op {
-		case "==", Eq:
+		case "==":
 			if w.Value != d.Get(w.Field) {
 				return false, nil
 			}
-		case "!=", Neq:
+		case "!=":
 			if w.Value == d.Get(w.Field) {
 				return false, nil
 			}
-		case ">", Gt:
+		case ">":
 			if d.GetFloat(w.Field) <= cast.ToFloat64(w.Value) {
 				return false, nil
 			}
-		case ">=", Gte:
+		case ">=":
 			if d.GetFloat(w.Field) < cast.ToFloat64(w.Value) {
 				return false, nil
 			}
-		case "<", Lt:
+		case "<":
 			if d.GetFloat(w.Field) >= cast.ToFloat64(w.Value) {
 				return false, nil
 			}
-		case "<=", Lte:
+		case "<=":
 			if d.GetFloat(w.Field) > cast.ToFloat64(w.Value) {
 				return false, nil
 			}
-		case In:
+		case "in":
 			bits, _ := json.Marshal(w.Value)
 			arr := gjson.ParseBytes(bits).Array()
 			value := d.Get(w.Field)
@@ -251,7 +254,7 @@ func (d *Document) Where(wheres []Where) (bool, error) {
 				return false, nil
 			}
 
-		case Contains:
+		case "contains":
 			if !strings.Contains(d.GetString(w.Field), cast.ToString(w.Value)) {
 				return false, nil
 			}
@@ -264,7 +267,7 @@ func (d *Document) Where(wheres []Where) (bool, error) {
 
 // Scan scans the json document into the value
 func (d *Document) Scan(value any) error {
-	return Decode(d.Value(), &value)
+	return util.Decode(d.Value(), &value)
 }
 
 // Encode encodes the json document to the io writer
@@ -314,14 +317,14 @@ func (documents Documents) ForEach(fn func(next *Document, i int)) {
 }
 
 // OrderBy orders the documents by the OrderBy clause
-func (d Documents) OrderBy(orderBys []OrderBy) Documents {
+func (d Documents) OrderBy(orderBys []QueryJsonOrderByElem) Documents {
 	if len(orderBys) == 0 {
 		return d
 	}
 	// TODO: support more than one order by
 	orderBy := orderBys[0]
 
-	if orderBy.Direction == DESC {
+	if orderBy.Direction == QueryJsonOrderByElemDirectionDesc {
 		sort.Slice(d, func(i, j int) bool {
 			index := 1
 			if d[i].Get(orderBy.Field) != d[j].Get(orderBy.Field) {
@@ -333,7 +336,7 @@ func (d Documents) OrderBy(orderBys []OrderBy) Documents {
 					return compareField(order.Field, d[i], d[j])
 				}
 				if d[i].Get(order.Field) != d[j].Get(order.Field) {
-					if order.Direction == DESC {
+					if order.Direction == QueryJsonOrderByElemDirectionDesc {
 						if d[i].Get(orderBy.Field) != d[j].Get(orderBy.Field) {
 							return compareField(orderBy.Field, d[i], d[j])
 						}
@@ -359,7 +362,7 @@ func (d Documents) OrderBy(orderBys []OrderBy) Documents {
 					return !compareField(order.Field, d[i], d[j])
 				}
 				if d[i].Get(order.Field) != d[j].Get(order.Field) {
-					if order.Direction == DESC {
+					if order.Direction == QueryJsonOrderByElemDirectionDesc {
 						if d[i].Get(orderBy.Field) != d[j].Get(orderBy.Field) {
 							return compareField(orderBy.Field, d[i], d[j])
 						}
@@ -379,7 +382,7 @@ func (d Documents) OrderBy(orderBys []OrderBy) Documents {
 }
 
 // Aggregate reduces the documents with the input aggregates
-func (d Documents) Aggregate(ctx context.Context, aggregates []SelectField) (*Document, error) {
+func (d Documents) Aggregate(ctx context.Context, aggregates []QueryJsonSelectElem) (*Document, error) {
 	var (
 		aggregated *Document
 	)
@@ -388,33 +391,33 @@ func (d Documents) Aggregate(ctx context.Context, aggregates []SelectField) (*Do
 			aggregated = next
 		}
 		for _, agg := range aggregates {
-			if agg.As == "" {
-				agg.As = defaultAs(agg.Function, agg.Field)
+			if util.IsNil(agg.As) {
+				agg.As = util.ToPtr(defaultAs(*agg.Aggregate, agg.Field))
 			}
-			if !agg.Function.IsAggregate() {
-				if err := aggregated.Set(agg.As, aggregated.Get(agg.Field)); err != nil {
+			if agg.Aggregate == nil {
+				if err := aggregated.Set(*agg.As, aggregated.Get(agg.Field)); err != nil {
 					return nil, stacktrace.Propagate(err, "")
 				}
 				continue
 			}
-			current := aggregated.GetFloat(agg.As)
-			switch agg.Function {
-			case COUNT:
+			current := aggregated.GetFloat(*agg.As)
+			switch *agg.Aggregate {
+			case QueryJsonSelectElemAggregateCount:
 				current++
-			case MAX:
+			case QueryJsonSelectElemAggregateMax:
 				if value := next.GetFloat(agg.Field); value > current {
 					current = value
 				}
-			case MIN:
+			case QueryJsonSelectElemAggregateMin:
 				if value := next.GetFloat(agg.Field); value < current {
 					current = value
 				}
-			case SUM:
+			case QueryJsonSelectElemAggregateSum:
 				current += next.GetFloat(agg.Field)
 			default:
-				return nil, stacktrace.NewError("unsupported aggregate function: %s/%s", agg.Field, agg.Function)
+				return nil, stacktrace.NewError("unsupported aggregate function: %s/%s", agg.Field, *agg.Aggregate)
 			}
-			if err := aggregated.Set(agg.As, current); err != nil {
+			if err := aggregated.Set(*agg.As, current); err != nil {
 				return nil, stacktrace.Propagate(err, "")
 			}
 		}

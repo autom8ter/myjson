@@ -1,6 +1,7 @@
 package gokvkit
 
 import (
+	"github.com/autom8ter/gokvkit/model"
 	"github.com/brianvoe/gofakeit/v6"
 	"github.com/stretchr/testify/assert"
 	"testing"
@@ -8,7 +9,7 @@ import (
 
 func TestOptimizer(t *testing.T) {
 	o := defaultOptimizer{}
-	indexes := map[string]Index{
+	indexes := map[string]model.Index{
 		"primary_idx": {
 			Collection: "testing",
 			Name:       "primary_idx",
@@ -32,7 +33,7 @@ func TestOptimizer(t *testing.T) {
 		},
 	}
 	t.Run("select secondary index", func(t *testing.T) {
-		i, err := o.Optimize(indexes, []Where{
+		i, err := o.Optimize(indexes, []model.QueryJsonWhereElem{
 			{
 				Field: "email",
 				Op:    "==",
@@ -45,7 +46,7 @@ func TestOptimizer(t *testing.T) {
 	})
 
 	t.Run("select primary index", func(t *testing.T) {
-		i, err := o.Optimize(indexes, []Where{
+		i, err := o.Optimize(indexes, []model.QueryJsonWhereElem{
 			{
 				Field: "_id",
 				Op:    "==",
@@ -58,7 +59,7 @@ func TestOptimizer(t *testing.T) {
 	})
 
 	t.Run("select secondary index (multi-field)", func(t *testing.T) {
-		i, err := o.Optimize(indexes, []Where{
+		i, err := o.Optimize(indexes, []model.QueryJsonWhereElem{
 			{
 				Field: "account_id",
 				Op:    "==",
@@ -76,7 +77,7 @@ func TestOptimizer(t *testing.T) {
 		assert.Equal(t, "language", i.MatchedFields[1])
 	})
 	t.Run("select secondary index (multi-field wrong order)", func(t *testing.T) {
-		i, err := o.Optimize(indexes, []Where{
+		i, err := o.Optimize(indexes, []model.QueryJsonWhereElem{
 			{
 				Field: "language",
 				Op:    "==",
@@ -92,7 +93,7 @@ func TestOptimizer(t *testing.T) {
 		assert.Equal(t, true, i.IsPrimaryIndex)
 	})
 	t.Run("select secondary index (multi-field partial match)", func(t *testing.T) {
-		i, err := o.Optimize(indexes, []Where{
+		i, err := o.Optimize(indexes, []model.QueryJsonWhereElem{
 			{
 				Field: "account_id",
 				Op:    "==",
@@ -104,7 +105,7 @@ func TestOptimizer(t *testing.T) {
 		assert.Equal(t, "account_id", i.MatchedFields[0])
 	})
 	t.Run("select secondary index (multi-field partial match (!=))", func(t *testing.T) {
-		i, err := o.Optimize(indexes, []Where{
+		i, err := o.Optimize(indexes, []model.QueryJsonWhereElem{
 			{
 				Field: "account_id",
 				Op:    "!=",

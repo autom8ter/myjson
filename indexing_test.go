@@ -3,6 +3,7 @@ package gokvkit
 import (
 	"bytes"
 	"fmt"
+	"github.com/autom8ter/gokvkit/model"
 	"github.com/brianvoe/gofakeit/v6"
 	"github.com/stretchr/testify/assert"
 	"testing"
@@ -10,7 +11,7 @@ import (
 )
 
 func TestIndexing(t *testing.T) {
-	i := &Index{
+	i := &model.Index{
 		Collection: "user",
 		Name:       "user_account_email_idx",
 		Fields:     []string{"account_id", "contact.email"},
@@ -18,7 +19,7 @@ func TestIndexing(t *testing.T) {
 		Primary:    false,
 	}
 	u := newUserDoc()
-	prefix := i.seekPrefix(u.Value())
+	prefix := i.SeekPrefix(u.Value())
 	t.Log(string(prefix.Path()))
 	t.Run("fields", func(t *testing.T) {
 		fields := prefix.Fields()
@@ -42,8 +43,8 @@ func TestIndexing(t *testing.T) {
 
 }
 
-func newUserDoc() *Document {
-	doc, err := NewDocumentFrom(map[string]interface{}{
+func newUserDoc() *model.Document {
+	doc, err := model.NewDocumentFrom(map[string]interface{}{
 		"_id":  gofakeit.UUID(),
 		"name": gofakeit.Name(),
 		"contact": map[string]interface{}{

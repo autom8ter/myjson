@@ -1,6 +1,7 @@
-package gokvkit
+package model
 
 import (
+	"github.com/autom8ter/gokvkit/internal/util"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
@@ -45,7 +46,7 @@ func TestUtil(t *testing.T) {
 		})
 		assert.Nil(t, err)
 		d1 := NewDocument()
-		assert.Nil(t, Decode(d, d1))
+		assert.Nil(t, util.Decode(d, d1))
 		assert.Equal(t, d.String(), d1.String())
 	})
 }

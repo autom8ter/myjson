@@ -3,6 +3,7 @@ package gokvkit
 import (
 	"context"
 	"github.com/autom8ter/gokvkit/kv"
+	"github.com/autom8ter/gokvkit/model"
 	"github.com/palantir/stacktrace"
 	"github.com/segmentio/ksuid"
 	"time"
@@ -11,11 +12,11 @@ import (
 // Tx is a database transaction interface
 type Tx interface {
 	// Create creates a new document - if the documents primary key is unset, it will be set as a sortable unique id
-	Create(ctx context.Context, collection string, document *Document) (string, error)
+	Create(ctx context.Context, collection string, document *model.Document) (string, error)
 	// Update updates a value in the database
 	Update(ctx context.Context, collection, id string, document map[string]any) error
 	// Set sets the specified key/value in the database
-	Set(ctx context.Context, collection string, document *Document) error
+	Set(ctx context.Context, collection string, document *model.Document) error
 	// Delete deletes the specified key from the database
 	Delete(ctx context.Context, collection string, id string) error
 	// Commit commits the transaction to the database
@@ -30,7 +31,7 @@ type TxFunc func(ctx context.Context, tx Tx) error
 
 type transaction struct {
 	db       *DB
-	commands []*Command
+	commands []*model.Command
 }
 
 func (t *transaction) Commit(ctx context.Context) error {
@@ -53,30 +54,30 @@ func (t *transaction) Commit(ctx context.Context) error {
 }
 
 func (t *transaction) Rollback(ctx context.Context) {
-	t.commands = []*Command{}
+	t.commands = []*model.Command{}
 }
 
 func (t *transaction) Update(ctx context.Context, collection string, id string, update map[string]any) error {
 	if !t.db.hasCollection(collection) {
 		return stacktrace.NewError("unsupported collection: %s", collection)
 	}
-	doc := NewDocument()
+	doc := model.NewDocument()
 	if err := doc.SetAll(update); err != nil {
 		return stacktrace.Propagate(err, "")
 	}
-	md, _ := GetMetadata(ctx)
-	t.commands = append(t.commands, &Command{
+	md, _ := model.GetMetadata(ctx)
+	t.commands = append(t.commands, &model.Command{
 		Collection: collection,
-		Action:     UpdateDocument,
+		Action:     model.Update,
 		DocID:      id,
-		Change:     doc,
+		After:      doc,
 		Timestamp:  time.Now(),
 		Metadata:   md,
 	})
 	return nil
 }
 
-func (t *transaction) Create(ctx context.Context, collection string, document *Document) (string, error) {
+func (t *transaction) Create(ctx context.Context, collection string, document *model.Document) (string, error) {
 	if !t.db.hasCollection(collection) {
 		return "", stacktrace.NewError("unsupported collection: %s", collection)
 	}
@@ -88,28 +89,28 @@ func (t *transaction) Create(ctx context.Context, collection string, document *D
 		}
 	}
 
-	md, _ := GetMetadata(ctx)
-	t.commands = append(t.commands, &Command{
+	md, _ := model.GetMetadata(ctx)
+	t.commands = append(t.commands, &model.Command{
 		Collection: collection,
-		Action:     CreateDocument,
+		Action:     model.Create,
 		DocID:      t.db.getPrimaryKey(collection, document),
-		Change:     document,
+		After:      document,
 		Timestamp:  time.Now(),
 		Metadata:   md,
 	})
 	return t.db.getPrimaryKey(collection, document), nil
 }
 
-func (t *transaction) Set(ctx context.Context, collection string, document *Document) error {
+func (t *transaction) Set(ctx context.Context, collection string, document *model.Document) error {
 	if !t.db.hasCollection(collection) {
 		return stacktrace.NewError("unsupported collection: %s", collection)
 	}
-	md, _ := GetMetadata(ctx)
-	t.commands = append(t.commands, &Command{
+	md, _ := model.GetMetadata(ctx)
+	t.commands = append(t.commands, &model.Command{
 		Collection: collection,
-		Action:     SetDocument,
+		Action:     model.Set,
 		DocID:      t.db.getPrimaryKey(collection, document),
-		Change:     document,
+		After:      document,
 		Timestamp:  time.Now(),
 		Metadata:   md,
 	})
@@ -120,10 +121,10 @@ func (t *transaction) Delete(ctx context.Context, collection string, id string) 
 	if !t.db.hasCollection(collection) {
 		return stacktrace.NewError("unsupported collection: %s", collection)
 	}
-	md, _ := GetMetadata(ctx)
-	t.commands = append(t.commands, &Command{
+	md, _ := model.GetMetadata(ctx)
+	t.commands = append(t.commands, &model.Command{
 		Collection: collection,
-		Action:     DeleteDocument,
+		Action:     model.Delete,
 		DocID:      id,
 		Timestamp:  time.Now(),
 		Metadata:   md,

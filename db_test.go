@@ -3,6 +3,8 @@ package gokvkit_test
 import (
 	"context"
 	"github.com/autom8ter/gokvkit"
+	"github.com/autom8ter/gokvkit/internal/util"
+	"github.com/autom8ter/gokvkit/model"
 	"github.com/autom8ter/gokvkit/testutil"
 	"github.com/brianvoe/gofakeit/v6"
 	"github.com/stretchr/testify/assert"
@@ -47,7 +49,7 @@ func Test(t *testing.T) {
 		}))
 	})
 	assert.Nil(t, testutil.TestDB(func(ctx context.Context, db *gokvkit.DB) {
-		var usrs []*gokvkit.Document
+		var usrs []*model.Document
 		var ids []string
 		t.Run("set all", func(t *testing.T) {
 			timer := timer()
@@ -77,10 +79,10 @@ func Test(t *testing.T) {
 		t.Run("query users account_id > 50", func(t *testing.T) {
 			timer := timer()
 			defer timer(t)
-			results, err := db.Query(ctx, gokvkit.Query{
+			results, err := db.Query(ctx, model.QueryJson{
 				From:   "user",
-				Select: []gokvkit.SelectField{{Field: "account_id"}},
-				Where: []gokvkit.Where{
+				Select: []model.QueryJsonSelectElem{{Field: "account_id"}},
+				Where: []model.QueryJsonWhereElem{
 					{
 						Field: "account_id",
 						Op:    ">",
@@ -98,18 +100,17 @@ func Test(t *testing.T) {
 		t.Run("query users account_id in 51-60", func(t *testing.T) {
 			timer := timer()
 			defer timer(t)
-			results, err := db.Query(ctx, gokvkit.Query{
+			results, err := db.Query(ctx, model.QueryJson{
 				From:   "user",
-				Select: []gokvkit.SelectField{{Field: "account_id"}},
-				Where: []gokvkit.Where{
+				Select: []model.QueryJsonSelectElem{{Field: "account_id"}},
+				Where: []model.QueryJsonWhereElem{
 					{
 						Field: "account_id",
-						Op:    gokvkit.In,
+						Op:    model.QueryJsonWhereElemOpIn,
 						Value: []float64{51, 52, 53, 54, 55, 56, 57, 58, 59, 60},
 					},
 				},
-				Page:  0,
-				Limit: 10,
+				Limit: util.ToPtr(10),
 			})
 			assert.Nil(t, err)
 			assert.Greater(t, len(results.Documents), 1)
@@ -121,11 +122,9 @@ func Test(t *testing.T) {
 		t.Run("query all", func(t *testing.T) {
 			timer := timer()
 			defer timer(t)
-			results, err := db.Query(ctx, gokvkit.Query{
+			results, err := db.Query(ctx, model.QueryJson{
 				From:   "user",
-				Select: []gokvkit.SelectField{{Field: "*"}},
-				Page:   0,
-				Limit:  0,
+				Select: []model.QueryJsonSelectElem{{Field: "*"}},
 			})
 			assert.Nil(t, err)
 			assert.Equal(t, 100, len(results.Documents))
@@ -135,7 +134,7 @@ func Test(t *testing.T) {
 			//timer := timer()
 			//defer timer(t)
 			//pageCount := 0
-			//err := collection.QueryPaginate(ctx, gokvkit.Query{
+			//err := collection.QueryPaginate(ctx, model.QueryJson{
 			//	Page:    0,
 			//	Limit:   10,
 			//
@@ -177,11 +176,9 @@ func Test(t *testing.T) {
 		})
 		t.Run("query delete all", func(t *testing.T) {
 			assert.Nil(t, db.Tx(ctx, func(ctx context.Context, tx gokvkit.Tx) error {
-				res, err := db.Query(ctx, gokvkit.Query{
+				res, err := db.Query(ctx, model.QueryJson{
 					From:   "user",
-					Select: []gokvkit.SelectField{{Field: "*"}},
-					Page:   0,
-					Limit:  0,
+					Select: []model.QueryJsonSelectElem{{Field: "*"}},
 				})
 				if err != nil {
 					return err
@@ -241,7 +238,7 @@ func Benchmark(b *testing.B) {
 			assert.Nil(b, db.Tx(ctx, func(ctx context.Context, tx gokvkit.Tx) error {
 				return tx.Set(ctx, "user", doc)
 			}))
-			var docs []*gokvkit.Document
+			var docs []*model.Document
 			assert.Nil(b, db.Tx(ctx, func(ctx context.Context, tx gokvkit.Tx) error {
 				for i := 0; i < 100000; i++ {
 					usr := testutil.NewUserDoc()
@@ -254,18 +251,17 @@ func Benchmark(b *testing.B) {
 			}))
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				results, err := db.Query(ctx, gokvkit.Query{
+				results, err := db.Query(ctx, model.QueryJson{
 					From:   "user",
-					Select: []gokvkit.SelectField{{Field: "*"}},
-					Where: []gokvkit.Where{
+					Select: []model.QueryJsonSelectElem{{Field: "*"}},
+					Where: []model.QueryJsonWhereElem{
 						{
 							Field: "contact.email",
 							Op:    "==",
 							Value: doc.GetString("contact.email"),
 						},
 					},
-					Page:  0,
-					Limit: 10,
+					Limit: util.ToPtr(10),
 				})
 				assert.Nil(b, err)
 				assert.Equal(b, 1, len(results.Documents))
@@ -281,7 +277,7 @@ func Benchmark(b *testing.B) {
 			assert.Nil(b, db.Tx(ctx, func(ctx context.Context, tx gokvkit.Tx) error {
 				return tx.Set(ctx, "user", doc)
 			}))
-			var docs []*gokvkit.Document
+			var docs []*model.Document
 			assert.Nil(b, db.Tx(ctx, func(ctx context.Context, tx gokvkit.Tx) error {
 				for i := 0; i < 100000; i++ {
 					usr := testutil.NewUserDoc()
@@ -294,18 +290,17 @@ func Benchmark(b *testing.B) {
 			}))
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				_, err := db.Query(ctx, gokvkit.Query{
+				_, err := db.Query(ctx, model.QueryJson{
 					From:   "user",
-					Select: []gokvkit.SelectField{{Field: "*"}},
-					Where: []gokvkit.Where{
+					Select: []model.QueryJsonSelectElem{{Field: "*"}},
+					Where: []model.QueryJsonWhereElem{
 						{
 							Field: "name",
-							Op:    gokvkit.Contains,
+							Op:    model.QueryJsonWhereElemOpContains,
 							Value: doc.GetString("John"),
 						},
 					},
-					Page:  0,
-					Limit: 10,
+					Limit: util.ToPtr(10),
 				})
 				assert.Nil(b, err)
 			}
@@ -316,7 +311,7 @@ func Benchmark(b *testing.B) {
 func TestIndexing1(t *testing.T) {
 	t.Run("matching unique index (contact.email)", func(t *testing.T) {
 		assert.Nil(t, testutil.TestDB(func(ctx context.Context, db *gokvkit.DB) {
-			var docs gokvkit.Documents
+			var docs model.Documents
 			assert.Nil(t, db.Tx(ctx, func(ctx context.Context, tx gokvkit.Tx) error {
 				for i := 0; i < 5; i++ {
 					usr := testutil.NewUserDoc()
@@ -327,14 +322,14 @@ func TestIndexing1(t *testing.T) {
 				}
 				return nil
 			}))
-			page, err := db.Query(ctx, gokvkit.Query{
+			page, err := db.Query(ctx, model.QueryJson{
 				From: "user",
-				Select: []gokvkit.SelectField{
+				Select: []model.QueryJsonSelectElem{
 					{
 						Field: "contact.email",
 					},
 				},
-				Where: []gokvkit.Where{
+				Where: []model.QueryJsonWhereElem{
 					{
 						Field: "contact.email",
 						Op:    "==",
@@ -350,7 +345,7 @@ func TestIndexing1(t *testing.T) {
 			assert.Equal(t, "contact.email", page.Stats.OptimizerResult.Ref.Fields[0])
 		}))
 		assert.Nil(t, testutil.TestDB(func(ctx context.Context, db *gokvkit.DB) {
-			var docs gokvkit.Documents
+			var docs model.Documents
 			assert.Nil(t, db.Tx(ctx, func(ctx context.Context, tx gokvkit.Tx) error {
 				for i := 0; i < 5; i++ {
 					usr := testutil.NewUserDoc()
@@ -361,14 +356,14 @@ func TestIndexing1(t *testing.T) {
 				}
 				return nil
 			}))
-			page, err := db.Query(ctx, gokvkit.Query{
+			page, err := db.Query(ctx, model.QueryJson{
 				From: "user",
-				Select: []gokvkit.SelectField{
+				Select: []model.QueryJsonSelectElem{
 					{
 						Field: "name",
 					},
 				},
-				Where: []gokvkit.Where{
+				Where: []model.QueryJsonWhereElem{
 					{
 						Field: "contact.email",
 						Op:    "==",
@@ -386,7 +381,7 @@ func TestIndexing1(t *testing.T) {
 	})
 	t.Run("non-matching (name)", func(t *testing.T) {
 		assert.Nil(t, testutil.TestDB(func(ctx context.Context, db *gokvkit.DB) {
-			var docs gokvkit.Documents
+			var docs model.Documents
 			assert.Nil(t, db.Tx(ctx, func(ctx context.Context, tx gokvkit.Tx) error {
 				for i := 0; i < 5; i++ {
 					usr := testutil.NewUserDoc()
@@ -397,17 +392,17 @@ func TestIndexing1(t *testing.T) {
 				}
 				return nil
 			}))
-			page, err := db.Query(ctx, gokvkit.Query{
+			page, err := db.Query(ctx, model.QueryJson{
 				From: "user",
-				Select: []gokvkit.SelectField{
+				Select: []model.QueryJsonSelectElem{
 					{
 						Field: "name",
 					},
 				},
-				Where: []gokvkit.Where{
+				Where: []model.QueryJsonWhereElem{
 					{
 						Field: "name",
-						Op:    gokvkit.Contains,
+						Op:    model.QueryJsonWhereElemOpContains,
 						Value: docs[0].Get("name"),
 					},
 				},
@@ -422,7 +417,7 @@ func TestIndexing1(t *testing.T) {
 	})
 	t.Run("matching primary (_id)", func(t *testing.T) {
 		assert.Nil(t, testutil.TestDB(func(ctx context.Context, db *gokvkit.DB) {
-			var docs gokvkit.Documents
+			var docs model.Documents
 			assert.Nil(t, db.Tx(ctx, func(ctx context.Context, tx gokvkit.Tx) error {
 				for i := 0; i < 5; i++ {
 					usr := testutil.NewUserDoc()
@@ -433,17 +428,17 @@ func TestIndexing1(t *testing.T) {
 				}
 				return nil
 			}))
-			page, err := db.Query(ctx, gokvkit.Query{
+			page, err := db.Query(ctx, model.QueryJson{
 				From: "user",
-				Select: []gokvkit.SelectField{
+				Select: []model.QueryJsonSelectElem{
 					{
 						Field: "_id",
 					},
 				},
-				Where: []gokvkit.Where{
+				Where: []model.QueryJsonWhereElem{
 					{
 						Field: "_id",
-						Op:    gokvkit.Eq,
+						Op:    model.QueryJsonWhereElemOpEq,
 						Value: docs[0].Get("_id"),
 					},
 				},
@@ -456,7 +451,7 @@ func TestIndexing1(t *testing.T) {
 			assert.Equal(t, true, page.Stats.OptimizerResult.IsPrimaryIndex)
 		}))
 		assert.Nil(t, testutil.TestDB(func(ctx context.Context, db *gokvkit.DB) {
-			var docs gokvkit.Documents
+			var docs model.Documents
 			assert.Nil(t, db.Tx(ctx, func(ctx context.Context, tx gokvkit.Tx) error {
 				for i := 0; i < 5; i++ {
 					usr := testutil.NewUserDoc()
@@ -467,17 +462,17 @@ func TestIndexing1(t *testing.T) {
 				}
 				return nil
 			}))
-			page, err := db.Query(ctx, gokvkit.Query{
+			page, err := db.Query(ctx, model.QueryJson{
 				From: "user",
-				Select: []gokvkit.SelectField{
+				Select: []model.QueryJsonSelectElem{
 					{
 						Field: "_id",
 					},
 				},
-				Where: []gokvkit.Where{
+				Where: []model.QueryJsonWhereElem{
 					{
 						Field: "_id",
-						Op:    gokvkit.Contains,
+						Op:    model.QueryJsonWhereElemOpContains,
 						Value: docs[0].Get("_id"),
 					},
 				},
@@ -495,17 +490,17 @@ func TestIndexing1(t *testing.T) {
 func TestAggregate(t *testing.T) {
 	t.Run("sum age", func(t *testing.T) {
 		var expected = float64(0)
-		var docs gokvkit.Documents
+		var docs model.Documents
 		for i := 0; i < 5; i++ {
 			u := testutil.NewUserDoc()
 			expected += u.GetFloat("age")
 			docs = append(docs, u)
 		}
-		reduced, err := docs.Aggregate(context.Background(), []gokvkit.SelectField{
+		reduced, err := docs.Aggregate(context.Background(), []model.QueryJsonSelectElem{
 			{
-				Field:    "age",
-				Function: "sum",
-				As:       "age_sum",
+				Field:     "age",
+				Aggregate: util.ToPtr(model.QueryJsonSelectElemAggregateSum),
+				As:        util.ToPtr("age_sum"),
 			},
 		})
 		assert.Nil(t, err)
@@ -513,7 +508,7 @@ func TestAggregate(t *testing.T) {
 	})
 	t.Run("sum advanced", func(t *testing.T) {
 		assert.Nil(t, testutil.TestDB(func(ctx context.Context, db *gokvkit.DB) {
-			var usrs gokvkit.Documents
+			var usrs model.Documents
 			ageSum := map[string]float64{}
 			assert.Nil(t, db.Tx(ctx, func(ctx context.Context, tx gokvkit.Tx) error {
 				for i := 0; i < 10; i++ {
@@ -525,7 +520,7 @@ func TestAggregate(t *testing.T) {
 				return nil
 			}))
 
-			query := gokvkit.Query{
+			query := model.QueryJson{
 				From:    "user",
 				GroupBy: []string{"account_id"},
 				//Where:      []schema.Where{
@@ -533,22 +528,20 @@ func TestAggregate(t *testing.T) {
 				//
 				//	},
 				//},
-				Select: []gokvkit.SelectField{
+				Select: []model.QueryJsonSelectElem{
 					{
 						Field: "account_id",
 					},
 					{
-						Field:    "age",
-						Function: gokvkit.SUM,
-						As:       "age_sum",
+						Field:     "age",
+						Aggregate: util.ToPtr(model.QueryJsonSelectElemAggregateSum),
+						As:        util.ToPtr("age_sum"),
 					},
 				},
-				Page:  0,
-				Limit: 0,
-				OrderBy: []gokvkit.OrderBy{
+				OrderBy: []model.QueryJsonOrderByElem{
 					{
 						Field:     "account_id",
-						Direction: gokvkit.ASC,
+						Direction: model.QueryJsonOrderByElemDirectionAsc,
 					},
 				},
 			}

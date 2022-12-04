@@ -1,9 +1,9 @@
-package gokvkit_test
+package model_test
 
 import (
 	"context"
 	"encoding/json"
-	"github.com/autom8ter/gokvkit"
+	"github.com/autom8ter/gokvkit/model"
 	"github.com/spf13/cast"
 	"github.com/stretchr/testify/assert"
 	"testing"
@@ -11,10 +11,10 @@ import (
 
 func TestContext(t *testing.T) {
 	ctx := context.Background()
-	c, ok := gokvkit.GetMetadata(ctx)
+	c, ok := model.GetMetadata(ctx)
 	assert.False(t, ok)
 	assert.NotNil(t, c)
-	c = gokvkit.NewMetadata(map[string]any{
+	c = model.NewMetadata(map[string]any{
 		"testing": true,
 	})
 	v, ok := c.Get("testing")
@@ -38,7 +38,7 @@ func TestContext(t *testing.T) {
 	assert.Nil(t, v)
 
 	ctx = c.ToContext(ctx)
-	c, ok = gokvkit.GetMetadata(ctx)
+	c, ok = model.GetMetadata(ctx)
 	assert.True(t, ok)
 	assert.NotNil(t, c)
 

@@ -3,6 +3,7 @@ package gokvkit
 import (
 	"encoding/json"
 	"github.com/autom8ter/gokvkit/kv"
+	"github.com/autom8ter/gokvkit/model"
 	"github.com/palantir/stacktrace"
 	"io"
 	"net/http"
@@ -12,6 +13,10 @@ import (
 // Handler is an http handler that serves database commands and queries
 func (db *DB) Handler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasSuffix(r.URL.Path, "/spec") {
+			specHandler(db)
+			return
+		}
 		path := strings.Split(r.URL.Path, "/")
 		op := path[len(path)-1]
 		collection := path[len(path)-2]
@@ -20,7 +25,7 @@ func (db *DB) Handler() http.Handler {
 			httpError(w, stacktrace.NewErrorWithCode(http.StatusBadRequest, "%s %s | zero operations for request", r.Method, r.RequestURI))
 			return
 		}
-		md, _ := GetMetadata(r.Context())
+		md, _ := model.GetMetadata(r.Context())
 		for k, v := range r.URL.Query() {
 			md.Set(k, v[0])
 		}
@@ -33,7 +38,7 @@ func (db *DB) Handler() http.Handler {
 
 func queryHandler(collection string, db *DB) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		var q Query
+		var q model.QueryJson
 		if err := json.NewDecoder(r.Body).Decode(&q); err != nil {
 			httpError(w, stacktrace.PropagateWithCode(err, http.StatusBadRequest, "failed to decode query"))
 			return
@@ -50,7 +55,7 @@ func queryHandler(collection string, db *DB) http.Handler {
 
 func commandHandler(collection string, db *DB) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		var commands []*Command
+		var commands []*model.Command
 		if err := json.NewDecoder(r.Body).Decode(&commands); err != nil {
 			httpError(w, stacktrace.PropagateWithCode(err, http.StatusBadRequest, "failed to decode command"))
 			return
@@ -89,6 +94,18 @@ func schemaHandler(collection string, db *DB) http.HandlerFunc {
 				return
 			}
 			w.WriteHeader(http.StatusOK)
+		}
+	})
+}
+
+func specHandler(db *DB) http.HandlerFunc {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			bits, _ := getOpenAPISpec(db.collections)
+			w.WriteHeader(http.StatusOK)
+			w.Write(bits)
+
 		}
 	})
 }

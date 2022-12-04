@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/autom8ter/gokvkit"
+	"github.com/autom8ter/gokvkit/model"
 	"github.com/palantir/stacktrace"
 	"io/ioutil"
 	"os"
@@ -23,8 +24,8 @@ var (
 	AllCollections = [][]byte{[]byte(UserSchema), []byte(TaskSchema)}
 )
 
-func NewUserDoc() *gokvkit.Document {
-	doc, err := gokvkit.NewDocumentFrom(map[string]interface{}{
+func NewUserDoc() *model.Document {
+	doc, err := model.NewDocumentFrom(map[string]interface{}{
 		"_id":  gofakeit.UUID(),
 		"name": gofakeit.Name(),
 		"contact": map[string]interface{}{
@@ -45,8 +46,8 @@ func NewUserDoc() *gokvkit.Document {
 	return doc
 }
 
-func NewTaskDoc(usrID string) *gokvkit.Document {
-	doc, err := gokvkit.NewDocumentFrom(map[string]interface{}{
+func NewTaskDoc(usrID string) *model.Document {
+	doc, err := model.NewDocumentFrom(map[string]interface{}{
 		"_id":     gofakeit.UUID(),
 		"user":    usrID,
 		"content": gofakeit.LoremIpsumSentence(5),
