@@ -1,5 +1,5 @@
 type: object
-collection: user
+x-collection: user
 required:
   - _id
   - name
@@ -40,7 +40,7 @@ properties:
     type: string
   annotations:
     type: object
-indexing:
+x-indexing:
   primary_idx:
     name: primary_idx
     unique: true

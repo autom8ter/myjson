@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/mitchellh/mapstructure"
+	"github.com/palantir/stacktrace"
 	"github.com/spf13/cast"
+	"gopkg.in/yaml.v2"
 )
 
 // Decode decodes the input into the output based on json tags
@@ -61,15 +63,39 @@ func ToPtr[T any](obj T) *T {
 	return &obj
 }
 
-func ConvertMap(m map[interface{}]interface{}) map[string]interface{} {
+func convertMap(m map[interface{}]interface{}) map[string]interface{} {
 	res := map[string]interface{}{}
 	for k, v := range m {
 		switch v2 := v.(type) {
 		case map[interface{}]interface{}:
-			res[fmt.Sprint(k)] = ConvertMap(v2)
+			res[fmt.Sprint(k)] = convertMap(v2)
 		default:
 			res[fmt.Sprint(k)] = v
 		}
 	}
 	return res
+}
+
+func YAMLToJSON(yamlContent []byte) ([]byte, error) {
+	var body map[interface{}]interface{}
+	if err := yaml.Unmarshal(yamlContent, &body); err != nil {
+		return nil, stacktrace.Propagate(err, "failed to convert yaml to json")
+	}
+	jsonContent, err := json.Marshal(convertMap(body))
+	if err != nil {
+		return nil, stacktrace.Propagate(err, "")
+	}
+	return jsonContent, nil
+}
+
+func JSONToYAML(jsonContent []byte) ([]byte, error) {
+	var body map[string]interface{}
+	if err := json.Unmarshal(jsonContent, &body); err != nil {
+		return nil, stacktrace.Propagate(err, "failed to convert json to yaml")
+	}
+	yamlContent, err := yaml.Marshal(body)
+	if err != nil {
+		return nil, stacktrace.Propagate(err, "")
+	}
+	return yamlContent, nil
 }

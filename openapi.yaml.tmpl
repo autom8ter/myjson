@@ -3,6 +3,7 @@ info:
   version: '1.0.0'
   title: Example.com
   description: |
+
     This is an **example** API to demonstrate features of OpenAPI specification
 tags:
 {{ range .collections }}
@@ -21,19 +22,13 @@ paths:
     post:
       tags:
         - {{ title .collection }}
-      summary: Updated user
-      description: This can only be done by the logged in user.
-      operationId: updateUser
-      parameters:
-        - name: username
-          in: path
-          description: The name that needs to be updated
-          required: true
-          schema:
-            type: string
+      summary: query {{ title .collection }} documents
+      description: This operation queries {{ title .collection }} documents
+      operationId: query{{ title .collection }}
       security:
         - main_auth:
-            - 'write:users'
+            - 'read:{{ title .collection }}'
+            - 'admin'
       responses:
         '200':
           description: OK
@@ -46,22 +41,13 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/{{ title .collection }}'
-          application/xml:
-            schema:
-              $ref: '#/components/schemas/{{ title .collection }}'
-        description: Updated user object
+              $ref: '#/components/schemas/Query'
         required: true
 {{end}}
 # An object to hold reusable parts that can be used across the definition
 components:
   schemas:
-  Query:
-    type: "object"
-    properties:
-      from:
-        type: string
-
+  {{ .querySchema | nindent 2 }}:
 {{ range .collections }}
     {{ title .collection }}:
       {{ .schema | nindent 8 }}

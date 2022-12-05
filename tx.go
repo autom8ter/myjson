@@ -37,38 +37,46 @@ type transaction struct {
 }
 
 func (t *transaction) Commit(ctx context.Context) error {
+	md, _ := model.GetMetadata(ctx)
 	if len(t.commands) >= batchThreshold {
 		batch := t.db.kv.Batch()
-		for _, c := range t.commands {
-			if err := t.db.applyPersistHooks(ctx, t, c, true); err != nil {
-				return stacktrace.Propagate(err, "")
+		if !md.Exists(string(isIndexingKey)) {
+			for _, c := range t.commands {
+				if err := t.db.applyPersistHooks(ctx, t, c, true); err != nil {
+					return stacktrace.Propagate(err, "")
+				}
 			}
 		}
 		if err := t.db.persistStateChange(ctx, batch, t.commands); err != nil {
 			return stacktrace.Propagate(err, "")
 		}
-		for _, c := range t.commands {
-			if err := t.db.applyPersistHooks(ctx, t, c, false); err != nil {
-				return stacktrace.Propagate(err, "")
+		if !md.Exists(string(isIndexingKey)) {
+			for _, c := range t.commands {
+				if err := t.db.applyPersistHooks(ctx, t, c, false); err != nil {
+					return stacktrace.Propagate(err, "")
+				}
 			}
 		}
 		return stacktrace.Propagate(batch.Flush(), "")
 	}
 	if err := t.db.kv.Tx(true, func(tx kv.Tx) error {
-		for _, c := range t.commands {
-			if err := t.db.applyPersistHooks(ctx, t, c, true); err != nil {
-				return stacktrace.Propagate(err, "")
+		if !md.Exists(string(isIndexingKey)) {
+			for _, c := range t.commands {
+				if err := t.db.applyPersistHooks(ctx, t, c, true); err != nil {
+					return stacktrace.Propagate(err, "")
+				}
 			}
 		}
 		if err := t.db.persistStateChange(ctx, tx, t.commands); err != nil {
 			return stacktrace.Propagate(err, "")
 		}
-		for _, c := range t.commands {
-			if err := t.db.applyPersistHooks(ctx, t, c, false); err != nil {
-				return stacktrace.Propagate(err, "")
+		if !md.Exists(string(isIndexingKey)) {
+			for _, c := range t.commands {
+				if err := t.db.applyPersistHooks(ctx, t, c, false); err != nil {
+					return stacktrace.Propagate(err, "")
+				}
 			}
 		}
-
 		return nil
 	}); err != nil {
 		return stacktrace.Propagate(err, "")

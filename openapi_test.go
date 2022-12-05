@@ -16,7 +16,7 @@ func TestOpenAPI(t *testing.T) {
 		bits, err := getOpenAPISpec(safe.NewMap(map[string]*collectionSchema{
 			"user": u,
 			"task": tsk,
-		}))
+		}), map[string]any{})
 		fmt.Println(string(bits))
 	})
 }

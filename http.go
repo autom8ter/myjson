@@ -102,7 +102,7 @@ func specHandler(db *DB) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodGet:
-			bits, _ := getOpenAPISpec(db.collections)
+			bits, _ := getOpenAPISpec(db.collections, map[string]any{})
 			w.WriteHeader(http.StatusOK)
 			w.Write(bits)
 

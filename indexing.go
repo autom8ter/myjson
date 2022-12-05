@@ -25,8 +25,7 @@ func (d *DB) addIndex(ctx context.Context, collection string, index model.Index)
 	})
 	batch := d.kv.Batch()
 	meta, _ := model.GetMetadata(ctx)
-	meta.Set("_internal", true)
-	meta.Set("_reindex", true)
+
 	if !index.Primary {
 		_, err := d.Scan(meta.ToContext(ctx), model.Scan{
 			From:  collection,

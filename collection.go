@@ -11,7 +11,8 @@ import (
 // ConfigureCollection overwrites a single database collection configuration
 func (d *DB) ConfigureCollection(ctx context.Context, collectionSchemaBytes []byte) error {
 	meta, _ := model.GetMetadata(ctx)
-	meta.Set("_internal", true)
+	meta.Set(string(isIndexingKey), true)
+	meta.Set(string(internalKey), true)
 	ctx = meta.ToContext(ctx)
 	collection, err := newCollectionSchema(collectionSchemaBytes)
 
