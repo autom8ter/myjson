@@ -6,21 +6,21 @@ import (
 
 // QueryBuilder is a utility for creating queries via chainable methods
 type QueryBuilder struct {
-	query *model.QueryJson
+	query *model.Query
 }
 
 // NewQueryBuilder creates a new QueryBuilder instance
 func NewQueryBuilder() *QueryBuilder {
-	return &QueryBuilder{query: &model.QueryJson{}}
+	return &QueryBuilder{query: &model.Query{}}
 }
 
 // Query returns the built query
-func (q *QueryBuilder) Query() model.QueryJson {
+func (q *QueryBuilder) Query() model.Query {
 	return *q.query
 }
 
 // Select adds the SelectFiel(s) to the query
-func (q *QueryBuilder) Select(fields ...model.QueryJsonSelectElem) *QueryBuilder {
+func (q *QueryBuilder) Select(fields ...model.Select) *QueryBuilder {
 	q.query.Select = append(q.query.Select, fields...)
 	return q
 }
@@ -32,13 +32,13 @@ func (q *QueryBuilder) From(from string) *QueryBuilder {
 }
 
 // Where adds the Where clause(s) to the query
-func (q *QueryBuilder) Where(where ...model.QueryJsonWhereElem) *QueryBuilder {
+func (q *QueryBuilder) Where(where ...model.Where) *QueryBuilder {
 	q.query.Where = append(q.query.Where, where...)
 	return q
 }
 
 // OrderBy adds the OrderBy clause(s) to the query
-func (q *QueryBuilder) OrderBy(ob ...model.QueryJsonOrderByElem) *QueryBuilder {
+func (q *QueryBuilder) OrderBy(ob ...model.OrderBy) *QueryBuilder {
 	q.query.OrderBy = append(q.query.OrderBy, ob...)
 	return q
 }

@@ -30,7 +30,7 @@ func (v OnPersist) Valid() error {
 // OnWhere is a hook function triggered before queries/scans are executed. They may be used for a varietey of purposes (ex: query authorization hooks)
 type OnWhere struct {
 	Name string
-	Func func(ctx context.Context, db *DB, where []model.QueryJsonWhereElem) ([]model.QueryJsonWhereElem, error)
+	Func func(ctx context.Context, db *DB, where []model.Where) ([]model.Where, error)
 }
 
 // Valid returns nil if the hook is valid

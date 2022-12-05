@@ -6,7 +6,7 @@ import (
 	"github.com/autom8ter/gokvkit/internal/util"
 )
 
-func (q QueryJson) IsAggregate() bool {
+func (q Query) IsAggregate() bool {
 	for _, a := range q.Select {
 		if !util.IsNil(a.Aggregate) {
 			return true
@@ -16,7 +16,7 @@ func (q QueryJson) IsAggregate() bool {
 }
 
 // Validate validates the query and returns a validation error if one exists
-func (q QueryJson) Validate(ctx context.Context) error {
+func (q Query) Validate(ctx context.Context) error {
 	vlid := QueryJSONSchema.Validate(ctx, q)
 	if !vlid.IsValid() {
 		return fmt.Errorf("%s", util.JSONString(&vlid.Errs))
@@ -25,7 +25,7 @@ func (q QueryJson) Validate(ctx context.Context) error {
 	return nil
 }
 
-func defaultAs(function QueryJsonSelectElemAggregate, field string) string {
+func defaultAs(function SelectAggregate, field string) string {
 	if function != "" {
 		return fmt.Sprintf("%s_%s", function, field)
 	}

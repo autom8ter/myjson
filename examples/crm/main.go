@@ -74,7 +74,7 @@ func (c *CRM) Serve(ctx context.Context, port int) error {
 
 func cascadeDelete(ctx context.Context, tx gokvkit.Tx, command *model.Command) error {
 	if command.Action == model.Delete {
-		results, err := tx.Query(ctx, gokvkit.NewQueryBuilder().From("task").Where(model.QueryJsonWhereElem{
+		results, err := tx.Query(ctx, gokvkit.NewQueryBuilder().From("task").Where(model.Where{
 			Field: "user",
 			Op:    "==",
 			Value: command.DocID,

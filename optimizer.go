@@ -9,12 +9,12 @@ import (
 // Optimizer selects the best index from a set of indexes based on where clauses
 type Optimizer interface {
 	// Optimize selects the optimal index to use based on the given where clauses
-	Optimize(indexes map[string]model.Index, where []model.QueryJsonWhereElem) (model.OptimizerResult, error)
+	Optimize(indexes map[string]model.Index, where []model.Where) (model.OptimizerResult, error)
 }
 
 type defaultOptimizer struct{}
 
-func (o defaultOptimizer) Optimize(indexes map[string]model.Index, where []model.QueryJsonWhereElem) (model.OptimizerResult, error) {
+func (o defaultOptimizer) Optimize(indexes map[string]model.Index, where []model.Where) (model.OptimizerResult, error) {
 	if len(indexes) == 0 {
 		return model.OptimizerResult{}, stacktrace.NewErrorWithCode(ErrTODO, "zero configured indexes")
 	}
@@ -35,7 +35,7 @@ func (o defaultOptimizer) Optimize(indexes map[string]model.Index, where []model
 		var matchedFields []string
 		for i, field := range index.Fields {
 			if len(where) > i {
-				if field == where[i].Field && where[i].Op == model.QueryJsonWhereElemOpEq {
+				if field == where[i].Field && where[i].Op == model.WhereOpEq {
 					matchedFields = append(matchedFields, field)
 				}
 			}
@@ -60,11 +60,11 @@ func (o defaultOptimizer) Optimize(indexes map[string]model.Index, where []model
 	}, nil
 }
 
-func indexableFields(where []model.QueryJsonWhereElem) map[string]any {
+func indexableFields(where []model.Where) map[string]any {
 	var whereFields []string
 	var whereValues = map[string]any{}
 	for _, w := range where {
-		if w.Op != "==" && w.Op != model.QueryJsonWhereElemOpEq {
+		if w.Op != "==" && w.Op != model.WhereOpEq {
 			continue
 		}
 		whereFields = append(whereFields, w.Field)

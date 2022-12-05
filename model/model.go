@@ -3,17 +3,22 @@ package model
 import (
 	_ "embed"
 	"encoding/json"
+	"github.com/autom8ter/gokvkit/internal/util"
 	"github.com/qri-io/jsonschema"
 	"time"
 )
 
 func init() {
-	if err := json.Unmarshal([]byte(QuerySchema), QueryJSONSchema); err != nil {
+	jsonContent, err := util.YAMLToJSON([]byte(QuerySchema))
+	if err != nil {
+		panic(err)
+	}
+	if err := json.Unmarshal(jsonContent, QueryJSONSchema); err != nil {
 		panic(err)
 	}
 }
 
-//go:embed query.json
+//go:embed query.yaml
 var QuerySchema string
 
 var (
@@ -42,7 +47,7 @@ type Scan struct {
 	// From is the collection to scan
 	From string `json:"from"`
 	// Where filters out records that don't pass the where clause(s)
-	Where []QueryJsonWhereElem `json:"filter"`
+	Where []Where `json:"filter"`
 }
 
 // Page is a page of documents

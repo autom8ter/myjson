@@ -89,7 +89,7 @@ func TestDocument(t *testing.T) {
 	})
 	t.Run("select", func(t *testing.T) {
 		before := r.Get("contact.email")
-		err := r.Select([]model.QueryJsonSelectElem{{Field: "contact.email"}})
+		err := r.Select([]model.Select{{Field: "contact.email"}})
 		assert.Nil(t, err)
 		after := r.Get("contact.email")
 		assert.Equal(t, before, after)
@@ -112,7 +112,7 @@ func TestDocument(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		pass, err := r.Where([]model.QueryJsonWhereElem{
+		pass, err := r.Where([]model.Where{
 			{
 				Field: "contact.email",
 				Op:    "==",
@@ -122,17 +122,17 @@ func TestDocument(t *testing.T) {
 		assert.Nil(t, err)
 		assert.True(t, pass)
 
-		pass, err = r.Where([]model.QueryJsonWhereElem{
+		pass, err = r.Where([]model.Where{
 			{
 				Field: "contact.email",
-				Op:    model.QueryJsonWhereElemOpContains,
+				Op:    model.WhereOpContains,
 				Value: email,
 			},
 		})
 		assert.Nil(t, err)
 		assert.True(t, pass)
 
-		pass, err = r.Where([]model.QueryJsonWhereElem{
+		pass, err = r.Where([]model.Where{
 			{
 				Field: "contact.email",
 				Op:    "==",
@@ -142,7 +142,7 @@ func TestDocument(t *testing.T) {
 		assert.Nil(t, err)
 		assert.False(t, pass)
 
-		pass, err = r.Where([]model.QueryJsonWhereElem{
+		pass, err = r.Where([]model.Where{
 			{
 				Field: "contact.email",
 				Op:    "!=",
@@ -152,7 +152,7 @@ func TestDocument(t *testing.T) {
 		assert.Nil(t, err)
 		assert.True(t, pass)
 
-		pass, err = r.Where([]model.QueryJsonWhereElem{
+		pass, err = r.Where([]model.Where{
 			{
 				Field: "age",
 				Op:    ">",
@@ -162,7 +162,7 @@ func TestDocument(t *testing.T) {
 		assert.Nil(t, err)
 		assert.True(t, pass)
 
-		pass, err = r.Where([]model.QueryJsonWhereElem{
+		pass, err = r.Where([]model.Where{
 			{
 				Field: "age",
 				Op:    ">=",
@@ -172,7 +172,7 @@ func TestDocument(t *testing.T) {
 		assert.Nil(t, err)
 		assert.True(t, pass)
 
-		pass, err = r.Where([]model.QueryJsonWhereElem{
+		pass, err = r.Where([]model.Where{
 			{
 				Field: "age",
 				Op:    ">=",
@@ -182,7 +182,7 @@ func TestDocument(t *testing.T) {
 		assert.Nil(t, err)
 		assert.False(t, pass)
 
-		pass, err = r.Where([]model.QueryJsonWhereElem{
+		pass, err = r.Where([]model.Where{
 			{
 				Field: "age",
 				Op:    "<",
@@ -192,7 +192,7 @@ func TestDocument(t *testing.T) {
 		assert.Nil(t, err)
 		assert.True(t, pass)
 
-		pass, err = r.Where([]model.QueryJsonWhereElem{
+		pass, err = r.Where([]model.Where{
 			{
 				Field: "age",
 				Op:    "<=",
@@ -202,7 +202,7 @@ func TestDocument(t *testing.T) {
 		assert.Nil(t, err)
 		assert.True(t, pass)
 
-		pass, err = r.Where([]model.QueryJsonWhereElem{
+		pass, err = r.Where([]model.Where{
 			{
 				Field: "age",
 				Op:    "<=",
@@ -212,7 +212,7 @@ func TestDocument(t *testing.T) {
 		assert.Nil(t, err)
 		assert.True(t, pass)
 
-		pass, err = r.Where([]model.QueryJsonWhereElem{
+		pass, err = r.Where([]model.Where{
 			{
 				Field: "age",
 				Op:    ">=",
@@ -222,17 +222,17 @@ func TestDocument(t *testing.T) {
 		assert.Nil(t, err)
 		assert.True(t, pass)
 
-		pass, err = r.Where([]model.QueryJsonWhereElem{
+		pass, err = r.Where([]model.Where{
 			{
 				Field: "age",
-				Op:    model.QueryJsonWhereElemOpIn,
+				Op:    model.WhereOpIn,
 				Value: []float64{50},
 			},
 		})
 		assert.Nil(t, err)
 		assert.True(t, pass)
 
-		pass, err = r.Where([]model.QueryJsonWhereElem{
+		pass, err = r.Where([]model.Where{
 			{
 				Field: "age",
 				Op:    "<",
@@ -242,7 +242,7 @@ func TestDocument(t *testing.T) {
 		assert.Nil(t, err)
 		assert.False(t, pass)
 
-		pass, err = r.Where([]model.QueryJsonWhereElem{
+		pass, err = r.Where([]model.Where{
 			{
 				Field: "age",
 				Op:    "8",
@@ -305,14 +305,14 @@ func TestDocument(t *testing.T) {
 			assert.Nil(t, doc.Set("account_id", gofakeit.IntRange(1, 5)))
 			docs = append(docs, doc)
 		}
-		docs = docs.OrderBy([]model.QueryJsonOrderByElem{
+		docs = docs.OrderBy([]model.OrderBy{
 			{
 				Field:     "account_id",
-				Direction: model.QueryJsonOrderByElemDirectionDesc,
+				Direction: model.OrderByDirectionDesc,
 			},
 			{
 				Field:     "age",
-				Direction: model.QueryJsonOrderByElemDirectionDesc,
+				Direction: model.OrderByDirectionDesc,
 			},
 		})
 		docs.ForEach(func(next *model.Document, i int) {

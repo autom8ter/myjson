@@ -90,7 +90,7 @@ func (d *Document) Clone() *Document {
 }
 
 // Select returns the document with only the selected fields populated
-func (d *Document) Select(fields []QueryJsonSelectElem) error {
+func (d *Document) Select(fields []Select) error {
 	if len(fields) == 0 || fields[0].Field == "*" {
 		return nil
 	}
@@ -213,7 +213,7 @@ func (d *Document) DelAll(fields ...string) error {
 }
 
 // Where executes the where clauses against the document and returns true if it passes the clauses
-func (d *Document) Where(wheres []QueryJsonWhereElem) (bool, error) {
+func (d *Document) Where(wheres []Where) (bool, error) {
 	for _, w := range wheres {
 		switch w.Op {
 		case "==":
@@ -317,14 +317,14 @@ func (documents Documents) ForEach(fn func(next *Document, i int)) {
 }
 
 // OrderBy orders the documents by the OrderBy clause
-func (d Documents) OrderBy(orderBys []QueryJsonOrderByElem) Documents {
+func (d Documents) OrderBy(orderBys []OrderBy) Documents {
 	if len(orderBys) == 0 {
 		return d
 	}
 	// TODO: support more than one order by
 	orderBy := orderBys[0]
 
-	if orderBy.Direction == QueryJsonOrderByElemDirectionDesc {
+	if orderBy.Direction == OrderByDirectionDesc {
 		sort.Slice(d, func(i, j int) bool {
 			index := 1
 			if d[i].Get(orderBy.Field) != d[j].Get(orderBy.Field) {
@@ -336,7 +336,7 @@ func (d Documents) OrderBy(orderBys []QueryJsonOrderByElem) Documents {
 					return compareField(order.Field, d[i], d[j])
 				}
 				if d[i].Get(order.Field) != d[j].Get(order.Field) {
-					if order.Direction == QueryJsonOrderByElemDirectionDesc {
+					if order.Direction == OrderByDirectionDesc {
 						if d[i].Get(orderBy.Field) != d[j].Get(orderBy.Field) {
 							return compareField(orderBy.Field, d[i], d[j])
 						}
@@ -362,7 +362,7 @@ func (d Documents) OrderBy(orderBys []QueryJsonOrderByElem) Documents {
 					return !compareField(order.Field, d[i], d[j])
 				}
 				if d[i].Get(order.Field) != d[j].Get(order.Field) {
-					if order.Direction == QueryJsonOrderByElemDirectionDesc {
+					if order.Direction == OrderByDirectionDesc {
 						if d[i].Get(orderBy.Field) != d[j].Get(orderBy.Field) {
 							return compareField(orderBy.Field, d[i], d[j])
 						}
@@ -382,7 +382,7 @@ func (d Documents) OrderBy(orderBys []QueryJsonOrderByElem) Documents {
 }
 
 // Aggregate reduces the documents with the input aggregates
-func (d Documents) Aggregate(ctx context.Context, aggregates []QueryJsonSelectElem) (*Document, error) {
+func (d Documents) Aggregate(ctx context.Context, aggregates []Select) (*Document, error) {
 	var (
 		aggregated *Document
 	)
@@ -402,17 +402,17 @@ func (d Documents) Aggregate(ctx context.Context, aggregates []QueryJsonSelectEl
 			}
 			current := aggregated.GetFloat(*agg.As)
 			switch *agg.Aggregate {
-			case QueryJsonSelectElemAggregateCount:
+			case SelectAggregateCount:
 				current++
-			case QueryJsonSelectElemAggregateMax:
+			case SelectAggregateMax:
 				if value := next.GetFloat(agg.Field); value > current {
 					current = value
 				}
-			case QueryJsonSelectElemAggregateMin:
+			case SelectAggregateMin:
 				if value := next.GetFloat(agg.Field); value < current {
 					current = value
 				}
-			case QueryJsonSelectElemAggregateSum:
+			case SelectAggregateSum:
 				current += next.GetFloat(agg.Field)
 			default:
 				return nil, stacktrace.NewError("unsupported aggregate function: %s/%s", agg.Field, *agg.Aggregate)

@@ -12,7 +12,7 @@ import (
 // Tx is a database transaction interface
 type Tx interface {
 	// Query executes a query against the database
-	Query(ctx context.Context, query model.QueryJson) (model.Page, error)
+	Query(ctx context.Context, query model.Query) (model.Page, error)
 	// Create creates a new document - if the documents primary key is unset, it will be set as a sortable unique id
 	Create(ctx context.Context, collection string, document *model.Document) (string, error)
 	// Update updates a value in the database
@@ -163,6 +163,6 @@ func (t *transaction) Delete(ctx context.Context, collection string, id string) 
 	return nil
 }
 
-func (t *transaction) Query(ctx context.Context, query model.QueryJson) (model.Page, error) {
+func (t *transaction) Query(ctx context.Context, query model.Query) (model.Page, error) {
 	return t.db.Query(ctx, query)
 }

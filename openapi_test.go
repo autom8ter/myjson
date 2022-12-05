@@ -8,7 +8,7 @@ import (
 )
 
 func TestOpenAPI(t *testing.T) {
-	t.Run("", func(t *testing.T) {
+	t.Run("crm api", func(t *testing.T) {
 		u, err := newCollectionSchema([]byte(userSchema))
 		assert.Nil(t, err)
 		tsk, err := newCollectionSchema([]byte(taskSchema))
@@ -16,7 +16,11 @@ func TestOpenAPI(t *testing.T) {
 		bits, err := getOpenAPISpec(safe.NewMap(map[string]*collectionSchema{
 			"user": u,
 			"task": tsk,
-		}), map[string]any{})
+		}), &openAPIParams{
+			title:       "CRM API",
+			version:     "1.0.0",
+			description: "an example CRM api",
+		})
 		fmt.Println(string(bits))
 	})
 }

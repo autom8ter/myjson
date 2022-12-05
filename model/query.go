@@ -8,111 +8,111 @@ import "encoding/json"
 
 // Query is a query against the NOSQL database - it does not support full text
 // search
-type QueryJson struct {
+type Query struct {
 	// the collection to query
-	From string `json:"from"`
+	From string `yaml:"from"`
 
 	// GroupBy corresponds to the JSON schema field "groupBy".
-	GroupBy []string `json:"groupBy,omitempty"`
+	GroupBy []string `yaml:"groupBy,omitempty"`
 
 	// Limit corresponds to the JSON schema field "limit".
-	Limit *int `json:"limit,omitempty"`
+	Limit *int `yaml:"limit,omitempty"`
 
 	// OrderBy corresponds to the JSON schema field "orderBy".
-	OrderBy []QueryJsonOrderByElem `json:"orderBy,omitempty"`
+	OrderBy []OrderBy `yaml:"orderBy,omitempty"`
 
 	// Page corresponds to the JSON schema field "page".
-	Page *int `json:"page,omitempty"`
+	Page *int `yaml:"page,omitempty"`
 
 	// Select corresponds to the JSON schema field "select".
-	Select []QueryJsonSelectElem `json:"select"`
+	Select []Select `yaml:"select"`
 
 	// Where corresponds to the JSON schema field "where".
-	Where []QueryJsonWhereElem `json:"where,omitempty"`
+	Where []Where `yaml:"where,omitempty"`
 }
 
 // orderBy orders results by a field and a direction
-type QueryJsonOrderByElem struct {
+type OrderBy struct {
 	// Direction corresponds to the JSON schema field "direction".
-	Direction QueryJsonOrderByElemDirection `json:"direction"`
+	Direction OrderByDirection `yaml:"direction"`
 
 	// Field corresponds to the JSON schema field "field".
-	Field string `json:"field"`
+	Field string `yaml:"field"`
 }
 
-type QueryJsonOrderByElemDirection string
+type OrderByDirection string
 
-const QueryJsonOrderByElemDirectionAsc QueryJsonOrderByElemDirection = "asc"
-const QueryJsonOrderByElemDirectionDesc QueryJsonOrderByElemDirection = "desc"
+const OrderByDirectionAsc OrderByDirection = "asc"
+const OrderByDirectionDesc OrderByDirection = "desc"
 
 // select is a list of fields to select from each record in the datbase(optional)
-type QueryJsonSelectElem struct {
+type Select struct {
 	// an aggregate function to apply against the field
-	Aggregate *QueryJsonSelectElemAggregate `json:"aggregate,omitempty"`
+	Aggregate *SelectAggregate `yaml:"aggregate,omitempty"`
 
 	// as is outputs the value of the field as an alias
-	As *string `json:"as,omitempty"`
+	As *string `yaml:"as,omitempty"`
 
 	// the select's field
-	Field string `json:"field"`
+	Field string `yaml:"field"`
 
 	// a function to apply against the field
-	Function *QueryJsonSelectElemFunction `json:"function,omitempty"`
+	Function *SelectFunction `yaml:"function,omitempty"`
 }
 
-type QueryJsonSelectElemAggregate string
+type SelectAggregate string
 
-const QueryJsonSelectElemAggregateCount QueryJsonSelectElemAggregate = "count"
-const QueryJsonSelectElemAggregateMax QueryJsonSelectElemAggregate = "max"
-const QueryJsonSelectElemAggregateMin QueryJsonSelectElemAggregate = "min"
-const QueryJsonSelectElemAggregateSum QueryJsonSelectElemAggregate = "sum"
+const SelectAggregateCount SelectAggregate = "count"
+const SelectAggregateMax SelectAggregate = "max"
+const SelectAggregateMin SelectAggregate = "min"
+const SelectAggregateSum SelectAggregate = "sum"
 
-type QueryJsonSelectElemFunction string
+type SelectFunction string
 
-const QueryJsonSelectElemFunctionToLower QueryJsonSelectElemFunction = "toLower"
-const QueryJsonSelectElemFunctionToUpper QueryJsonSelectElemFunction = "toUpper"
+const SelectFunctionToLower SelectFunction = "toLower"
+const SelectFunctionToUpper SelectFunction = "toUpper"
 
 // where is a filter applied against a query
-type QueryJsonWhereElem struct {
+type Where struct {
 	// Field corresponds to the JSON schema field "field".
-	Field string `json:"field"`
+	Field string `yaml:"field"`
 
 	// Op corresponds to the JSON schema field "op".
-	Op QueryJsonWhereElemOp `json:"op"`
+	Op WhereOp `yaml:"op"`
 
 	// Value corresponds to the JSON schema field "value".
-	Value interface{} `json:"value"`
+	Value interface{} `yaml:"value"`
 }
 
-type QueryJsonWhereElemOp string
+type WhereOp string
 
-const QueryJsonWhereElemOpContains QueryJsonWhereElemOp = "contains"
-const QueryJsonWhereElemOpEq QueryJsonWhereElemOp = "eq"
-const QueryJsonWhereElemOpGt QueryJsonWhereElemOp = "gt"
-const QueryJsonWhereElemOpGte QueryJsonWhereElemOp = "gte"
-const QueryJsonWhereElemOpIn QueryJsonWhereElemOp = "in"
+const WhereOpContains WhereOp = "contains"
+const WhereOpEq WhereOp = "eq"
+const WhereOpGt WhereOp = "gt"
+const WhereOpGte WhereOp = "gte"
+const WhereOpIn WhereOp = "in"
 
 // UnmarshalJSON implements json.Unmarshaler.
-func (j *QueryJsonOrderByElemDirection) UnmarshalJSON(b []byte) error {
+func (j *OrderByDirection) UnmarshalJSON(b []byte) error {
 	var v string
 	if err := json.Unmarshal(b, &v); err != nil {
 		return err
 	}
 	var ok bool
-	for _, expected := range enumValues_QueryJsonOrderByElemDirection {
+	for _, expected := range enumValues_OrderByDirection {
 		if reflect.DeepEqual(v, expected) {
 			ok = true
 			break
 		}
 	}
 	if !ok {
-		return fmt.Errorf("invalid value (expected one of %#v): %#v", enumValues_QueryJsonOrderByElemDirection, v)
+		return fmt.Errorf("invalid value (expected one of %#v): %#v", enumValues_OrderByDirection, v)
 	}
-	*j = QueryJsonOrderByElemDirection(v)
+	*j = OrderByDirection(v)
 	return nil
 }
 
-var enumValues_QueryJsonWhereElemOp = []interface{}{
+var enumValues_WhereOp = []interface{}{
 	"eq",
 	"neq",
 	"gt",
@@ -124,49 +124,49 @@ var enumValues_QueryJsonWhereElemOp = []interface{}{
 }
 
 // UnmarshalJSON implements json.Unmarshaler.
-func (j *QueryJsonWhereElemOp) UnmarshalJSON(b []byte) error {
+func (j *WhereOp) UnmarshalJSON(b []byte) error {
 	var v string
 	if err := json.Unmarshal(b, &v); err != nil {
 		return err
 	}
 	var ok bool
-	for _, expected := range enumValues_QueryJsonWhereElemOp {
+	for _, expected := range enumValues_WhereOp {
 		if reflect.DeepEqual(v, expected) {
 			ok = true
 			break
 		}
 	}
 	if !ok {
-		return fmt.Errorf("invalid value (expected one of %#v): %#v", enumValues_QueryJsonWhereElemOp, v)
+		return fmt.Errorf("invalid value (expected one of %#v): %#v", enumValues_WhereOp, v)
 	}
-	*j = QueryJsonWhereElemOp(v)
+	*j = WhereOp(v)
 	return nil
 }
 
 // UnmarshalJSON implements json.Unmarshaler.
-func (j *QueryJsonSelectElemAggregate) UnmarshalJSON(b []byte) error {
+func (j *SelectAggregate) UnmarshalJSON(b []byte) error {
 	var v string
 	if err := json.Unmarshal(b, &v); err != nil {
 		return err
 	}
 	var ok bool
-	for _, expected := range enumValues_QueryJsonSelectElemAggregate {
+	for _, expected := range enumValues_SelectAggregate {
 		if reflect.DeepEqual(v, expected) {
 			ok = true
 			break
 		}
 	}
 	if !ok {
-		return fmt.Errorf("invalid value (expected one of %#v): %#v", enumValues_QueryJsonSelectElemAggregate, v)
+		return fmt.Errorf("invalid value (expected one of %#v): %#v", enumValues_SelectAggregate, v)
 	}
-	*j = QueryJsonSelectElemAggregate(v)
+	*j = SelectAggregate(v)
 	return nil
 }
 
-const QueryJsonWhereElemOpNeq QueryJsonWhereElemOp = "neq"
+const WhereOpNeq WhereOp = "neq"
 
 // UnmarshalJSON implements json.Unmarshaler.
-func (j *QueryJsonSelectElem) UnmarshalJSON(b []byte) error {
+func (j *Select) UnmarshalJSON(b []byte) error {
 	var raw map[string]interface{}
 	if err := json.Unmarshal(b, &raw); err != nil {
 		return err
@@ -174,27 +174,27 @@ func (j *QueryJsonSelectElem) UnmarshalJSON(b []byte) error {
 	if v, ok := raw["field"]; !ok || v == nil {
 		return fmt.Errorf("field field: required")
 	}
-	type Plain QueryJsonSelectElem
+	type Plain Select
 	var plain Plain
 	if err := json.Unmarshal(b, &plain); err != nil {
 		return err
 	}
-	*j = QueryJsonSelectElem(plain)
+	*j = Select(plain)
 	return nil
 }
 
-var enumValues_QueryJsonSelectElemAggregate = []interface{}{
+var enumValues_SelectAggregate = []interface{}{
 	"sum",
 	"count",
 	"max",
 	"min",
 }
 
-const QueryJsonWhereElemOpLt QueryJsonWhereElemOp = "lt"
-const QueryJsonWhereElemOpLte QueryJsonWhereElemOp = "lte"
+const WhereOpLt WhereOp = "lt"
+const WhereOpLte WhereOp = "lte"
 
 // UnmarshalJSON implements json.Unmarshaler.
-func (j *QueryJsonOrderByElem) UnmarshalJSON(b []byte) error {
+func (j *OrderBy) UnmarshalJSON(b []byte) error {
 	var raw map[string]interface{}
 	if err := json.Unmarshal(b, &raw); err != nil {
 		return err
@@ -205,42 +205,42 @@ func (j *QueryJsonOrderByElem) UnmarshalJSON(b []byte) error {
 	if v, ok := raw["field"]; !ok || v == nil {
 		return fmt.Errorf("field field: required")
 	}
-	type Plain QueryJsonOrderByElem
+	type Plain OrderBy
 	var plain Plain
 	if err := json.Unmarshal(b, &plain); err != nil {
 		return err
 	}
-	*j = QueryJsonOrderByElem(plain)
+	*j = OrderBy(plain)
 	return nil
 }
 
 // UnmarshalJSON implements json.Unmarshaler.
-func (j *QueryJsonSelectElemFunction) UnmarshalJSON(b []byte) error {
+func (j *SelectFunction) UnmarshalJSON(b []byte) error {
 	var v string
 	if err := json.Unmarshal(b, &v); err != nil {
 		return err
 	}
 	var ok bool
-	for _, expected := range enumValues_QueryJsonSelectElemFunction {
+	for _, expected := range enumValues_SelectFunction {
 		if reflect.DeepEqual(v, expected) {
 			ok = true
 			break
 		}
 	}
 	if !ok {
-		return fmt.Errorf("invalid value (expected one of %#v): %#v", enumValues_QueryJsonSelectElemFunction, v)
+		return fmt.Errorf("invalid value (expected one of %#v): %#v", enumValues_SelectFunction, v)
 	}
-	*j = QueryJsonSelectElemFunction(v)
+	*j = SelectFunction(v)
 	return nil
 }
 
-var enumValues_QueryJsonSelectElemFunction = []interface{}{
+var enumValues_SelectFunction = []interface{}{
 	"toLower",
 	"toUpper",
 }
 
 // UnmarshalJSON implements json.Unmarshaler.
-func (j *QueryJsonWhereElem) UnmarshalJSON(b []byte) error {
+func (j *Where) UnmarshalJSON(b []byte) error {
 	var raw map[string]interface{}
 	if err := json.Unmarshal(b, &raw); err != nil {
 		return err
@@ -254,22 +254,22 @@ func (j *QueryJsonWhereElem) UnmarshalJSON(b []byte) error {
 	if v, ok := raw["value"]; !ok || v == nil {
 		return fmt.Errorf("field value: required")
 	}
-	type Plain QueryJsonWhereElem
+	type Plain Where
 	var plain Plain
 	if err := json.Unmarshal(b, &plain); err != nil {
 		return err
 	}
-	*j = QueryJsonWhereElem(plain)
+	*j = Where(plain)
 	return nil
 }
 
-var enumValues_QueryJsonOrderByElemDirection = []interface{}{
+var enumValues_OrderByDirection = []interface{}{
 	"asc",
 	"desc",
 }
 
 // UnmarshalJSON implements json.Unmarshaler.
-func (j *QueryJson) UnmarshalJSON(b []byte) error {
+func (j *Query) UnmarshalJSON(b []byte) error {
 	var raw map[string]interface{}
 	if err := json.Unmarshal(b, &raw); err != nil {
 		return err
@@ -280,11 +280,11 @@ func (j *QueryJson) UnmarshalJSON(b []byte) error {
 	if v, ok := raw["select"]; !ok || v == nil {
 		return fmt.Errorf("field select: required")
 	}
-	type Plain QueryJson
+	type Plain Query
 	var plain Plain
 	if err := json.Unmarshal(b, &plain); err != nil {
 		return err
 	}
-	*j = QueryJson(plain)
+	*j = Query(plain)
 	return nil
 }

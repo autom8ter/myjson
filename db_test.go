@@ -79,10 +79,10 @@ func Test(t *testing.T) {
 		t.Run("query users account_id > 50", func(t *testing.T) {
 			timer := timer()
 			defer timer(t)
-			results, err := db.Query(ctx, model.QueryJson{
+			results, err := db.Query(ctx, model.Query{
 				From:   "user",
-				Select: []model.QueryJsonSelectElem{{Field: "account_id"}},
-				Where: []model.QueryJsonWhereElem{
+				Select: []model.Select{{Field: "account_id"}},
+				Where: []model.Where{
 					{
 						Field: "account_id",
 						Op:    ">",
@@ -100,13 +100,13 @@ func Test(t *testing.T) {
 		t.Run("query users account_id in 51-60", func(t *testing.T) {
 			timer := timer()
 			defer timer(t)
-			results, err := db.Query(ctx, model.QueryJson{
+			results, err := db.Query(ctx, model.Query{
 				From:   "user",
-				Select: []model.QueryJsonSelectElem{{Field: "account_id"}},
-				Where: []model.QueryJsonWhereElem{
+				Select: []model.Select{{Field: "account_id"}},
+				Where: []model.Where{
 					{
 						Field: "account_id",
-						Op:    model.QueryJsonWhereElemOpIn,
+						Op:    model.WhereOpIn,
 						Value: []float64{51, 52, 53, 54, 55, 56, 57, 58, 59, 60},
 					},
 				},
@@ -122,9 +122,9 @@ func Test(t *testing.T) {
 		t.Run("query all", func(t *testing.T) {
 			timer := timer()
 			defer timer(t)
-			results, err := db.Query(ctx, model.QueryJson{
+			results, err := db.Query(ctx, model.Query{
 				From:   "user",
-				Select: []model.QueryJsonSelectElem{{Field: "*"}},
+				Select: []model.Select{{Field: "*"}},
 			})
 			assert.Nil(t, err)
 			assert.Equal(t, 100, len(results.Documents))
@@ -134,7 +134,7 @@ func Test(t *testing.T) {
 			//timer := timer()
 			//defer timer(t)
 			//pageCount := 0
-			//err := collection.QueryPaginate(ctx, model.QueryJson{
+			//err := collection.QueryPaginate(ctx, model.Query{
 			//	Page:    0,
 			//	Limit:   10,
 			//
@@ -176,9 +176,9 @@ func Test(t *testing.T) {
 		})
 		t.Run("query delete all", func(t *testing.T) {
 			assert.Nil(t, db.Tx(ctx, func(ctx context.Context, tx gokvkit.Tx) error {
-				res, err := db.Query(ctx, model.QueryJson{
+				res, err := db.Query(ctx, model.Query{
 					From:   "user",
-					Select: []model.QueryJsonSelectElem{{Field: "*"}},
+					Select: []model.Select{{Field: "*"}},
 				})
 				if err != nil {
 					return err
@@ -251,10 +251,10 @@ func Benchmark(b *testing.B) {
 			}))
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				results, err := db.Query(ctx, model.QueryJson{
+				results, err := db.Query(ctx, model.Query{
 					From:   "user",
-					Select: []model.QueryJsonSelectElem{{Field: "*"}},
-					Where: []model.QueryJsonWhereElem{
+					Select: []model.Select{{Field: "*"}},
+					Where: []model.Where{
 						{
 							Field: "contact.email",
 							Op:    "==",
@@ -290,13 +290,13 @@ func Benchmark(b *testing.B) {
 			}))
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				_, err := db.Query(ctx, model.QueryJson{
+				_, err := db.Query(ctx, model.Query{
 					From:   "user",
-					Select: []model.QueryJsonSelectElem{{Field: "*"}},
-					Where: []model.QueryJsonWhereElem{
+					Select: []model.Select{{Field: "*"}},
+					Where: []model.Where{
 						{
 							Field: "name",
-							Op:    model.QueryJsonWhereElemOpContains,
+							Op:    model.WhereOpContains,
 							Value: doc.GetString("John"),
 						},
 					},
@@ -322,14 +322,14 @@ func TestIndexing1(t *testing.T) {
 				}
 				return nil
 			}))
-			page, err := db.Query(ctx, model.QueryJson{
+			page, err := db.Query(ctx, model.Query{
 				From: "user",
-				Select: []model.QueryJsonSelectElem{
+				Select: []model.Select{
 					{
 						Field: "contact.email",
 					},
 				},
-				Where: []model.QueryJsonWhereElem{
+				Where: []model.Where{
 					{
 						Field: "contact.email",
 						Op:    "==",
@@ -356,14 +356,14 @@ func TestIndexing1(t *testing.T) {
 				}
 				return nil
 			}))
-			page, err := db.Query(ctx, model.QueryJson{
+			page, err := db.Query(ctx, model.Query{
 				From: "user",
-				Select: []model.QueryJsonSelectElem{
+				Select: []model.Select{
 					{
 						Field: "name",
 					},
 				},
-				Where: []model.QueryJsonWhereElem{
+				Where: []model.Where{
 					{
 						Field: "contact.email",
 						Op:    "==",
@@ -392,17 +392,17 @@ func TestIndexing1(t *testing.T) {
 				}
 				return nil
 			}))
-			page, err := db.Query(ctx, model.QueryJson{
+			page, err := db.Query(ctx, model.Query{
 				From: "user",
-				Select: []model.QueryJsonSelectElem{
+				Select: []model.Select{
 					{
 						Field: "name",
 					},
 				},
-				Where: []model.QueryJsonWhereElem{
+				Where: []model.Where{
 					{
 						Field: "name",
-						Op:    model.QueryJsonWhereElemOpContains,
+						Op:    model.WhereOpContains,
 						Value: docs[0].Get("name"),
 					},
 				},
@@ -428,17 +428,17 @@ func TestIndexing1(t *testing.T) {
 				}
 				return nil
 			}))
-			page, err := db.Query(ctx, model.QueryJson{
+			page, err := db.Query(ctx, model.Query{
 				From: "user",
-				Select: []model.QueryJsonSelectElem{
+				Select: []model.Select{
 					{
 						Field: "_id",
 					},
 				},
-				Where: []model.QueryJsonWhereElem{
+				Where: []model.Where{
 					{
 						Field: "_id",
-						Op:    model.QueryJsonWhereElemOpEq,
+						Op:    model.WhereOpEq,
 						Value: docs[0].Get("_id"),
 					},
 				},
@@ -462,17 +462,17 @@ func TestIndexing1(t *testing.T) {
 				}
 				return nil
 			}))
-			page, err := db.Query(ctx, model.QueryJson{
+			page, err := db.Query(ctx, model.Query{
 				From: "user",
-				Select: []model.QueryJsonSelectElem{
+				Select: []model.Select{
 					{
 						Field: "_id",
 					},
 				},
-				Where: []model.QueryJsonWhereElem{
+				Where: []model.Where{
 					{
 						Field: "_id",
-						Op:    model.QueryJsonWhereElemOpContains,
+						Op:    model.WhereOpContains,
 						Value: docs[0].Get("_id"),
 					},
 				},
@@ -496,10 +496,10 @@ func TestAggregate(t *testing.T) {
 			expected += u.GetFloat("age")
 			docs = append(docs, u)
 		}
-		reduced, err := docs.Aggregate(context.Background(), []model.QueryJsonSelectElem{
+		reduced, err := docs.Aggregate(context.Background(), []model.Select{
 			{
 				Field:     "age",
-				Aggregate: util.ToPtr(model.QueryJsonSelectElemAggregateSum),
+				Aggregate: util.ToPtr(model.SelectAggregateSum),
 				As:        util.ToPtr("age_sum"),
 			},
 		})
@@ -520,7 +520,7 @@ func TestAggregate(t *testing.T) {
 				return nil
 			}))
 
-			query := model.QueryJson{
+			query := model.Query{
 				From:    "user",
 				GroupBy: []string{"account_id"},
 				//Where:      []schema.Where{
@@ -528,20 +528,20 @@ func TestAggregate(t *testing.T) {
 				//
 				//	},
 				//},
-				Select: []model.QueryJsonSelectElem{
+				Select: []model.Select{
 					{
 						Field: "account_id",
 					},
 					{
 						Field:     "age",
-						Aggregate: util.ToPtr(model.QueryJsonSelectElemAggregateSum),
+						Aggregate: util.ToPtr(model.SelectAggregateSum),
 						As:        util.ToPtr("age_sum"),
 					},
 				},
-				OrderBy: []model.QueryJsonOrderByElem{
+				OrderBy: []model.OrderBy{
 					{
 						Field:     "account_id",
-						Direction: model.QueryJsonOrderByElemDirectionAsc,
+						Direction: model.OrderByDirectionAsc,
 					},
 				},
 			}

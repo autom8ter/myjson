@@ -9,18 +9,18 @@ import (
 func TestQuery(t *testing.T) {
 	t.Run("query builder 1", func(t *testing.T) {
 		q := NewQueryBuilder().
-			Select(model.QueryJsonSelectElem{
+			Select(model.Select{
 				Field: "account_id",
 			}).
-			Where(model.QueryJsonWhereElem{
+			Where(model.Where{
 				Field: "age",
 				Op:    ">",
 				Value: 50,
 			}).
 			GroupBy("account_id").
-			OrderBy(model.QueryJsonOrderByElem{
+			OrderBy(model.OrderBy{
 				Field:     "account_id",
-				Direction: model.QueryJsonOrderByElemDirectionDesc,
+				Direction: model.OrderByDirectionDesc,
 			}).
 			Limit(1).
 			Query()

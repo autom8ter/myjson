@@ -38,7 +38,7 @@ func (db *DB) Handler() http.Handler {
 
 func queryHandler(collection string, db *DB) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		var q model.QueryJson
+		var q model.Query
 		if err := json.NewDecoder(r.Body).Decode(&q); err != nil {
 			httpError(w, stacktrace.PropagateWithCode(err, http.StatusBadRequest, "failed to decode query"))
 			return
@@ -102,7 +102,7 @@ func specHandler(db *DB) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodGet:
-			bits, _ := getOpenAPISpec(db.collections, map[string]any{})
+			bits, _ := getOpenAPISpec(db.collections, &db.openAPIParams)
 			w.WriteHeader(http.StatusOK)
 			w.Write(bits)
 

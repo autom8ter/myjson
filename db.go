@@ -32,16 +32,17 @@ type Config struct {
 // DB is an embedded, durable NoSQL database with support for schemas, indexing, and aggregation
 type DB struct {
 	sync.RWMutex
-	config       Config
-	kv           kv.DB
-	machine      machine.Machine
-	collections  *safe.Map[*collectionSchema]
-	optimizer    Optimizer
-	initHooks    *safe.Map[OnInit]
-	persistHooks *safe.Map[[]OnPersist]
-	whereHooks   *safe.Map[[]OnWhere]
-	readHooks    *safe.Map[[]OnRead]
-	router       *safe.Router
+	config        Config
+	kv            kv.DB
+	machine       machine.Machine
+	collections   *safe.Map[*collectionSchema]
+	optimizer     Optimizer
+	initHooks     *safe.Map[OnInit]
+	persistHooks  *safe.Map[[]OnPersist]
+	whereHooks    *safe.Map[[]OnWhere]
+	readHooks     *safe.Map[[]OnRead]
+	router        *safe.Router
+	openAPIParams openAPIParams
 }
 
 /*
@@ -165,7 +166,7 @@ func (d *DB) BatchGet(ctx context.Context, collection string, ids []string) (mod
 }
 
 // aggregate performs aggregations against the collection
-func (d *DB) aggregate(ctx context.Context, query model.QueryJson) (model.Page, error) {
+func (d *DB) aggregate(ctx context.Context, query model.Query) (model.Page, error) {
 	if !d.hasCollection(query.From) {
 		return model.Page{}, stacktrace.NewError("unsupported collection: %s", query.From)
 	}
@@ -216,7 +217,7 @@ func (d *DB) aggregate(ctx context.Context, query model.QueryJson) (model.Page, 
 }
 
 // Query queries a list of documents
-func (d *DB) Query(ctx context.Context, query model.QueryJson) (model.Page, error) {
+func (d *DB) Query(ctx context.Context, query model.Query) (model.Page, error) {
 	if err := query.Validate(ctx); err != nil {
 		return model.Page{}, stacktrace.Propagate(err, "")
 	}

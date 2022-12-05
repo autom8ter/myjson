@@ -1,23 +1,17 @@
 openapi: 3.0.2
 info:
-  version: '1.0.0'
-  title: Example.com
+  version: {{ .version }}
+  title: {{ .title }}
   description: |
-
-    This is an **example** API to demonstrate features of OpenAPI specification
-tags:
-{{ range .collections }}
+    {{ .description | indent 4 }}
+tags: {{ range .collections }}
   - name: {{ title .collection }}
-    description: {{ title .collection }} operations
-{{end}}
-servers:
-  - url: 'http://example.com/api/v1'
-  - url: 'https://example.com/api/v1'
+    description: {{ title .collection }} operations {{end}}
 
-# Holds the relative paths to the individual endpoints. The path is appended to the
-# basePath in order to construct the full URL. 
-paths:
-{{ range .collections }}
+servers: {{ range .servers }}
+  - url: {{ .server }}
+{{end}}
+paths: {{ range .collections }}
   /{{ .collection }}/query:
     post:
       tags:
@@ -27,15 +21,15 @@ paths:
       operationId: query{{ title .collection }}
       security:
         - main_auth:
-            - 'read:{{ title .collection }}'
+            - 'query:{{ title .collection }}'
             - 'admin'
       responses:
         '200':
           description: OK
         '400':
-          description: Invalid user supplied
-        '404':
-          description: User not found
+          description: Invalid Query
+        '500':
+          description: Internal Server Error
       # request body documentation
       requestBody:
         content:
@@ -47,8 +41,8 @@ paths:
 # An object to hold reusable parts that can be used across the definition
 components:
   schemas:
-  {{ .querySchema | nindent 2 }}:
+    Query: {{ .querySchema | nindent 6 }}:
+
 {{ range .collections }}
-    {{ title .collection }}:
-      {{ .schema | nindent 8 }}
+    {{ title .collection }}: {{ .schema | nindent 6 }}
 {{end}}

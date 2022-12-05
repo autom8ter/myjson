@@ -277,7 +277,7 @@ func (d *DB) queryScan(ctx context.Context, scan model.Scan, handlerFunc model.S
 	return index, nil
 }
 
-func (d *DB) applyWhereHooks(ctx context.Context, collection string, where []model.QueryJsonWhereElem) ([]model.QueryJsonWhereElem, error) {
+func (d *DB) applyWhereHooks(ctx context.Context, collection string, where []model.Where) ([]model.Where, error) {
 	var err error
 	for _, whereHook := range d.whereHooks.Get(collection) {
 		where, err = whereHook.Func(ctx, d, where)
