@@ -1,0 +1,15 @@
+type: object
+description: Page is a list of documents returned from a query
+required:
+  - documents
+  - next_page
+  - count
+properties:
+  documents:
+    type: array
+    items:
+      type: object
+  next_page:
+    type: integer
+  count:
+    type: integer

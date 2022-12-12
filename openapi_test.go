@@ -1,14 +1,17 @@
 package gokvkit
 
 import (
-	"fmt"
+	"os"
+	"testing"
+
 	"github.com/autom8ter/gokvkit/internal/safe"
 	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 func TestOpenAPI(t *testing.T) {
 	t.Run("crm api", func(t *testing.T) {
+		f, _ := os.Create("tmp/openapi.yaml")
+		defer f.Close()
 		u, err := newCollectionSchema([]byte(userSchema))
 		assert.Nil(t, err)
 		tsk, err := newCollectionSchema([]byte(taskSchema))
@@ -21,6 +24,6 @@ func TestOpenAPI(t *testing.T) {
 			version:     "1.0.0",
 			description: "an example CRM api",
 		})
-		fmt.Println(string(bits))
+		f.Write(bits)
 	})
 }

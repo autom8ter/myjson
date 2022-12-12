@@ -3,11 +3,12 @@ package gokvkit
 import (
 	"bytes"
 	_ "embed"
+	"text/template"
+
 	"github.com/Masterminds/sprig/v3"
 	"github.com/autom8ter/gokvkit/internal/safe"
 	"github.com/autom8ter/gokvkit/model"
 	"github.com/palantir/stacktrace"
-	"text/template"
 )
 
 //go:embed openapi.yaml.tmpl
@@ -48,6 +49,7 @@ func getOpenAPISpec(collections *safe.Map[*collectionSchema], params *openAPIPar
 		"version":     params.version,
 		"collections": coll,
 		"querySchema": model.QuerySchema,
+		"pageSchema":  model.PageSchema,
 	})
 	if err != nil {
 		return nil, stacktrace.Propagate(err, "")

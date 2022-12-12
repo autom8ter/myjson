@@ -7,42 +7,231 @@ info:
 tags: {{ range .collections }}
   - name: {{ title .collection }}
     description: {{ title .collection }} operations {{end}}
-
+{{ if .servers}}
 servers: {{ range .servers }}
   - url: {{ .server }}
-{{end}}
-paths: {{ range .collections }}
-  /{{ .collection }}/query:
+{{end}} {{end}}
+paths:
+  /collections/query:
     post:
       tags:
-        - {{ title .collection }}
-      summary: query {{ title .collection }} documents
-      description: This operation queries {{ title .collection }} documents
-      operationId: query{{ title .collection }}
+        - Query
+      summary: query collections
+      description: This operation queries documents across collections
+      operationId: query
       security:
         - main_auth:
-            - 'query:{{ title .collection }}'
-            - 'admin'
+          - 'reader'
+          - 'admin'
       responses:
         '200':
           description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Page"
         '400':
           description: Invalid Query
         '500':
           description: Internal Server Error
-      # request body documentation
+      
       requestBody:
         content:
           application/json:
             schema:
               $ref: '#/components/schemas/Query'
         required: true
+{{ range .collections }}
+  /collections/{{ .collection }}:
+    post:
+      tags:
+        - {{ title .collection }}
+      summary: create a {{ title .collection }} document
+      description: This creates a document in the {{ title .collection }} collection
+      operationId: create{{ title .collection }}
+      security:
+        - main_auth:
+          - 'reader'
+          - 'admin'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/{{ title .collection }}"
+        '400':
+          description: Invalid document
+        '404':
+          description: Not found
+        '500':
+          description: Internal Server Error
+      
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/{{ title .collection }}'
+        required: true
+  /collections/{{ .collection }}/batch:
+    put:
+      tags:
+        - {{ title .collection }}
+      summary: batch set 1-many {{ title .collection }} documents
+      description: This set 1-many documents in the {{ title .collection }} collection
+      operationId: batchSet{{ title .collection }}
+      security:
+        - main_auth:
+          - 'reader'
+          - 'admin'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/{{ title .collection }}"
+        '400':
+          description: Invalid document(s)
+        '404':
+          description: Not found
+        '500':
+          description: Internal Server Error
+      
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: '#/components/schemas/{{ title .collection }}'
+        required: true
+  /collections/{{ .collection }}/{docID}:
+    get:
+      tags:
+        - {{ title .collection }}
+      summary: get a {{ title .collection }} document by id
+      description: This retrieves an existing document in the {{ title .collection }} collection by id
+      operationId: get{{ title .collection }}
+      security:
+        - main_auth:
+          - 'reader'
+          - 'admin'
+      parameters:
+        - $ref: "#/components/parameters/DocID"
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/{{ title .collection }}"
+        '400':
+          description: Invalid request
+        '404':
+          description: Not found
+        '500':
+          description: Internal Server Error
+    delete:
+      tags:
+        - {{ title .collection }}
+      summary: delete a {{ title .collection }} document by id
+      description: This deletes an existing document in the {{ title .collection }} collection by id
+      operationId: delete{{ title .collection }}
+      security:
+        - main_auth:
+          - 'writer'
+          - 'admin'
+      parameters:
+        - $ref: "#/components/parameters/DocID"
+      responses:
+        '200':
+          description: OK
+        '400':
+          description: Invalid request
+        '404':
+          description: Not found
+        '500':
+          description: Internal Server Error
+    put:
+      tags:
+        - {{ title .collection }}
+      summary: update a {{ title .collection }} document
+      description: This updates an existing document in the {{ title .collection }} collection
+      operationId: set{{ title .collection }}
+      security:
+        - main_auth:
+          - 'reader'
+          - 'admin'
+      parameters:
+        - $ref: "#/components/parameters/DocID"
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/{{ title .collection }}"
+        '400':
+          description: Invalid update
+        '404':
+          description: Not found
+        '500':
+          description: Internal Server Error
+      
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/{{ title .collection }}'
+        required: true
+    patch:
+      tags:
+        - {{ title .collection }}
+      summary: edit fields of an {{ title .collection }} document
+      description: This edits a document in the {{ title .collection }} collection
+      operationId: edit{{ title .collection }}
+      security:
+        - main_auth:
+          - 'reader'
+          - 'admin'
+      parameters:
+        - $ref: "#/components/parameters/DocID"
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/{{ title .collection }}"
+        '400':
+          description: Invalid document
+        '404':
+          description: Not found
+        '500':
+          description: Internal Server Error
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+        required: true
 {{end}}
-# An object to hold reusable parts that can be used across the definition
 components:
+  parameters:
+    DocID:
+      name: docid
+      in: path
+      required: true
+      schema:
+        type: string
   schemas:
-    Query: {{ .querySchema | nindent 6 }}:
-
+    Query: {{ .querySchema | nindent 6 }}
+    Page: {{ .pageSchema | nindent 6 }}
 {{ range .collections }}
     {{ title .collection }}: {{ .schema | nindent 6 }}
 {{end}}

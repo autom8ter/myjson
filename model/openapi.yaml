@@ -1,0 +1,368 @@
+openapi: 3.0.2
+info:
+  version: 1.0.0
+  title: CRM API
+  description: |
+    an example CRM api
+tags:
+  - name: User
+    description: User operations
+  - name: Task
+    description: Task operations
+
+paths:
+  /query:
+    post:
+      tags:
+        - Query
+      summary: query collections
+      description: This operation queries documents across collections
+      operationId: query
+      security:
+        - main_auth:
+            - 'query'
+            - 'admin'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Page"
+        '400':
+          description: Invalid Query
+        '500':
+          description: Internal Server Error
+      # request body documentation
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Query'
+        required: true
+
+  /user:
+    post:
+      tags:
+        - User
+      summary: create a User document
+      description: This creates a document in the User collection
+      operationId: createUser
+      security:
+        - main_auth:
+            - 'create:User'
+            - 'admin'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        '400':
+          description: Invalid document
+        '500':
+          description: Internal Server Error
+      # request body documentation
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/User'
+        required: true
+    put:
+      tags:
+        - User
+      summary: update a User document
+      description: This updates an existing document in the User collection
+      operationId: setUser
+      security:
+        - main_auth:
+            - 'set:User'
+            - 'admin'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        '400':
+          description: Invalid update
+        '500':
+          description: Internal Server Error
+      # request body documentation
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/User'
+        required: true
+
+
+  /task:
+    post:
+      tags:
+        - Task
+      summary: create a Task document
+      description: This creates a document in the Task collection
+      operationId: createTask
+      security:
+        - main_auth:
+            - 'create:Task'
+            - 'admin'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Task"
+        '400':
+          description: Invalid document
+        '500':
+          description: Internal Server Error
+      # request body documentation
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Task'
+        required: true
+    put:
+      tags:
+        - Task
+      summary: update a Task document
+      description: This updates an existing document in the Task collection
+      operationId: setTask
+      security:
+        - main_auth:
+            - 'set:Task'
+            - 'admin'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Task"
+        '400':
+          description: Invalid update
+        '500':
+          description: Internal Server Error
+      # request body documentation
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Task'
+        required: true
+
+
+# An object to hold reusable parts that can be used across the definition
+components:
+  schemas:
+    Query:
+      type: object
+      description: Query is a query against a collection of documents
+      required:
+        - from
+        - select
+      properties:
+        from:
+          type: string
+          description: the collection to query
+        select:
+          type: array
+          items:
+            type: object
+            description: select is a list of fields to select from each record in the datbase(optional)
+            properties:
+              field:
+                type: string
+                description: the select's field
+              aggregate:
+                type: string
+                description: an aggregate function to apply against the field
+                enum:
+                  - sum
+                  - count
+                  - max
+                  - min
+              function:
+                type: string
+                description: a function to apply against the field
+                enum:
+                  - toLower
+                  - toUpper
+              as:
+                type: string
+                description: as is outputs the value of the field as an alias
+            required:
+              - field
+        groupBy:
+          type: array
+          items:
+            type: string
+        where:
+          type: array
+          items:
+            type: object
+            description: where is a filter applied against a query
+            properties:
+              field:
+                type: string
+              op:
+                type: string
+                enum:
+                  - eq
+                  - neq
+                  - gt
+                  - gte
+                  - lt
+                  - lte
+                  - in
+                  - contains
+              value: {}
+            required:
+              - field
+              - op
+              - value
+        orderBy:
+          type: array
+          items:
+            type: object
+            description: orderBy orders results by a field and a direction
+            properties:
+              field:
+                type: string
+              direction:
+                type: string
+                enum:
+                  - asc
+                  - desc
+            required:
+              - field
+              - direction
+        page:
+          type: integer
+        limit:
+          type: integer
+    Page:
+      type: object
+      description: Page is a list of documents returned from a query
+      required:
+        - documents
+        - next_page
+        - count
+      properties:
+        documents:
+          type: array
+          items:
+            type: object
+        next_page:
+          type: integer
+        count:
+          type: integer
+
+    User:
+      type: object
+      x-collection: user
+      required:
+        - _id
+        - name
+        - age
+        - contact
+        - gender
+        - account_id
+      properties:
+        _id:
+          type: string
+          description: The user's id.
+        name:
+          type: string
+          description: The user's name.
+        contact:
+          type: object
+          properties:
+            email:
+              type: string
+              description: The user's email.
+        age:
+          description: Age in years which must be equal to or greater than zero.
+          type: integer
+          minimum: 0
+        account_id:
+          type: integer
+          minimum: 0
+        language:
+          type: string
+          description: The user's first language.
+        gender:
+          type: string
+          description: The user's gender.
+          enum:
+            - male
+            - female
+        timestamp:
+          type: string
+        annotations:
+          type: object
+      x-indexing:
+        primary_idx:
+          name: primary_idx
+          unique: true
+          primary: true
+          fields:
+            - _id
+        language_idx:
+          name: language_idx
+          unique: false
+          primary: false
+          fields:
+            - language
+        email_idx:
+          name: email_idx
+          unique: true
+          primary: false
+          fields:
+            - contact.email
+        account_idx:
+          name: account_idx
+          unique: false
+          primary: false
+          fields:
+            - account_id
+
+    Task:
+      type: object
+      x-collection: task
+      required:
+        - _id
+        - user
+        - content
+      properties:
+        _id:
+          type: string
+          description: The user's id.
+        user:
+          type: string
+          description: The id of the user who owns the task
+        content:
+          type: string
+          description: The content of the task
+      x-indexing:
+        primary_idx:
+          name: primary_idx
+          unique: true
+          primary: true
+          fields:
+            - _id
+        user_idx:
+          name: user_idx
+          unique: false
+          primary: false
+          fields:
+            - user
