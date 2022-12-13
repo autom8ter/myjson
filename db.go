@@ -193,7 +193,7 @@ func (d *DB) aggregate(ctx context.Context, collection string, query model.Query
 	}
 	var reduced model.Documents
 	for _, values := range results.GroupBy(query.GroupBy) {
-		value, err := values.Aggregate(ctx, query.Select)
+		value, err := values.Select(ctx, query.Select)
 		if err != nil {
 			return model.Page{}, stacktrace.Propagate(err, "")
 		}

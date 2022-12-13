@@ -395,54 +395,80 @@ func (d Documents) OrderBy(orderBys []OrderBy) Documents {
 	return d
 }
 
-// Aggregate reduces the documents with the input aggregates
-func (d Documents) Aggregate(ctx context.Context, aggregates []Select) (*Document, error) {
+// Select reduces the documents with the input aggregates
+func (d Documents) Select(ctx context.Context, selects []Select) (*Document, error) {
 	var (
 		aggregated *Document
 	)
+	var aggregates = lo.Filter[Select](selects, func(s Select, i int) bool {
+		return s.Aggregate != nil
+	})
+	var nonAggregates = lo.Filter[Select](selects, func(s Select, i int) bool {
+		return s.Aggregate == nil
+	})
 	for _, next := range d {
 		if aggregated == nil || !aggregated.Valid() {
 			aggregated = NewDocument()
+			for _, nagg := range nonAggregates {
+				if err := applyNonAggregates(nagg, aggregated, next); err != nil {
+					return nil, err
+				}
+			}
 		}
 		for _, agg := range aggregates {
-			if agg.Aggregate == nil {
-				if util.IsNil(agg.As) {
-					if err := aggregated.Set(agg.Field, next.Get(agg.Field)); err != nil {
-						return nil, stacktrace.Propagate(err, "")
-					}
-
-				} else {
-					if err := aggregated.Set(*agg.As, next.Get(agg.Field)); err != nil {
-						return nil, stacktrace.Propagate(err, "")
-					}
-				}
-				continue
-			}
 			if util.IsNil(agg.As) {
 				agg.As = util.ToPtr(defaultAs(*agg.Aggregate, agg.Field))
 			}
-
-			current := aggregated.GetFloat(*agg.As)
-			switch *agg.Aggregate {
-			case SelectAggregateCount:
-				current++
-			case SelectAggregateMax:
-				if value := next.GetFloat(agg.Field); value > current {
-					current = value
-				}
-			case SelectAggregateMin:
-				if value := next.GetFloat(agg.Field); value < current {
-					current = value
-				}
-			case SelectAggregateSum:
-				current += next.GetFloat(agg.Field)
-			default:
-				return nil, stacktrace.NewError("unsupported aggregate function: %s/%s", agg.Field, *agg.Aggregate)
-			}
-			if err := aggregated.Set(*agg.As, current); err != nil {
-				return nil, stacktrace.Propagate(err, "")
+			if err := applyAggregates(agg, aggregated, next); err != nil {
+				return nil, err
 			}
 		}
 	}
 	return aggregated, nil
+}
+
+func applyNonAggregates(selct Select, aggregated, next *Document) error {
+	value := next.Get(selct.Field)
+	if selct.Function != nil {
+		switch *selct.Function {
+		case SelectFunctionToLower:
+			value = strings.ToLower(cast.ToString(value))
+		case SelectFunctionToUpper:
+			value = strings.ToUpper(cast.ToString(value))
+		}
+	}
+	if util.IsNil(selct.As) {
+		if err := aggregated.Set(selct.Field, value); err != nil {
+			return stacktrace.Propagate(err, "")
+		}
+	} else {
+		if err := aggregated.Set(*selct.As, value); err != nil {
+			return stacktrace.Propagate(err, "")
+		}
+	}
+	return nil
+}
+
+func applyAggregates(agg Select, aggregated, next *Document) error {
+	current := aggregated.GetFloat(*agg.As)
+	switch *agg.Aggregate {
+	case SelectAggregateCount:
+		current++
+	case SelectAggregateMax:
+		if value := next.GetFloat(agg.Field); value > current {
+			current = value
+		}
+	case SelectAggregateMin:
+		if value := next.GetFloat(agg.Field); value < current {
+			current = value
+		}
+	case SelectAggregateSum:
+		current += next.GetFloat(agg.Field)
+	default:
+		return stacktrace.NewError("unsupported aggregate function: %s/%s", agg.Field, *agg.Aggregate)
+	}
+	if err := aggregated.Set(*agg.As, current); err != nil {
+		return stacktrace.Propagate(err, "")
+	}
+	return nil
 }
