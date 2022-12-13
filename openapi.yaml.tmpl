@@ -38,6 +38,7 @@ paths:
     get:
       tags:
         - {{ title .collection }}
+        - schema
       summary: get {{ title .collection }} collection schemas
       operationId: get{{ title .collection }}Schema
       security:
