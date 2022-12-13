@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/autom8ter/gokvkit/internal/util"
 	"github.com/palantir/stacktrace"
 	"github.com/samber/lo"
 )
@@ -322,4 +323,13 @@ func (q Query) Validate(ctx context.Context) error {
 		}
 	}
 	return nil
+}
+
+func (q Query) IsAggregate() bool {
+	for _, a := range q.Select {
+		if !util.IsNil(a.Aggregate) {
+			return true
+		}
+	}
+	return false
 }

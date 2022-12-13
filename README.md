@@ -33,6 +33,10 @@ Build stateful, extensible, and feature-rich programs on top of pluggable key/va
         - [x] json schema based validation
     - [x] read hooks (on read)
     - [x] sideEffect Hooks (on write)
+- [x] run as an http server
+  - [x] openapi support
+  - [x] optionally add http middlewares
+  - [ ] websocket transaction support
 
 ### Flexibility
 

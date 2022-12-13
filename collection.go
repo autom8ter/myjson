@@ -18,6 +18,9 @@ func (d *DB) ConfigureCollection(ctx context.Context, collectionSchemaBytes []by
 	if err != nil {
 		return stacktrace.Propagate(err, "")
 	}
+	for _, i := range collection.indexing {
+		i.Collection = collection.collection
+	}
 	var (
 		hasPrimary = 0
 	)

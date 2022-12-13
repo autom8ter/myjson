@@ -47,6 +47,7 @@ type DB struct {
 	readHooks     *safe.Map[[]OnRead]
 	router        chi.Router
 	openAPIParams *openAPIParams
+	middlewares   []func(http.Handler) http.Handler
 }
 
 /*
@@ -297,10 +298,12 @@ func (d *DB) Close(ctx context.Context) error {
 	return stacktrace.Propagate(d.kv.Close(), "")
 }
 
+// Handler returns the database http handler
+func (d *DB) Handler() http.Handler {
+	return d.router
+}
+
 // ServeHTTP starts an http server serving openapi and websocket endpoints
-func (d *DB) ServeHTTP(ctx context.Context, port int, middlewares ...func(http.Handler) http.Handler) error {
-	if len(middlewares) > 0 {
-		d.router.Use(middlewares...)
-	}
-	return http.ListenAndServe(fmt.Sprintf(":%v", port), d.router)
+func (d *DB) ServeHTTP(ctx context.Context, port int) error {
+	return http.ListenAndServe(fmt.Sprintf(":%v", port), d.Handler())
 }

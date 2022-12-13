@@ -11,15 +11,6 @@ import (
 	"github.com/spf13/cast"
 )
 
-func (q Query) IsAggregate() bool {
-	for _, a := range q.Select {
-		if !util.IsNil(a.Aggregate) {
-			return true
-		}
-	}
-	return false
-}
-
 func defaultAs(function SelectAggregate, field string) string {
 	if function != "" {
 		return fmt.Sprintf("%s_%s", function, field)

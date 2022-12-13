@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"html/template"
 	"io"
 	"net/http"
@@ -63,6 +64,8 @@ func getOpenAPISpec(collections *safe.Map[*collectionSchema], params *openAPIPar
 }
 
 func registerHTTPEndpoints(db *DB) {
+	db.middlewares = append([]func(http.Handler) http.Handler{metadataInjector()}, db.middlewares...)
+	db.router.Use(db.middlewares...)
 	db.router.Get("/openapi.yaml", specHandler(db))
 
 	db.router.Post("/collections/{collection}", createDocHandler(db))
@@ -324,4 +327,24 @@ func httpError(w http.ResponseWriter, err error) {
 	}
 	http.Error(w, stacktrace.RootCause(err).Error(), status)
 	return
+}
+
+func metadataInjector() func(http.Handler) http.Handler {
+	return func(handler http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			md, _ := model.GetMetadata(r.Context())
+			md.SetAll(map[string]any{
+				"http.url":    r.URL.String(),
+				"http.method": r.Method,
+				"http.host":   r.Host,
+			})
+			for k, v := range r.URL.Query() {
+				md.Set(fmt.Sprintf("http.query.%s", k), v)
+			}
+			for k, v := range r.Header {
+				md.Set(fmt.Sprintf("http.header.%s", k), v)
+			}
+			handler.ServeHTTP(w, r.WithContext(md.ToContext(r.Context())))
+		})
+	}
 }
