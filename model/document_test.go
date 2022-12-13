@@ -116,7 +116,7 @@ func TestDocument(t *testing.T) {
 		pass, err := r.Where([]model.Where{
 			{
 				Field: "contact.email",
-				Op:    "==",
+				Op:    model.WhereOpEq,
 				Value: email,
 			},
 		})
@@ -136,7 +136,7 @@ func TestDocument(t *testing.T) {
 		pass, err = r.Where([]model.Where{
 			{
 				Field: "contact.email",
-				Op:    "==",
+				Op:    model.WhereOpEq,
 				Value: gofakeit.Email(),
 			},
 		})
@@ -146,7 +146,7 @@ func TestDocument(t *testing.T) {
 		pass, err = r.Where([]model.Where{
 			{
 				Field: "contact.email",
-				Op:    "!=",
+				Op:    model.WhereOpNeq,
 				Value: gofakeit.Email(),
 			},
 		})
@@ -156,7 +156,7 @@ func TestDocument(t *testing.T) {
 		pass, err = r.Where([]model.Where{
 			{
 				Field: "age",
-				Op:    ">",
+				Op:    model.WhereOpGt,
 				Value: 10,
 			},
 		})
@@ -166,7 +166,7 @@ func TestDocument(t *testing.T) {
 		pass, err = r.Where([]model.Where{
 			{
 				Field: "age",
-				Op:    ">=",
+				Op:    model.WhereOpGte,
 				Value: 50,
 			},
 		})
@@ -176,7 +176,7 @@ func TestDocument(t *testing.T) {
 		pass, err = r.Where([]model.Where{
 			{
 				Field: "age",
-				Op:    ">=",
+				Op:    model.WhereOpGte,
 				Value: 51,
 			},
 		})
@@ -186,7 +186,7 @@ func TestDocument(t *testing.T) {
 		pass, err = r.Where([]model.Where{
 			{
 				Field: "age",
-				Op:    "<",
+				Op:    model.WhereOpLt,
 				Value: 51,
 			},
 		})
@@ -196,7 +196,7 @@ func TestDocument(t *testing.T) {
 		pass, err = r.Where([]model.Where{
 			{
 				Field: "age",
-				Op:    "<=",
+				Op:    model.WhereOpLte,
 				Value: 50,
 			},
 		})
@@ -206,7 +206,7 @@ func TestDocument(t *testing.T) {
 		pass, err = r.Where([]model.Where{
 			{
 				Field: "age",
-				Op:    "<=",
+				Op:    model.WhereOpLte,
 				Value: 50,
 			},
 		})
@@ -216,7 +216,7 @@ func TestDocument(t *testing.T) {
 		pass, err = r.Where([]model.Where{
 			{
 				Field: "age",
-				Op:    ">=",
+				Op:    model.WhereOpGte,
 				Value: 50,
 			},
 		})
@@ -236,7 +236,7 @@ func TestDocument(t *testing.T) {
 		pass, err = r.Where([]model.Where{
 			{
 				Field: "age",
-				Op:    "<",
+				Op:    model.WhereOpLt,
 				Value: 49,
 			},
 		})

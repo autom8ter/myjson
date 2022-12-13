@@ -1,9 +1,10 @@
 package gokvkit
 
 import (
+	"testing"
+
 	"github.com/autom8ter/gokvkit/model"
 	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 func TestQuery(t *testing.T) {
@@ -28,6 +29,6 @@ func TestQuery(t *testing.T) {
 		assert.Equal(t, 1, len(q.Where))
 		assert.Equal(t, 1, len(q.GroupBy))
 		assert.Equal(t, 1, len(q.OrderBy))
-		assert.Equal(t, 1, q.Limit)
+		assert.Equal(t, 1, *q.Limit)
 	})
 }

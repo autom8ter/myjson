@@ -31,7 +31,7 @@ func (d *DB) addIndex(ctx context.Context, collection string, index model.Index)
 			From:  collection,
 			Where: nil,
 		}, func(doc *model.Document) (bool, error) {
-			if err := d.setDocument(ctx, batch, &model.Command{
+			if err := d.setDocument(ctx, batch, d.collections.Get(collection), &model.Command{
 				Metadata:   meta,
 				Collection: collection,
 				Action:     model.Set,

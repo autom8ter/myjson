@@ -3,6 +3,7 @@ package gokvkit
 import (
 	"context"
 	"encoding/json"
+	"time"
 
 	"github.com/autom8ter/gokvkit/internal/util"
 	"github.com/autom8ter/gokvkit/model"
@@ -89,12 +90,22 @@ func (j *collectionSchema) UnmarshalJSON(bytes []byte) error {
 }
 
 func (j *collectionSchema) validateCommand(ctx context.Context, command *model.Command) error {
+	if command.Metadata == nil {
+		md, _ := model.GetMetadata(ctx)
+		command.Metadata = md
+	}
+	if command.Timestamp.IsZero() {
+		command.Timestamp = time.Now()
+	}
+	if err := command.Validate(); err != nil {
+		return err
+	}
 	switch command.Action {
 	case model.Update, model.Create, model.Set:
 		if command.After != nil {
-			kerrs := j.schema.Validate(ctx, command.After).Errs
+			kerrs := j.schema.Validate(ctx, command.After.Value()).Errs
 			if kerrs != nil && len(*kerrs) > 0 {
-				return stacktrace.NewError(util.JSONString(&kerrs))
+				return stacktrace.NewError("%v", util.JSONString(*kerrs))
 			}
 		}
 	case model.Delete:

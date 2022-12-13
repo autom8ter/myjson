@@ -237,19 +237,19 @@ func (d *Document) Where(wheres []Where) (bool, error) {
 				return false, nil
 			}
 		case WhereOpLt:
-			if d.GetFloat(w.Field) <= cast.ToFloat64(w.Value) {
-				return false, nil
-			}
-		case WhereOpLte:
-			if d.GetFloat(w.Field) < cast.ToFloat64(w.Value) {
-				return false, nil
-			}
-		case WhereOpGt:
 			if d.GetFloat(w.Field) >= cast.ToFloat64(w.Value) {
 				return false, nil
 			}
-		case WhereOpGte:
+		case WhereOpLte:
 			if d.GetFloat(w.Field) > cast.ToFloat64(w.Value) {
+				return false, nil
+			}
+		case WhereOpGt:
+			if d.GetFloat(w.Field) <= cast.ToFloat64(w.Value) {
+				return false, nil
+			}
+		case WhereOpGte:
+			if d.GetFloat(w.Field) < cast.ToFloat64(w.Value) {
 				return false, nil
 			}
 		case WhereOpIn:
@@ -271,7 +271,7 @@ func (d *Document) Where(wheres []Where) (bool, error) {
 				return false, nil
 			}
 		default:
-			return false, stacktrace.NewError("invalid operator: %s", w.Op)
+			return false, stacktrace.NewError("invalid operator: '%s'", w.Op)
 		}
 	}
 	return true, nil

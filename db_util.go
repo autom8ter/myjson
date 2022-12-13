@@ -3,20 +3,20 @@ package gokvkit
 import (
 	"bytes"
 	"context"
+	"fmt"
+	"time"
+
 	"github.com/autom8ter/gokvkit/kv"
 	"github.com/autom8ter/gokvkit/model"
 	"github.com/nqd/flat"
 	"github.com/palantir/stacktrace"
 	"github.com/segmentio/ksuid"
-	"time"
 )
 
 const batchThreshold = 10
 
-func (d *DB) updateDocument(ctx context.Context, mutator kv.Mutator, command *model.Command) error {
-	if err := command.Validate(); err != nil {
-		return stacktrace.Propagate(err, "")
-	}
+func (d *DB) updateDocument(ctx context.Context, mutator kv.Mutator, c *collectionSchema, command *model.Command) error {
+
 	primaryIndex := d.primaryIndex(command.Collection)
 	after := command.Before.Clone()
 	flattened, err := flat.Flatten(command.After.Value(), nil)
@@ -28,6 +28,9 @@ func (d *DB) updateDocument(ctx context.Context, mutator kv.Mutator, command *mo
 		return stacktrace.Propagate(err, "")
 	}
 	command.After = after
+	if err := c.validateCommand(ctx, command); err != nil {
+		return stacktrace.Propagate(err, "")
+	}
 	if err := mutator.Set(primaryIndex.SeekPrefix(map[string]any{
 		d.primaryKey(command.Collection): command.DocID,
 	}).SetDocumentID(command.DocID).Path(), command.After.Bytes()); err != nil {
@@ -36,8 +39,8 @@ func (d *DB) updateDocument(ctx context.Context, mutator kv.Mutator, command *mo
 	return nil
 }
 
-func (d *DB) deleteDocument(ctx context.Context, mutator kv.Mutator, command *model.Command) error {
-	if err := command.Validate(); err != nil {
+func (d *DB) deleteDocument(ctx context.Context, mutator kv.Mutator, c *collectionSchema, command *model.Command) error {
+	if err := c.validateCommand(ctx, command); err != nil {
 		return stacktrace.Propagate(err, "")
 	}
 	primaryIndex := d.primaryIndex(command.Collection)
@@ -49,7 +52,7 @@ func (d *DB) deleteDocument(ctx context.Context, mutator kv.Mutator, command *mo
 	return nil
 }
 
-func (d *DB) createDocument(ctx context.Context, mutator kv.Mutator, command *model.Command) error {
+func (d *DB) createDocument(ctx context.Context, mutator kv.Mutator, c *collectionSchema, command *model.Command) error {
 	primaryIndex := d.primaryIndex(command.Collection)
 	if command.DocID == "" {
 		command.DocID = ksuid.New().String()
@@ -57,7 +60,7 @@ func (d *DB) createDocument(ctx context.Context, mutator kv.Mutator, command *mo
 			return stacktrace.Propagate(err, "")
 		}
 	}
-	if err := command.Validate(); err != nil {
+	if err := c.validateCommand(ctx, command); err != nil {
 		return stacktrace.Propagate(err, "")
 	}
 	if err := mutator.Set(primaryIndex.SeekPrefix(map[string]any{
@@ -69,8 +72,8 @@ func (d *DB) createDocument(ctx context.Context, mutator kv.Mutator, command *mo
 	return nil
 }
 
-func (d *DB) setDocument(ctx context.Context, mutator kv.Mutator, command *model.Command) error {
-	if err := command.Validate(); err != nil {
+func (d *DB) setDocument(ctx context.Context, mutator kv.Mutator, c *collectionSchema, command *model.Command) error {
+	if err := c.validateCommand(ctx, command); err != nil {
 		return stacktrace.Propagate(err, "")
 	}
 	primaryIndex := d.primaryIndex(command.Collection)
@@ -84,6 +87,10 @@ func (d *DB) setDocument(ctx context.Context, mutator kv.Mutator, command *model
 
 func (d *DB) persistStateChange(ctx context.Context, mutator kv.Mutator, commands []*model.Command) error {
 	for _, command := range commands {
+		c := d.collections.Get(command.Collection)
+		if c == nil {
+			return fmt.Errorf("collection: %s does not exist", command.Collection)
+		}
 		if command.Timestamp.IsZero() {
 			command.Timestamp = time.Now()
 		}
@@ -98,19 +105,19 @@ func (d *DB) persistStateChange(ctx context.Context, mutator kv.Mutator, command
 		command.Before = before
 		switch command.Action {
 		case model.Update:
-			if err := d.updateDocument(ctx, mutator, command); err != nil {
+			if err := d.updateDocument(ctx, mutator, c, command); err != nil {
 				return stacktrace.Propagate(err, "")
 			}
 		case model.Create:
-			if err := d.createDocument(ctx, mutator, command); err != nil {
+			if err := d.createDocument(ctx, mutator, c, command); err != nil {
 				return stacktrace.Propagate(err, "")
 			}
 		case model.Delete:
-			if err := d.deleteDocument(ctx, mutator, command); err != nil {
+			if err := d.deleteDocument(ctx, mutator, c, command); err != nil {
 				return stacktrace.Propagate(err, "")
 			}
 		case model.Set:
-			if err := d.setDocument(ctx, mutator, command); err != nil {
+			if err := d.setDocument(ctx, mutator, c, command); err != nil {
 				return stacktrace.Propagate(err, "")
 			}
 		}

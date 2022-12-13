@@ -1,10 +1,11 @@
 package gokvkit
 
 import (
+	"testing"
+
 	"github.com/autom8ter/gokvkit/model"
 	"github.com/brianvoe/gofakeit/v6"
 	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 func TestOptimizer(t *testing.T) {
@@ -36,7 +37,7 @@ func TestOptimizer(t *testing.T) {
 		i, err := o.Optimize(indexes, []model.Where{
 			{
 				Field: "email",
-				Op:    "==",
+				Op:    model.WhereOpEq,
 				Value: gofakeit.Email(),
 			},
 		})
@@ -49,7 +50,7 @@ func TestOptimizer(t *testing.T) {
 		i, err := o.Optimize(indexes, []model.Where{
 			{
 				Field: "_id",
-				Op:    "==",
+				Op:    model.WhereOpEq,
 				Value: gofakeit.Email(),
 			},
 		})
@@ -62,12 +63,12 @@ func TestOptimizer(t *testing.T) {
 		i, err := o.Optimize(indexes, []model.Where{
 			{
 				Field: "account_id",
-				Op:    "==",
+				Op:    model.WhereOpEq,
 				Value: 1,
 			},
 			{
 				Field: "language",
-				Op:    "==",
+				Op:    model.WhereOpEq,
 				Value: gofakeit.Language(),
 			},
 		})
@@ -80,12 +81,12 @@ func TestOptimizer(t *testing.T) {
 		i, err := o.Optimize(indexes, []model.Where{
 			{
 				Field: "language",
-				Op:    "==",
+				Op:    model.WhereOpEq,
 				Value: gofakeit.Language(),
 			},
 			{
 				Field: "account_id",
-				Op:    "==",
+				Op:    model.WhereOpEq,
 				Value: 1,
 			},
 		})
@@ -96,7 +97,7 @@ func TestOptimizer(t *testing.T) {
 		i, err := o.Optimize(indexes, []model.Where{
 			{
 				Field: "account_id",
-				Op:    "==",
+				Op:    model.WhereOpEq,
 				Value: 1,
 			},
 		})

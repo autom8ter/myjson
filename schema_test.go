@@ -3,9 +3,10 @@ package gokvkit
 import (
 	"context"
 	_ "embed"
+	"testing"
+
 	"github.com/autom8ter/gokvkit/model"
 	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 var (
@@ -20,10 +21,11 @@ func TestJSONSchema(t *testing.T) {
 		validator, err := newCollectionSchema([]byte(userSchema))
 		assert.Nil(t, err)
 		assert.Nil(t, validator.validateCommand(context.Background(), &model.Command{
-			Action: model.Set,
-			DocID:  "",
-			Before: nil,
-			After:  newUserDoc(),
+			Collection: "user",
+			Action:     model.Set,
+			DocID:      "1",
+			Before:     nil,
+			After:      newUserDoc(),
 		}))
 	})
 	t.Run("json schema validation - fail", func(t *testing.T) {

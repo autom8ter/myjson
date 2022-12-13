@@ -85,7 +85,7 @@ func Test(t *testing.T) {
 				Where: []model.Where{
 					{
 						Field: "account_id",
-						Op:    ">",
+						Op:    model.WhereOpGt,
 						Value: 50,
 					},
 				},
@@ -254,7 +254,7 @@ func Benchmark(b *testing.B) {
 					Where: []model.Where{
 						{
 							Field: "contact.email",
-							Op:    "==",
+							Op:    model.WhereOpEq,
 							Value: doc.GetString("contact.email"),
 						},
 					},
@@ -327,7 +327,7 @@ func TestIndexing1(t *testing.T) {
 				Where: []model.Where{
 					{
 						Field: "contact.email",
-						Op:    "==",
+						Op:    model.WhereOpEq,
 						Value: docs[0].Get("contact.email"),
 					},
 				},
@@ -361,7 +361,7 @@ func TestIndexing1(t *testing.T) {
 				Where: []model.Where{
 					{
 						Field: "contact.email",
-						Op:    "==",
+						Op:    model.WhereOpEq,
 						Value: docs[0].Get("contact.email"),
 					},
 				},
