@@ -2,11 +2,12 @@ package model_test
 
 import (
 	"encoding/json"
+	"testing"
+
 	"github.com/autom8ter/gokvkit/model"
 	"github.com/autom8ter/gokvkit/testutil"
 	"github.com/brianvoe/gofakeit/v6"
 	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 func TestDocument(t *testing.T) {
@@ -305,7 +306,7 @@ func TestDocument(t *testing.T) {
 			assert.Nil(t, doc.Set("account_id", gofakeit.IntRange(1, 5)))
 			docs = append(docs, doc)
 		}
-		docs = docs.OrderBy([]model.OrderBy{
+		docs = model.OrderByDocs(docs, []model.OrderBy{
 			{
 				Field:     "account_id",
 				Direction: model.OrderByDirectionDesc,

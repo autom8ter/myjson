@@ -192,14 +192,14 @@ func (d *DB) aggregate(ctx context.Context, collection string, query model.Query
 		return model.Page{}, stacktrace.Propagate(err, "")
 	}
 	var reduced model.Documents
-	for _, values := range results.GroupBy(query.GroupBy) {
-		value, err := values.Select(ctx, query.Select)
+	for _, values := range model.GroupByDocs(results, query.GroupBy) {
+		value, err := model.AggregateDocs(values, query.Select)
 		if err != nil {
 			return model.Page{}, stacktrace.Propagate(err, "")
 		}
 		reduced = append(reduced, value)
 	}
-	reduced = reduced.OrderBy(query.OrderBy)
+	reduced = model.OrderByDocs(reduced, query.OrderBy)
 	if (!util.IsNil(query.Limit) && *query.Limit > 0) && (!util.IsNil(query.Limit) && *query.Page > 0) {
 		reduced = lo.Slice(reduced, *query.Limit**query.Page, (*query.Limit**query.Page)+*query.Limit)
 	}
@@ -251,7 +251,7 @@ func (d *DB) Query(ctx context.Context, collection string, query model.Query) (m
 	if err != nil {
 		return model.Page{}, stacktrace.Propagate(err, "")
 	}
-	results = results.OrderBy(query.OrderBy)
+	results = model.OrderByDocs(results, query.OrderBy)
 
 	if fullScan && !util.IsNil(query.Limit) && !util.IsNil(query.Page) && *query.Limit > 0 && *query.Page > 0 {
 		results = lo.Slice(results, *query.Limit**query.Page, (*query.Limit**query.Page)+*query.Limit)

@@ -1,10 +1,8 @@
 package model
 
 import (
-	"context"
 	"encoding/json"
 	"io"
-	"sort"
 	"strings"
 
 	"github.com/autom8ter/gokvkit/internal/util"
@@ -296,20 +294,6 @@ func (d *Document) Encode(w io.Writer) error {
 // Documents is an array of documents
 type Documents []*Document
 
-// GroupBy groups the documents by the given fields
-func (documents Documents) GroupBy(fields []string) map[string]Documents {
-	var grouped = map[string]Documents{}
-	for _, d := range documents {
-		var values []string
-		for _, g := range fields {
-			values = append(values, cast.ToString(d.Get(g)))
-		}
-		group := strings.Join(values, ".")
-		grouped[group] = append(grouped[group], d)
-	}
-	return grouped
-}
-
 // Slice slices the documents into a subarray of documents
 func (documents Documents) Slice(start, end int) Documents {
 	return lo.Slice[*Document](documents, start, end)
@@ -328,147 +312,4 @@ func (documents Documents) Map(mapper func(t *Document, i int) *Document) Docume
 // ForEach applies the function to each document in the documents
 func (documents Documents) ForEach(fn func(next *Document, i int)) {
 	lo.ForEach[*Document](documents, fn)
-}
-
-// OrderBy orders the documents by the OrderBy clause
-func (d Documents) OrderBy(orderBys []OrderBy) Documents {
-	if len(orderBys) == 0 {
-		return d
-	}
-	// TODO: support more than one order by
-	orderBy := orderBys[0]
-
-	if orderBy.Direction == OrderByDirectionDesc {
-		sort.Slice(d, func(i, j int) bool {
-			index := 1
-			if d[i].Get(orderBy.Field) != d[j].Get(orderBy.Field) {
-				return compareField(orderBy.Field, d[i], d[j])
-			}
-			for index < len(orderBys) {
-				order := orderBys[index]
-				if d[i].Get(order.Field) != d[j].Get(order.Field) {
-					return compareField(order.Field, d[i], d[j])
-				}
-				if d[i].Get(order.Field) != d[j].Get(order.Field) {
-					if order.Direction == OrderByDirectionDesc {
-						if d[i].Get(orderBy.Field) != d[j].Get(orderBy.Field) {
-							return compareField(orderBy.Field, d[i], d[j])
-						}
-					} else {
-						if d[i].Get(orderBy.Field) != d[j].Get(orderBy.Field) {
-							return !compareField(orderBy.Field, d[i], d[j])
-						}
-					}
-				}
-				index++
-			}
-			return false
-		})
-	} else {
-		sort.Slice(d, func(i, j int) bool {
-			index := 1
-			if d[i].Get(orderBy.Field) != d[j].Get(orderBy.Field) {
-				return !compareField(orderBy.Field, d[i], d[j])
-			}
-			for index < len(orderBys) {
-				order := orderBys[index]
-				if d[i].Get(order.Field) != d[j].Get(order.Field) {
-					return !compareField(order.Field, d[i], d[j])
-				}
-				if d[i].Get(order.Field) != d[j].Get(order.Field) {
-					if order.Direction == OrderByDirectionDesc {
-						if d[i].Get(orderBy.Field) != d[j].Get(orderBy.Field) {
-							return compareField(orderBy.Field, d[i], d[j])
-						}
-					} else {
-						if d[i].Get(orderBy.Field) != d[j].Get(orderBy.Field) {
-							return !compareField(orderBy.Field, d[i], d[j])
-						}
-					}
-				}
-				index++
-			}
-			return false
-
-		})
-	}
-	return d
-}
-
-// Select reduces the documents with the input aggregates
-func (d Documents) Select(ctx context.Context, selects []Select) (*Document, error) {
-	var (
-		aggregated *Document
-	)
-	var aggregates = lo.Filter[Select](selects, func(s Select, i int) bool {
-		return s.Aggregate != nil
-	})
-	var nonAggregates = lo.Filter[Select](selects, func(s Select, i int) bool {
-		return s.Aggregate == nil
-	})
-	for _, next := range d {
-		if aggregated == nil || !aggregated.Valid() {
-			aggregated = NewDocument()
-			for _, nagg := range nonAggregates {
-				if err := applyNonAggregates(nagg, aggregated, next); err != nil {
-					return nil, err
-				}
-			}
-		}
-		for _, agg := range aggregates {
-			if util.IsNil(agg.As) {
-				agg.As = util.ToPtr(defaultAs(*agg.Aggregate, agg.Field))
-			}
-			if err := applyAggregates(agg, aggregated, next); err != nil {
-				return nil, err
-			}
-		}
-	}
-	return aggregated, nil
-}
-
-func applyNonAggregates(selct Select, aggregated, next *Document) error {
-	value := next.Get(selct.Field)
-	if selct.Function != nil {
-		switch *selct.Function {
-		case SelectFunctionToLower:
-			value = strings.ToLower(cast.ToString(value))
-		case SelectFunctionToUpper:
-			value = strings.ToUpper(cast.ToString(value))
-		}
-	}
-	if util.IsNil(selct.As) {
-		if err := aggregated.Set(selct.Field, value); err != nil {
-			return stacktrace.Propagate(err, "")
-		}
-	} else {
-		if err := aggregated.Set(*selct.As, value); err != nil {
-			return stacktrace.Propagate(err, "")
-		}
-	}
-	return nil
-}
-
-func applyAggregates(agg Select, aggregated, next *Document) error {
-	current := aggregated.GetFloat(*agg.As)
-	switch *agg.Aggregate {
-	case SelectAggregateCount:
-		current++
-	case SelectAggregateMax:
-		if value := next.GetFloat(agg.Field); value > current {
-			current = value
-		}
-	case SelectAggregateMin:
-		if value := next.GetFloat(agg.Field); value < current {
-			current = value
-		}
-	case SelectAggregateSum:
-		current += next.GetFloat(agg.Field)
-	default:
-		return stacktrace.NewError("unsupported aggregate function: %s/%s", agg.Field, *agg.Aggregate)
-	}
-	if err := aggregated.Set(*agg.As, current); err != nil {
-		return stacktrace.Propagate(err, "")
-	}
-	return nil
 }

@@ -491,7 +491,7 @@ func TestAggregate(t *testing.T) {
 			expected += u.GetFloat("age")
 			docs = append(docs, u)
 		}
-		reduced, err := docs.Select(context.Background(), []model.Select{
+		reduced, err := model.AggregateDocs(docs, []model.Select{
 			{
 				Field:     "age",
 				Aggregate: util.ToPtr(model.SelectAggregateSum),
