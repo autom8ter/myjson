@@ -245,7 +245,7 @@ func (d *DB) Query(ctx context.Context, collection string, query model.Query) (m
 		Where: query.Where,
 	}, func(d *model.Document) (bool, error) {
 		results = append(results, d)
-		if *query.Page == 0 && len(query.OrderBy) == 0 && *query.Limit > 0 && len(results) >= *query.Limit {
+		if query.Page != nil && *query.Page == 0 && len(query.OrderBy) == 0 && *query.Limit > 0 && len(results) >= *query.Limit {
 			fullScan = false
 			return false, nil
 		}

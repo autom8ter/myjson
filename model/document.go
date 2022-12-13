@@ -3,6 +3,10 @@ package model
 import (
 	"context"
 	"encoding/json"
+	"io"
+	"sort"
+	"strings"
+
 	"github.com/autom8ter/gokvkit/internal/util"
 	flat2 "github.com/nqd/flat"
 	"github.com/palantir/stacktrace"
@@ -10,9 +14,6 @@ import (
 	"github.com/spf13/cast"
 	"github.com/tidwall/gjson"
 	"github.com/tidwall/sjson"
-	"io"
-	"sort"
-	"strings"
 )
 
 // Ref is a reference to a document
@@ -105,7 +106,12 @@ func (d *Document) Select(fields []Select) error {
 				f.As = util.ToPtr(defaultAs(*f.Aggregate, f.Field))
 			}
 		}
-		patch[*f.As] = d.Get(f.Field)
+		if f.As == nil {
+			patch[f.Field] = d.Get(f.Field)
+		} else {
+			patch[*f.As] = d.Get(f.Field)
+		}
+
 	}
 	err := selected.SetAll(patch)
 	if err != nil {
@@ -216,31 +222,31 @@ func (d *Document) DelAll(fields ...string) error {
 func (d *Document) Where(wheres []Where) (bool, error) {
 	for _, w := range wheres {
 		switch w.Op {
-		case "==":
+		case WhereOpEq:
 			if w.Value != d.Get(w.Field) {
 				return false, nil
 			}
-		case "!=":
+		case WhereOpNeq:
 			if w.Value == d.Get(w.Field) {
 				return false, nil
 			}
-		case ">":
+		case WhereOpLt:
 			if d.GetFloat(w.Field) <= cast.ToFloat64(w.Value) {
 				return false, nil
 			}
-		case ">=":
+		case WhereOpLte:
 			if d.GetFloat(w.Field) < cast.ToFloat64(w.Value) {
 				return false, nil
 			}
-		case "<":
+		case WhereOpGt:
 			if d.GetFloat(w.Field) >= cast.ToFloat64(w.Value) {
 				return false, nil
 			}
-		case "<=":
+		case WhereOpGte:
 			if d.GetFloat(w.Field) > cast.ToFloat64(w.Value) {
 				return false, nil
 			}
-		case "in":
+		case WhereOpIn:
 			bits, _ := json.Marshal(w.Value)
 			arr := gjson.ParseBytes(bits).Array()
 			value := d.Get(w.Field)
@@ -254,7 +260,7 @@ func (d *Document) Where(wheres []Where) (bool, error) {
 				return false, nil
 			}
 
-		case "contains":
+		case WhereOpContains:
 			if !strings.Contains(d.GetString(w.Field), cast.ToString(w.Value)) {
 				return false, nil
 			}

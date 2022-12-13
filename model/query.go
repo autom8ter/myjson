@@ -269,9 +269,6 @@ func (j *Query) UnmarshalJSON(b []byte) error {
 	if err := json.Unmarshal(b, &raw); err != nil {
 		return err
 	}
-	if v, ok := raw["from"]; !ok || v == nil {
-		return fmt.Errorf("field from: required")
-	}
 	if v, ok := raw["select"]; !ok || v == nil {
 		return fmt.Errorf("field select: required")
 	}
