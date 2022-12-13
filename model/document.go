@@ -27,6 +27,16 @@ type Document struct {
 	result gjson.Result
 }
 
+// UnmarshalJSON satisfies the json Unmarshaler interface
+func (d *Document) UnmarshalJSON(bytes []byte) error {
+	doc, err := NewDocumentFromBytes(bytes)
+	if err != nil {
+		return stacktrace.Propagate(err, "")
+	}
+	*d = *doc
+	return nil
+}
+
 // MarshalJSON satisfies the json Marshaler interface
 func (d *Document) MarshalJSON() ([]byte, error) {
 	return d.Bytes(), nil
@@ -98,7 +108,6 @@ func (d *Document) Select(fields []Select) error {
 	var (
 		selected = NewDocument()
 	)
-
 	patch := map[string]interface{}{}
 	for _, f := range fields {
 		if !util.IsNil(f.As) && *f.As == "" {
@@ -111,7 +120,6 @@ func (d *Document) Select(fields []Select) error {
 		} else {
 			patch[*f.As] = d.Get(f.Field)
 		}
-
 	}
 	err := selected.SetAll(patch)
 	if err != nil {
@@ -394,18 +402,26 @@ func (d Documents) Aggregate(ctx context.Context, aggregates []Select) (*Documen
 	)
 	for _, next := range d {
 		if aggregated == nil || !aggregated.Valid() {
-			aggregated = next
+			aggregated = NewDocument()
 		}
 		for _, agg := range aggregates {
-			if util.IsNil(agg.As) {
-				agg.As = util.ToPtr(defaultAs(*agg.Aggregate, agg.Field))
-			}
 			if agg.Aggregate == nil {
-				if err := aggregated.Set(*agg.As, aggregated.Get(agg.Field)); err != nil {
-					return nil, stacktrace.Propagate(err, "")
+				if util.IsNil(agg.As) {
+					if err := aggregated.Set(agg.Field, next.Get(agg.Field)); err != nil {
+						return nil, stacktrace.Propagate(err, "")
+					}
+
+				} else {
+					if err := aggregated.Set(*agg.As, next.Get(agg.Field)); err != nil {
+						return nil, stacktrace.Propagate(err, "")
+					}
 				}
 				continue
 			}
+			if util.IsNil(agg.As) {
+				agg.As = util.ToPtr(defaultAs(*agg.Aggregate, agg.Field))
+			}
+
 			current := aggregated.GetFloat(*agg.As)
 			switch *agg.Aggregate {
 			case SelectAggregateCount:

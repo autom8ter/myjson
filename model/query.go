@@ -1,6 +1,13 @@
 package model
 
-import "fmt"
+import (
+	"context"
+	"fmt"
+	"net/http"
+
+	"github.com/palantir/stacktrace"
+	"github.com/samber/lo"
+)
 import "reflect"
 import "encoding/json"
 
@@ -8,31 +15,31 @@ import "encoding/json"
 // search
 type Query struct {
 	// GroupBy corresponds to the JSON schema field "groupBy".
-	GroupBy []string `yaml:"groupBy,omitempty"`
+	GroupBy []string `json:"groupBy,omitempty"`
 
 	// Limit corresponds to the JSON schema field "limit".
-	Limit *int `yaml:"limit,omitempty"`
+	Limit *int `json:"limit,omitempty"`
 
 	// OrderBy corresponds to the JSON schema field "orderBy".
-	OrderBy []OrderBy `yaml:"orderBy,omitempty"`
+	OrderBy []OrderBy `json:"orderBy,omitempty"`
 
 	// Page corresponds to the JSON schema field "page".
-	Page *int `yaml:"page,omitempty"`
+	Page *int `json:"page,omitempty"`
 
 	// Select corresponds to the JSON schema field "select".
-	Select []Select `yaml:"select"`
+	Select []Select `json:"select"`
 
 	// Where corresponds to the JSON schema field "where".
-	Where []Where `yaml:"where,omitempty"`
+	Where []Where `json:"where,omitempty"`
 }
 
 // orderBy orders results by a field and a direction
 type OrderBy struct {
 	// Direction corresponds to the JSON schema field "direction".
-	Direction OrderByDirection `yaml:"direction"`
+	Direction OrderByDirection `json:"direction"`
 
 	// Field corresponds to the JSON schema field "field".
-	Field string `yaml:"field"`
+	Field string `json:"field"`
 }
 
 type OrderByDirection string
@@ -43,16 +50,16 @@ const OrderByDirectionDesc OrderByDirection = "desc"
 // select is a list of fields to select from each record in the datbase(optional)
 type Select struct {
 	// an aggregate function to apply against the field
-	Aggregate *SelectAggregate `yaml:"aggregate,omitempty"`
+	Aggregate *SelectAggregate `json:"aggregate,omitempty"`
 
 	// as is outputs the value of the field as an alias
-	As *string `yaml:"as,omitempty"`
+	As *string `json:"as,omitempty"`
 
 	// the select's field
-	Field string `yaml:"field"`
+	Field string `json:"field"`
 
 	// a function to apply against the field
-	Function *SelectFunction `yaml:"function,omitempty"`
+	Function *SelectFunction `json:"function,omitempty"`
 }
 
 type SelectAggregate string
@@ -70,13 +77,13 @@ const SelectFunctionToUpper SelectFunction = "toUpper"
 // where is a filter applied against a query
 type Where struct {
 	// Field corresponds to the JSON schema field "field".
-	Field string `yaml:"field"`
+	Field string `json:"field"`
 
 	// Op corresponds to the JSON schema field "op".
-	Op WhereOp `yaml:"op"`
+	Op WhereOp `json:"op"`
 
 	// Value corresponds to the JSON schema field "value".
-	Value interface{} `yaml:"value"`
+	Value interface{} `json:"value"`
 }
 
 type WhereOp string
@@ -278,5 +285,41 @@ func (j *Query) UnmarshalJSON(b []byte) error {
 		return err
 	}
 	*j = Query(plain)
+	return nil
+}
+
+// Validate validates the query and returns a validation error if one exists
+func (q Query) Validate(ctx context.Context) error {
+	if len(q.Select) == 0 {
+		return stacktrace.NewErrorWithCode(http.StatusBadRequest, "query validation error: at least one select is required")
+	}
+	isAggregate := false
+	for _, a := range q.Select {
+		if a.Field == "" {
+			return stacktrace.NewErrorWithCode(http.StatusBadRequest, "empty required field: 'select.field'")
+		}
+		if a.Aggregate != nil {
+			if a.Function != nil {
+				return stacktrace.NewErrorWithCode(http.StatusBadRequest, "select cannot have both a function and an aggregate")
+			}
+			isAggregate = true
+		}
+	}
+	if isAggregate {
+		for _, a := range q.Select {
+			if a.Aggregate == nil {
+				if !lo.Contains(q.GroupBy, a.Field) {
+					return stacktrace.NewErrorWithCode(http.StatusBadRequest, "'%s', is required in the group_by clause when aggregating", a.Field)
+				}
+			}
+		}
+		for _, g := range q.GroupBy {
+			if !lo.ContainsBy[Select](q.Select, func(f Select) bool {
+				return f.Field == g
+			}) {
+				return stacktrace.NewErrorWithCode(http.StatusBadRequest, "'%s', is required in the select clause when aggregating", g)
+			}
+		}
+	}
 	return nil
 }

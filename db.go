@@ -46,7 +46,7 @@ type DB struct {
 	whereHooks    *safe.Map[[]OnWhere]
 	readHooks     *safe.Map[[]OnRead]
 	router        chi.Router
-	openAPIParams openAPIParams
+	openAPIParams *openAPIParams
 }
 
 /*
@@ -210,12 +210,9 @@ func (d *DB) aggregate(ctx context.Context, collection string, query model.Query
 		query.Page = util.ToPtr(0)
 	}
 	return model.Page{
-		Documents: reduced.Map(func(t *model.Document, i int) *model.Document {
-			t.Select(query.Select)
-			return t
-		}),
-		NextPage: *query.Page + 1,
-		Count:    len(reduced),
+		Documents: reduced,
+		NextPage:  *query.Page + 1,
+		Count:     len(reduced),
 		Stats: model.PageStats{
 			ExecutionTime:   time.Since(now),
 			OptimizerResult: match,

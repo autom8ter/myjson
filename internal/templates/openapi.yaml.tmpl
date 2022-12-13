@@ -368,8 +368,10 @@ components:
               - direction
         page:
           type: integer
+          minimum: 0
         limit:
           type: integer
+          minimum: 0
     Page:
       type: object
       description: Page is a list of documents returned from a query
@@ -384,8 +386,10 @@ components:
             type: object
         next_page:
           type: integer
+          minimum: 0
         count:
           type: integer
+          minimum: 0
 {{- range .collections }}
     {{ title .collection }}: {{ .schema | nindent 6 }}
 {{end}}

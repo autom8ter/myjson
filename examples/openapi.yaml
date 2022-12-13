@@ -1,0 +1,732 @@
+openapi: 3.0.2
+info:
+  version:
+  title:
+  description: |
+
+tags:
+  - name: Task
+    description: Task operations
+  - name: User
+    description: User operations
+
+paths:
+  /schema:
+    get:
+      tags:
+        - schema
+      summary: get collection schemas
+      operationId: getSchemas
+      security:
+        - main_auth:
+            - 'admin'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: string
+        '400':
+          description: Invalid schema
+        '500':
+          description: Internal Server Error
+  # task collection endpoints
+  /schema/task:
+    get:
+      tags:
+        - Task
+        - schema
+      summary: get Task collection schemas
+      operationId: getTaskSchema
+      security:
+        - main_auth:
+            - 'admin'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: string
+        '400':
+          description: Invalid schema
+        '500':
+          description: Internal Server Error
+    put:
+      tags:
+        - Task
+      summary: set Task collection schemas
+      operationId: setTaskSchema
+      security:
+        - main_auth:
+            - 'admin'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: string
+        '400':
+          description: Invalid schema
+        '500':
+          description: Internal Server Error
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: string
+        required: true
+  /collections/task:
+    post:
+      tags:
+        - Task
+      summary: create a Task document
+      description: This creates a document in the Task collection
+      operationId: createTask
+      security:
+        - main_auth:
+            - 'reader'
+            - 'admin'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Task"
+        '400':
+          description: Invalid document
+        '404':
+          description: Not found
+        '500':
+          description: Internal Server Error
+
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Task'
+        required: true
+  /collections/task/{docID}:
+    get:
+      tags:
+        - Task
+      summary: get a Task document by id
+      description: This retrieves an existing document in the Task collection by id
+      operationId: getTask
+      security:
+        - main_auth:
+            - 'reader'
+            - 'admin'
+      parameters:
+        - $ref: "#/components/parameters/DocID"
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Task"
+        '400':
+          description: Invalid request
+        '404':
+          description: Not found
+        '500':
+          description: Internal Server Error
+    delete:
+      tags:
+        - Task
+      summary: delete a Task document by id
+      description: This deletes an existing document in the Task collection by id
+      operationId: deleteTask
+      security:
+        - main_auth:
+            - 'writer'
+            - 'admin'
+      parameters:
+        - $ref: "#/components/parameters/DocID"
+      responses:
+        '200':
+          description: OK
+        '400':
+          description: Invalid request
+        '404':
+          description: Not found
+        '500':
+          description: Internal Server Error
+    put:
+      tags:
+        - Task
+      summary: update a Task document
+      description: This updates an existing document in the Task collection
+      operationId: setTask
+      security:
+        - main_auth:
+            - 'reader'
+            - 'admin'
+      parameters:
+        - $ref: "#/components/parameters/DocID"
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Task"
+        '400':
+          description: Invalid update
+        '404':
+          description: Not found
+        '500':
+          description: Internal Server Error
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Task'
+        required: true
+    patch:
+      tags:
+        - Task
+      summary: edit fields of an Task document
+      description: This edits a document in the Task collection
+      operationId: editTask
+      security:
+        - main_auth:
+            - 'reader'
+            - 'admin'
+      parameters:
+        - $ref: "#/components/parameters/DocID"
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Task"
+        '400':
+          description: Invalid document
+        '404':
+          description: Not found
+        '500':
+          description: Internal Server Error
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+        required: true
+  /collections/task/_/query:
+    post:
+      tags:
+        - Task
+      summary: query Task collection
+      description: This operation queries documents in the Task collection
+      operationId: queryTask
+      security:
+        - main_auth:
+            - 'reader'
+            - 'admin'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Page"
+        '400':
+          description: Invalid Task Query
+        '500':
+          description: Internal Server Error
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Query'
+        required: true
+  /collections/task/_/batch:
+    put:
+      tags:
+        - Task
+      summary: batch set 1-many Task documents
+      description: This set 1-many documents in the Task collection
+      operationId: batchSetTask
+      security:
+        - main_auth:
+            - 'reader'
+            - 'admin'
+      responses:
+        '200':
+          description: OK
+        '400':
+          description: Invalid document(s)
+        '404':
+          description: Not found
+        '500':
+          description: Internal Server Error
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: '#/components/schemas/Task'
+        required: true
+
+  # user collection endpoints
+  /schema/user:
+    get:
+      tags:
+        - User
+        - schema
+      summary: get User collection schemas
+      operationId: getUserSchema
+      security:
+        - main_auth:
+            - 'admin'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: string
+        '400':
+          description: Invalid schema
+        '500':
+          description: Internal Server Error
+    put:
+      tags:
+        - User
+      summary: set User collection schemas
+      operationId: setUserSchema
+      security:
+        - main_auth:
+            - 'admin'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: string
+        '400':
+          description: Invalid schema
+        '500':
+          description: Internal Server Error
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: string
+        required: true
+  /collections/user:
+    post:
+      tags:
+        - User
+      summary: create a User document
+      description: This creates a document in the User collection
+      operationId: createUser
+      security:
+        - main_auth:
+            - 'reader'
+            - 'admin'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        '400':
+          description: Invalid document
+        '404':
+          description: Not found
+        '500':
+          description: Internal Server Error
+
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/User'
+        required: true
+  /collections/user/{docID}:
+    get:
+      tags:
+        - User
+      summary: get a User document by id
+      description: This retrieves an existing document in the User collection by id
+      operationId: getUser
+      security:
+        - main_auth:
+            - 'reader'
+            - 'admin'
+      parameters:
+        - $ref: "#/components/parameters/DocID"
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        '400':
+          description: Invalid request
+        '404':
+          description: Not found
+        '500':
+          description: Internal Server Error
+    delete:
+      tags:
+        - User
+      summary: delete a User document by id
+      description: This deletes an existing document in the User collection by id
+      operationId: deleteUser
+      security:
+        - main_auth:
+            - 'writer'
+            - 'admin'
+      parameters:
+        - $ref: "#/components/parameters/DocID"
+      responses:
+        '200':
+          description: OK
+        '400':
+          description: Invalid request
+        '404':
+          description: Not found
+        '500':
+          description: Internal Server Error
+    put:
+      tags:
+        - User
+      summary: update a User document
+      description: This updates an existing document in the User collection
+      operationId: setUser
+      security:
+        - main_auth:
+            - 'reader'
+            - 'admin'
+      parameters:
+        - $ref: "#/components/parameters/DocID"
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        '400':
+          description: Invalid update
+        '404':
+          description: Not found
+        '500':
+          description: Internal Server Error
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/User'
+        required: true
+    patch:
+      tags:
+        - User
+      summary: edit fields of an User document
+      description: This edits a document in the User collection
+      operationId: editUser
+      security:
+        - main_auth:
+            - 'reader'
+            - 'admin'
+      parameters:
+        - $ref: "#/components/parameters/DocID"
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        '400':
+          description: Invalid document
+        '404':
+          description: Not found
+        '500':
+          description: Internal Server Error
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+        required: true
+  /collections/user/_/query:
+    post:
+      tags:
+        - User
+      summary: query User collection
+      description: This operation queries documents in the User collection
+      operationId: queryUser
+      security:
+        - main_auth:
+            - 'reader'
+            - 'admin'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Page"
+        '400':
+          description: Invalid User Query
+        '500':
+          description: Internal Server Error
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Query'
+        required: true
+  /collections/user/_/batch:
+    put:
+      tags:
+        - User
+      summary: batch set 1-many User documents
+      description: This set 1-many documents in the User collection
+      operationId: batchSetUser
+      security:
+        - main_auth:
+            - 'reader'
+            - 'admin'
+      responses:
+        '200':
+          description: OK
+        '400':
+          description: Invalid document(s)
+        '404':
+          description: Not found
+        '500':
+          description: Internal Server Error
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: '#/components/schemas/User'
+        required: true
+
+components:
+  parameters:
+    DocID:
+      name: docid
+      in: path
+      required: true
+      schema:
+        type: string
+  schemas:
+    Query:
+      type: object
+      description: Query is a query against a collection of documents
+      required:
+        - select
+      properties:
+        select:
+          type: array
+          items:
+            type: object
+            description: select is a list of fields to select from each record in the datbase(optional)
+            properties:
+              field:
+                type: string
+                description: the select's field
+              aggregate:
+                type: string
+                description: an aggregate function to apply against the field
+                enum:
+                  - sum
+                  - count
+                  - max
+                  - min
+              function:
+                type: string
+                description: a function to apply against the field
+                enum:
+                  - toLower
+                  - toUpper
+              as:
+                type: string
+                description: as is outputs the value of the field as an alias
+            required:
+              - field
+        groupBy:
+          type: array
+          items:
+            type: string
+        where:
+          type: array
+          items:
+            type: object
+            description: where is a filter applied against a query
+            properties:
+              field:
+                type: string
+              op:
+                type: string
+                enum:
+                  - eq
+                  - neq
+                  - gt
+                  - gte
+                  - lt
+                  - lte
+                  - in
+                  - contains
+              value: {}
+            required:
+              - field
+              - op
+              - value
+        orderBy:
+          type: array
+          items:
+            type: object
+            description: orderBy orders results by a field and a direction
+            properties:
+              field:
+                type: string
+              direction:
+                type: string
+                enum:
+                  - asc
+                  - desc
+            required:
+              - field
+              - direction
+        page:
+          type: integer
+        limit:
+          type: integer
+    Page:
+      type: object
+      description: Page is a list of documents returned from a query
+      required:
+        - documents
+        - next_page
+        - count
+      properties:
+        documents:
+          type: array
+          items:
+            type: object
+        next_page:
+          type: integer
+        count:
+          type: integer
+    Task:
+      type: object
+      x-collection: task
+      required:
+        - _id
+        - user
+        - content
+      properties:
+        _id:
+          type: string
+          description: The user&#39;s id.
+        user:
+          type: string
+          description: The id of the user who owns the task
+        content:
+          type: string
+          description: The content of the task
+      x-indexing:
+        primary_idx:
+          name: primary_idx
+          unique: true
+          primary: true
+          fields:
+            - _id
+        user_idx:
+          name: user_idx
+          unique: false
+          primary: false
+          fields:
+            - user
+
+
+    User:
+      type: object
+      x-collection: user
+      required:
+        - _id
+        - name
+        - age
+        - contact
+        - gender
+        - account_id
+      properties:
+        _id:
+          type: string
+          description: The user&#39;s id.
+        name:
+          type: string
+          description: The user&#39;s name.
+        contact:
+          type: object
+          properties:
+            email:
+              type: string
+              description: The user&#39;s email.
+        age:
+          description: Age in years which must be equal to or greater than zero.
+          type: integer
+          minimum: 0
+        account_id:
+          type: integer
+          minimum: 0
+        language:
+          type: string
+          description: The user&#39;s first language.
+        gender:
+          type: string
+          description: The user&#39;s gender.
+          enum:
+            - male
+            - female
+        timestamp:
+          type: string
+        annotations:
+          type: object
+      x-indexing:
+        primary_idx:
+          name: primary_idx
+          unique: true
+          primary: true
+          fields:
+            - _id
+        language_idx:
+          name: language_idx
+          unique: false
+          primary: false
+          fields:
+            - language
+        email_idx:
+          name: email_idx
+          unique: true
+          primary: false
+          fields:
+            - contact.email
+        account_idx:
+          name: account_idx
+          unique: false
+          primary: false
+          fields:
+            - account_id

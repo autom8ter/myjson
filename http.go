@@ -55,8 +55,6 @@ func getOpenAPISpec(collections *safe.Map[*collectionSchema], params *openAPIPar
 		"description": params.description,
 		"version":     params.version,
 		"collections": coll,
-		"querySchema": model.QuerySchema,
-		"pageSchema":  model.PageSchema,
 	})
 	if err != nil {
 		return nil, stacktrace.Propagate(err, "")
@@ -65,7 +63,7 @@ func getOpenAPISpec(collections *safe.Map[*collectionSchema], params *openAPIPar
 }
 
 func registerHTTPEndpoints(db *DB) {
-	db.router.Get("/spec", specHandler(db))
+	db.router.Get("/openapi.yaml", specHandler(db))
 
 	db.router.Post("/collections/{collection}", createDocHandler(db))
 
@@ -176,6 +174,10 @@ func setDocHandler(db *DB) http.HandlerFunc {
 		var doc = model.NewDocument()
 		if err := json.NewDecoder(r.Body).Decode(&doc); err != nil {
 			httpError(w, stacktrace.PropagateWithCode(err, http.StatusBadRequest, "failed to decode update"))
+			return
+		}
+		if err := db.setPrimaryKey(collection, doc, docID); err != nil {
+			httpError(w, stacktrace.NewErrorWithCode(http.StatusBadRequest, "bad id: %s", docID))
 			return
 		}
 		if err := db.Tx(r.Context(), func(ctx context.Context, tx Tx) error {
@@ -309,7 +311,7 @@ func putSchemaHandler(db *DB) http.HandlerFunc {
 
 func specHandler(db *DB) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		bits, _ := getOpenAPISpec(db.collections, &db.openAPIParams)
+		bits, _ := getOpenAPISpec(db.collections, db.openAPIParams)
 		w.WriteHeader(http.StatusOK)
 		w.Write(bits)
 	})

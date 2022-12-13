@@ -2,40 +2,6 @@ package model
 
 import (
 	_ "embed"
-	"encoding/json"
-
-	"github.com/autom8ter/gokvkit/internal/util"
-	"github.com/qri-io/jsonschema"
-)
-
-func init() {
-	jsonContent, err := util.YAMLToJSON([]byte(PageSchema))
-	if err != nil {
-		panic(err)
-	}
-	if err := json.Unmarshal(jsonContent, PageJSONSchema); err != nil {
-		panic(err)
-	}
-
-	jsonContent, err = util.YAMLToJSON([]byte(QuerySchema))
-	if err != nil {
-		panic(err)
-	}
-	if err := json.Unmarshal(jsonContent, QueryJSONSchema); err != nil {
-		panic(err)
-	}
-
-}
-
-//go:embed query.yaml
-var QuerySchema string
-
-//go:embed page.yaml
-var PageSchema string
-
-var (
-	QueryJSONSchema = &jsonschema.Schema{}
-	PageJSONSchema  = &jsonschema.Schema{}
 )
 
 // OptimizerResult is the output of a query optimizer
