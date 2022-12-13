@@ -3,6 +3,7 @@ package gokvkit
 import (
 	"context"
 	"encoding/json"
+
 	"github.com/autom8ter/gokvkit/internal/util"
 	"github.com/autom8ter/gokvkit/model"
 	"github.com/palantir/stacktrace"
@@ -50,7 +51,7 @@ func newCollectionSchema(schemaContent []byte) (*collectionSchema, error) {
 	r := gjson.ParseBytes(jsonContent)
 
 	if !r.Get(string(collectionPath)).Exists() {
-		return nil, stacktrace.NewError("schema does not have 'collection' property")
+		return nil, stacktrace.NewError("schema does not have 'x-collection' property")
 	}
 	c.raw = r
 	if !r.Get("properties").Exists() {

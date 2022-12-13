@@ -1,5 +1,5 @@
 type: object
-collection: task
+x-collection: task
 required:
   - _id
   - user
@@ -14,7 +14,7 @@ properties:
   content:
     type: string
     description: The content of the task
-indexing:
+x-indexing:
   primary_idx:
     name: primary_idx
     unique: true
@@ -27,7 +27,3 @@ indexing:
     primary: false
     fields:
       - user
-
-
-
-# "enum": ["sum", "count", "max", "min"]

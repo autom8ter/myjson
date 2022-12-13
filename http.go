@@ -1,36 +1,85 @@
 package gokvkit
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"html/template"
 	"io"
 	"net/http"
 
+	_ "embed"
+
+	"github.com/Masterminds/sprig/v3"
+	"github.com/autom8ter/gokvkit/internal/safe"
 	"github.com/autom8ter/gokvkit/model"
 	"github.com/go-chi/chi/v5"
 	"github.com/palantir/stacktrace"
+	"gopkg.in/yaml.v2"
 )
 
-// Handler is an http handler that serves database commands and queries
-func (db *DB) Handler() http.Handler {
-	mux := chi.NewRouter()
-	mux.Get("/spec", specHandler(db))
+//go:embed internal/templates/openapi.yaml.tmpl
+var openapiTemplate string
 
-	mux.Post("/collections/{collection}", createDocHandler(db))
+type openAPIParams struct {
+	title       string
+	version     string
+	description string
+}
 
-	mux.Put("/collections/{collection}/{docID}", setDocHandler(db))
-	mux.Patch("/collections/{collection}/{docID}", patchDocHandler(db))
-	mux.Delete("/collections/{collection}/{docID}", deleteDocHandler(db))
-	mux.Get("/collections/{collection}/{docID}", getDocHandler(db))
+var defaultOpenAPIParams = openAPIParams{
+	title:       "gokvkit API",
+	version:     "0.0.0",
+	description: "an API built with gokvkit",
+}
 
-	mux.Post("/collections/{collection}/_/query", queryHandler(db))
-	mux.Post("/collections/{collection}/_/batch", batchSetHandler(db))
+func getOpenAPISpec(collections *safe.Map[*collectionSchema], params *openAPIParams) ([]byte, error) {
+	if params == nil {
+		params = &defaultOpenAPIParams
+	}
+	t, err := template.New("").Funcs(sprig.FuncMap()).Parse(openapiTemplate)
+	if err != nil {
+		return nil, err
+	}
+	var coll []map[string]interface{}
+	collections.RangeR(func(key string, schema *collectionSchema) bool {
+		coll = append(coll, map[string]interface{}{
+			"collection": schema.collection,
+			"schema":     string(schema.yamlRaw),
+		})
+		return true
+	})
+	buf := bytes.NewBuffer(nil)
+	err = t.Execute(buf, map[string]any{
+		"title":       params.title,
+		"description": params.description,
+		"version":     params.version,
+		"collections": coll,
+		"querySchema": model.QuerySchema,
+		"pageSchema":  model.PageSchema,
+	})
+	if err != nil {
+		return nil, stacktrace.Propagate(err, "")
+	}
+	return buf.Bytes(), nil
+}
 
-	mux.Get("/schema", getSchemasHandler(db))
-	mux.Get("/schema/{collection}", getSchemaHandler(db))
-	mux.Put("/schema/{collection}", putSchemaHandler(db))
+func registerHTTPEndpoints(db *DB) {
+	db.router.Get("/spec", specHandler(db))
 
-	return mux
+	db.router.Post("/collections/{collection}", createDocHandler(db))
+
+	db.router.Put("/collections/{collection}/{docID}", setDocHandler(db))
+	db.router.Patch("/collections/{collection}/{docID}", patchDocHandler(db))
+	db.router.Delete("/collections/{collection}/{docID}", deleteDocHandler(db))
+	db.router.Get("/collections/{collection}/{docID}", getDocHandler(db))
+
+	db.router.Post("/collections/{collection}/_/query", queryHandler(db))
+	db.router.Post("/collections/{collection}/_/batch", batchSetHandler(db))
+
+	db.router.Get("/schema", getSchemasHandler(db))
+	db.router.Get("/schema/{collection}", getSchemaHandler(db))
+	db.router.Put("/schema/{collection}", putSchemaHandler(db))
 }
 
 func queryHandler(db *DB) http.HandlerFunc {
@@ -216,14 +265,13 @@ func batchSetHandler(db *DB) http.HandlerFunc {
 
 func getSchemasHandler(db *DB) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		schemas, _ := db.getPersistedCollections()
-		var resp = map[string]string{}
-		schemas.RangeR(func(key string, c *collectionSchema) bool {
-			resp[c.collection] = c.raw.Raw
+		var resp = map[string]any{}
+		db.collections.RangeR(func(key string, c *collectionSchema) bool {
+			resp[key] = string(c.yamlRaw)
 			return true
 		})
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(&resp)
+		yaml.NewEncoder(w).Encode(&resp)
 	})
 }
 
@@ -234,9 +282,13 @@ func getSchemaHandler(db *DB) http.HandlerFunc {
 			httpError(w, stacktrace.NewErrorWithCode(http.StatusBadRequest, "collection does not exist"))
 			return
 		}
-		bits, _ := db.getCollectionSchema(collection)
+		c, err := db.getPersistedCollection(collection)
+		if err != nil {
+			httpError(w, err)
+			return
+		}
 		w.WriteHeader(http.StatusOK)
-		w.Write(bits)
+		w.Write(c.yamlRaw)
 	})
 }
 

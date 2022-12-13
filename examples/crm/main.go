@@ -4,7 +4,6 @@ import (
 	"context"
 	_ "embed"
 	"fmt"
-	"net/http"
 	"os"
 
 	"github.com/autom8ter/gokvkit"
@@ -21,26 +20,13 @@ var (
 )
 
 func main() {
+	ctx := context.Background()
 	os.MkdirAll("./tmp/crm", 0700)
-	c, err := newCRM(context.Background(), "./tmp/crm")
-	if err != nil {
-		panic(err)
-	}
-	if err := c.Serve(context.Background(), 8080); err != nil {
-		panic(err)
-	}
-}
-
-type CRM struct {
-	db *gokvkit.DB
-}
-
-func newCRM(ctx context.Context, dataDir string) (*CRM, error) {
 	db, err := gokvkit.New(ctx, gokvkit.Config{
 		KV: gokvkit.KVConfig{
 			Provider: "badger",
 			Params: map[string]any{
-				"storage_path": dataDir,
+				"storage_path": "./tmp/crm",
 			},
 		},
 	}, gokvkit.WithOnPersist(map[string][]gokvkit.OnPersist{
@@ -53,24 +39,20 @@ func newCRM(ctx context.Context, dataDir string) (*CRM, error) {
 		},
 	}))
 	if err != nil {
-		return nil, err
+		panic(err)
 	}
 	if err := db.ConfigureCollection(ctx, []byte(userSchema)); err != nil {
-		return nil, err
+		panic(err)
 	}
 	if err := db.ConfigureCollection(ctx, []byte(taskSchema)); err != nil {
-		return nil, err
+		panic(err)
 	}
 	if err := setupDatabase(ctx, db); err != nil {
-		return nil, err
+		panic(err)
 	}
-	return &CRM{
-		db: db,
-	}, nil
-}
-
-func (c *CRM) Serve(ctx context.Context, port int) error {
-	return http.ListenAndServe(fmt.Sprintf(":%v", port), c.db.Handler())
+	if err := db.ServeHTTP(context.Background(), 8080); err != nil {
+		panic(err)
+	}
 }
 
 func cascadeDelete(ctx context.Context, tx gokvkit.Tx, command *model.Command) error {

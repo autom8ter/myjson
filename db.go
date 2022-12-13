@@ -3,6 +3,8 @@ package gokvkit
 import (
 	"context"
 	_ "embed"
+	"fmt"
+	"net/http"
 	"sync"
 	"time"
 
@@ -12,6 +14,7 @@ import (
 	"github.com/autom8ter/gokvkit/kv/registry"
 	"github.com/autom8ter/gokvkit/model"
 	"github.com/autom8ter/machine/v4"
+	"github.com/go-chi/chi/v5"
 	"github.com/palantir/stacktrace"
 	"github.com/samber/lo"
 )
@@ -42,7 +45,7 @@ type DB struct {
 	persistHooks  *safe.Map[[]OnPersist]
 	whereHooks    *safe.Map[[]OnWhere]
 	readHooks     *safe.Map[[]OnRead]
-	router        *safe.Router
+	router        chi.Router
 	openAPIParams openAPIParams
 }
 
@@ -73,16 +76,18 @@ func New(ctx context.Context, cfg Config, opts ...DBOpt) (*DB, error) {
 		persistHooks: safe.NewMap(map[string][]OnPersist{}),
 		whereHooks:   safe.NewMap(map[string][]OnWhere{}),
 		readHooks:    safe.NewMap(map[string][]OnRead{}),
-		router:       safe.NewRouter(),
+		router:       chi.NewRouter(),
 	}
 	coll, err := d.getPersistedCollections()
 	if err != nil {
 		return nil, stacktrace.PropagateWithCode(err, ErrTODO, "failed to get existing collections")
 	}
 	d.collections = coll
+	registerHTTPEndpoints(d)
 	for _, o := range opts {
 		o(d)
 	}
+
 	d.initHooks.RangeR(func(key string, h OnInit) bool {
 		if err = h.Func(ctx, d); err != nil {
 			err = stacktrace.Propagate(err, "")
@@ -90,6 +95,7 @@ func New(ctx context.Context, cfg Config, opts ...DBOpt) (*DB, error) {
 		}
 		return true
 	})
+
 	return d, err
 }
 
@@ -292,4 +298,12 @@ func (d *DB) Scan(ctx context.Context, scan model.Scan, handlerFunc model.ScanFu
 // Close closes the database
 func (d *DB) Close(ctx context.Context) error {
 	return stacktrace.Propagate(d.kv.Close(), "")
+}
+
+// ServeHTTP starts an http server serving openapi and websocket endpoints
+func (d *DB) ServeHTTP(ctx context.Context, port int, middlewares ...func(http.Handler) http.Handler) error {
+	if len(middlewares) > 0 {
+		d.router.Use(middlewares...)
+	}
+	return http.ListenAndServe(fmt.Sprintf(":%v", port), d.router)
 }

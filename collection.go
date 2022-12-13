@@ -2,10 +2,10 @@ package gokvkit
 
 import (
 	"context"
+
 	"github.com/autom8ter/gokvkit/model"
 	"github.com/palantir/stacktrace"
 	"github.com/spf13/cast"
-	"net/http"
 )
 
 // ConfigureCollection overwrites a single database collection configuration
@@ -15,52 +15,40 @@ func (d *DB) ConfigureCollection(ctx context.Context, collectionSchemaBytes []by
 	meta.Set(string(internalKey), true)
 	ctx = meta.ToContext(ctx)
 	collection, err := newCollectionSchema(collectionSchemaBytes)
-
+	if err != nil {
+		return stacktrace.Propagate(err, "")
+	}
 	var (
 		hasPrimary = 0
-		primary    model.Index
 	)
 	for _, v := range collection.indexing {
 		v.Collection = collection.collection
 		if v.Primary {
-			primary = v
 			hasPrimary++
 		}
 	}
 	if hasPrimary > 1 {
 		return stacktrace.NewError("%s: only a single primary index is supported", collection.collection)
 	}
-	existing, _ := d.getPersistedCollection(collection.collection)
-
-	if existing == nil {
-		existing = &collectionSchema{collection: collection.collection, indexing: map[string]model.Index{}}
-	}
-
-	var (
-		existingHasPrimary = 0
-	)
-
-	for _, v := range existing.indexing {
-		if v.Primary {
-			existingHasPrimary++
-		}
-	}
-	switch {
-	case existingHasPrimary > 1:
-		return stacktrace.NewError("%s: only a single primary index is supported", collection.collection)
-	case hasPrimary == 0 && existingHasPrimary == 0:
+	if hasPrimary == 0 {
 		return stacktrace.NewError("%s: a primary index is required", collection.collection)
-	case existingHasPrimary == 0 && hasPrimary == 1:
-		existing.indexing[primary.Name] = primary
-		d.collections.Set(collection.collection, existing)
-		if err := d.persistIndexes(collection.collection); err != nil {
+	}
+	if err := d.persistCollectionConfig(collection); err != nil {
+		return stacktrace.Propagate(err, "")
+	}
+
+	existing, _ := d.getPersistedCollection(collection.collection)
+	var diff indexDiff
+	if existing == nil {
+		diff, err = getIndexDiff(collection.indexing, map[string]model.Index{})
+		if err != nil {
 			return stacktrace.Propagate(err, "")
 		}
-	}
-
-	diff, err := getIndexDiff(collection.indexing, existing.indexing)
-	if err != nil {
-		return stacktrace.Propagate(err, "")
+	} else {
+		diff, err = getIndexDiff(collection.indexing, existing.indexing)
+		if err != nil {
+			return stacktrace.Propagate(err, "")
+		}
 	}
 	for _, update := range diff.toUpdate {
 		if err := d.removeIndex(ctx, collection.collection, update); err != nil {
@@ -80,12 +68,9 @@ func (d *DB) ConfigureCollection(ctx context.Context, collectionSchemaBytes []by
 			return stacktrace.Propagate(err, "")
 		}
 	}
-	if err := d.persistIndexes(collection.collection); err != nil {
+	if err := d.persistCollectionConfig(collection); err != nil {
 		return stacktrace.Propagate(err, "")
 	}
-	d.router.Set(collection.collection, "query", http.MethodPost, queryHandler(collection.collection, d))
-	d.router.Set(collection.collection, "command", http.MethodPost, commandHandler(collection.collection, d))
-	d.router.Set(collection.collection, "schema", http.MethodPut, schemaHandler(collection.collection, d))
 	return nil
 }
 

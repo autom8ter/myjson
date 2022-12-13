@@ -3,12 +3,12 @@ package gokvkit
 import (
 	"context"
 	"fmt"
+	"time"
+
 	"github.com/autom8ter/gokvkit/internal/safe"
 	"github.com/autom8ter/gokvkit/kv"
 	"github.com/autom8ter/gokvkit/model"
 	"github.com/palantir/stacktrace"
-	"net/http"
-	"time"
 )
 
 func (d *DB) addIndex(ctx context.Context, collection string, index model.Index) error {
@@ -89,10 +89,12 @@ func (d *DB) removeIndex(ctx context.Context, collection string, index model.Ind
 	return nil
 }
 
-func (d *DB) persistIndexes(collection string) error {
-	val := d.collections.Get(collection)
+func (d *DB) persistCollectionConfig(val *collectionSchema) error {
+	if val.raw.Raw == "" {
+		return stacktrace.NewError("empty collection content")
+	}
 	if err := d.kv.Tx(true, func(tx kv.Tx) error {
-		err := tx.Set([]byte(fmt.Sprintf("internal.indexing.%s", collection)), []byte(val.raw.Raw))
+		err := tx.Set([]byte(fmt.Sprintf("internal.collections.%s", val.collection)), val.yamlRaw)
 		if err != nil {
 			return stacktrace.Propagate(err, "")
 		}
@@ -100,6 +102,7 @@ func (d *DB) persistIndexes(collection string) error {
 	}); err != nil {
 		return err
 	}
+	d.collections.Set(val.collection, val)
 	return nil
 }
 
@@ -109,7 +112,7 @@ func (d *DB) getPersistedCollections() (*safe.Map[*collectionSchema], error) {
 	)
 	if err := d.kv.Tx(false, func(tx kv.Tx) error {
 		i := tx.NewIterator(kv.IterOpts{
-			Prefix: []byte("internal.indexing."),
+			Prefix: []byte("internal.collections."),
 		})
 		defer i.Close()
 		for i.Valid() {
@@ -124,6 +127,9 @@ func (d *DB) getPersistedCollections() (*safe.Map[*collectionSchema], error) {
 				if err != nil {
 					return stacktrace.Propagate(err, "")
 				}
+				if cfg.yamlRaw == nil {
+					return stacktrace.NewError("empty collection yaml content")
+				}
 				collections.Set(cfg.collection, cfg)
 			}
 			i.Next()
@@ -132,19 +138,13 @@ func (d *DB) getPersistedCollections() (*safe.Map[*collectionSchema], error) {
 	}); err != nil {
 		return nil, stacktrace.Propagate(err, "")
 	}
-	collections.RangeR(func(key string, c *collectionSchema) bool {
-		d.router.Set(c.collection, "query", http.MethodPost, queryHandler(c.collection, d))
-		d.router.Set(c.collection, "command", http.MethodPost, commandHandler(c.collection, d))
-		d.router.Set(c.collection, "schema", http.MethodPut, schemaHandler(c.collection, d))
-		return true
-	})
 	return collections, nil
 }
 
 func (d *DB) getPersistedCollection(collection string) (*collectionSchema, error) {
 	var cfg *collectionSchema
 	if err := d.kv.Tx(false, func(tx kv.Tx) error {
-		bits, err := tx.Get([]byte(fmt.Sprintf("internal.indexing.%s", collection)))
+		bits, err := tx.Get([]byte(fmt.Sprintf("internal.collections.%s", collection)))
 		if err != nil {
 			return stacktrace.Propagate(err, "")
 		}
