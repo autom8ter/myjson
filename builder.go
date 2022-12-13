@@ -25,12 +25,6 @@ func (q *QueryBuilder) Select(fields ...model.Select) *QueryBuilder {
 	return q
 }
 
-// From adds the From clause to the query
-func (q *QueryBuilder) From(from string) *QueryBuilder {
-	q.query.From = from
-	return q
-}
-
 // Where adds the Where clause(s) to the query
 func (q *QueryBuilder) Where(where ...model.Where) *QueryBuilder {
 	q.query.Where = append(q.query.Where, where...)

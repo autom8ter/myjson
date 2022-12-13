@@ -3,6 +3,9 @@ package gokvkit
 import (
 	"context"
 	_ "embed"
+	"sync"
+	"time"
+
 	"github.com/autom8ter/gokvkit/internal/safe"
 	"github.com/autom8ter/gokvkit/internal/util"
 	"github.com/autom8ter/gokvkit/kv"
@@ -11,8 +14,6 @@ import (
 	"github.com/autom8ter/machine/v4"
 	"github.com/palantir/stacktrace"
 	"github.com/samber/lo"
-	"sync"
-	"time"
 )
 
 // KVConfig configures a key value database from the given provider
@@ -166,16 +167,16 @@ func (d *DB) BatchGet(ctx context.Context, collection string, ids []string) (mod
 }
 
 // aggregate performs aggregations against the collection
-func (d *DB) aggregate(ctx context.Context, query model.Query) (model.Page, error) {
-	if !d.hasCollection(query.From) {
-		return model.Page{}, stacktrace.NewError("unsupported collection: %s", query.From)
+func (d *DB) aggregate(ctx context.Context, collection string, query model.Query) (model.Page, error) {
+	if !d.hasCollection(collection) {
+		return model.Page{}, stacktrace.NewError("unsupported collection: %s", collection)
 	}
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	now := time.Now()
 	var results model.Documents
 	match, err := d.queryScan(ctx, model.Scan{
-		From:  query.From,
+		From:  collection,
 		Where: query.Where,
 	}, func(d *model.Document) (bool, error) {
 		results = append(results, d)
@@ -217,24 +218,24 @@ func (d *DB) aggregate(ctx context.Context, query model.Query) (model.Page, erro
 }
 
 // Query queries a list of documents
-func (d *DB) Query(ctx context.Context, query model.Query) (model.Page, error) {
+func (d *DB) Query(ctx context.Context, collection string, query model.Query) (model.Page, error) {
 	if err := query.Validate(ctx); err != nil {
 		return model.Page{}, stacktrace.Propagate(err, "")
 	}
 	if query.IsAggregate() {
-		return d.aggregate(ctx, query)
+		return d.aggregate(ctx, collection, query)
 	}
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	now := time.Now()
 
-	if !d.hasCollection(query.From) {
-		return model.Page{}, stacktrace.NewError("unsupported collection: %s", query.From)
+	if !d.hasCollection(collection) {
+		return model.Page{}, stacktrace.NewError("unsupported collection: %s", collection)
 	}
 	var results model.Documents
 	fullScan := true
 	match, err := d.queryScan(ctx, model.Scan{
-		From:  query.From,
+		From:  collection,
 		Where: query.Where,
 	}, func(d *model.Document) (bool, error) {
 		results = append(results, d)

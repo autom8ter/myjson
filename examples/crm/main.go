@@ -4,12 +4,13 @@ import (
 	"context"
 	_ "embed"
 	"fmt"
+	"net/http"
+	"os"
+
 	"github.com/autom8ter/gokvkit"
 	_ "github.com/autom8ter/gokvkit/kv/badger"
 	"github.com/autom8ter/gokvkit/model"
 	"github.com/autom8ter/gokvkit/testutil"
-	"net/http"
-	"os"
 )
 
 var (
@@ -74,7 +75,7 @@ func (c *CRM) Serve(ctx context.Context, port int) error {
 
 func cascadeDelete(ctx context.Context, tx gokvkit.Tx, command *model.Command) error {
 	if command.Action == model.Delete {
-		results, err := tx.Query(ctx, gokvkit.NewQueryBuilder().From("task").Where(model.Where{
+		results, err := tx.Query(ctx, "task", gokvkit.NewQueryBuilder().Where(model.Where{
 			Field: "user",
 			Op:    "==",
 			Value: command.DocID,

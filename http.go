@@ -2,12 +2,13 @@ package gokvkit
 
 import (
 	"encoding/json"
-	"github.com/autom8ter/gokvkit/kv"
-	"github.com/autom8ter/gokvkit/model"
-	"github.com/palantir/stacktrace"
 	"io"
 	"net/http"
 	"strings"
+
+	"github.com/autom8ter/gokvkit/kv"
+	"github.com/autom8ter/gokvkit/model"
+	"github.com/palantir/stacktrace"
 )
 
 // Handler is an http handler that serves database commands and queries
@@ -43,7 +44,7 @@ func queryHandler(collection string, db *DB) http.Handler {
 			httpError(w, stacktrace.PropagateWithCode(err, http.StatusBadRequest, "failed to decode query"))
 			return
 		}
-		results, err := db.Query(r.Context(), q)
+		results, err := db.Query(r.Context(), collection, q)
 		if err != nil {
 			httpError(w, err)
 			return

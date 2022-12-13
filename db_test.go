@@ -2,15 +2,16 @@ package gokvkit_test
 
 import (
 	"context"
+	"runtime"
+	"testing"
+	"time"
+
 	"github.com/autom8ter/gokvkit"
 	"github.com/autom8ter/gokvkit/internal/util"
 	"github.com/autom8ter/gokvkit/model"
 	"github.com/autom8ter/gokvkit/testutil"
 	"github.com/brianvoe/gofakeit/v6"
 	"github.com/stretchr/testify/assert"
-	"runtime"
-	"testing"
-	"time"
 )
 
 func timer() func(t *testing.T) {
@@ -79,8 +80,7 @@ func Test(t *testing.T) {
 		t.Run("query users account_id > 50", func(t *testing.T) {
 			timer := timer()
 			defer timer(t)
-			results, err := db.Query(ctx, model.Query{
-				From:   "user",
+			results, err := db.Query(ctx, "user", model.Query{
 				Select: []model.Select{{Field: "account_id"}},
 				Where: []model.Where{
 					{
@@ -100,8 +100,7 @@ func Test(t *testing.T) {
 		t.Run("query users account_id in 51-60", func(t *testing.T) {
 			timer := timer()
 			defer timer(t)
-			results, err := db.Query(ctx, model.Query{
-				From:   "user",
+			results, err := db.Query(ctx, "user", model.Query{
 				Select: []model.Select{{Field: "account_id"}},
 				Where: []model.Where{
 					{
@@ -122,8 +121,7 @@ func Test(t *testing.T) {
 		t.Run("query all", func(t *testing.T) {
 			timer := timer()
 			defer timer(t)
-			results, err := db.Query(ctx, model.Query{
-				From:   "user",
+			results, err := db.Query(ctx, "user", model.Query{
 				Select: []model.Select{{Field: "*"}},
 			})
 			assert.Nil(t, err)
@@ -176,8 +174,8 @@ func Test(t *testing.T) {
 		})
 		t.Run("query delete all", func(t *testing.T) {
 			assert.Nil(t, db.Tx(ctx, func(ctx context.Context, tx gokvkit.Tx) error {
-				res, err := db.Query(ctx, model.Query{
-					From:   "user",
+				res, err := db.Query(ctx, "user", model.Query{
+
 					Select: []model.Select{{Field: "*"}},
 				})
 				if err != nil {
@@ -251,8 +249,7 @@ func Benchmark(b *testing.B) {
 			}))
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				results, err := db.Query(ctx, model.Query{
-					From:   "user",
+				results, err := db.Query(ctx, "user", model.Query{
 					Select: []model.Select{{Field: "*"}},
 					Where: []model.Where{
 						{
@@ -290,8 +287,7 @@ func Benchmark(b *testing.B) {
 			}))
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				_, err := db.Query(ctx, model.Query{
-					From:   "user",
+				_, err := db.Query(ctx, "user", model.Query{
 					Select: []model.Select{{Field: "*"}},
 					Where: []model.Where{
 						{
@@ -322,8 +318,7 @@ func TestIndexing1(t *testing.T) {
 				}
 				return nil
 			}))
-			page, err := db.Query(ctx, model.Query{
-				From: "user",
+			page, err := db.Query(ctx, "user", model.Query{
 				Select: []model.Select{
 					{
 						Field: "contact.email",
@@ -356,8 +351,8 @@ func TestIndexing1(t *testing.T) {
 				}
 				return nil
 			}))
-			page, err := db.Query(ctx, model.Query{
-				From: "user",
+			page, err := db.Query(ctx, "user", model.Query{
+
 				Select: []model.Select{
 					{
 						Field: "name",
@@ -392,8 +387,8 @@ func TestIndexing1(t *testing.T) {
 				}
 				return nil
 			}))
-			page, err := db.Query(ctx, model.Query{
-				From: "user",
+			page, err := db.Query(ctx, "user", model.Query{
+
 				Select: []model.Select{
 					{
 						Field: "name",
@@ -428,8 +423,8 @@ func TestIndexing1(t *testing.T) {
 				}
 				return nil
 			}))
-			page, err := db.Query(ctx, model.Query{
-				From: "user",
+			page, err := db.Query(ctx, "user", model.Query{
+
 				Select: []model.Select{
 					{
 						Field: "_id",
@@ -462,8 +457,8 @@ func TestIndexing1(t *testing.T) {
 				}
 				return nil
 			}))
-			page, err := db.Query(ctx, model.Query{
-				From: "user",
+			page, err := db.Query(ctx, "user", model.Query{
+
 				Select: []model.Select{
 					{
 						Field: "_id",
@@ -521,7 +516,6 @@ func TestAggregate(t *testing.T) {
 			}))
 
 			query := model.Query{
-				From:    "user",
 				GroupBy: []string{"account_id"},
 				//Where:      []schema.Where{
 				//	{
@@ -545,7 +539,7 @@ func TestAggregate(t *testing.T) {
 					},
 				},
 			}
-			results, err := db.Query(ctx, query)
+			results, err := db.Query(ctx, "user", query)
 			if err != nil {
 				t.Fatal(err)
 			}
