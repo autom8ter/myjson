@@ -16,6 +16,7 @@ import (
 	"github.com/autom8ter/gokvkit/httpapi/handlers"
 	"github.com/autom8ter/gokvkit/httpapi/middlewares"
 	"github.com/go-chi/chi/v5"
+	"github.com/gorilla/websocket"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -47,6 +48,10 @@ func New(db *gokvkit.DB, params *OpenAPIParams, mwares ...func(http.Handler) htt
 	}
 	mwares = append([]func(http.Handler) http.Handler{middlewares.OpenAPIValidator(o)}, mwares...)
 	o.router.Get("/openapi.yaml", handlers.SpecHandler(o))
+	o.router.HandleFunc("/tx", handlers.TxHandler(o, websocket.Upgrader{
+		ReadBufferSize:  1024,
+		WriteBufferSize: 1024,
+	}))
 	o.router.Group(func(r chi.Router) {
 		r.Use(mwares...)
 
@@ -63,6 +68,7 @@ func New(db *gokvkit.DB, params *OpenAPIParams, mwares ...func(http.Handler) htt
 		r.Get("/schema", handlers.GetSchemasHandler(o))
 		r.Get("/schema/{collection}", handlers.GetSchemaHandler(o))
 		r.Put("/schema/{collection}", handlers.PutSchemaHandler(o))
+
 	})
 	return o, nil
 }

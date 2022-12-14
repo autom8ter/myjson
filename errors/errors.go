@@ -21,7 +21,7 @@ const (
 type Error struct {
 	Code     Code     `json:"code"`
 	Messages []string `json:"messages"`
-	Err      error    `json:"err,omitempty"`
+	Err      string   `json:"err,omitempty"`
 }
 
 // Error returns the Error as a json string
@@ -35,18 +35,21 @@ func (e *Error) RemoveError() *Error {
 	return &Error{
 		Code:     e.Code,
 		Messages: e.Messages,
-		Err:      nil,
+		Err:      "",
 	}
 }
 
-// Extract extracts the custom Error from the given error
+// Extract extracts the custom Error from the given error. If the error is nil, nil will be returned
 func Extract(err error) *Error {
+	if err == nil {
+		return nil
+	}
 	e, ok := err.(*Error)
 	if !ok {
 		return &Error{
 			Code:     0,
 			Messages: nil,
-			Err:      err,
+			Err:      err.Error(),
 		}
 	}
 	return e
@@ -56,7 +59,7 @@ func Extract(err error) *Error {
 func New(code Code, msg string, args ...any) error {
 	e := &Error{
 		Code: code,
-		Err:  nil,
+		Err:  "",
 	}
 	if msg != "" {
 		e.Messages = append(e.Messages, fmt.Sprintf(msg, args...))
@@ -74,8 +77,8 @@ func Wrap(err error, code Code, msg string, args ...any) error {
 		if msg != "" {
 			e.Messages = append(e.Messages, fmt.Sprintf(msg, args...))
 		}
-		if e.Err == nil {
-			e.Err = err
+		if e.Err == "" {
+			e.Err = err.Error()
 		}
 		if code > 0 {
 			e.Code = code
@@ -84,7 +87,7 @@ func Wrap(err error, code Code, msg string, args ...any) error {
 	} else {
 		e = &Error{
 			Code: code,
-			Err:  err,
+			Err:  err.Error(),
 		}
 		if msg != "" {
 			e.Messages = append(e.Messages, fmt.Sprintf(msg, args...))
