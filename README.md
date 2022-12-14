@@ -83,16 +83,17 @@ WIP
 
 WIP
 
-#### Adding hooks to a collection
+#### Adding business logic with hooks
 
 WIP
 
+#### Starting an OpenAPI Server
+
 ### Beta Roadmap
 
+- [ ] examples 
 - [ ] 80% test coverage
 - [ ] better errors & error codes
-- [ ] 80% test coverage
-- [ ] examples
 - [ ] awesome readme
 - [ ] cicd
 - [ ] migrations
@@ -100,7 +101,6 @@ WIP
 
 ### Beta+ Roadmap
 
-- [ ] multi-field primary key
 - [ ] search indexing
 - [ ] external data importer
 

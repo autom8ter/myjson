@@ -36,18 +36,19 @@ type Config struct {
 // DB is an embedded, durable NoSQL database with support for schemas, indexing, and aggregation
 type DB struct {
 	sync.RWMutex
-	config        Config
-	kv            kv.DB
-	machine       machine.Machine
-	collections   *safe.Map[*collectionSchema]
-	optimizer     Optimizer
-	initHooks     *safe.Map[OnInit]
-	persistHooks  *safe.Map[[]OnPersist]
-	whereHooks    *safe.Map[[]OnWhere]
-	readHooks     *safe.Map[[]OnRead]
-	router        chi.Router
-	openAPIParams *openAPIParams
-	middlewares   []func(http.Handler) http.Handler
+	config           Config
+	kv               kv.DB
+	machine          machine.Machine
+	collections      *safe.Map[*collectionSchema]
+	optimizer        Optimizer
+	initHooks        *safe.Map[OnInit]
+	persistHooks     *safe.Map[[]OnPersist]
+	whereHooks       *safe.Map[[]OnWhere]
+	readHooks        *safe.Map[[]OnRead]
+	router           chi.Router
+	openAPIParams    *openAPIParams
+	middlewares      []func(http.Handler) http.Handler
+	openTransactions *safe.Map[Tx]
 }
 
 /*
@@ -68,16 +69,17 @@ func New(ctx context.Context, cfg Config, opts ...DBOpt) (*DB, error) {
 		return nil, stacktrace.PropagateWithCode(err, ErrTODO, "failed to open kv database")
 	}
 	d := &DB{
-		config:       cfg,
-		kv:           db,
-		machine:      machine.New(),
-		collections:  safe.NewMap(map[string]*collectionSchema{}),
-		optimizer:    defaultOptimizer{},
-		initHooks:    safe.NewMap(map[string]OnInit{}),
-		persistHooks: safe.NewMap(map[string][]OnPersist{}),
-		whereHooks:   safe.NewMap(map[string][]OnWhere{}),
-		readHooks:    safe.NewMap(map[string][]OnRead{}),
-		router:       chi.NewRouter(),
+		config:           cfg,
+		kv:               db,
+		machine:          machine.New(),
+		collections:      safe.NewMap(map[string]*collectionSchema{}),
+		optimizer:        defaultOptimizer{},
+		initHooks:        safe.NewMap(map[string]OnInit{}),
+		persistHooks:     safe.NewMap(map[string][]OnPersist{}),
+		whereHooks:       safe.NewMap(map[string][]OnWhere{}),
+		readHooks:        safe.NewMap(map[string][]OnRead{}),
+		router:           chi.NewRouter(),
+		openTransactions: safe.NewMap(map[string]Tx{}),
 	}
 	coll, err := d.getPersistedCollections()
 	if err != nil {

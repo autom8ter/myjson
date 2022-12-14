@@ -10,6 +10,15 @@ import (
 	"github.com/segmentio/ksuid"
 )
 
+type TxCommand struct {
+	Collection string          `json:"collection"`
+	DocID      string          `json:"docID,omitempty"`
+	Query      *model.Query    `json:"query,omitempty"`
+	Create     *model.Document `json:"create,omitempty"`
+	Update     map[string]any  `json:"update,omitempty"`
+	Set        *model.Document `json:"set,omitempty"`
+}
+
 // Tx is a database transaction interface
 type Tx interface {
 	// Query executes a query against the database

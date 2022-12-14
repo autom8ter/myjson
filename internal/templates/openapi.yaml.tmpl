@@ -18,9 +18,6 @@ paths:
         - schema
       summary: get collection schemas
       operationId: getSchemas
-      security:
-        - main_auth:
-          - 'admin'
       responses:
         '200':
           description: OK
@@ -41,9 +38,6 @@ paths:
         - schema
       summary: get {{ title .collection }} collection schemas
       operationId: get{{ title .collection }}Schema
-      security:
-        - main_auth:
-          - 'admin'
       responses:
         '200':
           description: OK
@@ -60,9 +54,6 @@ paths:
         - {{ title .collection }}
       summary: set {{ title .collection }} collection schemas
       operationId: set{{ title .collection }}Schema
-      security:
-        - main_auth:
-          - 'admin'
       responses:
         '200':
           description: OK
@@ -87,10 +78,6 @@ paths:
       summary: create a {{ title .collection }} document
       description: This creates a document in the {{ title .collection }} collection
       operationId: create{{ title .collection }}
-      security:
-        - main_auth:
-          - 'reader'
-          - 'admin'
       responses:
         '200':
           description: OK
@@ -118,10 +105,6 @@ paths:
       summary: get a {{ title .collection }} document by id
       description: This retrieves an existing document in the {{ title .collection }} collection by id
       operationId: get{{ title .collection }}
-      security:
-        - main_auth:
-          - 'reader'
-          - 'admin'
       parameters:
         - $ref: "#/components/parameters/DocID"
       responses:
@@ -143,10 +126,6 @@ paths:
       summary: delete a {{ title .collection }} document by id
       description: This deletes an existing document in the {{ title .collection }} collection by id
       operationId: delete{{ title .collection }}
-      security:
-        - main_auth:
-          - 'writer'
-          - 'admin'
       parameters:
         - $ref: "#/components/parameters/DocID"
       responses:
@@ -164,10 +143,6 @@ paths:
       summary: update a {{ title .collection }} document
       description: This updates an existing document in the {{ title .collection }} collection
       operationId: set{{ title .collection }}
-      security:
-        - main_auth:
-          - 'reader'
-          - 'admin'
       parameters:
         - $ref: "#/components/parameters/DocID"
       responses:
@@ -195,10 +170,6 @@ paths:
       summary: edit fields of an {{ title .collection }} document
       description: This edits a document in the {{ title .collection }} collection
       operationId: edit{{ title .collection }}
-      security:
-        - main_auth:
-          - 'reader'
-          - 'admin'
       parameters:
         - $ref: "#/components/parameters/DocID"
       responses:
@@ -227,10 +198,6 @@ paths:
       summary: query {{ title .collection }} collection
       description: This operation queries documents in the {{ title .collection }} collection
       operationId: query{{ title .collection }}
-      security:
-        - main_auth:
-          - 'reader'
-          - 'admin'
       responses:
         '200':
           description: OK
@@ -257,10 +224,6 @@ paths:
       summary: batch set 1-many {{ title .collection }} documents
       description: This set 1-many documents in the {{ title .collection }} collection
       operationId: batchSet{{ title .collection }}
-      security:
-        - main_auth:
-          - 'reader'
-          - 'admin'
       responses:
         '200':
           description: OK

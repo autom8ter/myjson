@@ -14,6 +14,9 @@ import (
 	"github.com/Masterminds/sprig/v3"
 	"github.com/autom8ter/gokvkit/internal/safe"
 	"github.com/autom8ter/gokvkit/model"
+	"github.com/getkin/kin-openapi/openapi3"
+	"github.com/getkin/kin-openapi/openapi3filter"
+	"github.com/getkin/kin-openapi/routers/gorillamux"
 	"github.com/go-chi/chi/v5"
 	"github.com/palantir/stacktrace"
 	"gopkg.in/yaml.v2"
@@ -64,23 +67,25 @@ func getOpenAPISpec(collections *safe.Map[*collectionSchema], params *openAPIPar
 }
 
 func registerHTTPEndpoints(db *DB) {
-	db.middlewares = append([]func(http.Handler) http.Handler{metadataInjector()}, db.middlewares...)
-	db.router.Use(db.middlewares...)
+	db.middlewares = append([]func(http.Handler) http.Handler{openAPIValidator(db), metadataInjector()}, db.middlewares...)
 	db.router.Get("/openapi.yaml", specHandler(db))
+	db.router.Group(func(r chi.Router) {
+		r.Use(db.middlewares...)
 
-	db.router.Post("/collections/{collection}", createDocHandler(db))
+		r.Post("/collections/{collection}", createDocHandler(db))
 
-	db.router.Put("/collections/{collection}/{docID}", setDocHandler(db))
-	db.router.Patch("/collections/{collection}/{docID}", patchDocHandler(db))
-	db.router.Delete("/collections/{collection}/{docID}", deleteDocHandler(db))
-	db.router.Get("/collections/{collection}/{docID}", getDocHandler(db))
+		r.Put("/collections/{collection}/{docID}", setDocHandler(db))
+		r.Patch("/collections/{collection}/{docID}", patchDocHandler(db))
+		r.Delete("/collections/{collection}/{docID}", deleteDocHandler(db))
+		r.Get("/collections/{collection}/{docID}", getDocHandler(db))
 
-	db.router.Post("/collections/{collection}/_/query", queryHandler(db))
-	db.router.Post("/collections/{collection}/_/batch", batchSetHandler(db))
+		r.Post("/collections/{collection}/_/query", queryHandler(db))
+		r.Post("/collections/{collection}/_/batch", batchSetHandler(db))
 
-	db.router.Get("/schema", getSchemasHandler(db))
-	db.router.Get("/schema/{collection}", getSchemaHandler(db))
-	db.router.Put("/schema/{collection}", putSchemaHandler(db))
+		r.Get("/schema", getSchemasHandler(db))
+		r.Get("/schema/{collection}", getSchemaHandler(db))
+		r.Put("/schema/{collection}", putSchemaHandler(db))
+	})
 }
 
 func queryHandler(db *DB) http.HandlerFunc {
@@ -344,6 +349,50 @@ func metadataInjector() func(http.Handler) http.Handler {
 			for k, v := range r.Header {
 				md.Set(fmt.Sprintf("http.header.%s", k), v)
 			}
+			handler.ServeHTTP(w, r.WithContext(md.ToContext(r.Context())))
+		})
+	}
+}
+
+func openAPIValidator(db *DB) func(http.Handler) http.Handler {
+	return func(handler http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			bits, _ := getOpenAPISpec(db.collections, db.openAPIParams)
+			loader := openapi3.NewLoader()
+			doc, _ := loader.LoadFromData(bits)
+			err := doc.Validate(loader.Context)
+			if err != nil {
+				httpError(w, stacktrace.PropagateWithCode(err, http.StatusInternalServerError, "invalid openapi spec"))
+				return
+			}
+			router, err := gorillamux.NewRouter(doc)
+			if err != nil {
+				httpError(w, stacktrace.PropagateWithCode(err, http.StatusBadRequest, "failed to configure collection"))
+				return
+			}
+			md, _ := model.GetMetadata(r.Context())
+			route, pathParams, err := router.FindRoute(r)
+			if err != nil {
+				httpError(w, stacktrace.PropagateWithCode(err, http.StatusNotFound, "route not found"))
+				return
+			}
+			requestValidationInput := &openapi3filter.RequestValidationInput{
+				Request:    r,
+				PathParams: pathParams,
+				Route:      route,
+				Options: &openapi3filter.Options{AuthenticationFunc: func(ctx context.Context, input *openapi3filter.AuthenticationInput) error {
+					return nil
+				}},
+			}
+
+			if err := openapi3filter.ValidateRequest(r.Context(), requestValidationInput); err != nil {
+				httpError(w, stacktrace.PropagateWithCode(err, http.StatusBadRequest, ""))
+				return
+			}
+			md.SetAll(map[string]any{
+				"openapi.path_params": pathParams,
+				"openapi.route":       route.Path,
+			})
 			handler.ServeHTTP(w, r.WithContext(md.ToContext(r.Context())))
 		})
 	}
