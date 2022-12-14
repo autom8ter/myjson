@@ -3,16 +3,17 @@ package testutil
 import (
 	"context"
 	"fmt"
-	"github.com/autom8ter/gokvkit"
-	"github.com/autom8ter/gokvkit/model"
-	"github.com/palantir/stacktrace"
 	"io/ioutil"
 	"os"
 	"time"
 
+	"github.com/autom8ter/gokvkit"
+	"github.com/autom8ter/gokvkit/model"
+
 	"github.com/brianvoe/gofakeit/v6"
 
 	_ "embed"
+
 	_ "github.com/autom8ter/gokvkit/kv/badger"
 )
 
@@ -81,7 +82,7 @@ func TestDB(fn func(ctx context.Context, db *gokvkit.DB), collections ...[]byte)
 	}
 	for _, c := range collections {
 		if err := db.ConfigureCollection(ctx, c); err != nil {
-			return stacktrace.Propagate(err, "")
+			return err
 		}
 	}
 	time.Sleep(1 * time.Second)

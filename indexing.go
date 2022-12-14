@@ -5,15 +5,15 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/autom8ter/gokvkit/errors"
 	"github.com/autom8ter/gokvkit/internal/safe"
 	"github.com/autom8ter/gokvkit/kv"
 	"github.com/autom8ter/gokvkit/model"
-	"github.com/palantir/stacktrace"
 )
 
 func (d *DB) addIndex(ctx context.Context, collection string, index model.Index) error {
 	if index.Name == "" {
-		return stacktrace.NewError("%s - empty index name", collection)
+		return errors.Wrap(nil, errors.Validation, "%s - empty index name", collection)
 	}
 	if index.Collection == "" {
 		index.Collection = collection
@@ -39,16 +39,16 @@ func (d *DB) addIndex(ctx context.Context, collection string, index model.Index)
 				After:      doc,
 				Timestamp:  time.Now(),
 			}); err != nil {
-				return false, stacktrace.Propagate(err, "")
+				return false, err
 			}
 			return true, nil
 		})
 		if err != nil {
-			return stacktrace.Propagate(err, "%s - %s", collection, index.Name)
+			return errors.Wrap(err, 0, "%s - %s", collection, index.Name)
 		}
 	}
 	if err := batch.Flush(); err != nil {
-		return stacktrace.Propagate(err, "%s - %s", collection, index.Name)
+		return errors.Wrap(err, 0, "%s - %s", collection, index.Name)
 	}
 	index.IsBuilding = false
 	d.collections.SetFunc(collection, func(c *collectionSchema) *collectionSchema {
@@ -79,24 +79,24 @@ func (d *DB) removeIndex(ctx context.Context, collection string, index model.Ind
 			Timestamp:  time.Now(),
 			Metadata:   md,
 		}); err != nil {
-			return false, stacktrace.Propagate(err, "")
+			return false, err
 		}
 		return true, nil
 	})
 	if err != nil {
-		return stacktrace.Propagate(err, "")
+		return err
 	}
 	return nil
 }
 
 func (d *DB) persistCollectionConfig(val *collectionSchema) error {
 	if val.raw.Raw == "" {
-		return stacktrace.NewError("empty collection content")
+		return errors.Wrap(nil, 0, "empty collection content")
 	}
 	if err := d.kv.Tx(true, func(tx kv.Tx) error {
 		err := tx.Set([]byte(fmt.Sprintf("internal.collections.%s", val.collection)), val.yamlRaw)
 		if err != nil {
-			return stacktrace.Propagate(err, "")
+			return err
 		}
 		return nil
 	}); err != nil {
@@ -120,15 +120,15 @@ func (d *DB) getPersistedCollections() (*safe.Map[*collectionSchema], error) {
 
 			bits, err := item.Value()
 			if err != nil {
-				return stacktrace.Propagate(err, "")
+				return err
 			}
 			if len(bits) > 0 {
 				cfg, err := newCollectionSchema(bits)
 				if err != nil {
-					return stacktrace.Propagate(err, "")
+					return err
 				}
 				if cfg.yamlRaw == nil {
-					return stacktrace.NewError("empty collection yaml content")
+					return errors.Wrap(nil, 0, "empty collection yaml content")
 				}
 				collections.Set(cfg.collection, cfg)
 			}
@@ -136,7 +136,7 @@ func (d *DB) getPersistedCollections() (*safe.Map[*collectionSchema], error) {
 		}
 		return nil
 	}); err != nil {
-		return nil, stacktrace.Propagate(err, "")
+		return nil, err
 	}
 	return collections, nil
 }
@@ -146,18 +146,18 @@ func (d *DB) getPersistedCollection(collection string) (*collectionSchema, error
 	if err := d.kv.Tx(false, func(tx kv.Tx) error {
 		bits, err := tx.Get([]byte(fmt.Sprintf("internal.collections.%s", collection)))
 		if err != nil {
-			return stacktrace.Propagate(err, "")
+			return err
 		}
 		cfg, err = newCollectionSchema(bits)
 		if err != nil {
-			return stacktrace.Propagate(err, "")
+			return err
 		}
 		return nil
 	}); err != nil {
-		return cfg, stacktrace.Propagate(err, "")
+		return cfg, err
 	}
 	if cfg == nil {
-		return nil, stacktrace.NewError("collection not found")
+		return nil, errors.Wrap(nil, 0, "collection not found")
 	}
 	return cfg, nil
 }

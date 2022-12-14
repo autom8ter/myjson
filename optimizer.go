@@ -1,8 +1,8 @@
 package gokvkit
 
 import (
+	"github.com/autom8ter/gokvkit/errors"
 	"github.com/autom8ter/gokvkit/model"
-	"github.com/palantir/stacktrace"
 	"github.com/samber/lo"
 )
 
@@ -16,7 +16,7 @@ type defaultOptimizer struct{}
 
 func (o defaultOptimizer) Optimize(indexes map[string]model.Index, where []model.Where) (model.OptimizerResult, error) {
 	if len(indexes) == 0 {
-		return model.OptimizerResult{}, stacktrace.NewErrorWithCode(ErrTODO, "zero configured indexes")
+		return model.OptimizerResult{}, errors.Wrap(nil, errors.Internal, "zero configured indexes")
 	}
 	values := indexableFields(where)
 	var (

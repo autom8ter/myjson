@@ -5,8 +5,8 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/autom8ter/gokvkit/errors"
 	"github.com/autom8ter/gokvkit/internal/util"
-	"github.com/palantir/stacktrace"
 	"github.com/samber/lo"
 	"github.com/spf13/cast"
 )
@@ -148,11 +148,11 @@ func applyNonAggregates(selct Select, aggregated, next *Document) error {
 	value := next.Get(selct.Field)
 	if util.IsNil(selct.As) {
 		if err := aggregated.Set(selct.Field, value); err != nil {
-			return stacktrace.Propagate(err, "")
+			return err
 		}
 	} else {
 		if err := aggregated.Set(*selct.As, value); err != nil {
-			return stacktrace.Propagate(err, "")
+			return err
 		}
 	}
 	return nil
@@ -174,10 +174,10 @@ func applyAggregates(agg Select, aggregated, next *Document) error {
 	case SelectAggregateSum:
 		current += next.GetFloat(agg.Field)
 	default:
-		return stacktrace.NewError("unsupported aggregate function: %s/%s", agg.Field, *agg.Aggregate)
+		return errors.Wrap(nil, errors.Validation, "unsupported aggregate function: %s/%s", agg.Field, *agg.Aggregate)
 	}
 	if err := aggregated.Set(*agg.As, current); err != nil {
-		return stacktrace.Propagate(err, "")
+		return err
 	}
 	return nil
 }

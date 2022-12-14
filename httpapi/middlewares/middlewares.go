@@ -5,13 +5,13 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/autom8ter/gokvkit/errors"
 	"github.com/autom8ter/gokvkit/httpapi/api"
 	"github.com/autom8ter/gokvkit/httpapi/httpError"
 	"github.com/autom8ter/gokvkit/model"
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/getkin/kin-openapi/openapi3filter"
 	"github.com/getkin/kin-openapi/routers/gorillamux"
-	"github.com/palantir/stacktrace"
 )
 
 // OpenAPIValidator validates inbound requests against the openapi schema
@@ -26,12 +26,12 @@ func OpenAPIValidator(o api.OpenAPIServer) func(http.Handler) http.Handler {
 			doc, _ := loader.LoadFromData(bits)
 			err := doc.Validate(loader.Context)
 			if err != nil {
-				httpError.Error(w, stacktrace.PropagateWithCode(err, http.StatusInternalServerError, "invalid openapi spec"))
+				httpError.Error(w, errors.Wrap(err, http.StatusInternalServerError, "invalid openapi spec"))
 				return
 			}
 			router, err := gorillamux.NewRouter(doc)
 			if err != nil {
-				httpError.Error(w, stacktrace.PropagateWithCode(err, http.StatusBadRequest, "failed to configure collection"))
+				httpError.Error(w, errors.Wrap(err, http.StatusBadRequest, "failed to configure collection"))
 				return
 			}
 			md, _ := model.GetMetadata(r.Context())
@@ -40,7 +40,7 @@ func OpenAPIValidator(o api.OpenAPIServer) func(http.Handler) http.Handler {
 			}
 			route, pathParams, err := router.FindRoute(r)
 			if err != nil {
-				httpError.Error(w, stacktrace.PropagateWithCode(err, http.StatusNotFound, "route not found"))
+				httpError.Error(w, errors.Wrap(err, http.StatusNotFound, "route not found"))
 				return
 			}
 			requestValidationInput := &openapi3filter.RequestValidationInput{
@@ -52,7 +52,7 @@ func OpenAPIValidator(o api.OpenAPIServer) func(http.Handler) http.Handler {
 				}},
 			}
 			if err := openapi3filter.ValidateRequest(r.Context(), requestValidationInput); err != nil {
-				httpError.Error(w, stacktrace.PropagateWithCode(err, http.StatusBadRequest, ""))
+				httpError.Error(w, errors.Wrap(err, http.StatusBadRequest, ""))
 				return
 			}
 			md.SetAll(map[string]any{

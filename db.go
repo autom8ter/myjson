@@ -5,13 +5,13 @@ import (
 	_ "embed"
 	"time"
 
+	"github.com/autom8ter/gokvkit/errors"
 	"github.com/autom8ter/gokvkit/internal/safe"
 	"github.com/autom8ter/gokvkit/internal/util"
 	"github.com/autom8ter/gokvkit/kv"
 	"github.com/autom8ter/gokvkit/kv/registry"
 	"github.com/autom8ter/gokvkit/model"
 	"github.com/autom8ter/machine/v4"
-	"github.com/palantir/stacktrace"
 	"github.com/samber/lo"
 )
 
@@ -57,7 +57,7 @@ func OpenKV(cfg KVConfig) (kv.DB, error) {
 func New(ctx context.Context, cfg Config, opts ...DBOpt) (*DB, error) {
 	db, err := OpenKV(cfg.KV)
 	if err != nil {
-		return nil, stacktrace.PropagateWithCode(err, ErrTODO, "failed to open kv database")
+		return nil, errors.Wrap(err, errors.Internal, "failed to open kv database")
 	}
 	d := &DB{
 		config:       cfg,
@@ -72,7 +72,7 @@ func New(ctx context.Context, cfg Config, opts ...DBOpt) (*DB, error) {
 	}
 	coll, err := d.getPersistedCollections()
 	if err != nil {
-		return nil, stacktrace.PropagateWithCode(err, ErrTODO, "failed to get existing collections")
+		return nil, errors.Wrap(err, errors.Internal, "failed to get existing collections")
 	}
 	d.collections = coll
 	for _, o := range opts {
@@ -81,7 +81,6 @@ func New(ctx context.Context, cfg Config, opts ...DBOpt) (*DB, error) {
 
 	d.initHooks.RangeR(func(key string, h OnInit) bool {
 		if err = h.Func(ctx, d); err != nil {
-			err = stacktrace.Propagate(err, "")
 			return false
 		}
 		return true
@@ -103,9 +102,9 @@ func (d *DB) Tx(ctx context.Context, fn TxFunc) error {
 	err := fn(ctx, tx)
 	if err != nil {
 		tx.Rollback(ctx)
-		return stacktrace.Propagate(err, "rolled back transaction")
+		return errors.Wrap(err, 0, "rolled back transaction")
 	}
-	return stacktrace.Propagate(tx.Commit(ctx), "failed to commit transaction")
+	return errors.Wrap(tx.Commit(ctx), 0, "failed to commit transaction")
 }
 
 // Get gets a single document by id
@@ -120,19 +119,19 @@ func (d *DB) Get(ctx context.Context, collection, id string) (*model.Document, e
 			d.PrimaryKey(collection): id,
 		}).SetDocumentID(id).Path())
 		if err != nil {
-			return stacktrace.Propagate(err, "")
+			return err
 		}
 		document, err = model.NewDocumentFromBytes(val)
 		if err != nil {
-			return stacktrace.Propagate(err, "")
+			return err
 		}
 		return nil
 	}); err != nil {
-		return nil, stacktrace.Propagate(err, "")
+		return nil, err
 	}
 	document, err = d.applyReadHooks(ctx, collection, document)
 	if err != nil {
-		return document, stacktrace.Propagate(err, "")
+		return document, err
 	}
 	return document, nil
 }
@@ -147,12 +146,12 @@ func (d *DB) BatchGet(ctx context.Context, collection string, ids []string) (mod
 				d.PrimaryKey(collection): id,
 			}).SetDocumentID(id).Path())
 			if err != nil {
-				return stacktrace.Propagate(err, "")
+				return err
 			}
 
 			document, err := model.NewDocumentFromBytes(value)
 			if err != nil {
-				return stacktrace.Propagate(err, "")
+				return err
 			}
 			documents = append(documents, document)
 		}
@@ -166,7 +165,7 @@ func (d *DB) BatchGet(ctx context.Context, collection string, ids []string) (mod
 // aggregate performs aggregations against the collection
 func (d *DB) aggregate(ctx context.Context, collection string, query model.Query) (model.Page, error) {
 	if !d.HasCollection(collection) {
-		return model.Page{}, stacktrace.NewError("unsupported collection: %s", collection)
+		return model.Page{}, errors.Wrap(nil, 0, "unsupported collection: %s", collection)
 	}
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -180,13 +179,13 @@ func (d *DB) aggregate(ctx context.Context, collection string, query model.Query
 		return true, nil
 	})
 	if err != nil {
-		return model.Page{}, stacktrace.Propagate(err, "")
+		return model.Page{}, err
 	}
 	var reduced model.Documents
 	for _, values := range model.GroupByDocs(results, query.GroupBy) {
 		value, err := model.AggregateDocs(values, query.Select)
 		if err != nil {
-			return model.Page{}, stacktrace.Propagate(err, "")
+			return model.Page{}, err
 		}
 		reduced = append(reduced, value)
 	}
@@ -214,7 +213,7 @@ func (d *DB) aggregate(ctx context.Context, collection string, query model.Query
 // Query queries a list of documents
 func (d *DB) Query(ctx context.Context, collection string, query model.Query) (model.Page, error) {
 	if err := query.Validate(ctx); err != nil {
-		return model.Page{}, stacktrace.Propagate(err, "")
+		return model.Page{}, err
 	}
 	if query.IsAggregate() {
 		return d.aggregate(ctx, collection, query)
@@ -224,7 +223,7 @@ func (d *DB) Query(ctx context.Context, collection string, query model.Query) (m
 	now := time.Now()
 
 	if !d.HasCollection(collection) {
-		return model.Page{}, stacktrace.NewError("unsupported collection: %s", collection)
+		return model.Page{}, errors.Wrap(nil, 0, "unsupported collection: %s", collection)
 	}
 	var results model.Documents
 	fullScan := true
@@ -240,7 +239,7 @@ func (d *DB) Query(ctx context.Context, collection string, query model.Query) (m
 		return true, nil
 	})
 	if err != nil {
-		return model.Page{}, stacktrace.Propagate(err, "")
+		return model.Page{}, err
 	}
 	results = model.OrderByDocs(results, query.OrderBy)
 
@@ -255,7 +254,7 @@ func (d *DB) Query(ctx context.Context, collection string, query model.Query) (m
 		for _, result := range results {
 			err := result.Select(query.Select)
 			if err != nil {
-				return model.Page{}, stacktrace.Propagate(err, "")
+				return model.Page{}, err
 			}
 		}
 	}
@@ -278,12 +277,12 @@ func (d *DB) Query(ctx context.Context, collection string, query model.Query) (m
 // Query should be used when order is more important than performance/resource-usage
 func (d *DB) Scan(ctx context.Context, scan model.Scan, handlerFunc model.ScanFunc) (model.OptimizerResult, error) {
 	if !d.HasCollection(scan.From) {
-		return model.OptimizerResult{}, stacktrace.NewError("unsupported collection: %s", scan.From)
+		return model.OptimizerResult{}, errors.Wrap(nil, 0, "unsupported collection: %s", scan.From)
 	}
 	return d.queryScan(ctx, scan, handlerFunc)
 }
 
 // Close closes the database
 func (d *DB) Close(ctx context.Context) error {
-	return stacktrace.Propagate(d.kv.Close(), "")
+	return errors.Wrap(d.kv.Close(), 0, "")
 }

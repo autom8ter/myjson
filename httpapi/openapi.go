@@ -16,7 +16,6 @@ import (
 	"github.com/autom8ter/gokvkit/httpapi/handlers"
 	"github.com/autom8ter/gokvkit/httpapi/middlewares"
 	"github.com/go-chi/chi/v5"
-	"github.com/palantir/stacktrace"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -96,7 +95,7 @@ func (o *openAPIServer) Spec() ([]byte, error) {
 		"collections": coll,
 	})
 	if err != nil {
-		return nil, stacktrace.Propagate(err, "")
+		return nil, err
 	}
 	return buf.Bytes(), nil
 }

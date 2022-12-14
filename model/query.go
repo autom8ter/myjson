@@ -3,10 +3,9 @@ package model
 import (
 	"context"
 	"fmt"
-	"net/http"
 
+	"github.com/autom8ter/gokvkit/errors"
 	"github.com/autom8ter/gokvkit/internal/util"
-	"github.com/palantir/stacktrace"
 	"github.com/samber/lo"
 )
 import "reflect"
@@ -292,16 +291,16 @@ func (j *Query) UnmarshalJSON(b []byte) error {
 // Validate validates the query and returns a validation error if one exists
 func (q Query) Validate(ctx context.Context) error {
 	if len(q.Select) == 0 {
-		return stacktrace.NewErrorWithCode(http.StatusBadRequest, "query validation error: at least one select is required")
+		return errors.Wrap(nil, errors.Validation, "query validation error: at least one select is required")
 	}
 	isAggregate := false
 	for _, a := range q.Select {
 		if a.Field == "" {
-			return stacktrace.NewErrorWithCode(http.StatusBadRequest, "empty required field: 'select.field'")
+			return errors.Wrap(nil, errors.Validation, "empty required field: 'select.field'")
 		}
 		if a.Aggregate != nil {
 			if a.Function != nil {
-				return stacktrace.NewErrorWithCode(http.StatusBadRequest, "select cannot have both a function and an aggregate")
+				return errors.Wrap(nil, errors.Validation, "select cannot have both a function and an aggregate")
 			}
 			isAggregate = true
 		}
@@ -310,7 +309,7 @@ func (q Query) Validate(ctx context.Context) error {
 		for _, a := range q.Select {
 			if a.Aggregate == nil {
 				if !lo.Contains(q.GroupBy, a.Field) {
-					return stacktrace.NewErrorWithCode(http.StatusBadRequest, "'%s', is required in the group_by clause when aggregating", a.Field)
+					return errors.Wrap(nil, errors.Validation, "'%s', is required in the group_by clause when aggregating", a.Field)
 				}
 			}
 		}
@@ -318,7 +317,7 @@ func (q Query) Validate(ctx context.Context) error {
 			if !lo.ContainsBy[Select](q.Select, func(f Select) bool {
 				return f.Field == g
 			}) {
-				return stacktrace.NewErrorWithCode(http.StatusBadRequest, "'%s', is required in the select clause when aggregating", g)
+				return errors.Wrap(nil, errors.Validation, "'%s', is required in the select clause when aggregating", g)
 			}
 		}
 	}

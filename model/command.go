@@ -1,8 +1,9 @@
 package model
 
 import (
-	"github.com/palantir/stacktrace"
 	"time"
+
+	"github.com/autom8ter/gokvkit/errors"
 )
 
 // Action is an action that causes a mutation to the database
@@ -39,28 +40,28 @@ type Command struct {
 
 func (c *Command) Validate() error {
 	if c.Collection == "" {
-		return stacktrace.NewError("command: empty command.collection")
+		return errors.Wrap(nil, 0, "command: empty command.collection")
 	}
 	if c.Metadata == nil {
-		return stacktrace.NewError("command: empty command.metadata")
+		return errors.Wrap(nil, 0, "command: empty command.metadata")
 	}
 	if c.Timestamp.IsZero() {
-		return stacktrace.NewError("command: empty command.timestamp")
+		return errors.Wrap(nil, 0, "command: empty command.timestamp")
 	}
 	if c.DocID == "" {
-		return stacktrace.NewError("command: empty command.docID")
+		return errors.Wrap(nil, 0, "command: empty command.docID")
 	}
 	switch c.Action {
 	case Set, Update, Create:
 		if c.After == nil {
-			return stacktrace.NewError("command: empty command.change")
+			return errors.Wrap(nil, 0, "command: empty command.change")
 		}
 	case Delete:
 		if c.Before == nil {
-			return stacktrace.NewError("command: empty command.before")
+			return errors.Wrap(nil, 0, "command: empty command.before")
 		}
 	default:
-		return stacktrace.NewError("command: unsupported command.action: %s", c.Action)
+		return errors.Wrap(nil, 0, "command: unsupported command.action: %s", c.Action)
 	}
 
 	return nil

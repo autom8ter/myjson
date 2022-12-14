@@ -1,8 +1,8 @@
 package registry
 
 import (
+	"github.com/autom8ter/gokvkit/errors"
 	"github.com/autom8ter/gokvkit/kv"
-	"github.com/palantir/stacktrace"
 )
 
 // KVDBOpener opens a key value database
@@ -19,7 +19,7 @@ func Register(name string, opener KVDBOpener) {
 func Open(name string, params map[string]interface{}) (kv.DB, error) {
 	opener, ok := registeredOpeners[name]
 	if !ok {
-		return nil, stacktrace.NewError("%s is not registered", name)
+		return nil, errors.Wrap(nil, errors.NotFound, "%s is not registered", name)
 	}
 	return opener(params)
 }

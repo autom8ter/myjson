@@ -3,8 +3,8 @@ package gokvkit
 import (
 	"context"
 
+	"github.com/autom8ter/gokvkit/errors"
 	"github.com/autom8ter/gokvkit/model"
-	"github.com/palantir/stacktrace"
 )
 
 // OnPersist is a hook function triggered whenever a command is persisted
@@ -20,10 +20,10 @@ type OnPersist struct {
 // Valid returns nil if the hook is valid
 func (v OnPersist) Valid() error {
 	if v.Name == "" {
-		return stacktrace.NewError("empty hook name")
+		return errors.Wrap(nil, 0, "empty hook name")
 	}
 	if v.Func == nil {
-		return stacktrace.NewError("empty hook function")
+		return errors.Wrap(nil, 0, "empty hook function")
 	}
 	return nil
 }
@@ -37,10 +37,10 @@ type OnWhere struct {
 // Valid returns nil if the hook is valid
 func (v OnWhere) Valid() error {
 	if v.Name == "" {
-		return stacktrace.NewError("empty hook name")
+		return errors.Wrap(nil, 0, "empty hook name")
 	}
 	if v.Func == nil {
-		return stacktrace.NewError("empty hook function")
+		return errors.Wrap(nil, 0, "empty hook function")
 	}
 	return nil
 }
@@ -54,10 +54,10 @@ type OnRead struct {
 // Valid returns nil if the hook is valid
 func (v OnRead) Valid() error {
 	if v.Name == "" {
-		return stacktrace.NewError("empty hook name")
+		return errors.Wrap(nil, 0, "empty hook name")
 	}
 	if v.Func == nil {
-		return stacktrace.NewError("empty hook function")
+		return errors.Wrap(nil, 0, "empty hook function")
 	}
 	return nil
 }
@@ -71,10 +71,10 @@ type OnInit struct {
 // Valid returns nil if the hook is valid
 func (v OnInit) Valid() error {
 	if v.Name == "" {
-		return stacktrace.NewError("empty hook name")
+		return errors.Wrap(nil, 0, "empty hook name")
 	}
 	if v.Func == nil {
-		return stacktrace.NewError("empty hook function")
+		return errors.Wrap(nil, 0, "empty hook function")
 	}
 	return nil
 }

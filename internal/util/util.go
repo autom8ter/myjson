@@ -4,8 +4,9 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
+
+	"github.com/autom8ter/gokvkit/errors"
 	"github.com/mitchellh/mapstructure"
-	"github.com/palantir/stacktrace"
 	"github.com/spf13/cast"
 	"gopkg.in/yaml.v2"
 )
@@ -79,11 +80,11 @@ func convertMap(m map[interface{}]interface{}) map[string]interface{} {
 func YAMLToJSON(yamlContent []byte) ([]byte, error) {
 	var body map[interface{}]interface{}
 	if err := yaml.Unmarshal(yamlContent, &body); err != nil {
-		return nil, stacktrace.Propagate(err, "failed to convert yaml to json")
+		return nil, errors.Wrap(err, 0, "failed to convert yaml to json")
 	}
 	jsonContent, err := json.Marshal(convertMap(body))
 	if err != nil {
-		return nil, stacktrace.Propagate(err, "")
+		return nil, err
 	}
 	return jsonContent, nil
 }
@@ -91,11 +92,11 @@ func YAMLToJSON(yamlContent []byte) ([]byte, error) {
 func JSONToYAML(jsonContent []byte) ([]byte, error) {
 	var body map[string]interface{}
 	if err := json.Unmarshal(jsonContent, &body); err != nil {
-		return nil, stacktrace.Propagate(err, "failed to convert json to yaml")
+		return nil, errors.Wrap(err, 0, "failed to convert json to yaml")
 	}
 	yamlContent, err := yaml.Marshal(body)
 	if err != nil {
-		return nil, stacktrace.Propagate(err, "")
+		return nil, err
 	}
 	return yamlContent, nil
 }

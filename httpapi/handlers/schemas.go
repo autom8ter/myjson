@@ -4,10 +4,10 @@ import (
 	"io"
 	"net/http"
 
+	"github.com/autom8ter/gokvkit/errors"
 	"github.com/autom8ter/gokvkit/httpapi/api"
 	"github.com/autom8ter/gokvkit/httpapi/httpError"
 	"github.com/go-chi/chi/v5"
-	"github.com/palantir/stacktrace"
 	"gopkg.in/yaml.v2"
 )
 
@@ -30,7 +30,7 @@ func GetSchemaHandler(o api.OpenAPIServer) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		collection := chi.URLParam(r, "collection")
 		if !o.DB().HasCollection(collection) {
-			httpError.Error(w, stacktrace.NewErrorWithCode(http.StatusBadRequest, "collection does not exist"))
+			httpError.Error(w, errors.Wrap(nil, errors.Validation, "collection does not exist"))
 			return
 		}
 		schema, _ := o.DB().CollectionSchema(collection)
@@ -43,11 +43,11 @@ func PutSchemaHandler(o api.OpenAPIServer) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		bits, err := io.ReadAll(r.Body)
 		if err != nil {
-			httpError.Error(w, stacktrace.PropagateWithCode(err, http.StatusBadRequest, "failed to read request body"))
+			httpError.Error(w, errors.Wrap(err, http.StatusBadRequest, "failed to read request body"))
 			return
 		}
 		if err := o.DB().ConfigureCollection(r.Context(), bits); err != nil {
-			httpError.Error(w, stacktrace.PropagateWithCode(err, http.StatusBadRequest, "failed to configure collection"))
+			httpError.Error(w, errors.Wrap(err, http.StatusBadRequest, "failed to configure collection"))
 			return
 		}
 		w.WriteHeader(http.StatusOK)

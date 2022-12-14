@@ -5,9 +5,9 @@ import (
 	"io"
 	"strings"
 
+	"github.com/autom8ter/gokvkit/errors"
 	"github.com/autom8ter/gokvkit/internal/util"
 	flat2 "github.com/nqd/flat"
-	"github.com/palantir/stacktrace"
 	"github.com/samber/lo"
 	"github.com/spf13/cast"
 	"github.com/tidwall/gjson"
@@ -29,7 +29,7 @@ type Document struct {
 func (d *Document) UnmarshalJSON(bytes []byte) error {
 	doc, err := NewDocumentFromBytes(bytes)
 	if err != nil {
-		return stacktrace.Propagate(err, "")
+		return err
 	}
 	*d = *doc
 	return nil
@@ -51,13 +51,13 @@ func NewDocument() *Document {
 // NewDocumentFromBytes creates a new document from the given json bytes
 func NewDocumentFromBytes(json []byte) (*Document, error) {
 	if !gjson.ValidBytes(json) {
-		return nil, stacktrace.NewError("invalid json: %s", string(json))
+		return nil, errors.Wrap(nil, 0, "invalid json: %s", string(json))
 	}
 	d := &Document{
 		result: gjson.ParseBytes(json),
 	}
 	if !d.Valid() {
-		return nil, stacktrace.NewError("invalid document")
+		return nil, errors.Wrap(nil, 0, "invalid document")
 	}
 	return d, nil
 }
@@ -67,7 +67,7 @@ func NewDocumentFrom(value any) (*Document, error) {
 	var err error
 	bits, err := json.Marshal(value)
 	if err != nil {
-		return nil, stacktrace.NewError("failed to json encode value: %#v", value)
+		return nil, errors.Wrap(nil, 0, "failed to json encode value: %#v", value)
 	}
 	return NewDocumentFromBytes(bits)
 }
@@ -121,7 +121,7 @@ func (d *Document) Select(fields []Select) error {
 	}
 	err := selected.SetAll(patch)
 	if err != nil {
-		return stacktrace.Propagate(err, "")
+		return err
 	}
 	d.result = selected.result
 	return nil
@@ -173,10 +173,10 @@ func (d *Document) set(field string, val any) error {
 		result, err = sjson.Set(d.result.Raw, field, val)
 	}
 	if err != nil {
-		return stacktrace.Propagate(err, "")
+		return err
 	}
 	if !gjson.Valid(result) {
-		return stacktrace.NewError("invalid document")
+		return errors.Wrap(nil, 0, "invalid document")
 	}
 	d.result = gjson.Parse(result)
 	return nil
@@ -188,7 +188,7 @@ func (d *Document) SetAll(values map[string]any) error {
 	for k, v := range values {
 		err = d.set(k, v)
 		if err != nil {
-			return stacktrace.Propagate(err, "")
+			return err
 		}
 	}
 	return nil
@@ -197,12 +197,12 @@ func (d *Document) SetAll(values map[string]any) error {
 // Merge merges the doument with the provided document. This is not an overwrite.
 func (d *Document) Merge(with *Document) error {
 	if !with.Valid() {
-		return stacktrace.NewError("invalid document")
+		return errors.Wrap(nil, 0, "invalid document")
 	}
 	withMap := with.Value()
 	flattened, err := flat2.Flatten(withMap, nil)
 	if err != nil {
-		return stacktrace.Propagate(err, "")
+		return err
 	}
 	return d.SetAll(flattened)
 }
@@ -217,7 +217,7 @@ func (d *Document) DelAll(fields ...string) error {
 	for _, field := range fields {
 		result, err := sjson.Delete(d.result.Raw, field)
 		if err != nil {
-			return stacktrace.Propagate(err, "")
+			return err
 		}
 		d.result = gjson.Parse(result)
 	}
@@ -271,7 +271,7 @@ func (d *Document) Where(wheres []Where) (bool, error) {
 				return false, nil
 			}
 		default:
-			return false, stacktrace.NewError("invalid operator: '%s'", w.Op)
+			return false, errors.Wrap(nil, 0, "invalid operator: '%s'", w.Op)
 		}
 	}
 	return true, nil
@@ -286,7 +286,7 @@ func (d *Document) Scan(value any) error {
 func (d *Document) Encode(w io.Writer) error {
 	_, err := w.Write(d.Bytes())
 	if err != nil {
-		return stacktrace.Propagate(err, "failed to encode document")
+		return errors.Wrap(err, 0, "failed to encode document")
 	}
 	return nil
 }

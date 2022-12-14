@@ -4,9 +4,9 @@ import (
 	"context"
 	"time"
 
+	"github.com/autom8ter/gokvkit/errors"
 	"github.com/autom8ter/gokvkit/kv"
 	"github.com/autom8ter/gokvkit/model"
-	"github.com/palantir/stacktrace"
 	"github.com/segmentio/ksuid"
 )
 
@@ -44,43 +44,43 @@ func (t *transaction) Commit(ctx context.Context) error {
 		if !md.Exists(string(isIndexingKey)) {
 			for _, c := range t.commands {
 				if err := t.db.applyPersistHooks(ctx, t, c, true); err != nil {
-					return stacktrace.Propagate(err, "")
+					return err
 				}
 			}
 		}
 		if err := t.db.persistStateChange(ctx, batch, t.commands); err != nil {
-			return stacktrace.Propagate(err, "")
+			return err
 		}
 		if !md.Exists(string(isIndexingKey)) {
 			for _, c := range t.commands {
 				if err := t.db.applyPersistHooks(ctx, t, c, false); err != nil {
-					return stacktrace.Propagate(err, "")
+					return err
 				}
 			}
 		}
-		return stacktrace.Propagate(batch.Flush(), "")
+		return batch.Flush()
 	}
 	if err := t.db.kv.Tx(true, func(tx kv.Tx) error {
 		if !md.Exists(string(isIndexingKey)) {
 			for _, c := range t.commands {
 				if err := t.db.applyPersistHooks(ctx, t, c, true); err != nil {
-					return stacktrace.Propagate(err, "")
+					return err
 				}
 			}
 		}
 		if err := t.db.persistStateChange(ctx, tx, t.commands); err != nil {
-			return stacktrace.Propagate(err, "")
+			return err
 		}
 		if !md.Exists(string(isIndexingKey)) {
 			for _, c := range t.commands {
 				if err := t.db.applyPersistHooks(ctx, t, c, false); err != nil {
-					return stacktrace.Propagate(err, "")
+					return err
 				}
 			}
 		}
 		return nil
 	}); err != nil {
-		return stacktrace.Propagate(err, "")
+		return err
 	}
 	return nil
 }
@@ -91,11 +91,11 @@ func (t *transaction) Rollback(ctx context.Context) {
 
 func (t *transaction) Update(ctx context.Context, collection string, id string, update map[string]any) error {
 	if !t.db.HasCollection(collection) {
-		return stacktrace.NewError("unsupported collection: %s", collection)
+		return errors.Wrap(nil, 0, "unsupported collection: %s", collection)
 	}
 	doc := model.NewDocument()
 	if err := doc.SetAll(update); err != nil {
-		return stacktrace.Propagate(err, "")
+		return err
 	}
 	md, _ := model.GetMetadata(ctx)
 	t.commands = append(t.commands, &model.Command{
@@ -111,13 +111,13 @@ func (t *transaction) Update(ctx context.Context, collection string, id string, 
 
 func (t *transaction) Create(ctx context.Context, collection string, document *model.Document) (string, error) {
 	if !t.db.HasCollection(collection) {
-		return "", stacktrace.NewError("unsupported collection: %s", collection)
+		return "", errors.Wrap(nil, 0, "unsupported collection: %s", collection)
 	}
 	if t.db.GetPrimaryKey(collection, document) == "" {
 		id := ksuid.New().String()
 		err := t.db.SetPrimaryKey(collection, document, id)
 		if err != nil {
-			return "", stacktrace.Propagate(err, "")
+			return "", err
 		}
 	}
 
@@ -135,7 +135,7 @@ func (t *transaction) Create(ctx context.Context, collection string, document *m
 
 func (t *transaction) Set(ctx context.Context, collection string, document *model.Document) error {
 	if !t.db.HasCollection(collection) {
-		return stacktrace.NewError("unsupported collection: %s", collection)
+		return errors.Wrap(nil, 0, "unsupported collection: %s", collection)
 	}
 	md, _ := model.GetMetadata(ctx)
 	t.commands = append(t.commands, &model.Command{
@@ -151,7 +151,7 @@ func (t *transaction) Set(ctx context.Context, collection string, document *mode
 
 func (t *transaction) Delete(ctx context.Context, collection string, id string) error {
 	if !t.db.HasCollection(collection) {
-		return stacktrace.NewError("unsupported collection: %s", collection)
+		return errors.Wrap(nil, 0, "unsupported collection: %s", collection)
 	}
 	md, _ := model.GetMetadata(ctx)
 	t.commands = append(t.commands, &model.Command{

@@ -6,34 +6,34 @@ import (
 	"net/http"
 
 	"github.com/autom8ter/gokvkit"
+	"github.com/autom8ter/gokvkit/errors"
 	"github.com/autom8ter/gokvkit/httpapi/api"
 	"github.com/autom8ter/gokvkit/httpapi/httpError"
 	"github.com/autom8ter/gokvkit/model"
 	"github.com/go-chi/chi/v5"
-	"github.com/palantir/stacktrace"
 )
 
 func SetDocHandler(o api.OpenAPIServer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		collection := chi.URLParam(r, "collection")
 		if !o.DB().HasCollection(collection) {
-			httpError.Error(w, stacktrace.NewErrorWithCode(http.StatusBadRequest, "collection does not exist"))
+			httpError.Error(w, errors.Wrap(nil, errors.Validation, "collection does not exist"))
 			return
 		}
 		docID := chi.URLParam(r, "docID")
 		var doc = model.NewDocument()
 		if err := json.NewDecoder(r.Body).Decode(&doc); err != nil {
-			httpError.Error(w, stacktrace.PropagateWithCode(err, http.StatusBadRequest, "failed to decode update"))
+			httpError.Error(w, errors.Wrap(err, http.StatusBadRequest, "failed to decode update"))
 			return
 		}
 		if err := o.DB().SetPrimaryKey(collection, doc, docID); err != nil {
-			httpError.Error(w, stacktrace.NewErrorWithCode(http.StatusBadRequest, "bad id: %s", docID))
+			httpError.Error(w, errors.Wrap(nil, errors.Validation, "bad id: %s", docID))
 			return
 		}
 		if err := o.DB().Tx(r.Context(), func(ctx context.Context, tx gokvkit.Tx) error {
 			err := tx.Set(ctx, collection, doc)
 			if err != nil {
-				return stacktrace.Propagate(err, "")
+				return err
 			}
 			return nil
 		}); err != nil {
@@ -42,7 +42,7 @@ func SetDocHandler(o api.OpenAPIServer) http.HandlerFunc {
 		}
 		doc, err := o.DB().Get(r.Context(), collection, docID)
 		if err != nil {
-			httpError.Error(w, stacktrace.PropagateWithCode(err, http.StatusBadRequest, "failed to edit document"))
+			httpError.Error(w, errors.Wrap(err, http.StatusBadRequest, "failed to edit document"))
 			return
 		}
 		json.NewEncoder(w).Encode(doc)

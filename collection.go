@@ -3,8 +3,8 @@ package gokvkit
 import (
 	"context"
 
+	"github.com/autom8ter/gokvkit/errors"
 	"github.com/autom8ter/gokvkit/model"
-	"github.com/palantir/stacktrace"
 	"github.com/spf13/cast"
 )
 
@@ -16,7 +16,7 @@ func (d *DB) ConfigureCollection(ctx context.Context, collectionSchemaBytes []by
 	ctx = meta.ToContext(ctx)
 	collection, err := newCollectionSchema(collectionSchemaBytes)
 	if err != nil {
-		return stacktrace.Propagate(err, "")
+		return err
 	}
 	for _, i := range collection.indexing {
 		i.Collection = collection.collection
@@ -31,13 +31,13 @@ func (d *DB) ConfigureCollection(ctx context.Context, collectionSchemaBytes []by
 		}
 	}
 	if hasPrimary > 1 {
-		return stacktrace.NewError("%s: only a single primary index is supported", collection.collection)
+		return errors.Wrap(nil, errors.Validation, "%s: only a single primary index is supported", collection.collection)
 	}
 	if hasPrimary == 0 {
-		return stacktrace.NewError("%s: a primary index is required", collection.collection)
+		return errors.Wrap(nil, errors.Validation, "%s: a primary index is required", collection.collection)
 	}
 	if err := d.persistCollectionConfig(collection); err != nil {
-		return stacktrace.Propagate(err, "")
+		return err
 	}
 
 	existing, _ := d.getPersistedCollection(collection.collection)
@@ -45,34 +45,34 @@ func (d *DB) ConfigureCollection(ctx context.Context, collectionSchemaBytes []by
 	if existing == nil {
 		diff, err = getIndexDiff(collection.indexing, map[string]model.Index{})
 		if err != nil {
-			return stacktrace.Propagate(err, "")
+			return err
 		}
 	} else {
 		diff, err = getIndexDiff(collection.indexing, existing.indexing)
 		if err != nil {
-			return stacktrace.Propagate(err, "")
+			return err
 		}
 	}
 	for _, update := range diff.toUpdate {
 		if err := d.removeIndex(ctx, collection.collection, update); err != nil {
-			return stacktrace.Propagate(err, "")
+			return err
 		}
 		if err := d.addIndex(ctx, collection.collection, update); err != nil {
-			return stacktrace.Propagate(err, "")
+			return err
 		}
 	}
 	for _, toDelete := range diff.toRemove {
 		if err := d.removeIndex(ctx, collection.collection, toDelete); err != nil {
-			return stacktrace.Propagate(err, "")
+			return err
 		}
 	}
 	for _, toAdd := range diff.toAdd {
 		if err := d.addIndex(ctx, collection.collection, toAdd); err != nil {
-			return stacktrace.Propagate(err, "")
+			return err
 		}
 	}
 	if err := d.persistCollectionConfig(collection); err != nil {
-		return stacktrace.Propagate(err, "")
+		return err
 	}
 	return nil
 }
@@ -116,7 +116,7 @@ func (d *DB) GetPrimaryKey(collection string, doc *model.Document) string {
 
 func (d *DB) SetPrimaryKey(collection string, doc *model.Document, id string) error {
 	pkey := d.PrimaryKey(collection)
-	return stacktrace.Propagate(doc.Set(pkey, id), "failed to set primary key")
+	return errors.Wrap(doc.Set(pkey, id), 0, "failed to set primary key")
 }
 
 func (d *DB) primaryIndex(collection string) model.Index {

@@ -1,16 +1,20 @@
 package httpError
 
 import (
+	"encoding/json"
 	"net/http"
 
-	"github.com/palantir/stacktrace"
+	"github.com/autom8ter/gokvkit/errors"
 )
 
 func Error(w http.ResponseWriter, err error) {
 	status := http.StatusInternalServerError
-	if cde := stacktrace.GetCode(err); cde >= 400 && cde < 600 {
+	var e = errors.Extract(err)
+	if cde := e.Code; cde >= 400 && cde < 600 {
 		status = int(cde)
 	}
-	http.Error(w, stacktrace.RootCause(err).Error(), status)
+	w.WriteHeader(status)
+	// remove the internal error
+	json.NewEncoder(w).Encode(e.RemoveError())
 	return
 }
