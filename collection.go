@@ -93,29 +93,29 @@ func (d *DB) Collections() []string {
 }
 
 // PrimaryKey returns the collections primary key
-func (d *DB) primaryKey(collection string) string {
+func (d *DB) PrimaryKey(collection string) string {
 	fields := d.primaryIndex(collection).Fields
 	return fields[0]
 }
 
-func (d *DB) hasCollection(collection string) bool {
+func (d *DB) HasCollection(collection string) bool {
 	return d.collections.Exists(collection)
 }
 
-func (d *DB) getCollectionSchema(collection string) ([]byte, bool) {
-	return []byte(d.collections.Get(collection).raw.Raw), d.hasCollection(collection)
+func (d *DB) CollectionSchema(collection string) ([]byte, bool) {
+	return d.collections.Get(collection).yamlRaw, d.HasCollection(collection)
 }
 
-func (d *DB) getPrimaryKey(collection string, doc *model.Document) string {
+func (d *DB) GetPrimaryKey(collection string, doc *model.Document) string {
 	if d == nil {
 		return ""
 	}
-	pkey := d.primaryKey(collection)
+	pkey := d.PrimaryKey(collection)
 	return cast.ToString(doc.GetString(pkey))
 }
 
-func (d *DB) setPrimaryKey(collection string, doc *model.Document, id string) error {
-	pkey := d.primaryKey(collection)
+func (d *DB) SetPrimaryKey(collection string, doc *model.Document, id string) error {
+	pkey := d.PrimaryKey(collection)
 	return stacktrace.Propagate(doc.Set(pkey, id), "failed to set primary key")
 }
 

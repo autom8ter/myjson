@@ -32,7 +32,7 @@ func (d *DB) updateDocument(ctx context.Context, mutator kv.Mutator, c *collecti
 		return stacktrace.Propagate(err, "")
 	}
 	if err := mutator.Set(primaryIndex.SeekPrefix(map[string]any{
-		d.primaryKey(command.Collection): command.DocID,
+		d.PrimaryKey(command.Collection): command.DocID,
 	}).SetDocumentID(command.DocID).Path(), command.After.Bytes()); err != nil {
 		return stacktrace.PropagateWithCode(err, ErrTODO, "failed to batch set documents to primary index")
 	}
@@ -45,7 +45,7 @@ func (d *DB) deleteDocument(ctx context.Context, mutator kv.Mutator, c *collecti
 	}
 	primaryIndex := d.primaryIndex(command.Collection)
 	if err := mutator.Delete(primaryIndex.SeekPrefix(map[string]any{
-		d.primaryKey(command.Collection): command.DocID,
+		d.PrimaryKey(command.Collection): command.DocID,
 	}).SetDocumentID(command.DocID).Path()); err != nil {
 		return stacktrace.Propagate(err, "failed to batch delete documents")
 	}
@@ -56,7 +56,7 @@ func (d *DB) createDocument(ctx context.Context, mutator kv.Mutator, c *collecti
 	primaryIndex := d.primaryIndex(command.Collection)
 	if command.DocID == "" {
 		command.DocID = ksuid.New().String()
-		if err := d.setPrimaryKey(command.Collection, command.After, command.DocID); err != nil {
+		if err := d.SetPrimaryKey(command.Collection, command.After, command.DocID); err != nil {
 			return stacktrace.Propagate(err, "")
 		}
 	}
@@ -64,7 +64,7 @@ func (d *DB) createDocument(ctx context.Context, mutator kv.Mutator, c *collecti
 		return stacktrace.Propagate(err, "")
 	}
 	if err := mutator.Set(primaryIndex.SeekPrefix(map[string]any{
-		d.primaryKey(command.Collection): command.DocID,
+		d.PrimaryKey(command.Collection): command.DocID,
 	}).SetDocumentID(command.DocID).Path(), command.After.Bytes()); err != nil {
 		return stacktrace.PropagateWithCode(err, ErrTODO, "failed to batch set documents to primary index")
 	}
@@ -78,7 +78,7 @@ func (d *DB) setDocument(ctx context.Context, mutator kv.Mutator, c *collectionS
 	}
 	primaryIndex := d.primaryIndex(command.Collection)
 	if err := mutator.Set(primaryIndex.SeekPrefix(map[string]any{
-		d.primaryKey(command.Collection): command.DocID,
+		d.PrimaryKey(command.Collection): command.DocID,
 	}).SetDocumentID(command.DocID).Path(), command.After.Bytes()); err != nil {
 		return stacktrace.PropagateWithCode(err, ErrTODO, "failed to batch set documents to primary index")
 	}

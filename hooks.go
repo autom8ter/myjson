@@ -2,6 +2,7 @@ package gokvkit
 
 import (
 	"context"
+
 	"github.com/autom8ter/gokvkit/model"
 	"github.com/palantir/stacktrace"
 )

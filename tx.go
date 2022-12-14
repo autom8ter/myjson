@@ -10,15 +10,6 @@ import (
 	"github.com/segmentio/ksuid"
 )
 
-type TxCommand struct {
-	Collection string          `json:"collection"`
-	DocID      string          `json:"docID,omitempty"`
-	Query      *model.Query    `json:"query,omitempty"`
-	Create     *model.Document `json:"create,omitempty"`
-	Update     map[string]any  `json:"update,omitempty"`
-	Set        *model.Document `json:"set,omitempty"`
-}
-
 // Tx is a database transaction interface
 type Tx interface {
 	// Query executes a query against the database
@@ -99,7 +90,7 @@ func (t *transaction) Rollback(ctx context.Context) {
 }
 
 func (t *transaction) Update(ctx context.Context, collection string, id string, update map[string]any) error {
-	if !t.db.hasCollection(collection) {
+	if !t.db.HasCollection(collection) {
 		return stacktrace.NewError("unsupported collection: %s", collection)
 	}
 	doc := model.NewDocument()
@@ -119,12 +110,12 @@ func (t *transaction) Update(ctx context.Context, collection string, id string, 
 }
 
 func (t *transaction) Create(ctx context.Context, collection string, document *model.Document) (string, error) {
-	if !t.db.hasCollection(collection) {
+	if !t.db.HasCollection(collection) {
 		return "", stacktrace.NewError("unsupported collection: %s", collection)
 	}
-	if t.db.getPrimaryKey(collection, document) == "" {
+	if t.db.GetPrimaryKey(collection, document) == "" {
 		id := ksuid.New().String()
-		err := t.db.setPrimaryKey(collection, document, id)
+		err := t.db.SetPrimaryKey(collection, document, id)
 		if err != nil {
 			return "", stacktrace.Propagate(err, "")
 		}
@@ -134,23 +125,23 @@ func (t *transaction) Create(ctx context.Context, collection string, document *m
 	t.commands = append(t.commands, &model.Command{
 		Collection: collection,
 		Action:     model.Create,
-		DocID:      t.db.getPrimaryKey(collection, document),
+		DocID:      t.db.GetPrimaryKey(collection, document),
 		After:      document,
 		Timestamp:  time.Now(),
 		Metadata:   md,
 	})
-	return t.db.getPrimaryKey(collection, document), nil
+	return t.db.GetPrimaryKey(collection, document), nil
 }
 
 func (t *transaction) Set(ctx context.Context, collection string, document *model.Document) error {
-	if !t.db.hasCollection(collection) {
+	if !t.db.HasCollection(collection) {
 		return stacktrace.NewError("unsupported collection: %s", collection)
 	}
 	md, _ := model.GetMetadata(ctx)
 	t.commands = append(t.commands, &model.Command{
 		Collection: collection,
 		Action:     model.Set,
-		DocID:      t.db.getPrimaryKey(collection, document),
+		DocID:      t.db.GetPrimaryKey(collection, document),
 		After:      document,
 		Timestamp:  time.Now(),
 		Metadata:   md,
@@ -159,7 +150,7 @@ func (t *transaction) Set(ctx context.Context, collection string, document *mode
 }
 
 func (t *transaction) Delete(ctx context.Context, collection string, id string) error {
-	if !t.db.hasCollection(collection) {
+	if !t.db.HasCollection(collection) {
 		return stacktrace.NewError("unsupported collection: %s", collection)
 	}
 	md, _ := model.GetMetadata(ctx)

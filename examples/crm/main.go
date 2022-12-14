@@ -7,6 +7,7 @@ import (
 	"os"
 
 	"github.com/autom8ter/gokvkit"
+	"github.com/autom8ter/gokvkit/httpapi"
 	_ "github.com/autom8ter/gokvkit/kv/badger"
 	"github.com/autom8ter/gokvkit/model"
 	"github.com/autom8ter/gokvkit/testutil"
@@ -50,7 +51,12 @@ func main() {
 	if err := setupDatabase(ctx, db); err != nil {
 		panic(err)
 	}
-	if err := db.ServeHTTP(context.Background(), 8080); err != nil {
+	o, err := httpapi.New(db, &httpapi.OpenAPIParams{
+		Title:       "Example CRM API",
+		Version:     "v0.0.0",
+		Description: "an example crm api",
+	})
+	if err := o.Serve(context.Background(), 8080); err != nil {
 		panic(err)
 	}
 }

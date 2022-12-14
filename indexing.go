@@ -35,7 +35,7 @@ func (d *DB) addIndex(ctx context.Context, collection string, index model.Index)
 				Metadata:   meta,
 				Collection: collection,
 				Action:     model.Set,
-				DocID:      doc.GetString(d.primaryKey(collection)),
+				DocID:      doc.GetString(d.PrimaryKey(collection)),
 				After:      doc,
 				Timestamp:  time.Now(),
 			}); err != nil {
@@ -74,7 +74,7 @@ func (d *DB) removeIndex(ctx context.Context, collection string, index model.Ind
 		if err := d.updateSecondaryIndex(ctx, batch, index, &model.Command{
 			Collection: collection,
 			Action:     model.Delete,
-			DocID:      doc.GetString(d.primaryKey(collection)),
+			DocID:      doc.GetString(d.PrimaryKey(collection)),
 			Before:     doc,
 			Timestamp:  time.Now(),
 			Metadata:   md,

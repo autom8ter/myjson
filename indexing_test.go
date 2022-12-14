@@ -3,11 +3,12 @@ package gokvkit
 import (
 	"bytes"
 	"fmt"
+	"testing"
+	"time"
+
 	"github.com/autom8ter/gokvkit/model"
 	"github.com/brianvoe/gofakeit/v6"
 	"github.com/stretchr/testify/assert"
-	"testing"
-	"time"
 )
 
 func TestIndexing(t *testing.T) {

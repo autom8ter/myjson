@@ -1,8 +1,9 @@
 package gokvkit
 
 import (
-	"github.com/autom8ter/gokvkit/model"
 	"reflect"
+
+	"github.com/autom8ter/gokvkit/model"
 )
 
 type indexDiff struct {

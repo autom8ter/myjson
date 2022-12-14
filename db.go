@@ -3,9 +3,6 @@ package gokvkit
 import (
 	"context"
 	_ "embed"
-	"fmt"
-	"net/http"
-	"sync"
 	"time"
 
 	"github.com/autom8ter/gokvkit/internal/safe"
@@ -14,7 +11,6 @@ import (
 	"github.com/autom8ter/gokvkit/kv/registry"
 	"github.com/autom8ter/gokvkit/model"
 	"github.com/autom8ter/machine/v4"
-	"github.com/go-chi/chi/v5"
 	"github.com/palantir/stacktrace"
 	"github.com/samber/lo"
 )
@@ -35,20 +31,15 @@ type Config struct {
 
 // DB is an embedded, durable NoSQL database with support for schemas, indexing, and aggregation
 type DB struct {
-	sync.RWMutex
-	config           Config
-	kv               kv.DB
-	machine          machine.Machine
-	collections      *safe.Map[*collectionSchema]
-	optimizer        Optimizer
-	initHooks        *safe.Map[OnInit]
-	persistHooks     *safe.Map[[]OnPersist]
-	whereHooks       *safe.Map[[]OnWhere]
-	readHooks        *safe.Map[[]OnRead]
-	router           chi.Router
-	openAPIParams    *openAPIParams
-	middlewares      []func(http.Handler) http.Handler
-	openTransactions *safe.Map[Tx]
+	config       Config
+	kv           kv.DB
+	machine      machine.Machine
+	collections  *safe.Map[*collectionSchema]
+	optimizer    Optimizer
+	initHooks    *safe.Map[OnInit]
+	persistHooks *safe.Map[[]OnPersist]
+	whereHooks   *safe.Map[[]OnWhere]
+	readHooks    *safe.Map[[]OnRead]
 }
 
 /*
@@ -69,24 +60,21 @@ func New(ctx context.Context, cfg Config, opts ...DBOpt) (*DB, error) {
 		return nil, stacktrace.PropagateWithCode(err, ErrTODO, "failed to open kv database")
 	}
 	d := &DB{
-		config:           cfg,
-		kv:               db,
-		machine:          machine.New(),
-		collections:      safe.NewMap(map[string]*collectionSchema{}),
-		optimizer:        defaultOptimizer{},
-		initHooks:        safe.NewMap(map[string]OnInit{}),
-		persistHooks:     safe.NewMap(map[string][]OnPersist{}),
-		whereHooks:       safe.NewMap(map[string][]OnWhere{}),
-		readHooks:        safe.NewMap(map[string][]OnRead{}),
-		router:           chi.NewRouter(),
-		openTransactions: safe.NewMap(map[string]Tx{}),
+		config:       cfg,
+		kv:           db,
+		machine:      machine.New(),
+		collections:  safe.NewMap(map[string]*collectionSchema{}),
+		optimizer:    defaultOptimizer{},
+		initHooks:    safe.NewMap(map[string]OnInit{}),
+		persistHooks: safe.NewMap(map[string][]OnPersist{}),
+		whereHooks:   safe.NewMap(map[string][]OnWhere{}),
+		readHooks:    safe.NewMap(map[string][]OnRead{}),
 	}
 	coll, err := d.getPersistedCollections()
 	if err != nil {
 		return nil, stacktrace.PropagateWithCode(err, ErrTODO, "failed to get existing collections")
 	}
 	d.collections = coll
-	registerHTTPEndpoints(d)
 	for _, o := range opts {
 		o(d)
 	}
@@ -129,7 +117,7 @@ func (d *DB) Get(ctx context.Context, collection, id string) (*model.Document, e
 	primaryIndex := d.primaryIndex(collection)
 	if err := d.kv.Tx(false, func(txn kv.Tx) error {
 		val, err := txn.Get(primaryIndex.SeekPrefix(map[string]any{
-			d.primaryKey(collection): id,
+			d.PrimaryKey(collection): id,
 		}).SetDocumentID(id).Path())
 		if err != nil {
 			return stacktrace.Propagate(err, "")
@@ -156,7 +144,7 @@ func (d *DB) BatchGet(ctx context.Context, collection string, ids []string) (mod
 	if err := d.kv.Tx(false, func(txn kv.Tx) error {
 		for _, id := range ids {
 			value, err := txn.Get(primaryIndex.SeekPrefix(map[string]any{
-				d.primaryKey(collection): id,
+				d.PrimaryKey(collection): id,
 			}).SetDocumentID(id).Path())
 			if err != nil {
 				return stacktrace.Propagate(err, "")
@@ -177,7 +165,7 @@ func (d *DB) BatchGet(ctx context.Context, collection string, ids []string) (mod
 
 // aggregate performs aggregations against the collection
 func (d *DB) aggregate(ctx context.Context, collection string, query model.Query) (model.Page, error) {
-	if !d.hasCollection(collection) {
+	if !d.HasCollection(collection) {
 		return model.Page{}, stacktrace.NewError("unsupported collection: %s", collection)
 	}
 	ctx, cancel := context.WithCancel(ctx)
@@ -235,7 +223,7 @@ func (d *DB) Query(ctx context.Context, collection string, query model.Query) (m
 	defer cancel()
 	now := time.Now()
 
-	if !d.hasCollection(collection) {
+	if !d.HasCollection(collection) {
 		return model.Page{}, stacktrace.NewError("unsupported collection: %s", collection)
 	}
 	var results model.Documents
@@ -289,7 +277,7 @@ func (d *DB) Query(ctx context.Context, collection string, query model.Query) (m
 // results will not be ordered unless an index supporting the order by(s) was found by the optimizer
 // Query should be used when order is more important than performance/resource-usage
 func (d *DB) Scan(ctx context.Context, scan model.Scan, handlerFunc model.ScanFunc) (model.OptimizerResult, error) {
-	if !d.hasCollection(scan.From) {
+	if !d.HasCollection(scan.From) {
 		return model.OptimizerResult{}, stacktrace.NewError("unsupported collection: %s", scan.From)
 	}
 	return d.queryScan(ctx, scan, handlerFunc)
@@ -298,14 +286,4 @@ func (d *DB) Scan(ctx context.Context, scan model.Scan, handlerFunc model.ScanFu
 // Close closes the database
 func (d *DB) Close(ctx context.Context) error {
 	return stacktrace.Propagate(d.kv.Close(), "")
-}
-
-// Handler returns the database http handler
-func (d *DB) Handler() http.Handler {
-	return d.router
-}
-
-// ServeHTTP starts an http server serving openapi and websocket endpoints
-func (d *DB) ServeHTTP(ctx context.Context, port int) error {
-	return http.ListenAndServe(fmt.Sprintf(":%v", port), d.Handler())
 }
