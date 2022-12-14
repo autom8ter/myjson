@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"text/template"
+	"time"
 
 	_ "embed"
 
@@ -16,15 +17,17 @@ import (
 	"github.com/autom8ter/gokvkit/httpapi/middlewares"
 	"github.com/go-chi/chi/v5"
 	"github.com/palantir/stacktrace"
+	"golang.org/x/sync/errgroup"
 )
 
 //go:embed templates/openapi.yaml.tmpl
 var openapiTemplate string
 
+// OpenAPIParams are custom params for generating an openapi specification
 type OpenAPIParams struct {
-	Title       string
-	Version     string
-	Description string
+	Title       string `json:"title"`
+	Version     string `json:"version"`
+	Description string `json:"description"`
 }
 
 type openAPIServer struct {
@@ -33,6 +36,7 @@ type openAPIServer struct {
 	router chi.Router
 }
 
+// New creates a new openapi server
 func New(db *gokvkit.DB, params *OpenAPIParams, mwares ...func(http.Handler) http.Handler) (api.OpenAPIServer, error) {
 	if params == nil {
 		return nil, fmt.Errorf("empty openapi params")
@@ -42,7 +46,7 @@ func New(db *gokvkit.DB, params *OpenAPIParams, mwares ...func(http.Handler) htt
 		params: params,
 		router: chi.NewRouter(),
 	}
-	mwares = append([]func(http.Handler) http.Handler{middlewares.OpenAPIValidator(o), middlewares.MetadataInjector()}, mwares...)
+	mwares = append([]func(http.Handler) http.Handler{middlewares.OpenAPIValidator(o)}, mwares...)
 	o.router.Get("/openapi.yaml", handlers.SpecHandler(o))
 	o.router.Group(func(r chi.Router) {
 		r.Use(mwares...)
@@ -54,8 +58,8 @@ func New(db *gokvkit.DB, params *OpenAPIParams, mwares ...func(http.Handler) htt
 		r.Delete("/collections/{collection}/{docID}", handlers.DeleteDocHandler(o))
 		r.Get("/collections/{collection}/{docID}", handlers.GetDocHandler(o))
 
-		r.Post("/collections/{collection}/_/query", handlers.QueryHandler(o))
-		r.Post("/collections/{collection}/_/batch", handlers.BatchSetHandler(o))
+		r.Post("/collections/{collection}/cmd/query", handlers.QueryHandler(o))
+		r.Post("/collections/{collection}/cmd/batchset", handlers.BatchSetHandler(o))
 
 		r.Get("/schema", handlers.GetSchemasHandler(o))
 		r.Get("/schema/{collection}", handlers.GetSchemaHandler(o))
@@ -104,5 +108,17 @@ func (d *openAPIServer) Handler() http.Handler {
 
 // Serve starts an http server serving openapi
 func (d *openAPIServer) Serve(ctx context.Context, port int) error {
-	return http.ListenAndServe(fmt.Sprintf(":%v", port), d.Handler())
+	egp, ctx := errgroup.WithContext(ctx)
+	egp.Go(func() error {
+		return http.ListenAndServe(fmt.Sprintf(":%v", port), d.Handler())
+	})
+	err := egp.Wait()
+	d.shutdown()
+	return err
+}
+
+func (d *openAPIServer) shutdown() {
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	d.DB().Close(ctx)
 }

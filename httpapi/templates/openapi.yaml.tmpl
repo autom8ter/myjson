@@ -191,7 +191,7 @@ paths:
             schema:
               type: object
         required: true
-  /collections/{{ .collection }}/_/query:
+  /collections/{{ .collection }}/cmd/query:
     post:
       tags:
         - {{ title .collection }}
@@ -217,7 +217,7 @@ paths:
             schema:
               $ref: '#/components/schemas/Query'
         required: true
-  /collections/{{ .collection }}/_/batch:
+  /collections/{{ .collection }}/cmd/batchset:
     put:
       tags:
         - {{ title .collection }}

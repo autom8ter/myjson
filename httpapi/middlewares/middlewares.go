@@ -14,18 +14,10 @@ import (
 	"github.com/palantir/stacktrace"
 )
 
-func MetadataInjector() func(http.Handler) http.Handler {
-	return func(handler http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			md, _ := model.GetMetadata(r.Context())
-			for k, v := range r.Header {
-				md.Set(fmt.Sprintf("http.header.%s", k), v)
-			}
-			handler.ServeHTTP(w, r.WithContext(md.ToContext(r.Context())))
-		})
-	}
-}
-
+// OpenAPIValidator validates inbound requests against the openapi schema
+// adds openapi.path_params to the inbound metadata
+// adds openapi.route to the inbound metadata
+// adds openapi.header.${headerName} to the metadata
 func OpenAPIValidator(o api.OpenAPIServer) func(http.Handler) http.Handler {
 	return func(handler http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -43,6 +35,9 @@ func OpenAPIValidator(o api.OpenAPIServer) func(http.Handler) http.Handler {
 				return
 			}
 			md, _ := model.GetMetadata(r.Context())
+			for k, v := range r.Header {
+				md.Set(fmt.Sprintf("openapi.header.%s", k), v)
+			}
 			route, pathParams, err := router.FindRoute(r)
 			if err != nil {
 				httpError.Error(w, stacktrace.PropagateWithCode(err, http.StatusNotFound, "route not found"))
