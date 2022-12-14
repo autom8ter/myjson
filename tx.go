@@ -91,7 +91,7 @@ func (t *transaction) Rollback(ctx context.Context) {
 
 func (t *transaction) Update(ctx context.Context, collection string, id string, update map[string]any) error {
 	if !t.db.HasCollection(collection) {
-		return errors.Wrap(nil, 0, "unsupported collection: %s", collection)
+		return errors.New(errors.Validation, "unsupported collection: %s", collection)
 	}
 	doc := model.NewDocument()
 	if err := doc.SetAll(update); err != nil {
@@ -111,7 +111,7 @@ func (t *transaction) Update(ctx context.Context, collection string, id string, 
 
 func (t *transaction) Create(ctx context.Context, collection string, document *model.Document) (string, error) {
 	if !t.db.HasCollection(collection) {
-		return "", errors.Wrap(nil, 0, "unsupported collection: %s", collection)
+		return "", errors.New(errors.Validation, "unsupported collection: %s", collection)
 	}
 	if t.db.GetPrimaryKey(collection, document) == "" {
 		id := ksuid.New().String()
@@ -135,7 +135,7 @@ func (t *transaction) Create(ctx context.Context, collection string, document *m
 
 func (t *transaction) Set(ctx context.Context, collection string, document *model.Document) error {
 	if !t.db.HasCollection(collection) {
-		return errors.Wrap(nil, 0, "unsupported collection: %s", collection)
+		return errors.New(errors.Validation, "unsupported collection: %s", collection)
 	}
 	md, _ := model.GetMetadata(ctx)
 	t.commands = append(t.commands, &model.Command{
@@ -151,7 +151,7 @@ func (t *transaction) Set(ctx context.Context, collection string, document *mode
 
 func (t *transaction) Delete(ctx context.Context, collection string, id string) error {
 	if !t.db.HasCollection(collection) {
-		return errors.Wrap(nil, 0, "unsupported collection: %s", collection)
+		return errors.New(errors.Validation, "unsupported collection: %s", collection)
 	}
 	md, _ := model.GetMetadata(ctx)
 	t.commands = append(t.commands, &model.Command{

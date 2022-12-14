@@ -20,10 +20,10 @@ type OnPersist struct {
 // Valid returns nil if the hook is valid
 func (v OnPersist) Valid() error {
 	if v.Name == "" {
-		return errors.Wrap(nil, 0, "empty hook name")
+		return errors.New(errors.Validation, "empty hook name")
 	}
 	if v.Func == nil {
-		return errors.Wrap(nil, 0, "empty hook function")
+		return errors.New(errors.Validation, "empty hook function")
 	}
 	return nil
 }
@@ -37,10 +37,10 @@ type OnWhere struct {
 // Valid returns nil if the hook is valid
 func (v OnWhere) Valid() error {
 	if v.Name == "" {
-		return errors.Wrap(nil, 0, "empty hook name")
+		return errors.New(errors.Validation, "empty hook name")
 	}
 	if v.Func == nil {
-		return errors.Wrap(nil, 0, "empty hook function")
+		return errors.New(errors.Validation, "empty hook function")
 	}
 	return nil
 }
@@ -54,10 +54,10 @@ type OnRead struct {
 // Valid returns nil if the hook is valid
 func (v OnRead) Valid() error {
 	if v.Name == "" {
-		return errors.Wrap(nil, 0, "empty hook name")
+		return errors.New(errors.Validation, "empty hook name")
 	}
 	if v.Func == nil {
-		return errors.Wrap(nil, 0, "empty hook function")
+		return errors.New(errors.Validation, "empty hook function")
 	}
 	return nil
 }
@@ -71,10 +71,10 @@ type OnInit struct {
 // Valid returns nil if the hook is valid
 func (v OnInit) Valid() error {
 	if v.Name == "" {
-		return errors.Wrap(nil, 0, "empty hook name")
+		return errors.New(errors.Validation, "empty hook name")
 	}
 	if v.Func == nil {
-		return errors.Wrap(nil, 0, "empty hook function")
+		return errors.New(errors.Validation, "empty hook function")
 	}
 	return nil
 }

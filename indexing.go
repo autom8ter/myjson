@@ -13,7 +13,7 @@ import (
 
 func (d *DB) addIndex(ctx context.Context, collection string, index model.Index) error {
 	if index.Name == "" {
-		return errors.Wrap(nil, errors.Validation, "%s - empty index name", collection)
+		return errors.New(errors.Validation, "%s - empty index name", collection)
 	}
 	if index.Collection == "" {
 		index.Collection = collection
@@ -91,7 +91,7 @@ func (d *DB) removeIndex(ctx context.Context, collection string, index model.Ind
 
 func (d *DB) persistCollectionConfig(val *collectionSchema) error {
 	if val.raw.Raw == "" {
-		return errors.Wrap(nil, 0, "empty collection content")
+		return errors.New(errors.Validation, "empty collection content")
 	}
 	if err := d.kv.Tx(true, func(tx kv.Tx) error {
 		err := tx.Set([]byte(fmt.Sprintf("internal.collections.%s", val.collection)), val.yamlRaw)
@@ -128,7 +128,7 @@ func (d *DB) getPersistedCollections() (*safe.Map[*collectionSchema], error) {
 					return err
 				}
 				if cfg.yamlRaw == nil {
-					return errors.Wrap(nil, 0, "empty collection yaml content")
+					return errors.New(errors.Validation, "empty collection yaml content")
 				}
 				collections.Set(cfg.collection, cfg)
 			}
@@ -157,7 +157,7 @@ func (d *DB) getPersistedCollection(collection string) (*collectionSchema, error
 		return cfg, err
 	}
 	if cfg == nil {
-		return nil, errors.Wrap(nil, 0, "collection not found")
+		return nil, errors.New(errors.Validation, "collection not found")
 	}
 	return cfg, nil
 }

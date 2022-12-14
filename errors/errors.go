@@ -6,13 +6,15 @@ import (
 	"net/http"
 )
 
+// Code is a code associated with an error
 type Code int
 
 const (
-	Internal   Code = http.StatusInternalServerError
-	NotFound   Code = http.StatusNotFound
-	Forbidden  Code = http.StatusForbidden
-	Validation Code = http.StatusBadRequest
+	Internal     Code = http.StatusInternalServerError
+	NotFound     Code = http.StatusNotFound
+	Forbidden    Code = http.StatusForbidden
+	Validation   Code = http.StatusBadRequest
+	Unauthorized Code = http.StatusUnauthorized
 )
 
 // Error is a custom error
@@ -24,9 +26,6 @@ type Error struct {
 
 // Error returns the Error as a json string
 func (e *Error) Error() string {
-	if e.Code == 0 {
-		e.Code = http.StatusOK
-	}
 	bits, _ := json.Marshal(e)
 	return string(bits)
 }
@@ -53,8 +52,23 @@ func Extract(err error) *Error {
 	return e
 }
 
-// Wraps the given error and returns a new one
+// New creates a new error and returns it
+func New(code Code, msg string, args ...any) error {
+	e := &Error{
+		Code: code,
+		Err:  nil,
+	}
+	if msg != "" {
+		e.Messages = append(e.Messages, fmt.Sprintf(msg, args...))
+	}
+	return e
+}
+
+// Wrap Wraps the given error and returns a new one. If the error is nil, it will return nil
 func Wrap(err error, code Code, msg string, args ...any) error {
+	if err == nil {
+		return nil
+	}
 	e, ok := err.(*Error)
 	if ok {
 		if msg != "" {

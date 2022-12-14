@@ -174,7 +174,7 @@ func applyAggregates(agg Select, aggregated, next *Document) error {
 	case SelectAggregateSum:
 		current += next.GetFloat(agg.Field)
 	default:
-		return errors.Wrap(nil, errors.Validation, "unsupported aggregate function: %s/%s", agg.Field, *agg.Aggregate)
+		return errors.New(errors.Validation, "unsupported aggregate function: %s/%s", agg.Field, *agg.Aggregate)
 	}
 	if err := aggregated.Set(*agg.As, current); err != nil {
 		return err

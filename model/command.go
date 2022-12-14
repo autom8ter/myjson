@@ -40,28 +40,28 @@ type Command struct {
 
 func (c *Command) Validate() error {
 	if c.Collection == "" {
-		return errors.Wrap(nil, 0, "command: empty command.collection")
+		return errors.New(errors.Validation, "command: empty command.collection")
 	}
 	if c.Metadata == nil {
-		return errors.Wrap(nil, 0, "command: empty command.metadata")
+		return errors.New(errors.Validation, "command: empty command.metadata")
 	}
 	if c.Timestamp.IsZero() {
-		return errors.Wrap(nil, 0, "command: empty command.timestamp")
+		return errors.New(errors.Validation, "command: empty command.timestamp")
 	}
 	if c.DocID == "" {
-		return errors.Wrap(nil, 0, "command: empty command.docID")
+		return errors.New(errors.Validation, "command: empty command.docID")
 	}
 	switch c.Action {
 	case Set, Update, Create:
 		if c.After == nil {
-			return errors.Wrap(nil, 0, "command: empty command.change")
+			return errors.New(errors.Validation, "command: empty command.change")
 		}
 	case Delete:
 		if c.Before == nil {
-			return errors.Wrap(nil, 0, "command: empty command.before")
+			return errors.New(errors.Validation, "command: empty command.before")
 		}
 	default:
-		return errors.Wrap(nil, 0, "command: unsupported command.action: %s", c.Action)
+		return errors.New(errors.Validation, "command: unsupported command.action: %s", c.Action)
 	}
 
 	return nil

@@ -165,7 +165,7 @@ func (d *DB) BatchGet(ctx context.Context, collection string, ids []string) (mod
 // aggregate performs aggregations against the collection
 func (d *DB) aggregate(ctx context.Context, collection string, query model.Query) (model.Page, error) {
 	if !d.HasCollection(collection) {
-		return model.Page{}, errors.Wrap(nil, 0, "unsupported collection: %s", collection)
+		return model.Page{}, errors.New(errors.Validation, "unsupported collection: %s", collection)
 	}
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -223,7 +223,7 @@ func (d *DB) Query(ctx context.Context, collection string, query model.Query) (m
 	now := time.Now()
 
 	if !d.HasCollection(collection) {
-		return model.Page{}, errors.Wrap(nil, 0, "unsupported collection: %s", collection)
+		return model.Page{}, errors.New(errors.Validation, "unsupported collection: %s", collection)
 	}
 	var results model.Documents
 	fullScan := true
@@ -277,7 +277,7 @@ func (d *DB) Query(ctx context.Context, collection string, query model.Query) (m
 // Query should be used when order is more important than performance/resource-usage
 func (d *DB) Scan(ctx context.Context, scan model.Scan, handlerFunc model.ScanFunc) (model.OptimizerResult, error) {
 	if !d.HasCollection(scan.From) {
-		return model.OptimizerResult{}, errors.Wrap(nil, 0, "unsupported collection: %s", scan.From)
+		return model.OptimizerResult{}, errors.New(errors.Validation, "unsupported collection: %s", scan.From)
 	}
 	return d.queryScan(ctx, scan, handlerFunc)
 }

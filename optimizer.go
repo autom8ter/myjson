@@ -16,7 +16,7 @@ type defaultOptimizer struct{}
 
 func (o defaultOptimizer) Optimize(indexes map[string]model.Index, where []model.Where) (model.OptimizerResult, error) {
 	if len(indexes) == 0 {
-		return model.OptimizerResult{}, errors.Wrap(nil, errors.Internal, "zero configured indexes")
+		return model.OptimizerResult{}, errors.New(errors.Internal, "zero configured indexes")
 	}
 	values := indexableFields(where)
 	var (

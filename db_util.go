@@ -172,7 +172,7 @@ func (d *DB) updateSecondaryIndex(ctx context.Context, mutator kv.Mutator, idx m
 					split := bytes.Split(item.Key(), []byte("\x00"))
 					id := split[len(split)-1]
 					if string(id) != command.DocID {
-						return errors.Wrap(nil, errors.Internal, "duplicate value( %s ) found for unique index: %s", command.DocID, idx.Name)
+						return errors.New(errors.Internal, "duplicate value( %s ) found for unique index: %s", command.DocID, idx.Name)
 					}
 					it.Next()
 				}
@@ -214,7 +214,7 @@ func (d *DB) getReadyIndexes(ctx context.Context, collection string) map[string]
 
 func (d *DB) queryScan(ctx context.Context, scan model.Scan, handlerFunc model.ScanFunc) (model.OptimizerResult, error) {
 	if handlerFunc == nil {
-		return model.OptimizerResult{}, errors.Wrap(nil, 0, "empty scan handler")
+		return model.OptimizerResult{}, errors.New(errors.Validation, "empty scan handler")
 	}
 	var err error
 	scan.Where, err = d.applyWhereHooks(ctx, scan.From, scan.Where)

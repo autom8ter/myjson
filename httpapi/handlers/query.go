@@ -15,7 +15,7 @@ func QueryHandler(o api.OpenAPIServer) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		collection := chi.URLParam(r, "collection")
 		if !o.DB().HasCollection(collection) {
-			httpError.Error(w, errors.Wrap(nil, errors.Validation, "collection does not exist"))
+			httpError.Error(w, errors.New(errors.Validation, "collection does not exist"))
 			return
 		}
 		var q model.Query

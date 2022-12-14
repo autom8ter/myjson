@@ -17,7 +17,7 @@ func CreateDocHandler(o api.OpenAPIServer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		collection := chi.URLParam(r, "collection")
 		if !o.DB().HasCollection(collection) {
-			httpError.Error(w, errors.Wrap(nil, errors.NotFound, "collection does not exist"))
+			httpError.Error(w, errors.New(errors.NotFound, "collection does not exist"))
 			return
 		}
 		var doc = model.NewDocument()

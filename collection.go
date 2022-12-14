@@ -31,10 +31,10 @@ func (d *DB) ConfigureCollection(ctx context.Context, collectionSchemaBytes []by
 		}
 	}
 	if hasPrimary > 1 {
-		return errors.Wrap(nil, errors.Validation, "%s: only a single primary index is supported", collection.collection)
+		return errors.New(errors.Validation, "%s: only a single primary index is supported", collection.collection)
 	}
 	if hasPrimary == 0 {
-		return errors.Wrap(nil, errors.Validation, "%s: a primary index is required", collection.collection)
+		return errors.New(errors.Validation, "%s: a primary index is required", collection.collection)
 	}
 	if err := d.persistCollectionConfig(collection); err != nil {
 		return err

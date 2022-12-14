@@ -19,7 +19,7 @@ func Register(name string, opener KVDBOpener) {
 func Open(name string, params map[string]interface{}) (kv.DB, error) {
 	opener, ok := registeredOpeners[name]
 	if !ok {
-		return nil, errors.Wrap(nil, errors.NotFound, "%s is not registered", name)
+		return nil, errors.New(errors.NotFound, "%s is not registered", name)
 	}
 	return opener(params)
 }

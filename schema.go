@@ -32,7 +32,7 @@ const (
 
 func newCollectionSchema(schemaContent []byte) (*collectionSchema, error) {
 	if len(schemaContent) == 0 {
-		return nil, errors.Wrap(nil, 0, "empty schema content")
+		return nil, errors.New(errors.Validation, "empty schema content")
 	}
 	var (
 		schema = &jsonschema.Schema{}
@@ -52,18 +52,18 @@ func newCollectionSchema(schemaContent []byte) (*collectionSchema, error) {
 	r := gjson.ParseBytes(jsonContent)
 
 	if !r.Get(string(collectionPath)).Exists() {
-		return nil, errors.Wrap(nil, 0, "schema does not have 'x-collection' property")
+		return nil, errors.New(errors.Validation, "schema does not have 'x-collection' property")
 	}
 	c.raw = r
 	if !r.Get("properties").Exists() {
-		return nil, errors.Wrap(nil, 0, "schema does not have 'properties' property")
+		return nil, errors.New(errors.Validation, "schema does not have 'properties' property")
 	}
 	if !r.Get(string(indexingPath)).Exists() {
-		return nil, errors.Wrap(nil, 0, "schema does not have 'properties' property")
+		return nil, errors.New(errors.Validation, "schema does not have 'properties' property")
 	}
 	c.collection = r.Get(string(collectionPath)).String()
 	if !r.Get(string(indexingPath)).IsObject() {
-		return nil, errors.Wrap(nil, 0, "'indexing' property must be an object")
+		return nil, errors.New(errors.Validation, "'indexing' property must be an object")
 	}
 	if err := util.Decode(r.Get(string(indexingPath)).Value(), &c.indexing); err != nil {
 		return nil, err
@@ -105,12 +105,12 @@ func (j *collectionSchema) validateCommand(ctx context.Context, command *model.C
 		if command.After != nil {
 			kerrs := j.schema.Validate(ctx, command.After.Value()).Errs
 			if kerrs != nil && len(*kerrs) > 0 {
-				return errors.Wrap(nil, 0, "%v", util.JSONString(*kerrs))
+				return errors.New(errors.Validation, "%v", util.JSONString(*kerrs))
 			}
 		}
 	case model.Delete:
 		if command.DocID == "" {
-			return errors.Wrap(nil, 0, "empty document id")
+			return errors.New(errors.Validation, "empty document id")
 		}
 	}
 	return nil

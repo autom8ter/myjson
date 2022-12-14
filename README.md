@@ -1,6 +1,6 @@
 # gokvkit
 
-A framework for building powerful, extensible, and feature-rich microservices on top of key/value storeage
+A framework for building powerful, extensible, and feature-rich microservices on top of key/value storage
 
     go get -u github.com/autom8ter/gokvkit
 
@@ -36,7 +36,7 @@ Build stateful, extensible, and feature-rich programs on top of pluggable key/va
 - [x] run as an http server
   - [x] openapi support
   - [x] optionally add http middlewares
-  - [ ] websocket transaction support
+  - [ ] transaction support
 
 ### Flexibility
 

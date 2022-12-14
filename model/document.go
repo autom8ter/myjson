@@ -51,13 +51,13 @@ func NewDocument() *Document {
 // NewDocumentFromBytes creates a new document from the given json bytes
 func NewDocumentFromBytes(json []byte) (*Document, error) {
 	if !gjson.ValidBytes(json) {
-		return nil, errors.Wrap(nil, 0, "invalid json: %s", string(json))
+		return nil, errors.New(errors.Validation, "invalid json: %s", string(json))
 	}
 	d := &Document{
 		result: gjson.ParseBytes(json),
 	}
 	if !d.Valid() {
-		return nil, errors.Wrap(nil, 0, "invalid document")
+		return nil, errors.New(errors.Validation, "invalid document")
 	}
 	return d, nil
 }
@@ -67,7 +67,7 @@ func NewDocumentFrom(value any) (*Document, error) {
 	var err error
 	bits, err := json.Marshal(value)
 	if err != nil {
-		return nil, errors.Wrap(nil, 0, "failed to json encode value: %#v", value)
+		return nil, errors.New(errors.Validation, "failed to json encode value: %#v", value)
 	}
 	return NewDocumentFromBytes(bits)
 }
@@ -176,7 +176,7 @@ func (d *Document) set(field string, val any) error {
 		return err
 	}
 	if !gjson.Valid(result) {
-		return errors.Wrap(nil, 0, "invalid document")
+		return errors.New(errors.Validation, "invalid document")
 	}
 	d.result = gjson.Parse(result)
 	return nil
@@ -197,7 +197,7 @@ func (d *Document) SetAll(values map[string]any) error {
 // Merge merges the doument with the provided document. This is not an overwrite.
 func (d *Document) Merge(with *Document) error {
 	if !with.Valid() {
-		return errors.Wrap(nil, 0, "invalid document")
+		return errors.New(errors.Validation, "invalid document")
 	}
 	withMap := with.Value()
 	flattened, err := flat2.Flatten(withMap, nil)
@@ -271,7 +271,7 @@ func (d *Document) Where(wheres []Where) (bool, error) {
 				return false, nil
 			}
 		default:
-			return false, errors.Wrap(nil, 0, "invalid operator: '%s'", w.Op)
+			return false, errors.New(errors.Validation, "invalid operator: '%s'", w.Op)
 		}
 	}
 	return true, nil
