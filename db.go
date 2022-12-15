@@ -104,7 +104,10 @@ func (d *DB) Tx(ctx context.Context, fn TxFunc) error {
 		tx.Rollback(ctx)
 		return errors.Wrap(err, 0, "rolled back transaction")
 	}
-	return errors.Wrap(tx.Commit(ctx), 0, "failed to commit transaction")
+	if err := tx.Commit(ctx); err != nil {
+		return errors.Wrap(err, 0, "failed to commit transaction")
+	}
+	return nil
 }
 
 // Get gets a single document by id

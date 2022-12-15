@@ -40,3 +40,11 @@ func (b *badgerTx) Set(key, value []byte) error {
 func (b *badgerTx) Delete(key []byte) error {
 	return b.txn.Delete(key)
 }
+
+func (b *badgerTx) Rollback() {
+	b.txn.Discard()
+}
+
+func (b *badgerTx) Commit() error {
+	return b.txn.Commit()
+}

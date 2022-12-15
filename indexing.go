@@ -3,7 +3,6 @@ package gokvkit
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/autom8ter/gokvkit/errors"
 	"github.com/autom8ter/gokvkit/internal/safe"
@@ -23,32 +22,27 @@ func (d *DB) addIndex(ctx context.Context, collection string, index model.Index)
 		c.indexing[index.Name] = index
 		return c
 	})
-	batch := d.kv.Batch()
 	meta, _ := model.GetMetadata(ctx)
-
+	meta.Set(string(internalKey), true)
+	meta.Set(string(isIndexingKey), true)
 	if !index.Primary {
-		_, err := d.Scan(meta.ToContext(ctx), model.Scan{
-			From:  collection,
-			Where: nil,
-		}, func(doc *model.Document) (bool, error) {
-			if err := d.setDocument(ctx, batch, d.collections.Get(collection), &model.Command{
-				Metadata:   meta,
-				Collection: collection,
-				Action:     model.Set,
-				DocID:      doc.GetString(d.PrimaryKey(collection)),
-				After:      doc,
-				Timestamp:  time.Now(),
-			}); err != nil {
-				return false, err
+		if err := d.Tx(ctx, func(ctx context.Context, tx Tx) error {
+			_, err := d.Scan(meta.ToContext(ctx), model.Scan{
+				From:  collection,
+				Where: nil,
+			}, func(doc *model.Document) (bool, error) {
+				if err := tx.Set(meta.ToContext(ctx), collection, doc); err != nil {
+					return false, err
+				}
+				return true, nil
+			})
+			if err != nil {
+				return err
 			}
-			return true, nil
-		})
-		if err != nil {
-			return errors.Wrap(err, 0, "%s - %s", collection, index.Name)
+			return nil
+		}); err != nil {
+			return errors.Wrap(err, 0, "indexing: failed to add index %s - %s", collection, index.Name)
 		}
-	}
-	if err := batch.Flush(); err != nil {
-		return errors.Wrap(err, 0, "%s - %s", collection, index.Name)
 	}
 	index.IsBuilding = false
 	d.collections.SetFunc(collection, func(c *collectionSchema) *collectionSchema {
@@ -63,28 +57,25 @@ func (d *DB) removeIndex(ctx context.Context, collection string, index model.Ind
 		delete(c.indexing, index.Name)
 		return c
 	})
-	batch := d.kv.Batch()
 	meta, _ := model.GetMetadata(ctx)
-	meta.Set("_internal", true)
-	meta.Set("_reindex", true)
-	_, err := d.queryScan(ctx, model.Scan{
-		From: collection,
-	}, func(doc *model.Document) (bool, error) {
-		md, _ := model.GetMetadata(ctx)
-		if err := d.updateSecondaryIndex(ctx, batch, index, &model.Command{
-			Collection: collection,
-			Action:     model.Delete,
-			DocID:      doc.GetString(d.PrimaryKey(collection)),
-			Before:     doc,
-			Timestamp:  time.Now(),
-			Metadata:   md,
-		}); err != nil {
-			return false, err
+	meta.Set(string(internalKey), true)
+	meta.Set(string(isIndexingKey), true)
+
+	if err := d.Tx(ctx, func(ctx context.Context, tx Tx) error {
+		_, err := d.queryScan(ctx, model.Scan{
+			From: collection,
+		}, func(doc *model.Document) (bool, error) {
+			if err := tx.Delete(meta.ToContext(ctx), collection, doc.GetString(d.PrimaryKey(collection))); err != nil {
+				return false, err
+			}
+			return true, nil
+		})
+		if err != nil {
+			return err
 		}
-		return true, nil
-	})
-	if err != nil {
-		return err
+		return nil
+	}); err != nil {
+		return errors.Wrap(err, 0, "indexing: failed to remove index %s - %s", collection, index.Name)
 	}
 	return nil
 }

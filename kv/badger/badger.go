@@ -43,6 +43,10 @@ func (b *badgerKV) Tx(isUpdate bool, fn func(kv.Tx) error) error {
 	})
 }
 
+func (b *badgerKV) NewTx(isUpdate bool) kv.Tx {
+	return &badgerTx{txn: b.db.NewTransaction(isUpdate)}
+}
+
 func (b *badgerKV) Batch() kv.Batch {
 	return &badgerBatch{batch: b.db.NewWriteBatch()}
 }

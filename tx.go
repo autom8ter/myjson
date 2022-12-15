@@ -33,79 +33,38 @@ type Tx interface {
 type TxFunc func(ctx context.Context, tx Tx) error
 
 type transaction struct {
-	db       *DB
-	commands []*model.Command
+	db      *DB
+	tx      kv.Tx
+	isBatch bool
 }
 
 func (t *transaction) Commit(ctx context.Context) error {
-	md, _ := model.GetMetadata(ctx)
-	if len(t.commands) >= batchThreshold {
-		batch := t.db.kv.Batch()
-		if !md.Exists(string(isIndexingKey)) {
-			for _, c := range t.commands {
-				if err := t.db.applyPersistHooks(ctx, t, c, true); err != nil {
-					return err
-				}
-			}
-		}
-		if err := t.db.persistStateChange(ctx, batch, t.commands); err != nil {
-			return err
-		}
-		if !md.Exists(string(isIndexingKey)) {
-			for _, c := range t.commands {
-				if err := t.db.applyPersistHooks(ctx, t, c, false); err != nil {
-					return err
-				}
-			}
-		}
-		return batch.Flush()
-	}
-	if err := t.db.kv.Tx(true, func(tx kv.Tx) error {
-		if !md.Exists(string(isIndexingKey)) {
-			for _, c := range t.commands {
-				if err := t.db.applyPersistHooks(ctx, t, c, true); err != nil {
-					return err
-				}
-			}
-		}
-		if err := t.db.persistStateChange(ctx, tx, t.commands); err != nil {
-			return err
-		}
-		if !md.Exists(string(isIndexingKey)) {
-			for _, c := range t.commands {
-				if err := t.db.applyPersistHooks(ctx, t, c, false); err != nil {
-					return err
-				}
-			}
-		}
-		return nil
-	}); err != nil {
-		return err
-	}
-	return nil
+	return t.tx.Commit()
 }
 
 func (t *transaction) Rollback(ctx context.Context) {
-	t.commands = []*model.Command{}
+	t.tx.Rollback()
 }
 
 func (t *transaction) Update(ctx context.Context, collection string, id string, update map[string]any) error {
 	if !t.db.HasCollection(collection) {
-		return errors.New(errors.Validation, "unsupported collection: %s", collection)
+		return errors.New(errors.Validation, "tx: unsupported collection: %s", collection)
 	}
 	doc := model.NewDocument()
 	if err := doc.SetAll(update); err != nil {
 		return err
 	}
 	md, _ := model.GetMetadata(ctx)
-	t.commands = append(t.commands, &model.Command{
+	if err := t.persistCommand(ctx, md, &model.Command{
 		Collection: collection,
 		Action:     model.Update,
 		DocID:      id,
 		After:      doc,
 		Timestamp:  time.Now(),
 		Metadata:   md,
-	})
+	}); err != nil {
+		return errors.Wrap(err, 0, "tx: failed to commit update")
+	}
 	return nil
 }
 
@@ -120,47 +79,52 @@ func (t *transaction) Create(ctx context.Context, collection string, document *m
 			return "", err
 		}
 	}
-
 	md, _ := model.GetMetadata(ctx)
-	t.commands = append(t.commands, &model.Command{
+	if err := t.persistCommand(ctx, md, &model.Command{
 		Collection: collection,
 		Action:     model.Create,
 		DocID:      t.db.GetPrimaryKey(collection, document),
 		After:      document,
 		Timestamp:  time.Now(),
 		Metadata:   md,
-	})
+	}); err != nil {
+		return "", errors.Wrap(err, 0, "tx: failed to commit delete")
+	}
 	return t.db.GetPrimaryKey(collection, document), nil
 }
 
 func (t *transaction) Set(ctx context.Context, collection string, document *model.Document) error {
 	if !t.db.HasCollection(collection) {
-		return errors.New(errors.Validation, "unsupported collection: %s", collection)
+		return errors.New(errors.Validation, "tx: unsupported collection: %s", collection)
 	}
 	md, _ := model.GetMetadata(ctx)
-	t.commands = append(t.commands, &model.Command{
+	if err := t.persistCommand(ctx, md, &model.Command{
 		Collection: collection,
 		Action:     model.Set,
 		DocID:      t.db.GetPrimaryKey(collection, document),
 		After:      document,
 		Timestamp:  time.Now(),
 		Metadata:   md,
-	})
+	}); err != nil {
+		return errors.Wrap(err, 0, "tx: failed to commit set")
+	}
 	return nil
 }
 
 func (t *transaction) Delete(ctx context.Context, collection string, id string) error {
 	if !t.db.HasCollection(collection) {
-		return errors.New(errors.Validation, "unsupported collection: %s", collection)
+		return errors.New(errors.Validation, "tx: unsupported collection: %s", collection)
 	}
 	md, _ := model.GetMetadata(ctx)
-	t.commands = append(t.commands, &model.Command{
+	if err := t.persistCommand(ctx, md, &model.Command{
 		Collection: collection,
 		Action:     model.Delete,
 		DocID:      id,
 		Timestamp:  time.Now(),
 		Metadata:   md,
-	})
+	}); err != nil {
+		return errors.Wrap(err, 0, "tx: failed to commit delete")
+	}
 	return nil
 }
 

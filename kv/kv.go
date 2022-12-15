@@ -4,6 +4,8 @@ package kv
 type DB interface {
 	// Tx executes the given function against a database transaction
 	Tx(isUpdate bool, fn func(Tx) error) error
+	// NewTx creates a new database transaction.
+	NewTx(isUpdate bool) Tx
 	// Batch returns a batch kv writer
 	Batch() Batch
 	// Close closes the key value database
@@ -30,6 +32,10 @@ type Tx interface {
 	Deleter
 	// NewIterator creates a new iterator
 	NewIterator(opts IterOpts) Iterator
+	// Commit commits the transaction
+	Commit() error
+	// Rollback rolls back any changes made by the transaction
+	Rollback()
 }
 
 // Getter gets the specified key in the database(if it exists)
