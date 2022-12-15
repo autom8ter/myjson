@@ -90,22 +90,26 @@ func New(ctx context.Context, cfg Config, opts ...DBOpt) (*DB, error) {
 }
 
 // NewTx returns a new transaction. a transaction must call Commit method in order to persist changes
-func (d *DB) NewTx() Tx {
-	return &transaction{db: d}
+func (d *DB) NewTx(isUpdate, isBatch bool) Tx {
+	return &transaction{
+		db:      d,
+		tx:      d.kv.NewTx(isUpdate),
+		isBatch: isBatch,
+	}
 }
 
 // Tx executs the given function against a new transaction.
 // if the function returns an error, all changes will be rolled back.
 // otherwise, the changes will be commited to the database
-func (d *DB) Tx(ctx context.Context, fn TxFunc) error {
-	tx := d.NewTx()
+func (d *DB) Tx(ctx context.Context, isUpdate, isBatch bool, fn TxFunc) error {
+	tx := d.NewTx(isUpdate, isBatch)
 	err := fn(ctx, tx)
 	if err != nil {
 		tx.Rollback(ctx)
-		return errors.Wrap(err, 0, "rolled back transaction")
+		return errors.Wrap(err, 0, "tx: rolled back transaction")
 	}
 	if err := tx.Commit(ctx); err != nil {
-		return errors.Wrap(err, 0, "failed to commit transaction")
+		return errors.Wrap(err, 0, "tx: failed to commit transaction")
 	}
 	return nil
 }

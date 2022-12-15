@@ -25,7 +25,7 @@ func PatchDocHandler(o api.OpenAPIServer) http.HandlerFunc {
 			httpError.Error(w, errors.Wrap(err, http.StatusBadRequest, "failed to decode edit"))
 			return
 		}
-		if err := o.DB().Tx(r.Context(), func(ctx context.Context, tx gokvkit.Tx) error {
+		if err := o.DB().Tx(r.Context(), true, false, func(ctx context.Context, tx gokvkit.Tx) error {
 			err := tx.Update(ctx, collection, docID, update)
 			if err != nil {
 				return err

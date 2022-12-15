@@ -28,7 +28,7 @@ func Test(t *testing.T) {
 				id  string
 				err error
 			)
-			assert.Nil(t, db.Tx(ctx, func(ctx context.Context, tx gokvkit.Tx) error {
+			assert.Nil(t, db.Tx(ctx, true, false, func(ctx context.Context, tx gokvkit.Tx) error {
 				id, err = tx.Create(ctx, "user", testutil.NewUserDoc())
 				return err
 			}))
@@ -41,7 +41,7 @@ func Test(t *testing.T) {
 		assert.Nil(t, testutil.TestDB(func(ctx context.Context, db *gokvkit.DB) {
 			timer := timer()
 			defer timer(t)
-			assert.Nil(t, db.Tx(ctx, func(ctx context.Context, tx gokvkit.Tx) error {
+			assert.Nil(t, db.Tx(ctx, true, false, func(ctx context.Context, tx gokvkit.Tx) error {
 				for i := 0; i < 10; i++ {
 					assert.Nil(t, tx.Set(ctx, "user", testutil.NewUserDoc()))
 				}
@@ -56,7 +56,7 @@ func Test(t *testing.T) {
 			timer := timer()
 			defer timer(t)
 
-			assert.Nil(t, db.Tx(ctx, func(ctx context.Context, tx gokvkit.Tx) error {
+			assert.Nil(t, db.Tx(ctx, true, false, func(ctx context.Context, tx gokvkit.Tx) error {
 				for i := 0; i < 100; i++ {
 					usr := testutil.NewUserDoc()
 					ids = append(ids, usr.GetString("_id"))
@@ -147,7 +147,7 @@ func Test(t *testing.T) {
 			for _, u := range usrs {
 				id := u.GetString("_id")
 				email := gofakeit.Email()
-				assert.Nil(t, db.Tx(ctx, func(ctx context.Context, tx gokvkit.Tx) error {
+				assert.Nil(t, db.Tx(ctx, true, false, func(ctx context.Context, tx gokvkit.Tx) error {
 					assert.Nil(t, tx.Update(ctx, "user", id, map[string]any{
 						"contact.email": email,
 					}))
@@ -161,7 +161,7 @@ func Test(t *testing.T) {
 		})
 		t.Run("delete first 50", func(t *testing.T) {
 			for _, id := range ids[:50] {
-				assert.Nil(t, db.Tx(ctx, func(ctx context.Context, tx gokvkit.Tx) error {
+				assert.Nil(t, db.Tx(ctx, true, false, func(ctx context.Context, tx gokvkit.Tx) error {
 					assert.Nil(t, tx.Delete(ctx, "user", id))
 					return nil
 				}))
@@ -173,7 +173,7 @@ func Test(t *testing.T) {
 			}
 		})
 		t.Run("query delete all", func(t *testing.T) {
-			assert.Nil(t, db.Tx(ctx, func(ctx context.Context, tx gokvkit.Tx) error {
+			assert.Nil(t, db.Tx(ctx, true, false, func(ctx context.Context, tx gokvkit.Tx) error {
 				res, err := db.Query(ctx, "user", model.Query{
 
 					Select: []model.Select{{Field: "*"}},
@@ -207,7 +207,7 @@ func Benchmark(b *testing.B) {
 		assert.Nil(b, testutil.TestDB(func(ctx context.Context, db *gokvkit.DB) {
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				assert.Nil(b, db.Tx(ctx, func(ctx context.Context, tx gokvkit.Tx) error {
+				assert.Nil(b, db.Tx(ctx, true, false, func(ctx context.Context, tx gokvkit.Tx) error {
 					return tx.Set(ctx, "user", doc)
 				}))
 			}
@@ -218,7 +218,7 @@ func Benchmark(b *testing.B) {
 		b.ReportAllocs()
 		doc := testutil.NewUserDoc()
 		assert.Nil(b, testutil.TestDB(func(ctx context.Context, db *gokvkit.DB) {
-			assert.Nil(b, db.Tx(ctx, func(ctx context.Context, tx gokvkit.Tx) error {
+			assert.Nil(b, db.Tx(ctx, true, false, func(ctx context.Context, tx gokvkit.Tx) error {
 				return tx.Set(ctx, "user", doc)
 			}))
 			b.ResetTimer()
@@ -233,11 +233,11 @@ func Benchmark(b *testing.B) {
 		b.ReportAllocs()
 		doc := testutil.NewUserDoc()
 		assert.Nil(b, testutil.TestDB(func(ctx context.Context, db *gokvkit.DB) {
-			assert.Nil(b, db.Tx(ctx, func(ctx context.Context, tx gokvkit.Tx) error {
+			assert.Nil(b, db.Tx(ctx, true, false, func(ctx context.Context, tx gokvkit.Tx) error {
 				return tx.Set(ctx, "user", doc)
 			}))
 			var docs []*model.Document
-			assert.Nil(b, db.Tx(ctx, func(ctx context.Context, tx gokvkit.Tx) error {
+			assert.Nil(b, db.Tx(ctx, true, false, func(ctx context.Context, tx gokvkit.Tx) error {
 				for i := 0; i < 100000; i++ {
 					usr := testutil.NewUserDoc()
 					docs = append(docs, usr)
@@ -271,11 +271,11 @@ func Benchmark(b *testing.B) {
 		b.ReportAllocs()
 		doc := testutil.NewUserDoc()
 		assert.Nil(b, testutil.TestDB(func(ctx context.Context, db *gokvkit.DB) {
-			assert.Nil(b, db.Tx(ctx, func(ctx context.Context, tx gokvkit.Tx) error {
+			assert.Nil(b, db.Tx(ctx, true, false, func(ctx context.Context, tx gokvkit.Tx) error {
 				return tx.Set(ctx, "user", doc)
 			}))
 			var docs []*model.Document
-			assert.Nil(b, db.Tx(ctx, func(ctx context.Context, tx gokvkit.Tx) error {
+			assert.Nil(b, db.Tx(ctx, true, false, func(ctx context.Context, tx gokvkit.Tx) error {
 				for i := 0; i < 100000; i++ {
 					usr := testutil.NewUserDoc()
 					docs = append(docs, usr)
@@ -308,7 +308,7 @@ func TestIndexing1(t *testing.T) {
 	t.Run("matching unique index (contact.email)", func(t *testing.T) {
 		assert.Nil(t, testutil.TestDB(func(ctx context.Context, db *gokvkit.DB) {
 			var docs model.Documents
-			assert.Nil(t, db.Tx(ctx, func(ctx context.Context, tx gokvkit.Tx) error {
+			assert.Nil(t, db.Tx(ctx, true, false, func(ctx context.Context, tx gokvkit.Tx) error {
 				for i := 0; i < 5; i++ {
 					usr := testutil.NewUserDoc()
 					docs = append(docs, usr)
@@ -341,7 +341,7 @@ func TestIndexing1(t *testing.T) {
 		}))
 		assert.Nil(t, testutil.TestDB(func(ctx context.Context, db *gokvkit.DB) {
 			var docs model.Documents
-			assert.Nil(t, db.Tx(ctx, func(ctx context.Context, tx gokvkit.Tx) error {
+			assert.Nil(t, db.Tx(ctx, true, false, func(ctx context.Context, tx gokvkit.Tx) error {
 				for i := 0; i < 5; i++ {
 					usr := testutil.NewUserDoc()
 					docs = append(docs, usr)
@@ -377,7 +377,7 @@ func TestIndexing1(t *testing.T) {
 	t.Run("non-matching (name)", func(t *testing.T) {
 		assert.Nil(t, testutil.TestDB(func(ctx context.Context, db *gokvkit.DB) {
 			var docs model.Documents
-			assert.Nil(t, db.Tx(ctx, func(ctx context.Context, tx gokvkit.Tx) error {
+			assert.Nil(t, db.Tx(ctx, true, false, func(ctx context.Context, tx gokvkit.Tx) error {
 				for i := 0; i < 5; i++ {
 					usr := testutil.NewUserDoc()
 					docs = append(docs, usr)
@@ -413,7 +413,7 @@ func TestIndexing1(t *testing.T) {
 	t.Run("matching primary (_id)", func(t *testing.T) {
 		assert.Nil(t, testutil.TestDB(func(ctx context.Context, db *gokvkit.DB) {
 			var docs model.Documents
-			assert.Nil(t, db.Tx(ctx, func(ctx context.Context, tx gokvkit.Tx) error {
+			assert.Nil(t, db.Tx(ctx, true, false, func(ctx context.Context, tx gokvkit.Tx) error {
 				for i := 0; i < 5; i++ {
 					usr := testutil.NewUserDoc()
 					docs = append(docs, usr)
@@ -447,7 +447,7 @@ func TestIndexing1(t *testing.T) {
 		}))
 		assert.Nil(t, testutil.TestDB(func(ctx context.Context, db *gokvkit.DB) {
 			var docs model.Documents
-			assert.Nil(t, db.Tx(ctx, func(ctx context.Context, tx gokvkit.Tx) error {
+			assert.Nil(t, db.Tx(ctx, true, false, func(ctx context.Context, tx gokvkit.Tx) error {
 				for i := 0; i < 5; i++ {
 					usr := testutil.NewUserDoc()
 					docs = append(docs, usr)
@@ -505,7 +505,7 @@ func TestAggregate(t *testing.T) {
 		assert.Nil(t, testutil.TestDB(func(ctx context.Context, db *gokvkit.DB) {
 			var usrs model.Documents
 			ageSum := map[string]float64{}
-			assert.Nil(t, db.Tx(ctx, func(ctx context.Context, tx gokvkit.Tx) error {
+			assert.Nil(t, db.Tx(ctx, true, false, func(ctx context.Context, tx gokvkit.Tx) error {
 				for i := 0; i < 10; i++ {
 					u := testutil.NewUserDoc()
 					ageSum[u.GetString("account_id")] += u.GetFloat("age")

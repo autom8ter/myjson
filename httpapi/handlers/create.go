@@ -25,7 +25,7 @@ func CreateDocHandler(o api.OpenAPIServer) http.HandlerFunc {
 			httpError.Error(w, errors.Wrap(err, errors.Validation, "failed to decode query"))
 			return
 		}
-		if err := o.DB().Tx(r.Context(), func(ctx context.Context, tx gokvkit.Tx) error {
+		if err := o.DB().Tx(r.Context(), true, false, func(ctx context.Context, tx gokvkit.Tx) error {
 			id, err := tx.Create(ctx, collection, doc)
 			if err != nil {
 				return err

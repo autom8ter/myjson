@@ -19,7 +19,7 @@ func DeleteDocHandler(o api.OpenAPIServer) http.HandlerFunc {
 			return
 		}
 		docID := chi.URLParam(r, "docID")
-		if err := o.DB().Tx(r.Context(), func(ctx context.Context, tx gokvkit.Tx) error {
+		if err := o.DB().Tx(r.Context(), true, false, func(ctx context.Context, tx gokvkit.Tx) error {
 			err := tx.Delete(ctx, collection, docID)
 			if err != nil {
 				return err
