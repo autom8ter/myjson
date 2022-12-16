@@ -6,8 +6,8 @@ type DB interface {
 	Tx(isUpdate bool, fn func(Tx) error) error
 	// NewTx creates a new database transaction.
 	NewTx(isUpdate bool) Tx
-	// Batch returns a batch kv writer
-	Batch() Batch
+	// NewBatch returns a batch kv writer
+	NewBatch() Batch
 	// Close closes the key value database
 	Close() error
 }
@@ -26,10 +26,8 @@ type IterOpts struct {
 type Tx interface {
 	// Getter gets the specified key in the database(if it exists)
 	Getter
-	// Setter sets specified key/value in the database
-	Setter
-	// Deleter deletes specified key from the database
-	Deleter
+	// Mutator executes mutations against the database
+	Mutator
 	// NewIterator creates a new iterator
 	NewIterator(opts IterOpts) Iterator
 	// Commit commits the transaction
@@ -77,7 +75,9 @@ type Deleter interface {
 
 // Mutator executes mutations against the database
 type Mutator interface {
+	// Setter sets specified key/value in the database
 	Setter
+	// Deleter deletes specified keys from the database
 	Deleter
 }
 
@@ -85,10 +85,8 @@ type Mutator interface {
 type Batch interface {
 	// Flush flushes the batch to the database - it should be called after all Set(s)/Delete(s)
 	Flush() error
-	// Setter sets specified key/value in the database
-	Setter
-	// Deleter deletes specified keys from the database
-	Deleter
+	// Mutator executes mutations against the database
+	Mutator
 }
 
 // KVConfig configures a key value database from the given provider

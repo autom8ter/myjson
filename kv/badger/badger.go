@@ -47,7 +47,7 @@ func (b *badgerKV) NewTx(isUpdate bool) kv.Tx {
 	return &badgerTx{txn: b.db.NewTransaction(isUpdate)}
 }
 
-func (b *badgerKV) Batch() kv.Batch {
+func (b *badgerKV) NewBatch() kv.Batch {
 	return &badgerBatch{batch: b.db.NewWriteBatch()}
 }
 

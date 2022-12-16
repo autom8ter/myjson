@@ -2,9 +2,10 @@ package badger
 
 import (
 	"fmt"
+	"testing"
+
 	"github.com/autom8ter/gokvkit/kv"
 	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 func Test(t *testing.T) {
@@ -34,7 +35,7 @@ func Test(t *testing.T) {
 		}))
 	})
 	t.Run("batch", func(t *testing.T) {
-		batch := db.Batch()
+		batch := db.NewBatch()
 		for k, v := range data {
 			assert.Nil(t, batch.Set([]byte(k), []byte(v)))
 		}
@@ -81,12 +82,12 @@ func Test(t *testing.T) {
 		}))
 	})
 	t.Run("batch set then delete", func(t *testing.T) {
-		batch := db.Batch()
+		batch := db.NewBatch()
 		for k, v := range data {
 			assert.Nil(t, batch.Set([]byte(k), []byte(v)))
 		}
 		assert.Nil(t, batch.Flush())
-		batch2 := db.Batch()
+		batch2 := db.NewBatch()
 		for k, _ := range data {
 			assert.Nil(t, batch2.Delete([]byte(k)))
 		}
