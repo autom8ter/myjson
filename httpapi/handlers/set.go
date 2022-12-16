@@ -30,7 +30,7 @@ func SetDocHandler(o api.OpenAPIServer) http.HandlerFunc {
 			httpError.Error(w, errors.New(errors.Validation, "bad id: %s", docID))
 			return
 		}
-		if err := o.DB().Tx(r.Context(), true, false, func(ctx context.Context, tx gokvkit.Tx) error {
+		if err := o.DB().Tx(r.Context(), true, func(ctx context.Context, tx gokvkit.Tx) error {
 			err := tx.Set(ctx, collection, doc)
 			if err != nil {
 				return err

@@ -25,7 +25,7 @@ func BatchSetHandler(o api.OpenAPIServer) http.HandlerFunc {
 			httpError.Error(w, errors.Wrap(err, errors.Validation, "failed to decode query"))
 			return
 		}
-		if err := o.DB().Tx(r.Context(), true, true, func(ctx context.Context, tx gokvkit.Tx) error {
+		if err := o.DB().Tx(r.Context(), true, func(ctx context.Context, tx gokvkit.Tx) error {
 			for _, d := range docs {
 				if err := tx.Set(ctx, collection, d); err != nil {
 					return err

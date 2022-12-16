@@ -9,7 +9,6 @@ import (
 	"github.com/autom8ter/gokvkit/httpapi/httpError"
 	"github.com/autom8ter/gokvkit/model"
 	"github.com/gorilla/websocket"
-	"github.com/spf13/cast"
 )
 
 type TxAction string
@@ -47,7 +46,7 @@ func TxHandler(o api.OpenAPIServer, upgrader websocket.Upgrader) http.HandlerFun
 
 		ctx, cancel := context.WithCancel(r.Context())
 		defer cancel()
-		tx := o.DB().NewTx(true, cast.ToBool(r.URL.Query().Get("isBatch")))
+		tx := o.DB().NewTx(true)
 		for {
 			select {
 			case <-ctx.Done():

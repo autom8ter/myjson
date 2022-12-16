@@ -84,7 +84,7 @@ func cascadeDelete(ctx context.Context, tx gokvkit.Tx, command *model.Command) e
 func setupDatabase(ctx context.Context, db *gokvkit.DB) error {
 	fmt.Println("seeding database")
 	for i := 0; i < 1000; i++ {
-		if err := db.Tx(context.Background(), true, true, func(ctx context.Context, tx gokvkit.Tx) error {
+		if err := db.Tx(context.Background(), true, func(ctx context.Context, tx gokvkit.Tx) error {
 			id, err := tx.Create(ctx, "user", testutil.NewUserDoc())
 			if err != nil {
 				return err

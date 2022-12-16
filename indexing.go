@@ -26,7 +26,7 @@ func (d *DB) addIndex(ctx context.Context, collection string, index model.Index)
 	meta.Set(string(internalKey), true)
 	meta.Set(string(isIndexingKey), true)
 	if !index.Primary {
-		if err := d.Tx(ctx, true, true, func(ctx context.Context, tx Tx) error {
+		if err := d.Tx(ctx, true, func(ctx context.Context, tx Tx) error {
 			_, err := d.Scan(meta.ToContext(ctx), model.Scan{
 				From:  collection,
 				Where: nil,
@@ -61,7 +61,7 @@ func (d *DB) removeIndex(ctx context.Context, collection string, index model.Ind
 	meta.Set(string(internalKey), true)
 	meta.Set(string(isIndexingKey), true)
 
-	if err := d.Tx(ctx, true, true, func(ctx context.Context, tx Tx) error {
+	if err := d.Tx(ctx, true, func(ctx context.Context, tx Tx) error {
 		_, err := d.queryScan(ctx, model.Scan{
 			From: collection,
 		}, func(doc *model.Document) (bool, error) {
