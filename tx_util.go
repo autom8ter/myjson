@@ -94,7 +94,7 @@ func (t *transaction) persistCommand(ctx context.Context, md *model.Metadata, co
 		}
 		return nil
 	}
-	if err := t.db.applyPersistHooks(ctx, t, command, true); err != nil {
+	if err := t.applyPersistHooks(ctx, t, command, true); err != nil {
 		return err
 	}
 	c := t.db.collections.Get(command.Collection)
@@ -139,7 +139,7 @@ func (t *transaction) persistCommand(ctx context.Context, md *model.Metadata, co
 			return errors.Wrap(err, errors.Internal, "")
 		}
 	}
-	if err := t.db.applyPersistHooks(ctx, t, command, false); err != nil {
+	if err := t.applyPersistHooks(ctx, t, command, false); err != nil {
 		return err
 	}
 	return nil
@@ -210,4 +210,105 @@ func (t *transaction) updateSecondaryIndex(ctx context.Context, idx model.Index,
 		}
 	}
 	return nil
+}
+
+func (t *transaction) applyWhereHooks(ctx context.Context, collection string, where []model.Where) ([]model.Where, error) {
+	var err error
+	for _, whereHook := range t.db.whereHooks.Get(collection) {
+		where, err = whereHook.Func(ctx, t, where)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return where, nil
+}
+
+func (t *transaction) applyReadHooks(ctx context.Context, collection string, doc *model.Document) (*model.Document, error) {
+	var err error
+	for _, readHook := range t.db.readHooks.Get(collection) {
+		doc, err = readHook.Func(ctx, t, doc)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return doc, nil
+}
+
+func (t *transaction) applyPersistHooks(ctx context.Context, tx Tx, command *model.Command, before bool) error {
+	for _, sideEffect := range t.db.persistHooks.Get(command.Collection) {
+		if sideEffect.Before == before {
+			if err := sideEffect.Func(ctx, tx, command); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func (t *transaction) queryScan(ctx context.Context, scan model.Scan, handlerFunc model.ScanFunc) (model.OptimizerResult, error) {
+	if handlerFunc == nil {
+		return model.OptimizerResult{}, errors.New(errors.Validation, "empty scan handler")
+	}
+	var err error
+	scan.Where, err = t.applyWhereHooks(ctx, scan.From, scan.Where)
+	if err != nil {
+		return model.OptimizerResult{}, err
+	}
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	index, err := t.db.optimizer.Optimize(t.db.getReadyIndexes(ctx, scan.From), scan.Where)
+	if err != nil {
+		return model.OptimizerResult{}, err
+	}
+
+	pfx := index.Ref.SeekPrefix(index.Values)
+	opts := kv.IterOpts{
+		Prefix:  pfx.Path(),
+		Seek:    nil,
+		Reverse: false,
+	}
+	it := t.tx.NewIterator(opts)
+	defer it.Close()
+	for it.Valid() {
+		item := it.Item()
+
+		var document *model.Document
+		if index.IsPrimaryIndex {
+			bits, err := item.Value()
+			if err != nil {
+				return index, err
+			}
+			document, err = model.NewDocumentFromBytes(bits)
+			if err != nil {
+				return index, err
+			}
+		} else {
+			split := bytes.Split(item.Key(), []byte("\x00"))
+			id := split[len(split)-1]
+			document, err = t.Get(ctx, scan.From, string(id))
+			if err != nil {
+				return index, err
+			}
+		}
+
+		pass, err := document.Where(scan.Where)
+		if err != nil {
+			return index, err
+		}
+		if pass {
+			document, err = t.applyReadHooks(ctx, scan.From, document)
+			if err != nil {
+				return index, err
+			}
+			shouldContinue, err := handlerFunc(document)
+			if err != nil {
+				return index, err
+			}
+			if !shouldContinue {
+				return index, err
+			}
+		}
+		it.Next()
+	}
+	return index, nil
 }

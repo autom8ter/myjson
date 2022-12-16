@@ -14,13 +14,14 @@ import (
 )
 
 type collectionSchema struct {
-	yamlRaw    []byte
-	collection string
-	indexing   map[string]model.Index
-	required   []string
-	properties map[string]any
-	schema     *jsonschema.Schema
-	raw        gjson.Result
+	yamlRaw      []byte
+	collection   string
+	indexing     map[string]model.Index
+	required     []string
+	properties   map[string]any
+	requireIndex bool
+	schema       *jsonschema.Schema
+	raw          gjson.Result
 }
 
 type schemaPath string
@@ -28,6 +29,7 @@ type schemaPath string
 const (
 	collectionPath schemaPath = "x-collection"
 	indexingPath   schemaPath = "x-indexing"
+	requireIndex   schemaPath = "x-require-index"
 )
 
 func newCollectionSchema(schemaContent []byte) (*collectionSchema, error) {
@@ -73,6 +75,7 @@ func newCollectionSchema(schemaContent []byte) (*collectionSchema, error) {
 	if ok {
 		c.required = cast.ToStringSlice(required)
 	}
+	c.requireIndex = r.Get(string(requireIndex)).Bool()
 	return c, nil
 }
 

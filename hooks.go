@@ -31,7 +31,7 @@ func (v OnPersist) Valid() error {
 // OnWhere is a hook function triggered before queries/scans are executed. They may be used for a varietey of purposes (ex: query authorization hooks)
 type OnWhere struct {
 	Name string
-	Func func(ctx context.Context, db *DB, where []model.Where) ([]model.Where, error)
+	Func func(ctx context.Context, tx Tx, where []model.Where) ([]model.Where, error)
 }
 
 // Valid returns nil if the hook is valid
@@ -48,7 +48,7 @@ func (v OnWhere) Valid() error {
 // OnRead is a hook function triggered on each passing result of a read-based request
 type OnRead struct {
 	Name string
-	Func func(ctx context.Context, db *DB, document *model.Document) (*model.Document, error)
+	Func func(ctx context.Context, tx Tx, document *model.Document) (*model.Document, error)
 }
 
 // Valid returns nil if the hook is valid

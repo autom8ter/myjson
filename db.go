@@ -3,16 +3,13 @@ package gokvkit
 import (
 	"context"
 	_ "embed"
-	"time"
 
 	"github.com/autom8ter/gokvkit/errors"
 	"github.com/autom8ter/gokvkit/internal/safe"
-	"github.com/autom8ter/gokvkit/internal/util"
 	"github.com/autom8ter/gokvkit/kv"
 	"github.com/autom8ter/gokvkit/kv/registry"
 	"github.com/autom8ter/gokvkit/model"
 	"github.com/autom8ter/machine/v4"
-	"github.com/samber/lo"
 )
 
 // KVConfig configures a key value database from the given provider
@@ -120,43 +117,21 @@ func (d *DB) Get(ctx context.Context, collection, id string) (*model.Document, e
 		document *model.Document
 		err      error
 	)
-	primaryIndex := d.primaryIndex(collection)
-	if err := d.kv.Tx(false, func(txn kv.Tx) error {
-		val, err := txn.Get(primaryIndex.SeekPrefix(map[string]any{
-			d.PrimaryKey(collection): id,
-		}).SetDocumentID(id).Path())
-		if err != nil {
-			return err
-		}
-		document, err = model.NewDocumentFromBytes(val)
-		if err != nil {
-			return err
-		}
-		return nil
+	if err := d.Tx(ctx, false, func(ctx context.Context, tx Tx) error {
+		document, err = tx.Get(ctx, collection, id)
+		return err
 	}); err != nil {
 		return nil, err
 	}
-	document, err = d.applyReadHooks(ctx, collection, document)
-	if err != nil {
-		return document, err
-	}
-	return document, nil
+	return document, err
 }
 
 // Get gets 1-many document by id(s)
 func (d *DB) BatchGet(ctx context.Context, collection string, ids []string) (model.Documents, error) {
 	var documents []*model.Document
-	primaryIndex := d.primaryIndex(collection)
-	if err := d.kv.Tx(false, func(txn kv.Tx) error {
+	if err := d.Tx(ctx, false, func(ctx context.Context, tx Tx) error {
 		for _, id := range ids {
-			value, err := txn.Get(primaryIndex.SeekPrefix(map[string]any{
-				d.PrimaryKey(collection): id,
-			}).SetDocumentID(id).Path())
-			if err != nil {
-				return err
-			}
-
-			document, err := model.NewDocumentFromBytes(value)
+			document, err := tx.Get(ctx, collection, id)
 			if err != nil {
 				return err
 			}
@@ -164,129 +139,41 @@ func (d *DB) BatchGet(ctx context.Context, collection string, ids []string) (mod
 		}
 		return nil
 	}); err != nil {
-		return documents, err
+		return nil, err
 	}
 	return documents, nil
 }
 
-// aggregate performs aggregations against the collection
-func (d *DB) aggregate(ctx context.Context, collection string, query model.Query) (model.Page, error) {
-	if !d.HasCollection(collection) {
-		return model.Page{}, errors.New(errors.Validation, "unsupported collection: %s", collection)
-	}
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-	now := time.Now()
-	var results model.Documents
-	match, err := d.queryScan(ctx, model.Scan{
-		From:  collection,
-		Where: query.Where,
-	}, func(d *model.Document) (bool, error) {
-		results = append(results, d)
-		return true, nil
-	})
-	if err != nil {
-		return model.Page{}, err
-	}
-	var reduced model.Documents
-	for _, values := range model.GroupByDocs(results, query.GroupBy) {
-		value, err := model.AggregateDocs(values, query.Select)
-		if err != nil {
-			return model.Page{}, err
-		}
-		reduced = append(reduced, value)
-	}
-	reduced = model.OrderByDocs(reduced, query.OrderBy)
-	if (!util.IsNil(query.Limit) && *query.Limit > 0) && (!util.IsNil(query.Limit) && *query.Page > 0) {
-		reduced = lo.Slice(reduced, *query.Limit**query.Page, (*query.Limit**query.Page)+*query.Limit)
-	}
-	if !util.IsNil(query.Limit) && *query.Limit > 0 && len(reduced) > *query.Limit {
-		reduced = reduced[:*query.Limit]
-	}
-	if query.Page == nil {
-		query.Page = util.ToPtr(0)
-	}
-	return model.Page{
-		Documents: reduced,
-		NextPage:  *query.Page + 1,
-		Count:     len(reduced),
-		Stats: model.PageStats{
-			ExecutionTime:   time.Since(now),
-			OptimizerResult: match,
-		},
-	}, nil
-}
-
 // Query queries a list of documents
 func (d *DB) Query(ctx context.Context, collection string, query model.Query) (model.Page, error) {
-	if err := query.Validate(ctx); err != nil {
+	var (
+		page model.Page
+		err  error
+	)
+	if err := d.Tx(ctx, false, func(ctx context.Context, tx Tx) error {
+		page, err = tx.Query(ctx, collection, query)
+		return err
+	}); err != nil {
 		return model.Page{}, err
 	}
-	if query.IsAggregate() {
-		return d.aggregate(ctx, collection, query)
-	}
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-	now := time.Now()
-
-	if !d.HasCollection(collection) {
-		return model.Page{}, errors.New(errors.Validation, "unsupported collection: %s", collection)
-	}
-	var results model.Documents
-	fullScan := true
-	match, err := d.queryScan(ctx, model.Scan{
-		From:  collection,
-		Where: query.Where,
-	}, func(d *model.Document) (bool, error) {
-		results = append(results, d)
-		if query.Page != nil && *query.Page == 0 && len(query.OrderBy) == 0 && *query.Limit > 0 && len(results) >= *query.Limit {
-			fullScan = false
-			return false, nil
-		}
-		return true, nil
-	})
-	if err != nil {
-		return model.Page{}, err
-	}
-	results = model.OrderByDocs(results, query.OrderBy)
-
-	if fullScan && !util.IsNil(query.Limit) && !util.IsNil(query.Page) && *query.Limit > 0 && *query.Page > 0 {
-		results = lo.Slice(results, *query.Limit**query.Page, (*query.Limit**query.Page)+*query.Limit)
-	}
-	if !util.IsNil(query.Limit) && *query.Limit > 0 && len(results) > *query.Limit {
-		results = results[:*query.Limit]
-	}
-
-	if len(query.Select) > 0 && query.Select[0].Field != "*" {
-		for _, result := range results {
-			err := result.Select(query.Select)
-			if err != nil {
-				return model.Page{}, err
-			}
-		}
-	}
-	if query.Page == nil {
-		query.Page = util.ToPtr(0)
-	}
-	return model.Page{
-		Documents: results,
-		NextPage:  *query.Page + 1,
-		Count:     len(results),
-		Stats: model.PageStats{
-			ExecutionTime:   time.Since(now),
-			OptimizerResult: match,
-		},
-	}, nil
+	return page, nil
 }
 
 // Scan scans the optimal index for a collection's documents passing its filters.
 // results will not be ordered unless an index supporting the order by(s) was found by the optimizer
 // Query should be used when order is more important than performance/resource-usage
 func (d *DB) Scan(ctx context.Context, scan model.Scan, handlerFunc model.ScanFunc) (model.OptimizerResult, error) {
-	if !d.HasCollection(scan.From) {
-		return model.OptimizerResult{}, errors.New(errors.Validation, "unsupported collection: %s", scan.From)
+	var (
+		result model.OptimizerResult
+		err    error
+	)
+	if err := d.Tx(ctx, false, func(ctx context.Context, tx Tx) error {
+		result, err = tx.Scan(ctx, scan, handlerFunc)
+		return err
+	}); err != nil {
+		return result, err
 	}
-	return d.queryScan(ctx, scan, handlerFunc)
+	return result, nil
 }
 
 // Close closes the database

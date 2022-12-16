@@ -62,7 +62,7 @@ func (d *DB) removeIndex(ctx context.Context, collection string, index model.Ind
 	meta.Set(string(isIndexingKey), true)
 
 	if err := d.Tx(ctx, true, func(ctx context.Context, tx Tx) error {
-		_, err := d.queryScan(ctx, model.Scan{
+		_, err := tx.Scan(ctx, model.Scan{
 			From: collection,
 		}, func(doc *model.Document) (bool, error) {
 			if err := tx.Delete(meta.ToContext(ctx), collection, doc.GetString(d.PrimaryKey(collection))); err != nil {
