@@ -30,12 +30,18 @@ func (m *Map[T]) Exists(key string) bool {
 func (m *Map[T]) Set(key string, value T) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	if m.data == nil {
+		m.data = map[string]T{}
+	}
 	m.data[key] = value
 }
 
 func (m *Map[T]) SetFunc(key string, fn func(T) T) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	if m.data == nil {
+		m.data = map[string]T{}
+	}
 	m.data[key] = fn(m.data[key])
 }
 
@@ -45,19 +51,9 @@ func (m *Map[T]) Del(key string) {
 	delete(m.data, key)
 }
 
-func (m *Map[T]) RangeR(fn func(key string, t T) bool) {
+func (m *Map[T]) Range(fn func(key string, t T) bool) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	for key, m := range m.data {
-		if !fn(key, m) {
-			break
-		}
-	}
-}
-
-func (m *Map[T]) RangeW(fn func(key string, t T) bool) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
 	for key, m := range m.data {
 		if !fn(key, m) {
 			break

@@ -12,7 +12,18 @@ import (
 	"github.com/segmentio/ksuid"
 )
 
-// Tx is a database transaction interface
+// Txn is a database transaction interface - it holds the methods used while using a transaction + commit,rollback,and close functionality
+type Txn interface {
+	// Commit commits the transaction to the database
+	Commit(ctx context.Context) error
+	// Rollback rollsback all changes made to the datbase
+	Rollback(ctx context.Context)
+	// Close closes the transaction - it should be deferred after
+	Close(ctx context.Context)
+	Tx
+}
+
+// Tx is a database transaction interface - it holds the methods used while using a transaction
 type Tx interface {
 	// Query executes a query against the database
 	Query(ctx context.Context, collection string, query model.Query) (model.Page, error)
@@ -26,11 +37,10 @@ type Tx interface {
 	Set(ctx context.Context, collection string, document *model.Document) error
 	// Delete deletes the specified key from the database
 	Delete(ctx context.Context, collection string, id string) error
+	// Scan scans the optimal index for a collection's documents passing its filters.
+	// results will not be ordered unless an index supporting the order by(s) was found by the optimizer
+	// Query should be used when order is more important than performance/resource-usage
 	Scan(ctx context.Context, scan model.Scan, handlerFunc model.ScanFunc) (model.OptimizerResult, error)
-	// Commit commits the transaction to the database
-	Commit(ctx context.Context) error
-	// Rollback rollsback all changes made to the datbase
-	Rollback(ctx context.Context)
 }
 
 // TxFunc is a function executed against a transaction - if the function returns an error, all changes will be rolled back.
@@ -263,12 +273,13 @@ func (t *transaction) aggregate(ctx context.Context, collection string, query mo
 	}, nil
 }
 
-// Scan scans the optimal index for a collection's documents passing its filters.
-// results will not be ordered unless an index supporting the order by(s) was found by the optimizer
-// Query should be used when order is more important than performance/resource-usage
 func (t *transaction) Scan(ctx context.Context, scan model.Scan, handlerFunc model.ScanFunc) (model.OptimizerResult, error) {
 	if !t.db.HasCollection(scan.From) {
 		return model.OptimizerResult{}, errors.New(errors.Validation, "unsupported collection: %s", scan.From)
 	}
 	return t.queryScan(ctx, scan, handlerFunc)
+}
+
+func (t *transaction) Close(ctx context.Context) {
+	t.tx.Close()
 }

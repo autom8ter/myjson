@@ -34,6 +34,8 @@ type Tx interface {
 	Commit() error
 	// Rollback rolls back any changes made by the transaction
 	Rollback()
+	// Close closes the transaction
+	Close()
 }
 
 // Getter gets the specified key in the database(if it exists)

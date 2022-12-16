@@ -48,3 +48,7 @@ func (b *badgerTx) Rollback() {
 func (b *badgerTx) Commit() error {
 	return b.txn.Commit()
 }
+
+func (b *badgerTx) Close() {
+	b.txn.Discard()
+}

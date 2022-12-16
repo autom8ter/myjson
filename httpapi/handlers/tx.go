@@ -43,7 +43,6 @@ func TxHandler(o api.OpenAPIServer, upgrader websocket.Upgrader) http.HandlerFun
 			httpError.Error(w, errors.Wrap(err, http.StatusBadRequest, "failed to upgrade socket tx request"))
 			return
 		}
-
 		ctx, cancel := context.WithCancel(r.Context())
 		defer cancel()
 		tx := o.DB().NewTx(true)

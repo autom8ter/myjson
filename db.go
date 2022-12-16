@@ -87,7 +87,7 @@ func New(ctx context.Context, cfg Config, opts ...DBOpt) (*DB, error) {
 }
 
 // NewTx returns a new transaction. a transaction must call Commit method in order to persist changes
-func (d *DB) NewTx(isUpdate bool) Tx {
+func (d *DB) NewTx(isUpdate bool) Txn {
 	return &transaction{
 		db:      d,
 		tx:      d.kv.NewTx(isUpdate),
@@ -100,6 +100,7 @@ func (d *DB) NewTx(isUpdate bool) Tx {
 // otherwise, the changes will be commited to the database
 func (d *DB) Tx(ctx context.Context, isUpdate bool, fn TxFunc) error {
 	tx := d.NewTx(isUpdate)
+	defer tx.Close(ctx)
 	err := fn(ctx, tx)
 	if err != nil {
 		tx.Rollback(ctx)

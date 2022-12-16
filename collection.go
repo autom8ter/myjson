@@ -85,7 +85,7 @@ func (d *DB) Indexes(collection string) map[string]model.Index {
 // Collections returns a list of collection names that are registered in the collection
 func (d *DB) Collections() []string {
 	var names []string
-	d.collections.RangeR(func(key string, c *collectionSchema) bool {
+	d.collections.Range(func(key string, c *collectionSchema) bool {
 		names = append(names, c.collection)
 		return true
 	})
