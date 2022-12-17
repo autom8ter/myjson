@@ -31,7 +31,7 @@ type DB struct {
 	config       Config
 	kv           kv.DB
 	machine      machine.Machine
-	collections  *safe.Map[*collectionSchema]
+	collections  *safe.Map[CollectionSchema]
 	optimizer    Optimizer
 	initHooks    *safe.Map[OnInit]
 	persistHooks *safe.Map[[]OnPersist]
@@ -60,7 +60,7 @@ func New(ctx context.Context, cfg Config, opts ...DBOpt) (*DB, error) {
 		config:       cfg,
 		kv:           db,
 		machine:      machine.New(),
-		collections:  safe.NewMap(map[string]*collectionSchema{}),
+		collections:  safe.NewMap(map[string]CollectionSchema{}),
 		optimizer:    defaultOptimizer{},
 		initHooks:    safe.NewMap(map[string]OnInit{}),
 		persistHooks: safe.NewMap(map[string][]OnPersist{}),
@@ -76,7 +76,7 @@ func New(ctx context.Context, cfg Config, opts ...DBOpt) (*DB, error) {
 		o(d)
 	}
 
-	d.initHooks.RangeR(func(key string, h OnInit) bool {
+	d.initHooks.Range(func(key string, h OnInit) bool {
 		if err = h.Func(ctx, d); err != nil {
 			return false
 		}
@@ -177,7 +177,95 @@ func (d *DB) Scan(ctx context.Context, scan model.Scan, handlerFunc model.ScanFu
 	return result, nil
 }
 
+// ConfigureCollection overwrites a single database collection configuration
+func (d *DB) ConfigureCollection(ctx context.Context, collectionSchemaBytes []byte) error {
+	meta, _ := model.GetMetadata(ctx)
+	meta.Set(string(isIndexingKey), true)
+	meta.Set(string(internalKey), true)
+	ctx = meta.ToContext(ctx)
+	collection, err := newCollectionSchema(collectionSchemaBytes)
+	if err != nil {
+		return err
+	}
+	for _, i := range collection.Indexing() {
+		i.Collection = collection.Collection()
+	}
+	var (
+		hasPrimary = 0
+	)
+	for _, v := range collection.Indexing() {
+		v.Collection = collection.Collection()
+		if v.Primary {
+			hasPrimary++
+		}
+	}
+	if hasPrimary > 1 {
+		return errors.New(errors.Validation, "%s: only a single primary index is supported", collection.Collection())
+	}
+	if hasPrimary == 0 {
+		return errors.New(errors.Validation, "%s: a primary index is required", collection.Collection())
+	}
+	if err := d.persistCollectionConfig(collection); err != nil {
+		return err
+	}
+
+	existing, _ := d.getPersistedCollection(collection.Collection())
+	var diff indexDiff
+	if existing == nil {
+		diff, err = getIndexDiff(collection.Indexing(), map[string]model.Index{})
+		if err != nil {
+			return err
+		}
+	} else {
+		diff, err = getIndexDiff(collection.Indexing(), existing.Indexing())
+		if err != nil {
+			return err
+		}
+	}
+	for _, update := range diff.toUpdate {
+		if err := d.removeIndex(ctx, collection.Collection(), update); err != nil {
+			return err
+		}
+		if err := d.addIndex(ctx, collection.Collection(), update); err != nil {
+			return err
+		}
+	}
+	for _, toDelete := range diff.toRemove {
+		if err := d.removeIndex(ctx, collection.Collection(), toDelete); err != nil {
+			return err
+		}
+	}
+	for _, toAdd := range diff.toAdd {
+		if err := d.addIndex(ctx, collection.Collection(), toAdd); err != nil {
+			return err
+		}
+	}
+	if err := d.persistCollectionConfig(collection); err != nil {
+		return err
+	}
+	return nil
+}
+
+// Collections returns a list of collection names that are registered in the collection
+func (d *DB) Collections() []string {
+	var names []string
+	d.collections.Range(func(key string, c CollectionSchema) bool {
+		names = append(names, c.Collection())
+		return true
+	})
+	return names
+}
+
+func (d *DB) HasCollection(collection string) bool {
+	return d.collections.Exists(collection)
+}
+
 // Close closes the database
 func (d *DB) Close(ctx context.Context) error {
 	return errors.Wrap(d.kv.Close(), 0, "")
+}
+
+// GetSchema gets a collection schema by name (if it exists)
+func (d *DB) GetSchema(collection string) CollectionSchema {
+	return d.collections.Get(collection)
 }

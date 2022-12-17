@@ -30,6 +30,7 @@ func Test(t *testing.T) {
 			)
 			assert.Nil(t, db.Tx(ctx, true, func(ctx context.Context, tx gokvkit.Tx) error {
 				id, err = tx.Create(ctx, "user", testutil.NewUserDoc())
+
 				return err
 			}))
 			u, err := db.Get(ctx, "user", id)

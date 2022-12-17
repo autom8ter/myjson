@@ -87,9 +87,11 @@ func (t *transaction) Create(ctx context.Context, collection string, document *m
 	if !t.db.HasCollection(collection) {
 		return "", errors.New(errors.Validation, "unsupported collection: %s", collection)
 	}
-	if t.db.GetPrimaryKey(collection, document) == "" {
-		id := ksuid.New().String()
-		err := t.db.SetPrimaryKey(collection, document, id)
+	var c = t.db.collections.Get(collection)
+	var id = c.GetPrimaryKey(document)
+	if id == "" {
+		id = ksuid.New().String()
+		err := c.SetPrimaryKey(document, id)
 		if err != nil {
 			return "", err
 		}
@@ -98,14 +100,14 @@ func (t *transaction) Create(ctx context.Context, collection string, document *m
 	if err := t.persistCommand(ctx, md, &model.Command{
 		Collection: collection,
 		Action:     model.Create,
-		DocID:      t.db.GetPrimaryKey(collection, document),
+		DocID:      id,
 		After:      document,
 		Timestamp:  time.Now(),
 		Metadata:   md,
 	}); err != nil {
 		return "", errors.Wrap(err, 0, "tx: failed to commit delete")
 	}
-	return t.db.GetPrimaryKey(collection, document), nil
+	return id, nil
 }
 
 func (t *transaction) Set(ctx context.Context, collection string, document *model.Document) error {
@@ -116,7 +118,7 @@ func (t *transaction) Set(ctx context.Context, collection string, document *mode
 	if err := t.persistCommand(ctx, md, &model.Command{
 		Collection: collection,
 		Action:     model.Set,
-		DocID:      t.db.GetPrimaryKey(collection, document),
+		DocID:      t.db.collections.Get(collection).GetPrimaryKey(document),
 		After:      document,
 		Timestamp:  time.Now(),
 		Metadata:   md,
@@ -205,11 +207,15 @@ func (t *transaction) Query(ctx context.Context, collection string, query model.
 }
 
 func (t *transaction) Get(ctx context.Context, collection string, id string) (*model.Document, error) {
+	if !t.db.HasCollection(collection) {
+		return nil, errors.New(errors.Validation, "unsupported collection: %s", collection)
+	}
 	md, _ := model.GetMetadata(ctx)
 	md.Set(string(txCtx), t.tx)
-	primaryIndex := t.db.primaryIndex(collection)
+	var c = t.db.collections.Get(collection)
+	primaryIndex := c.PrimaryIndex()
 	val, err := t.tx.Get(primaryIndex.SeekPrefix(map[string]any{
-		t.db.PrimaryKey(collection): id,
+		c.PrimaryKey(): id,
 	}).SetDocumentID(id).Path())
 	if err != nil {
 		return nil, err

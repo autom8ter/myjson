@@ -1,6 +1,8 @@
 package safe
 
-import "sync"
+import (
+	"sync"
+)
 
 // Map is a concurrency & type safe map
 type Map[T any] struct {
@@ -59,4 +61,13 @@ func (m *Map[T]) Range(fn func(key string, t T) bool) {
 			break
 		}
 	}
+}
+
+func (m *Map[T]) AsMap() map[string]T {
+	data := map[string]T{}
+	m.Range(func(key string, entry T) bool {
+		data[key] = entry
+		return true
+	})
+	return data
 }

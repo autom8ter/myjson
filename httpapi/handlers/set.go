@@ -26,7 +26,7 @@ func SetDocHandler(o api.OpenAPIServer) http.HandlerFunc {
 			httpError.Error(w, errors.Wrap(err, http.StatusBadRequest, "failed to decode update"))
 			return
 		}
-		if err := o.DB().SetPrimaryKey(collection, doc, docID); err != nil {
+		if err := o.DB().GetSchema(collection).SetPrimaryKey(doc, docID); err != nil {
 			httpError.Error(w, errors.New(errors.Validation, "bad id: %s", docID))
 			return
 		}

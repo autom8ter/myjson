@@ -20,7 +20,7 @@ func TestJSONSchema(t *testing.T) {
 	t.Run("json schema validation - success", func(t *testing.T) {
 		validator, err := newCollectionSchema([]byte(userSchema))
 		assert.Nil(t, err)
-		assert.Nil(t, validator.validateCommand(context.Background(), &model.Command{
+		assert.Nil(t, validator.ValidateCommand(context.Background(), &model.Command{
 			Collection: "user",
 			Action:     model.Set,
 			DocID:      "1",
@@ -31,11 +31,12 @@ func TestJSONSchema(t *testing.T) {
 	t.Run("json schema validation - fail", func(t *testing.T) {
 		validator, err := newCollectionSchema([]byte(taskSchema))
 		assert.Nil(t, err)
-		assert.NotNil(t, validator.validateCommand(context.Background(), &model.Command{
+		assert.NotNil(t, validator.ValidateCommand(context.Background(), &model.Command{
 			Action: model.Set,
 			DocID:  "",
 			Before: nil,
 			After:  newUserDoc(),
 		}))
 	})
+
 }

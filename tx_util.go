@@ -13,8 +13,8 @@ import (
 	"github.com/segmentio/ksuid"
 )
 
-func (t *transaction) updateDocument(ctx context.Context, c *collectionSchema, command *model.Command) error {
-	primaryIndex := t.db.primaryIndex(command.Collection)
+func (t *transaction) updateDocument(ctx context.Context, c CollectionSchema, command *model.Command) error {
+	primaryIndex := c.PrimaryIndex()
 	after := command.Before.Clone()
 	flattened, err := flat.Flatten(command.After.Value(), nil)
 	if err != nil {
@@ -25,43 +25,43 @@ func (t *transaction) updateDocument(ctx context.Context, c *collectionSchema, c
 		return err
 	}
 	command.After = after
-	if err := c.validateCommand(ctx, command); err != nil {
+	if err := c.ValidateCommand(ctx, command); err != nil {
 		return err
 	}
 	if err := t.tx.Set(primaryIndex.SeekPrefix(map[string]any{
-		t.db.PrimaryKey(command.Collection): command.DocID,
+		c.PrimaryKey(): command.DocID,
 	}).SetDocumentID(command.DocID).Path(), command.After.Bytes()); err != nil {
 		return errors.Wrap(err, errors.Internal, "failed to batch set documents to primary index")
 	}
 	return nil
 }
 
-func (t *transaction) deleteDocument(ctx context.Context, c *collectionSchema, command *model.Command) error {
-	if err := c.validateCommand(ctx, command); err != nil {
+func (t *transaction) deleteDocument(ctx context.Context, c CollectionSchema, command *model.Command) error {
+	if err := c.ValidateCommand(ctx, command); err != nil {
 		return err
 	}
-	primaryIndex := t.db.primaryIndex(command.Collection)
+	primaryIndex := c.PrimaryIndex()
 	if err := t.tx.Delete(primaryIndex.SeekPrefix(map[string]any{
-		t.db.PrimaryKey(command.Collection): command.DocID,
+		c.PrimaryKey(): command.DocID,
 	}).SetDocumentID(command.DocID).Path()); err != nil {
 		return errors.Wrap(err, 0, "failed to batch delete documents")
 	}
 	return nil
 }
 
-func (t *transaction) createDocument(ctx context.Context, c *collectionSchema, command *model.Command) error {
-	primaryIndex := t.db.primaryIndex(command.Collection)
+func (t *transaction) createDocument(ctx context.Context, c CollectionSchema, command *model.Command) error {
+	primaryIndex := c.PrimaryIndex()
 	if command.DocID == "" {
 		command.DocID = ksuid.New().String()
-		if err := t.db.SetPrimaryKey(command.Collection, command.After, command.DocID); err != nil {
+		if err := c.SetPrimaryKey(command.After, command.DocID); err != nil {
 			return err
 		}
 	}
-	if err := c.validateCommand(ctx, command); err != nil {
+	if err := c.ValidateCommand(ctx, command); err != nil {
 		return err
 	}
 	if err := t.tx.Set(primaryIndex.SeekPrefix(map[string]any{
-		t.db.PrimaryKey(command.Collection): command.DocID,
+		c.PrimaryKey(): command.DocID,
 	}).SetDocumentID(command.DocID).Path(), command.After.Bytes()); err != nil {
 		return errors.Wrap(err, errors.Internal, "failed to batch set documents to primary index")
 	}
@@ -69,13 +69,13 @@ func (t *transaction) createDocument(ctx context.Context, c *collectionSchema, c
 	return nil
 }
 
-func (t *transaction) setDocument(ctx context.Context, c *collectionSchema, command *model.Command) error {
-	if err := c.validateCommand(ctx, command); err != nil {
+func (t *transaction) setDocument(ctx context.Context, c CollectionSchema, command *model.Command) error {
+	if err := c.ValidateCommand(ctx, command); err != nil {
 		return err
 	}
-	primaryIndex := t.db.primaryIndex(command.Collection)
+	primaryIndex := c.PrimaryIndex()
 	if err := t.tx.Set(primaryIndex.SeekPrefix(map[string]any{
-		t.db.PrimaryKey(command.Collection): command.DocID,
+		c.PrimaryKey(): command.DocID,
 	}).SetDocumentID(command.DocID).Path(), command.After.Bytes()); err != nil {
 		return errors.Wrap(err, errors.Internal, "failed to batch set documents to primary index")
 	}
@@ -84,7 +84,7 @@ func (t *transaction) setDocument(ctx context.Context, c *collectionSchema, comm
 
 func (t *transaction) persistCommand(ctx context.Context, md *model.Metadata, command *model.Command) error {
 	if md.Exists(string(isIndexingKey)) {
-		for _, i := range t.db.collections.Get(command.Collection).indexing {
+		for _, i := range t.db.collections.Get(command.Collection).Indexing() {
 			if i.Primary {
 				continue
 			}
@@ -131,7 +131,7 @@ func (t *transaction) persistCommand(ctx context.Context, md *model.Metadata, co
 			return err
 		}
 	}
-	for _, i := range t.db.collections.Get(command.Collection).indexing {
+	for _, i := range t.db.collections.Get(command.Collection).Indexing() {
 		if i.Primary {
 			continue
 		}

@@ -3,96 +3,114 @@ package gokvkit
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/autom8ter/gokvkit/errors"
 	"github.com/autom8ter/gokvkit/internal/util"
 	"github.com/autom8ter/gokvkit/model"
 	"github.com/qri-io/jsonschema"
-	"github.com/spf13/cast"
 	"github.com/tidwall/gjson"
+	"github.com/tidwall/sjson"
 )
 
+type CollectionSchema interface {
+	Collection() string
+	ValidateCommand(ctx context.Context, command *model.Command) error
+	Indexing() map[string]model.Index
+	SetIndex(index model.Index) error
+	DelIndex(name string) error
+	PrimaryIndex() model.Index
+	PrimaryKey() string
+	GetPrimaryKey(doc *model.Document) string
+	SetPrimaryKey(doc *model.Document, id string) error
+	RequireQueryIndex() bool
+	Bytes() ([]byte, error)
+}
+
 type collectionSchema struct {
-	yamlRaw      []byte
-	collection   string
-	indexing     map[string]model.Index
-	required     []string
-	properties   map[string]any
-	requireIndex bool
 	schema       *jsonschema.Schema
 	raw          gjson.Result
+	primaryIndex model.Index
 }
 
 type schemaPath string
 
 const (
-	collectionPath schemaPath = "x-collection"
-	indexingPath   schemaPath = "x-indexing"
-	requireIndex   schemaPath = "x-require-index"
+	collectionPath   schemaPath = "x-collection"
+	indexingPath     schemaPath = "x-indexing"
+	requireIndexPath schemaPath = "x-require-index"
 )
 
-func newCollectionSchema(schemaContent []byte) (*collectionSchema, error) {
-	if len(schemaContent) == 0 {
+func newCollectionSchema(yamlContent []byte) (CollectionSchema, error) {
+	if len(yamlContent) == 0 {
 		return nil, errors.New(errors.Validation, "empty schema content")
 	}
 	var (
 		schema = &jsonschema.Schema{}
 	)
-	jsonContent, err := util.YAMLToJSON(schemaContent)
+	jsonContent, err := util.YAMLToJSON(yamlContent)
 	if err != nil {
 		return nil, err
 	}
 	if err := json.Unmarshal(jsonContent, schema); err != nil {
 		return nil, errors.Wrap(err, 0, "failed to decode json schema")
 	}
-
-	var c = &collectionSchema{
-		schema:  schema,
-		yamlRaw: schemaContent,
+	s := &collectionSchema{
+		schema: schema,
+		raw:    gjson.ParseBytes(jsonContent),
 	}
-	r := gjson.ParseBytes(jsonContent)
-
-	if !r.Get(string(collectionPath)).Exists() {
-		return nil, errors.New(errors.Validation, "schema does not have 'x-collection' property")
+	for _, index := range s.raw.Get(string(indexingPath)).Map() {
+		var i model.Index
+		util.Decode(index.Value(), &i)
+		if i.Primary {
+			s.primaryIndex = i
+			return s, nil
+		}
 	}
-	c.raw = r
-	if !r.Get("properties").Exists() {
-		return nil, errors.New(errors.Validation, "schema does not have 'properties' property")
+	if len(s.primaryIndex.Fields) == 0 {
+		return nil, errors.New(errors.Validation, "primary index is required")
 	}
-	if !r.Get(string(indexingPath)).Exists() {
-		return nil, errors.New(errors.Validation, "schema does not have 'properties' property")
-	}
-	c.collection = r.Get(string(collectionPath)).String()
-	if !r.Get(string(indexingPath)).IsObject() {
-		return nil, errors.New(errors.Validation, "'indexing' property must be an object")
-	}
-	if err := util.Decode(r.Get(string(indexingPath)).Value(), &c.indexing); err != nil {
-		return nil, err
-	}
-	c.properties = cast.ToStringMap(r.Get(string(collectionPath)).Value())
-	required, ok := r.Get("required").Value().([]any)
-	if ok {
-		c.required = cast.ToStringSlice(required)
-	}
-	c.requireIndex = r.Get(string(requireIndex)).Bool()
-	return c, nil
+	return s, nil
 }
 
-func (j *collectionSchema) MarshalJSON() ([]byte, error) {
-	return []byte(j.raw.Raw), nil
+func (c *collectionSchema) Bytes() ([]byte, error) {
+	return util.JSONToYAML([]byte(c.raw.Raw))
 }
 
-func (j *collectionSchema) UnmarshalJSON(bytes []byte) error {
-	n, err := newCollectionSchema(bytes)
+func (c *collectionSchema) Collection() string {
+	return c.raw.Get(string(collectionPath)).String()
+}
+
+func (c *collectionSchema) Indexing() map[string]model.Index {
+	data := map[string]model.Index{}
+	for _, index := range c.raw.Get(string(indexingPath)).Map() {
+		var i model.Index
+		util.Decode(index.Value(), &i)
+		data[i.Name] = i
+	}
+	return data
+}
+
+func (c *collectionSchema) SetIndex(index model.Index) error {
+	raw, err := sjson.Set(c.raw.Raw, fmt.Sprintf("%s.%s", string(indexingPath), index.Name), index)
 	if err != nil {
-		return err
+		return errors.Wrap(err, 0, "failed to set schema index: %s", index.Name)
 	}
-	*j = *n
+	c.raw = gjson.Parse(raw)
 	return nil
 }
 
-func (j *collectionSchema) validateCommand(ctx context.Context, command *model.Command) error {
+func (c *collectionSchema) DelIndex(name string) error {
+	raw, err := sjson.Delete(c.raw.Raw, fmt.Sprintf("%s.%s", string(indexingPath), name))
+	if err != nil {
+		return errors.Wrap(err, 0, "failed to delete schema index: %s", name)
+	}
+	c.raw = gjson.Parse(raw)
+	return nil
+}
+
+func (c *collectionSchema) ValidateCommand(ctx context.Context, command *model.Command) error {
 	if command.Metadata == nil {
 		md, _ := model.GetMetadata(ctx)
 		command.Metadata = md
@@ -106,7 +124,7 @@ func (j *collectionSchema) validateCommand(ctx context.Context, command *model.C
 	switch command.Action {
 	case model.Update, model.Create, model.Set:
 		if command.After != nil {
-			kerrs := j.schema.Validate(ctx, command.After.Value()).Errs
+			kerrs := c.schema.Validate(ctx, command.After.Value()).Errs
 			if kerrs != nil && len(*kerrs) > 0 {
 				return errors.New(errors.Validation, "%v", util.JSONString(*kerrs))
 			}
@@ -117,4 +135,37 @@ func (j *collectionSchema) validateCommand(ctx context.Context, command *model.C
 		}
 	}
 	return nil
+}
+
+// PrimaryKey returns the collections primary key
+func (c *collectionSchema) PrimaryKey() string {
+	fields := c.PrimaryIndex().Fields
+	if len(fields) == 0 {
+		return ""
+	}
+	return fields[0]
+}
+
+func (c *collectionSchema) Content() ([]byte, error) {
+	return util.JSONToYAML([]byte(c.raw.Raw))
+}
+
+func (c *collectionSchema) GetPrimaryKey(doc *model.Document) string {
+	if doc == nil {
+		return ""
+	}
+	return doc.GetString(c.PrimaryKey())
+}
+
+func (c *collectionSchema) SetPrimaryKey(doc *model.Document, id string) error {
+	pkey := c.PrimaryKey()
+	return errors.Wrap(doc.Set(pkey, id), 0, "failed to set primary key")
+}
+
+func (c *collectionSchema) RequireQueryIndex() bool {
+	return c.raw.Get(string(requireIndexPath)).Bool()
+}
+
+func (c *collectionSchema) PrimaryIndex() model.Index {
+	return c.primaryIndex
 }

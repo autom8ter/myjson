@@ -85,13 +85,11 @@ func (o *openAPIServer) Spec() ([]byte, error) {
 	var coll []map[string]interface{}
 	var collections = o.db.Collections()
 	for _, c := range collections {
-		schema, ok := o.db.CollectionSchema(c)
-		if ok {
-			coll = append(coll, map[string]interface{}{
-				"collection": c,
-				"schema":     string(schema),
-			})
-		}
+		schema, _ := o.db.GetSchema(c).Bytes()
+		coll = append(coll, map[string]interface{}{
+			"collection": c,
+			"schema":     string(schema),
+		})
 	}
 	buf := bytes.NewBuffer(nil)
 	err = t.Execute(buf, map[string]any{

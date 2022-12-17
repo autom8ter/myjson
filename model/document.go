@@ -134,7 +134,7 @@ func (d *Document) Get(field string) any {
 
 // GetString gets a string field value on the document. Get has GJSON syntax support and supports dot notation
 func (d *Document) GetString(field string) string {
-	return cast.ToString(d.result.Get(field).Value())
+	return d.result.Get(field).String()
 }
 
 // GetBool gets a bool field value on the document. GetBool has GJSON syntax support and supports dot notation

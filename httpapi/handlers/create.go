@@ -30,7 +30,7 @@ func CreateDocHandler(o api.OpenAPIServer) http.HandlerFunc {
 			if err != nil {
 				return err
 			}
-			if err := o.DB().SetPrimaryKey(collection, doc, id); err != nil {
+			if err := o.DB().GetSchema(collection).SetPrimaryKey(doc, id); err != nil {
 				return err
 			}
 			return nil

@@ -18,10 +18,14 @@ func (d *DB) addIndex(ctx context.Context, collection string, index model.Index)
 		index.Collection = collection
 	}
 	index.IsBuilding = true
-	d.collections.SetFunc(collection, func(c *collectionSchema) *collectionSchema {
-		c.indexing[index.Name] = index
+	var err error
+	d.collections.SetFunc(collection, func(c CollectionSchema) CollectionSchema {
+		err = c.SetIndex(index)
 		return c
 	})
+	if err != nil {
+		return err
+	}
 	meta, _ := model.GetMetadata(ctx)
 	meta.Set(string(internalKey), true)
 	meta.Set(string(isIndexingKey), true)
@@ -45,27 +49,31 @@ func (d *DB) addIndex(ctx context.Context, collection string, index model.Index)
 		}
 	}
 	index.IsBuilding = false
-	d.collections.SetFunc(collection, func(c *collectionSchema) *collectionSchema {
-		c.indexing[index.Name] = index
+	d.collections.SetFunc(collection, func(c CollectionSchema) CollectionSchema {
+		err = c.SetIndex(index)
 		return c
 	})
-	return nil
+	return err
 }
 
 func (d *DB) removeIndex(ctx context.Context, collection string, index model.Index) error {
-	d.collections.SetFunc(collection, func(c *collectionSchema) *collectionSchema {
-		delete(c.indexing, index.Name)
+	var err error
+	d.collections.SetFunc(collection, func(c CollectionSchema) CollectionSchema {
+		err = c.DelIndex(index.Name)
 		return c
 	})
+	if err != nil {
+		return err
+	}
 	meta, _ := model.GetMetadata(ctx)
 	meta.Set(string(internalKey), true)
 	meta.Set(string(isIndexingKey), true)
-
+	c := d.collections.Get(collection)
 	if err := d.Tx(ctx, true, func(ctx context.Context, tx Tx) error {
 		_, err := tx.Scan(ctx, model.Scan{
 			From: collection,
 		}, func(doc *model.Document) (bool, error) {
-			if err := tx.Delete(meta.ToContext(ctx), collection, doc.GetString(d.PrimaryKey(collection))); err != nil {
+			if err := tx.Delete(meta.ToContext(ctx), collection, c.GetPrimaryKey(doc)); err != nil {
 				return false, err
 			}
 			return true, nil
@@ -80,12 +88,13 @@ func (d *DB) removeIndex(ctx context.Context, collection string, index model.Ind
 	return nil
 }
 
-func (d *DB) persistCollectionConfig(val *collectionSchema) error {
-	if val.raw.Raw == "" {
-		return errors.New(errors.Validation, "empty collection content")
-	}
+func (d *DB) persistCollectionConfig(val CollectionSchema) error {
 	if err := d.kv.Tx(true, func(tx kv.Tx) error {
-		err := tx.Set([]byte(fmt.Sprintf("internal.collections.%s", val.collection)), val.yamlRaw)
+		bits, err := val.Bytes()
+		if err != nil {
+			return err
+		}
+		err = tx.Set([]byte(fmt.Sprintf("internal.collections.%s", val.Collection())), bits)
 		if err != nil {
 			return err
 		}
@@ -93,13 +102,13 @@ func (d *DB) persistCollectionConfig(val *collectionSchema) error {
 	}); err != nil {
 		return err
 	}
-	d.collections.Set(val.collection, val)
+	d.collections.Set(val.Collection(), val)
 	return nil
 }
 
-func (d *DB) getPersistedCollections() (*safe.Map[*collectionSchema], error) {
+func (d *DB) getPersistedCollections() (*safe.Map[CollectionSchema], error) {
 	var (
-		collections = safe.NewMap(map[string]*collectionSchema{})
+		collections = safe.NewMap(map[string]CollectionSchema{})
 	)
 	if err := d.kv.Tx(false, func(tx kv.Tx) error {
 		i := tx.NewIterator(kv.IterOpts{
@@ -118,10 +127,7 @@ func (d *DB) getPersistedCollections() (*safe.Map[*collectionSchema], error) {
 				if err != nil {
 					return err
 				}
-				if cfg.yamlRaw == nil {
-					return errors.New(errors.Validation, "empty collection yaml content")
-				}
-				collections.Set(cfg.collection, cfg)
+				collections.Set(cfg.Collection(), cfg)
 			}
 			i.Next()
 		}
@@ -132,8 +138,8 @@ func (d *DB) getPersistedCollections() (*safe.Map[*collectionSchema], error) {
 	return collections, nil
 }
 
-func (d *DB) getPersistedCollection(collection string) (*collectionSchema, error) {
-	var cfg *collectionSchema
+func (d *DB) getPersistedCollection(collection string) (CollectionSchema, error) {
+	var cfg CollectionSchema
 	if err := d.kv.Tx(false, func(tx kv.Tx) error {
 		bits, err := tx.Get([]byte(fmt.Sprintf("internal.collections.%s", collection)))
 		if err != nil {
