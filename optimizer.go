@@ -9,29 +9,40 @@ import (
 // Optimizer selects the best index from a set of indexes based on where clauses
 type Optimizer interface {
 	// Optimize selects the optimal index to use based on the given where clauses
-	Optimize(c CollectionSchema, where []model.Where) (model.OptimizerResult, error)
+	Optimize(c CollectionSchema, where []model.Where) (model.Optimization, error)
 }
 
 type defaultOptimizer struct{}
 
-func (o defaultOptimizer) Optimize(c CollectionSchema, where []model.Where) (model.OptimizerResult, error) {
+func (o defaultOptimizer) Optimize(c CollectionSchema, where []model.Where) (model.Optimization, error) {
+	if len(c.PrimaryIndex().Fields) == 0 {
+		return model.Optimization{}, errors.New(errors.Internal, "zero configured indexes")
+	}
 	indexes := c.Indexing()
 	if len(indexes) == 0 {
-		return model.OptimizerResult{}, errors.New(errors.Internal, "zero configured indexes")
+		return model.Optimization{}, errors.New(errors.Internal, "zero configured indexes")
 	}
-	values := indexableFields(where)
+	var defaultOptimization = model.Optimization{
+		Index:         c.PrimaryIndex(),
+		MatchedFields: []string{},
+		MatchedValues: map[string]any{},
+	}
+	if len(where) == 0 {
+		return defaultOptimization, nil
+	}
+	if c.PrimaryIndex().Fields[0] == where[0].Field && where[0].Op == model.WhereOpEq {
+		return model.Optimization{
+			Index:         c.PrimaryIndex(),
+			MatchedFields: []string{c.PrimaryKey()},
+			MatchedValues: getMatchedFieldValues([]string{c.PrimaryKey()}, where),
+		}, nil
+	}
 	var (
-		i = model.OptimizerResult{
-			Values: values,
-		}
-		primary model.Index
+		i = model.Optimization{}
 	)
 	for _, index := range indexes {
 		if len(index.Fields) == 0 {
 			continue
-		}
-		if index.Primary {
-			primary = index
 		}
 		var matchedFields []string
 		for i, field := range index.Fields {
@@ -44,32 +55,28 @@ func (o defaultOptimizer) Optimize(c CollectionSchema, where []model.Where) (mod
 		matchedFields = lo.Uniq(matchedFields)
 		if (len(matchedFields) > len(i.MatchedFields)) ||
 			(len(matchedFields) == len(i.MatchedFields)) {
-			i.Ref = index
+			i.Index = index
 			i.MatchedFields = matchedFields
-			i.IsPrimaryIndex = index.Primary
 		}
-
 	}
 	if len(i.MatchedFields) > 0 {
+		i.MatchedValues = getMatchedFieldValues(i.MatchedFields, where)
 		return i, nil
 	}
-	return model.OptimizerResult{
-		Ref:            primary,
-		MatchedFields:  []string{},
-		Values:         values,
-		IsPrimaryIndex: true,
-	}, nil
+	return defaultOptimization, nil
 }
 
-func indexableFields(where []model.Where) map[string]any {
+func getMatchedFieldValues(fields []string, where []model.Where) map[string]any {
 	var whereFields []string
 	var whereValues = map[string]any{}
-	for _, w := range where {
-		if w.Op != "==" && w.Op != model.WhereOpEq {
-			continue
+	for _, f := range fields {
+		for _, w := range where {
+			if w.Op != model.WhereOpEq || w.Field != f {
+				continue
+			}
+			whereFields = append(whereFields, w.Field)
+			whereValues[w.Field] = w.Value
 		}
-		whereFields = append(whereFields, w.Field)
-		whereValues[w.Field] = w.Value
 	}
 	return whereValues
 }

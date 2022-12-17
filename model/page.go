@@ -18,6 +18,16 @@ type Page struct {
 type PageStats struct {
 	// ExecutionTime is the execution time to get the page
 	ExecutionTime time.Duration `json:"execution_time"`
-	// OptimizerResult is the index that was used to get the page
-	OptimizerResult OptimizerResult `json:"index_match"`
+	// Optimization
+	Optimization Optimization `json:"optimization,omitempty"`
+}
+
+// Optimization
+type Optimization struct {
+	// Index is the index the query optimizer chose
+	Index Index `json:"index"`
+	// MatchedFields are the fields that matched the index
+	MatchedFields []string `json:"matched_fields"`
+	// MatchedValues are the values that were matched to the index
+	MatchedValues map[string]any `json:"matched_values"`
 }

@@ -98,35 +98,6 @@ func (d *Document) Clone() *Document {
 	return &Document{result: gjson.Parse(raw)}
 }
 
-// Select returns the document with only the selected fields populated
-func (d *Document) Select(fields []Select) error {
-	if len(fields) == 0 || fields[0].Field == "*" {
-		return nil
-	}
-	var (
-		selected = NewDocument()
-	)
-	patch := map[string]interface{}{}
-	for _, f := range fields {
-		if !util.IsNil(f.As) && *f.As == "" {
-			if !util.IsNil(f.Aggregate) {
-				f.As = util.ToPtr(defaultAs(*f.Aggregate, f.Field))
-			}
-		}
-		if f.As == nil {
-			patch[f.Field] = d.Get(f.Field)
-		} else {
-			patch[*f.As] = d.Get(f.Field)
-		}
-	}
-	err := selected.SetAll(patch)
-	if err != nil {
-		return err
-	}
-	d.result = selected.result
-	return nil
-}
-
 // Get gets a field on the document. Get has GJSON syntax support and supports dot notation
 func (d *Document) Get(field string) any {
 	return d.result.Get(field).Value()

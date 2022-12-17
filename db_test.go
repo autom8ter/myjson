@@ -263,7 +263,7 @@ func Benchmark(b *testing.B) {
 				})
 				assert.Nil(b, err)
 				assert.Equal(b, 1, len(results.Documents))
-				assert.Equal(b, "contact.email", results.Stats.OptimizerResult.MatchedFields[0])
+				assert.Equal(b, "contact.email", results.Stats.Optimization.MatchedFields[0])
 			}
 		}))
 	})
@@ -336,9 +336,8 @@ func TestIndexing1(t *testing.T) {
 			assert.Nil(t, err)
 			assert.Equal(t, 1, page.Count)
 			assert.Equal(t, page.Documents[0].Get("contact.email"), docs[0].Get("contact.email"))
-			assert.Equal(t, "contact.email", page.Stats.OptimizerResult.MatchedFields[0])
-			assert.Equal(t, false, page.Stats.OptimizerResult.IsPrimaryIndex)
-			assert.Equal(t, "contact.email", page.Stats.OptimizerResult.Ref.Fields[0])
+			assert.Equal(t, "contact.email", page.Stats.Optimization.MatchedFields[0])
+			assert.Equal(t, false, page.Stats.Optimization.Index.Primary)
 		}))
 		assert.Nil(t, testutil.TestDB(func(ctx context.Context, db *gokvkit.DB) {
 			var docs model.Documents
@@ -369,10 +368,9 @@ func TestIndexing1(t *testing.T) {
 			})
 			assert.Nil(t, err)
 			assert.Equal(t, 1, page.Count)
-			assert.Equal(t, "contact.email", page.Stats.OptimizerResult.MatchedFields[0])
+			assert.Equal(t, "contact.email", page.Stats.Optimization.MatchedFields[0])
 
-			assert.Equal(t, false, page.Stats.OptimizerResult.IsPrimaryIndex)
-			assert.Equal(t, "contact.email", page.Stats.OptimizerResult.Ref.Fields[0])
+			assert.Equal(t, false, page.Stats.Optimization.Index.Primary)
 		}))
 	})
 	t.Run("non-matching (name)", func(t *testing.T) {
@@ -406,9 +404,9 @@ func TestIndexing1(t *testing.T) {
 			assert.Nil(t, err)
 			assert.Equal(t, 1, page.Count)
 			assert.Equal(t, page.Documents[0].Get("name"), docs[0].Get("name"))
-			assert.Equal(t, []string{}, page.Stats.OptimizerResult.MatchedFields)
+			assert.Equal(t, []string{}, page.Stats.Optimization.MatchedFields)
 
-			assert.Equal(t, true, page.Stats.OptimizerResult.IsPrimaryIndex)
+			assert.Equal(t, true, page.Stats.Optimization.Index.Primary)
 		}))
 	})
 	t.Run("matching primary (_id)", func(t *testing.T) {
@@ -442,9 +440,9 @@ func TestIndexing1(t *testing.T) {
 			assert.Nil(t, err)
 			assert.Equal(t, 1, page.Count)
 			assert.Equal(t, page.Documents[0].Get("_id"), docs[0].Get("_id"))
-			assert.Equal(t, []string{"_id"}, page.Stats.OptimizerResult.MatchedFields)
+			assert.Equal(t, []string{"_id"}, page.Stats.Optimization.MatchedFields)
 
-			assert.Equal(t, true, page.Stats.OptimizerResult.IsPrimaryIndex)
+			assert.Equal(t, true, page.Stats.Optimization.Index.Primary)
 		}))
 		assert.Nil(t, testutil.TestDB(func(ctx context.Context, db *gokvkit.DB) {
 			var docs model.Documents
@@ -476,32 +474,15 @@ func TestIndexing1(t *testing.T) {
 			assert.Nil(t, err)
 			assert.Equal(t, 1, page.Count)
 			assert.Equal(t, page.Documents[0].Get("_id"), docs[0].Get("_id"))
-			assert.Equal(t, []string{}, page.Stats.OptimizerResult.MatchedFields)
+			assert.Equal(t, []string{}, page.Stats.Optimization.MatchedFields)
 
-			assert.Equal(t, true, page.Stats.OptimizerResult.IsPrimaryIndex)
+			assert.Equal(t, true, page.Stats.Optimization.Index.Primary)
 		}))
 	})
 }
 
 func TestAggregate(t *testing.T) {
-	t.Run("sum age", func(t *testing.T) {
-		var expected = float64(0)
-		var docs model.Documents
-		for i := 0; i < 5; i++ {
-			u := testutil.NewUserDoc()
-			expected += u.GetFloat("age")
-			docs = append(docs, u)
-		}
-		reduced, err := model.AggregateDocs(docs, []model.Select{
-			{
-				Field:     "age",
-				Aggregate: util.ToPtr(model.SelectAggregateSum),
-				As:        util.ToPtr("age_sum"),
-			},
-		})
-		assert.Nil(t, err)
-		assert.Equal(t, expected, reduced.GetFloat("age_sum"))
-	})
+
 	t.Run("sum advanced", func(t *testing.T) {
 		assert.Nil(t, testutil.TestDB(func(ctx context.Context, db *gokvkit.DB) {
 			var usrs model.Documents

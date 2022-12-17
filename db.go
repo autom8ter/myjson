@@ -163,9 +163,9 @@ func (d *DB) Query(ctx context.Context, collection string, query model.Query) (m
 // Scan scans the optimal index for a collection's documents passing its filters.
 // results will not be ordered unless an index supporting the order by(s) was found by the optimizer
 // Query should be used when order is more important than performance/resource-usage
-func (d *DB) Scan(ctx context.Context, scan model.Scan, handlerFunc model.ScanFunc) (model.OptimizerResult, error) {
+func (d *DB) Scan(ctx context.Context, scan model.Scan, handlerFunc model.ScanFunc) (model.Optimization, error) {
 	var (
-		result model.OptimizerResult
+		result model.Optimization
 		err    error
 	)
 	if err := d.Tx(ctx, false, func(ctx context.Context, tx Tx) error {

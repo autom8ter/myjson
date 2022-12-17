@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/autom8ter/gokvkit/errors"
+	"github.com/autom8ter/gokvkit/internal/indexing"
 	"github.com/autom8ter/gokvkit/internal/util"
 	"github.com/autom8ter/gokvkit/kv"
 	"github.com/autom8ter/gokvkit/model"
@@ -40,7 +41,7 @@ type Tx interface {
 	// Scan scans the optimal index for a collection's documents passing its filters.
 	// results will not be ordered unless an index supporting the order by(s) was found by the optimizer
 	// Query should be used when order is more important than performance/resource-usage
-	Scan(ctx context.Context, scan model.Scan, handlerFunc model.ScanFunc) (model.OptimizerResult, error)
+	Scan(ctx context.Context, scan model.Scan, handlerFunc model.ScanFunc) (model.Optimization, error)
 }
 
 // TxFunc is a function executed against a transaction - if the function returns an error, all changes will be rolled back.
@@ -175,7 +176,7 @@ func (t *transaction) Query(ctx context.Context, collection string, query model.
 	if err != nil {
 		return model.Page{}, err
 	}
-	results = model.OrderByDocs(results, query.OrderBy)
+	results = orderByDocs(results, query.OrderBy)
 
 	if fullScan && !util.IsNil(query.Limit) && !util.IsNil(query.Page) && *query.Limit > 0 && *query.Page > 0 {
 		results = lo.Slice(results, *query.Limit**query.Page, (*query.Limit**query.Page)+*query.Limit)
@@ -186,7 +187,7 @@ func (t *transaction) Query(ctx context.Context, collection string, query model.
 
 	if len(query.Select) > 0 && query.Select[0].Field != "*" {
 		for _, result := range results {
-			err := result.Select(query.Select)
+			err := selectDocument(result, query.Select)
 			if err != nil {
 				return model.Page{}, err
 			}
@@ -200,8 +201,8 @@ func (t *transaction) Query(ctx context.Context, collection string, query model.
 		NextPage:  *query.Page + 1,
 		Count:     len(results),
 		Stats: model.PageStats{
-			ExecutionTime:   time.Since(now),
-			OptimizerResult: match,
+			ExecutionTime: time.Since(now),
+			Optimization:  match,
 		},
 	}, nil
 }
@@ -214,7 +215,7 @@ func (t *transaction) Get(ctx context.Context, collection string, id string) (*m
 	md.Set(string(txCtx), t.tx)
 	var c = t.db.collections.Get(collection)
 	primaryIndex := c.PrimaryIndex()
-	val, err := t.tx.Get(primaryIndex.SeekPrefix(collection, map[string]any{
+	val, err := t.tx.Get(indexing.SeekPrefix(collection, primaryIndex, map[string]any{
 		c.PrimaryKey(): id,
 	}).SetDocumentID(id).Path())
 	if err != nil {
@@ -251,14 +252,14 @@ func (t *transaction) aggregate(ctx context.Context, collection string, query mo
 		return model.Page{}, err
 	}
 	var reduced model.Documents
-	for _, values := range model.GroupByDocs(results, query.GroupBy) {
-		value, err := model.AggregateDocs(values, query.Select)
+	for _, values := range groupByDocs(results, query.GroupBy) {
+		value, err := aggregateDocs(values, query.Select)
 		if err != nil {
 			return model.Page{}, err
 		}
 		reduced = append(reduced, value)
 	}
-	reduced = model.OrderByDocs(reduced, query.OrderBy)
+	reduced = orderByDocs(reduced, query.OrderBy)
 	if (!util.IsNil(query.Limit) && *query.Limit > 0) && (!util.IsNil(query.Limit) && *query.Page > 0) {
 		reduced = lo.Slice(reduced, *query.Limit**query.Page, (*query.Limit**query.Page)+*query.Limit)
 	}
@@ -273,15 +274,15 @@ func (t *transaction) aggregate(ctx context.Context, collection string, query mo
 		NextPage:  *query.Page + 1,
 		Count:     len(reduced),
 		Stats: model.PageStats{
-			ExecutionTime:   time.Since(now),
-			OptimizerResult: match,
+			ExecutionTime: time.Since(now),
+			Optimization:  match,
 		},
 	}, nil
 }
 
-func (t *transaction) Scan(ctx context.Context, scan model.Scan, handlerFunc model.ScanFunc) (model.OptimizerResult, error) {
+func (t *transaction) Scan(ctx context.Context, scan model.Scan, handlerFunc model.ScanFunc) (model.Optimization, error) {
 	if !t.db.HasCollection(scan.Collection) {
-		return model.OptimizerResult{}, errors.New(errors.Validation, "unsupported collection: %s", scan.Collection)
+		return model.Optimization{}, errors.New(errors.Validation, "unsupported collection: %s", scan.Collection)
 	}
 	return t.queryScan(ctx, scan, handlerFunc)
 }

@@ -88,14 +88,6 @@ func TestDocument(t *testing.T) {
 		assert.Nil(t, err)
 		assert.Equal(t, r.String(), string(n.Bytes()))
 	})
-	t.Run("select", func(t *testing.T) {
-		before := r.Get("contact.email")
-		err := r.Select([]model.Select{{Field: "contact.email"}})
-		assert.Nil(t, err)
-		after := r.Get("contact.email")
-		assert.Equal(t, before, after)
-		assert.Nil(t, r.Get("name"))
-	})
 	t.Run("set all", func(t *testing.T) {
 		c := r.Clone()
 		err = c.SetAll(map[string]any{
@@ -299,32 +291,7 @@ func TestDocument(t *testing.T) {
 		docs = docs.Slice(1, 3)
 		assert.Equal(t, 2, len(docs))
 	})
-	t.Run("documents - orderBy", func(t *testing.T) {
-		var docs model.Documents
-		for i := 0; i < 100; i++ {
-			doc := testutil.NewUserDoc()
-			assert.Nil(t, doc.Set("account_id", gofakeit.IntRange(1, 5)))
-			docs = append(docs, doc)
-		}
-		docs = model.OrderByDocs(docs, []model.OrderBy{
-			{
-				Field:     "account_id",
-				Direction: model.OrderByDirectionDesc,
-			},
-			{
-				Field:     "age",
-				Direction: model.OrderByDirectionDesc,
-			},
-		})
-		docs.ForEach(func(next *model.Document, i int) {
-			if len(docs) > i+1 {
-				assert.GreaterOrEqual(t, next.GetFloat("account_id"), docs[i+1].GetFloat("account_id"), i)
-				if next.GetFloat("account_id") == docs[i+1].GetFloat("account_id") {
-					assert.GreaterOrEqual(t, next.GetFloat("age"), docs[i+1].GetFloat("age"), i)
-				}
-			}
-		})
-	})
+
 }
 
 func BenchmarkDocument(b *testing.B) {

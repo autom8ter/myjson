@@ -1,4 +1,4 @@
-package gokvkit
+package indexing
 
 import (
 	"bytes"
@@ -19,7 +19,7 @@ func TestIndexing(t *testing.T) {
 		Primary: false,
 	}
 	u := newUserDoc()
-	prefix := i.SeekPrefix("user", u.Value())
+	prefix := SeekPrefix("user", *i, u.Value())
 	t.Log(string(prefix.Path()))
 	t.Run("fields", func(t *testing.T) {
 		fields := prefix.Fields()

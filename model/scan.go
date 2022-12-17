@@ -1,21 +1,5 @@
 package model
 
-import (
-	_ "embed"
-)
-
-// OptimizerResult is the output of a query optimizer
-type OptimizerResult struct {
-	// Ref is the matching index
-	Ref Index `json:"ref"`
-	// MatchedFields is the fields that match the index
-	MatchedFields []string `json:"matchedFields"`
-	// IsPrimaryIndex indicates whether the primary index was selected
-	IsPrimaryIndex bool `json:"isPrimaryIndex"`
-	// Values are the original values used to target the index
-	Values map[string]any `json:"values"`
-}
-
 // ScanFunc returns false to stop scanning and an error if one occurred
 type ScanFunc func(d *Document) (bool, error)
 
