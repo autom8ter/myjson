@@ -10,40 +10,20 @@ import (
 
 func TestOptimizer(t *testing.T) {
 	o := defaultOptimizer{}
-	indexes := map[string]model.Index{
-		"primary_idx": {
-			Collection: "testing",
-			Name:       "primary_idx",
-			Fields:     []string{"_id"},
-			Unique:     true,
-			Primary:    true,
-		},
-		"email_idx": {
-			Collection: "testing",
-			Name:       "email_idx",
-			Fields:     []string{"email"},
-			Unique:     true,
-			Primary:    false,
-		},
-		"account_language_idx": {
-			Collection: "testing",
-			Name:       "account_language_idx",
-			Fields:     []string{"account_id", "language"},
-			Unique:     false,
-			Primary:    false,
-		},
-	}
+	schema, err := newCollectionSchema([]byte(userSchema))
+	assert.Nil(t, err)
+	indexes := schema
 	t.Run("select secondary index", func(t *testing.T) {
 		i, err := o.Optimize(indexes, []model.Where{
 			{
-				Field: "email",
+				Field: "contact.email",
 				Op:    model.WhereOpEq,
 				Value: gofakeit.Email(),
 			},
 		})
 		assert.Nil(t, err)
 		assert.Equal(t, false, i.IsPrimaryIndex)
-		assert.Equal(t, "email", i.MatchedFields[0])
+		assert.Equal(t, "contact.email", i.MatchedFields[0])
 	})
 
 	t.Run("select primary index", func(t *testing.T) {
@@ -67,22 +47,22 @@ func TestOptimizer(t *testing.T) {
 				Value: 1,
 			},
 			{
-				Field: "language",
+				Field: "contact.email",
 				Op:    model.WhereOpEq,
-				Value: gofakeit.Language(),
+				Value: gofakeit.Email(),
 			},
 		})
 		assert.Nil(t, err)
 		assert.Equal(t, false, i.IsPrimaryIndex)
 		assert.Equal(t, "account_id", i.MatchedFields[0])
-		assert.Equal(t, "language", i.MatchedFields[1])
+		assert.Equal(t, "contact.email", i.MatchedFields[1])
 	})
-	t.Run("select secondary index (multi-field wrong order)", func(t *testing.T) {
+	t.Run("select secondary index 2", func(t *testing.T) {
 		i, err := o.Optimize(indexes, []model.Where{
 			{
-				Field: "language",
+				Field: "contact.email",
 				Op:    model.WhereOpEq,
-				Value: gofakeit.Language(),
+				Value: gofakeit.Email(),
 			},
 			{
 				Field: "account_id",
@@ -91,7 +71,8 @@ func TestOptimizer(t *testing.T) {
 			},
 		})
 		assert.Nil(t, err)
-		assert.Equal(t, true, i.IsPrimaryIndex)
+		assert.EqualValues(t, false, i.IsPrimaryIndex)
+		assert.Equal(t, "contact.email", i.MatchedFields[0])
 	})
 	t.Run("select secondary index (multi-field partial match)", func(t *testing.T) {
 		i, err := o.Optimize(indexes, []model.Where{

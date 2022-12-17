@@ -187,14 +187,10 @@ func (d *DB) ConfigureCollection(ctx context.Context, collectionSchemaBytes []by
 	if err != nil {
 		return err
 	}
-	for _, i := range collection.Indexing() {
-		i.Collection = collection.Collection()
-	}
 	var (
 		hasPrimary = 0
 	)
 	for _, v := range collection.Indexing() {
-		v.Collection = collection.Collection()
 		if v.Primary {
 			hasPrimary++
 		}

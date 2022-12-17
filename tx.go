@@ -162,8 +162,8 @@ func (t *transaction) Query(ctx context.Context, collection string, query model.
 	var results model.Documents
 	fullScan := true
 	match, err := t.queryScan(ctx, model.Scan{
-		From:  collection,
-		Where: query.Where,
+		Collection: collection,
+		Where:      query.Where,
 	}, func(d *model.Document) (bool, error) {
 		results = append(results, d)
 		if query.Page != nil && *query.Page == 0 && len(query.OrderBy) == 0 && *query.Limit > 0 && len(results) >= *query.Limit {
@@ -214,7 +214,7 @@ func (t *transaction) Get(ctx context.Context, collection string, id string) (*m
 	md.Set(string(txCtx), t.tx)
 	var c = t.db.collections.Get(collection)
 	primaryIndex := c.PrimaryIndex()
-	val, err := t.tx.Get(primaryIndex.SeekPrefix(map[string]any{
+	val, err := t.tx.Get(primaryIndex.SeekPrefix(collection, map[string]any{
 		c.PrimaryKey(): id,
 	}).SetDocumentID(id).Path())
 	if err != nil {
@@ -241,8 +241,8 @@ func (t *transaction) aggregate(ctx context.Context, collection string, query mo
 	now := time.Now()
 	var results model.Documents
 	match, err := t.queryScan(ctx, model.Scan{
-		From:  collection,
-		Where: query.Where,
+		Collection: collection,
+		Where:      query.Where,
 	}, func(d *model.Document) (bool, error) {
 		results = append(results, d)
 		return true, nil
@@ -280,8 +280,8 @@ func (t *transaction) aggregate(ctx context.Context, collection string, query mo
 }
 
 func (t *transaction) Scan(ctx context.Context, scan model.Scan, handlerFunc model.ScanFunc) (model.OptimizerResult, error) {
-	if !t.db.HasCollection(scan.From) {
-		return model.OptimizerResult{}, errors.New(errors.Validation, "unsupported collection: %s", scan.From)
+	if !t.db.HasCollection(scan.Collection) {
+		return model.OptimizerResult{}, errors.New(errors.Validation, "unsupported collection: %s", scan.Collection)
 	}
 	return t.queryScan(ctx, scan, handlerFunc)
 }

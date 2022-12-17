@@ -14,9 +14,6 @@ func (d *DB) addIndex(ctx context.Context, collection string, index model.Index)
 	if index.Name == "" {
 		return errors.New(errors.Validation, "%s - empty index name", collection)
 	}
-	if index.Collection == "" {
-		index.Collection = collection
-	}
 	index.IsBuilding = true
 	var err error
 	d.collections.SetFunc(collection, func(c CollectionSchema) CollectionSchema {
@@ -32,8 +29,8 @@ func (d *DB) addIndex(ctx context.Context, collection string, index model.Index)
 	if !index.Primary {
 		if err := d.Tx(ctx, true, func(ctx context.Context, tx Tx) error {
 			_, err := d.Scan(meta.ToContext(ctx), model.Scan{
-				From:  collection,
-				Where: nil,
+				Collection: collection,
+				Where:      nil,
 			}, func(doc *model.Document) (bool, error) {
 				if err := tx.Set(meta.ToContext(ctx), collection, doc); err != nil {
 					return false, err
@@ -71,7 +68,7 @@ func (d *DB) removeIndex(ctx context.Context, collection string, index model.Ind
 	c := d.collections.Get(collection)
 	if err := d.Tx(ctx, true, func(ctx context.Context, tx Tx) error {
 		_, err := tx.Scan(ctx, model.Scan{
-			From: collection,
+			Collection: collection,
 		}, func(doc *model.Document) (bool, error) {
 			if err := tx.Delete(meta.ToContext(ctx), collection, c.GetPrimaryKey(doc)); err != nil {
 				return false, err

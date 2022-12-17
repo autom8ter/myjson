@@ -13,14 +13,13 @@ import (
 
 func TestIndexing(t *testing.T) {
 	i := &model.Index{
-		Collection: "user",
-		Name:       "user_account_email_idx",
-		Fields:     []string{"account_id", "contact.email"},
-		Unique:     true,
-		Primary:    false,
+		Name:    "user_account_email_idx",
+		Fields:  []string{"account_id", "contact.email"},
+		Unique:  true,
+		Primary: false,
 	}
 	u := newUserDoc()
-	prefix := i.SeekPrefix(u.Value())
+	prefix := i.SeekPrefix("user", u.Value())
 	t.Log(string(prefix.Path()))
 	t.Run("fields", func(t *testing.T) {
 		fields := prefix.Fields()

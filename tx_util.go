@@ -28,7 +28,7 @@ func (t *transaction) updateDocument(ctx context.Context, c CollectionSchema, co
 	if err := c.ValidateCommand(ctx, command); err != nil {
 		return err
 	}
-	if err := t.tx.Set(primaryIndex.SeekPrefix(map[string]any{
+	if err := t.tx.Set(primaryIndex.SeekPrefix(c.Collection(), map[string]any{
 		c.PrimaryKey(): command.DocID,
 	}).SetDocumentID(command.DocID).Path(), command.After.Bytes()); err != nil {
 		return errors.Wrap(err, errors.Internal, "failed to batch set documents to primary index")
@@ -41,7 +41,7 @@ func (t *transaction) deleteDocument(ctx context.Context, c CollectionSchema, co
 		return err
 	}
 	primaryIndex := c.PrimaryIndex()
-	if err := t.tx.Delete(primaryIndex.SeekPrefix(map[string]any{
+	if err := t.tx.Delete(primaryIndex.SeekPrefix(c.Collection(), map[string]any{
 		c.PrimaryKey(): command.DocID,
 	}).SetDocumentID(command.DocID).Path()); err != nil {
 		return errors.Wrap(err, 0, "failed to batch delete documents")
@@ -60,7 +60,7 @@ func (t *transaction) createDocument(ctx context.Context, c CollectionSchema, co
 	if err := c.ValidateCommand(ctx, command); err != nil {
 		return err
 	}
-	if err := t.tx.Set(primaryIndex.SeekPrefix(map[string]any{
+	if err := t.tx.Set(primaryIndex.SeekPrefix(c.Collection(), map[string]any{
 		c.PrimaryKey(): command.DocID,
 	}).SetDocumentID(command.DocID).Path(), command.After.Bytes()); err != nil {
 		return errors.Wrap(err, errors.Internal, "failed to batch set documents to primary index")
@@ -74,7 +74,7 @@ func (t *transaction) setDocument(ctx context.Context, c CollectionSchema, comma
 		return err
 	}
 	primaryIndex := c.PrimaryIndex()
-	if err := t.tx.Set(primaryIndex.SeekPrefix(map[string]any{
+	if err := t.tx.Set(primaryIndex.SeekPrefix(c.Collection(), map[string]any{
 		c.PrimaryKey(): command.DocID,
 	}).SetDocumentID(command.DocID).Path(), command.After.Bytes()); err != nil {
 		return errors.Wrap(err, errors.Internal, "failed to batch set documents to primary index")
@@ -151,7 +151,7 @@ func (t *transaction) updateSecondaryIndex(ctx context.Context, idx model.Index,
 	}
 	switch command.Action {
 	case model.Delete:
-		if err := t.tx.Delete(idx.SeekPrefix(command.Before.Value()).SetDocumentID(command.DocID).Path()); err != nil {
+		if err := t.tx.Delete(idx.SeekPrefix(command.Collection, command.Before.Value()).SetDocumentID(command.DocID).Path()); err != nil {
 			return errors.Wrap(
 				err,
 				errors.Internal,
@@ -162,7 +162,7 @@ func (t *transaction) updateSecondaryIndex(ctx context.Context, idx model.Index,
 		}
 	case model.Set, model.Update, model.Create:
 		if command.Before != nil {
-			if err := t.tx.Delete(idx.SeekPrefix(command.Before.Value()).SetDocumentID(command.DocID).Path()); err != nil {
+			if err := t.tx.Delete(idx.SeekPrefix(command.Collection, command.Before.Value()).SetDocumentID(command.DocID).Path()); err != nil {
 				return errors.Wrap(
 					err,
 					errors.Internal,
@@ -175,7 +175,7 @@ func (t *transaction) updateSecondaryIndex(ctx context.Context, idx model.Index,
 		if idx.Unique && !idx.Primary && command.After != nil {
 			if err := t.db.kv.Tx(false, func(tx kv.Tx) error {
 				it := tx.NewIterator(kv.IterOpts{
-					Prefix: idx.SeekPrefix(command.After.Value()).Path(),
+					Prefix: idx.SeekPrefix(command.Collection, command.After.Value()).Path(),
 				})
 				defer it.Close()
 				for it.Valid() {
@@ -199,7 +199,7 @@ func (t *transaction) updateSecondaryIndex(ctx context.Context, idx model.Index,
 			}
 		}
 		// only persist ids in secondary index - lookup full document in primary index
-		if err := t.tx.Set(idx.SeekPrefix(command.After.Value()).SetDocumentID(command.DocID).Path(), []byte(command.DocID)); err != nil {
+		if err := t.tx.Set(idx.SeekPrefix(command.Collection, command.After.Value()).SetDocumentID(command.DocID).Path(), []byte(command.DocID)); err != nil {
 			return errors.Wrap(
 				err,
 				errors.Internal,
@@ -249,19 +249,22 @@ func (t *transaction) queryScan(ctx context.Context, scan model.Scan, handlerFun
 	if handlerFunc == nil {
 		return model.OptimizerResult{}, errors.New(errors.Validation, "empty scan handler")
 	}
+	if !t.db.HasCollection(scan.Collection) {
+		return model.OptimizerResult{}, errors.New(errors.Validation, "unsupported collection: %s", scan.Collection)
+	}
 	var err error
-	scan.Where, err = t.applyWhereHooks(ctx, scan.From, scan.Where)
+	scan.Where, err = t.applyWhereHooks(ctx, scan.Collection, scan.Where)
 	if err != nil {
 		return model.OptimizerResult{}, err
 	}
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	index, err := t.db.optimizer.Optimize(t.db.getReadyIndexes(ctx, scan.From), scan.Where)
+	index, err := t.db.optimizer.Optimize(t.db.collections.Get(scan.Collection), scan.Where)
 	if err != nil {
 		return model.OptimizerResult{}, err
 	}
 
-	pfx := index.Ref.SeekPrefix(index.Values)
+	pfx := index.Ref.SeekPrefix(scan.Collection, index.Values)
 	opts := kv.IterOpts{
 		Prefix:  pfx.Path(),
 		Seek:    nil,
@@ -285,7 +288,7 @@ func (t *transaction) queryScan(ctx context.Context, scan model.Scan, handlerFun
 		} else {
 			split := bytes.Split(item.Key(), []byte("\x00"))
 			id := split[len(split)-1]
-			document, err = t.Get(ctx, scan.From, string(id))
+			document, err = t.Get(ctx, scan.Collection, string(id))
 			if err != nil {
 				return index, err
 			}
@@ -296,7 +299,7 @@ func (t *transaction) queryScan(ctx context.Context, scan model.Scan, handlerFun
 			return index, err
 		}
 		if pass {
-			document, err = t.applyReadHooks(ctx, scan.From, document)
+			document, err = t.applyReadHooks(ctx, scan.Collection, document)
 			if err != nil {
 				return index, err
 			}

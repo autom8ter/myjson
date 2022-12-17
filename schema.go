@@ -21,6 +21,7 @@ type CollectionSchema interface {
 	SetIndex(index model.Index) error
 	DelIndex(name string) error
 	PrimaryIndex() model.Index
+	// PrimaryKey returns the collections primary key
 	PrimaryKey() string
 	GetPrimaryKey(doc *model.Document) string
 	SetPrimaryKey(doc *model.Document, id string) error
@@ -93,6 +94,9 @@ func (c *collectionSchema) Indexing() map[string]model.Index {
 }
 
 func (c *collectionSchema) SetIndex(index model.Index) error {
+	if index.Name == c.primaryIndex.Name {
+		return errors.New(errors.Forbidden, "forbidden from modifying the primary index: %s", index.Name)
+	}
 	raw, err := sjson.Set(c.raw.Raw, fmt.Sprintf("%s.%s", string(indexingPath), index.Name), index)
 	if err != nil {
 		return errors.Wrap(err, 0, "failed to set schema index: %s", index.Name)
@@ -102,6 +106,9 @@ func (c *collectionSchema) SetIndex(index model.Index) error {
 }
 
 func (c *collectionSchema) DelIndex(name string) error {
+	if name == c.primaryIndex.Name {
+		return errors.New(errors.Forbidden, "forbidden from deleting the primary index: %s", name)
+	}
 	raw, err := sjson.Delete(c.raw.Raw, fmt.Sprintf("%s.%s", string(indexingPath), name))
 	if err != nil {
 		return errors.Wrap(err, 0, "failed to delete schema index: %s", name)
@@ -137,17 +144,12 @@ func (c *collectionSchema) ValidateCommand(ctx context.Context, command *model.C
 	return nil
 }
 
-// PrimaryKey returns the collections primary key
 func (c *collectionSchema) PrimaryKey() string {
 	fields := c.PrimaryIndex().Fields
 	if len(fields) == 0 {
 		return ""
 	}
 	return fields[0]
-}
-
-func (c *collectionSchema) Content() ([]byte, error) {
-	return util.JSONToYAML([]byte(c.raw.Raw))
 }
 
 func (c *collectionSchema) GetPrimaryKey(doc *model.Document) string {

@@ -9,12 +9,13 @@ import (
 // Optimizer selects the best index from a set of indexes based on where clauses
 type Optimizer interface {
 	// Optimize selects the optimal index to use based on the given where clauses
-	Optimize(indexes map[string]model.Index, where []model.Where) (model.OptimizerResult, error)
+	Optimize(c CollectionSchema, where []model.Where) (model.OptimizerResult, error)
 }
 
 type defaultOptimizer struct{}
 
-func (o defaultOptimizer) Optimize(indexes map[string]model.Index, where []model.Where) (model.OptimizerResult, error) {
+func (o defaultOptimizer) Optimize(c CollectionSchema, where []model.Where) (model.OptimizerResult, error) {
+	indexes := c.Indexing()
 	if len(indexes) == 0 {
 		return model.OptimizerResult{}, errors.New(errors.Internal, "zero configured indexes")
 	}

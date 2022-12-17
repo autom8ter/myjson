@@ -65,3 +65,10 @@ x-indexing:
     primary: false
     fields:
       - account_id
+  account_email_idx:
+    name: account_email_idx
+    unique: false
+    primary: false
+    fields:
+      - account_id
+      - contact.email

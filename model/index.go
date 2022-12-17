@@ -2,14 +2,13 @@ package model
 
 import (
 	"bytes"
+
 	"github.com/autom8ter/gokvkit/internal/util"
 	"github.com/nqd/flat"
 )
 
 // Index is a database index used to optimize queries against a collection
 type Index struct {
-	// Collection is the collection the index belongs to
-	Collection string `json:"collection"`
 	// Name is the indexes unique name in the collection
 	Name string `json:"name"`
 	// Fields to index - order matters
@@ -44,12 +43,12 @@ type FieldValue struct {
 	Value any    `json:"value"`
 }
 
-func (i Index) SeekPrefix(fields map[string]any) IndexPrefix {
+func (i Index) SeekPrefix(collection string, fields map[string]any) IndexPrefix {
 	fields, _ = flat.Flatten(fields, nil)
 	var prefix = IndexPrefix(IndexPathPrefix{
 		prefix: [][]byte{
 			[]byte("index"),
-			[]byte(i.Collection),
+			[]byte(collection),
 			[]byte(i.Name),
 		},
 	})
