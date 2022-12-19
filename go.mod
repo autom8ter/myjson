@@ -32,6 +32,9 @@ require (
 	github.com/dustin/go-humanize v1.0.0 // indirect
 	github.com/go-openapi/jsonpointer v0.19.5 // indirect
 	github.com/go-openapi/swag v0.19.5 // indirect
+	github.com/go-playground/locales v0.14.0 // indirect
+	github.com/go-playground/universal-translator v0.18.0 // indirect
+	github.com/go-playground/validator/v10 v10.11.1 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang/glog v1.0.0 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
@@ -46,6 +49,7 @@ require (
 	github.com/imdario/mergo v0.3.13 // indirect
 	github.com/invopop/yaml v0.1.0 // indirect
 	github.com/klauspost/compress v1.13.6 // indirect
+	github.com/leodido/go-urn v1.2.1 // indirect
 	github.com/mailru/easyjson v0.0.0-20190626092158-b2ccc519800e // indirect
 	github.com/mitchellh/copystructure v1.2.0 // indirect
 	github.com/mitchellh/reflectwalk v1.0.2 // indirect
@@ -62,6 +66,7 @@ require (
 	golang.org/x/exp v0.0.0-20220921164117-439092de6870 // indirect
 	golang.org/x/net v0.2.0 // indirect
 	golang.org/x/sys v0.2.0 // indirect
+	golang.org/x/text v0.4.0 // indirect
 	google.golang.org/protobuf v1.28.1 // indirect
 	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect

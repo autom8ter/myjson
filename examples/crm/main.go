@@ -66,7 +66,7 @@ func cascadeDelete(ctx context.Context, tx gokvkit.Tx, command *model.Command) e
 		results, err := tx.Query(ctx, "task", gokvkit.NewQueryBuilder().Where(model.Where{
 			Field: "user",
 			Op:    "==",
-			Value: command.DocID,
+			Value: command.Document.Get("_id"),
 		}).Query())
 		if err != nil {
 			return err

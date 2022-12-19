@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"time"
 
 	"github.com/autom8ter/gokvkit/errors"
 	"github.com/autom8ter/gokvkit/internal/util"
@@ -16,7 +15,7 @@ import (
 
 type CollectionSchema interface {
 	Collection() string
-	ValidateCommand(ctx context.Context, command *model.Command) error
+	ValidateDocument(ctx context.Context, doc *model.Document) error
 	Indexing() map[string]model.Index
 	SetIndex(index model.Index) error
 	DelIndex(name string) error
@@ -32,7 +31,9 @@ type CollectionSchema interface {
 type collectionSchema struct {
 	schema       *jsonschema.Schema
 	raw          gjson.Result
+	collection   string
 	primaryIndex model.Index
+	indexing     map[string]model.Index
 }
 
 type schemaPath string
@@ -57,17 +58,26 @@ func newCollectionSchema(yamlContent []byte) (CollectionSchema, error) {
 	if err := json.Unmarshal(jsonContent, schema); err != nil {
 		return nil, errors.Wrap(err, 0, "failed to decode json schema")
 	}
+	r := gjson.ParseBytes(jsonContent)
 	s := &collectionSchema{
-		schema: schema,
-		raw:    gjson.ParseBytes(jsonContent),
+		schema:     schema,
+		raw:        r,
+		collection: r.Get(string(collectionPath)).String(),
+		indexing:   map[string]model.Index{},
 	}
 	for _, index := range s.raw.Get(string(indexingPath)).Map() {
 		var i model.Index
-		util.Decode(index.Value(), &i)
+		err = util.Decode(index.Value(), &i)
+		if err != nil {
+			continue
+		}
 		if i.Primary {
 			s.primaryIndex = i
-			return s, nil
 		}
+		s.indexing[i.Name] = i
+	}
+	if err != nil {
+		return nil, err
 	}
 	if len(s.primaryIndex.Fields) == 0 {
 		return nil, errors.New(errors.Validation, "primary index is required")
@@ -80,17 +90,11 @@ func (c *collectionSchema) Bytes() ([]byte, error) {
 }
 
 func (c *collectionSchema) Collection() string {
-	return c.raw.Get(string(collectionPath)).String()
+	return c.collection
 }
 
 func (c *collectionSchema) Indexing() map[string]model.Index {
-	data := map[string]model.Index{}
-	for _, index := range c.raw.Get(string(indexingPath)).Map() {
-		var i model.Index
-		util.Decode(index.Value(), &i)
-		data[i.Name] = i
-	}
-	return data
+	return c.indexing
 }
 
 func (c *collectionSchema) SetIndex(index model.Index) error {
@@ -102,6 +106,7 @@ func (c *collectionSchema) SetIndex(index model.Index) error {
 		return errors.Wrap(err, 0, "failed to set schema index: %s", index.Name)
 	}
 	c.raw = gjson.Parse(raw)
+	c.indexing[index.Name] = index
 	return nil
 }
 
@@ -114,32 +119,14 @@ func (c *collectionSchema) DelIndex(name string) error {
 		return errors.Wrap(err, 0, "failed to delete schema index: %s", name)
 	}
 	c.raw = gjson.Parse(raw)
+	delete(c.indexing, name)
 	return nil
 }
 
-func (c *collectionSchema) ValidateCommand(ctx context.Context, command *model.Command) error {
-	if command.Metadata == nil {
-		md, _ := model.GetMetadata(ctx)
-		command.Metadata = md
-	}
-	if command.Timestamp.IsZero() {
-		command.Timestamp = time.Now()
-	}
-	if err := command.Validate(); err != nil {
-		return err
-	}
-	switch command.Action {
-	case model.Update, model.Create, model.Set:
-		if command.After != nil {
-			kerrs := c.schema.Validate(ctx, command.After.Value()).Errs
-			if kerrs != nil && len(*kerrs) > 0 {
-				return errors.New(errors.Validation, "%v", util.JSONString(*kerrs))
-			}
-		}
-	case model.Delete:
-		if command.DocID == "" {
-			return errors.New(errors.Validation, "empty document id")
-		}
+func (c *collectionSchema) ValidateDocument(ctx context.Context, doc *model.Document) error {
+	kerrs := c.schema.Validate(ctx, doc.Value()).Errs
+	if kerrs != nil && len(*kerrs) > 0 {
+		return errors.New(errors.Validation, "%v", util.JSONString(*kerrs))
 	}
 	return nil
 }

@@ -14,10 +14,14 @@ import (
 	"github.com/segmentio/ksuid"
 )
 
-func (t *transaction) updateDocument(ctx context.Context, c CollectionSchema, command *model.Command) error {
+func (t *transaction) updateDocument(ctx context.Context, c CollectionSchema, docID string, before *model.Document, command *model.Command) error {
+	if before == nil {
+		return errors.New(errors.Internal, "tx: updateDocument - empty before value")
+	}
 	primaryIndex := c.PrimaryIndex()
-	after := command.Before.Clone()
-	flattened, err := flat.Flatten(command.After.Value(), nil)
+
+	after := before.Clone()
+	flattened, err := flat.Flatten(command.Document.Value(), nil)
 	if err != nil {
 		return err
 	}
@@ -25,71 +29,84 @@ func (t *transaction) updateDocument(ctx context.Context, c CollectionSchema, co
 	if err != nil {
 		return err
 	}
-	command.After = after
-	if err := c.ValidateCommand(ctx, command); err != nil {
+	if err := c.ValidateDocument(ctx, after); err != nil {
 		return err
 	}
 	if err := t.tx.Set(indexing.SeekPrefix(c.Collection(), primaryIndex, map[string]any{
-		c.PrimaryKey(): command.DocID,
-	}).SetDocumentID(command.DocID).Path(), command.After.Bytes()); err != nil {
+		c.PrimaryKey(): docID,
+	}).SetDocumentID(docID).Path(), after.Bytes()); err != nil {
 		return errors.Wrap(err, errors.Internal, "failed to batch set documents to primary index")
 	}
 	return nil
 }
 
-func (t *transaction) deleteDocument(ctx context.Context, c CollectionSchema, command *model.Command) error {
-	if err := c.ValidateCommand(ctx, command); err != nil {
-		return err
+func (t *transaction) deleteDocument(ctx context.Context, c CollectionSchema, docID string) error {
+	if docID == "" {
+		return errors.New(errors.Validation, "tx: delete command - empty document id")
 	}
 	primaryIndex := c.PrimaryIndex()
 	if err := t.tx.Delete(indexing.SeekPrefix(c.Collection(), primaryIndex, map[string]any{
-		c.PrimaryKey(): command.DocID,
-	}).SetDocumentID(command.DocID).Path()); err != nil {
-		return errors.Wrap(err, 0, "failed to batch delete documents")
+		c.PrimaryKey(): docID,
+	}).SetDocumentID(docID).Path()); err != nil {
+		return errors.Wrap(err, 0, "failed to delete documents")
 	}
 	return nil
 }
 
 func (t *transaction) createDocument(ctx context.Context, c CollectionSchema, command *model.Command) error {
 	primaryIndex := c.PrimaryIndex()
-	if command.DocID == "" {
-		command.DocID = ksuid.New().String()
-		if err := c.SetPrimaryKey(command.After, command.DocID); err != nil {
-			return err
-		}
+	docID := ksuid.New().String()
+	if err := c.SetPrimaryKey(command.Document, docID); err != nil {
+		return err
 	}
-	if err := c.ValidateCommand(ctx, command); err != nil {
+	if err := c.ValidateDocument(ctx, command.Document); err != nil {
 		return err
 	}
 	if err := t.tx.Set(indexing.SeekPrefix(c.Collection(), primaryIndex, map[string]any{
-		c.PrimaryKey(): command.DocID,
-	}).SetDocumentID(command.DocID).Path(), command.After.Bytes()); err != nil {
+		c.PrimaryKey(): docID,
+	}).SetDocumentID(docID).Path(), command.Document.Bytes()); err != nil {
 		return errors.Wrap(err, errors.Internal, "failed to batch set documents to primary index")
 	}
 
 	return nil
 }
 
-func (t *transaction) setDocument(ctx context.Context, c CollectionSchema, command *model.Command) error {
-	if err := c.ValidateCommand(ctx, command); err != nil {
+func (t *transaction) setDocument(ctx context.Context, c CollectionSchema, docID string, command *model.Command) error {
+	if docID == "" {
+		return errors.New(errors.Validation, "tx: set command - empty document id")
+	}
+	if err := c.ValidateDocument(ctx, command.Document); err != nil {
 		return err
 	}
 	primaryIndex := c.PrimaryIndex()
 	if err := t.tx.Set(indexing.SeekPrefix(c.Collection(), primaryIndex, map[string]any{
-		c.PrimaryKey(): command.DocID,
-	}).SetDocumentID(command.DocID).Path(), command.After.Bytes()); err != nil {
-		return errors.Wrap(err, errors.Internal, "failed to batch set documents to primary index")
+		c.PrimaryKey(): docID,
+	}).SetDocumentID(docID).Path(), command.Document.Bytes()); err != nil {
+		return errors.Wrap(err, errors.Internal, "failed to set documents to primary index")
 	}
 	return nil
 }
 
 func (t *transaction) persistCommand(ctx context.Context, md *model.Metadata, command *model.Command) error {
+	c := t.db.collections.Get(command.Collection)
+	if c == nil {
+		return fmt.Errorf("tx: collection: %s does not exist", command.Collection)
+	}
+	docID := c.GetPrimaryKey(command.Document)
+	if command.Timestamp.IsZero() {
+		command.Timestamp = time.Now()
+	}
+	if command.Metadata == nil {
+		md, _ := model.GetMetadata(ctx)
+		command.Metadata = md
+	}
+	before, _ := t.Get(ctx, command.Collection, docID)
 	if md.Exists(string(isIndexingKey)) {
 		for _, i := range t.db.collections.Get(command.Collection).Indexing() {
 			if i.Primary {
 				continue
 			}
-			if err := t.updateSecondaryIndex(ctx, i, command); err != nil {
+			if err := t.updateSecondaryIndex(ctx, i, docID, before, command); err != nil {
 				return errors.Wrap(err, errors.Internal, "")
 			}
 		}
@@ -98,25 +115,10 @@ func (t *transaction) persistCommand(ctx context.Context, md *model.Metadata, co
 	if err := t.applyPersistHooks(ctx, t, command, true); err != nil {
 		return err
 	}
-	c := t.db.collections.Get(command.Collection)
-	if c == nil {
-		return fmt.Errorf("collection: %s does not exist", command.Collection)
-	}
-	if command.Timestamp.IsZero() {
-		command.Timestamp = time.Now()
-	}
-	if command.Metadata == nil {
-		md, _ := model.GetMetadata(ctx)
-		command.Metadata = md
-	}
-	before, _ := t.db.Get(ctx, command.Collection, command.DocID)
-	if before == nil || !before.Valid() {
-		before = model.NewDocument()
-	}
-	command.Before = before
+
 	switch command.Action {
 	case model.Update:
-		if err := t.updateDocument(ctx, c, command); err != nil {
+		if err := t.updateDocument(ctx, c, docID, before, command); err != nil {
 			return err
 		}
 	case model.Create:
@@ -124,11 +126,11 @@ func (t *transaction) persistCommand(ctx context.Context, md *model.Metadata, co
 			return err
 		}
 	case model.Delete:
-		if err := t.deleteDocument(ctx, c, command); err != nil {
+		if err := t.deleteDocument(ctx, c, docID); err != nil {
 			return err
 		}
 	case model.Set:
-		if err := t.setDocument(ctx, c, command); err != nil {
+		if err := t.setDocument(ctx, c, docID, command); err != nil {
 			return err
 		}
 	}
@@ -136,7 +138,7 @@ func (t *transaction) persistCommand(ctx context.Context, md *model.Metadata, co
 		if i.Primary {
 			continue
 		}
-		if err := t.updateSecondaryIndex(ctx, i, command); err != nil {
+		if err := t.updateSecondaryIndex(ctx, i, docID, before, command); err != nil {
 			return errors.Wrap(err, errors.Internal, "")
 		}
 	}
@@ -146,45 +148,45 @@ func (t *transaction) persistCommand(ctx context.Context, md *model.Metadata, co
 	return nil
 }
 
-func (t *transaction) updateSecondaryIndex(ctx context.Context, idx model.Index, command *model.Command) error {
+func (t *transaction) updateSecondaryIndex(ctx context.Context, idx model.Index, docID string, before *model.Document, command *model.Command) error {
 	if idx.Primary {
 		return nil
 	}
 	switch command.Action {
 	case model.Delete:
-		if err := t.tx.Delete(indexing.SeekPrefix(command.Collection, idx, command.Before.Value()).SetDocumentID(command.DocID).Path()); err != nil {
+		if err := t.tx.Delete(indexing.SeekPrefix(command.Collection, idx, before.Value()).SetDocumentID(docID).Path()); err != nil {
 			return errors.Wrap(
 				err,
 				errors.Internal,
 				"failed to delete document %s/%s index references",
 				command.Collection,
-				command.DocID,
+				docID,
 			)
 		}
 	case model.Set, model.Update, model.Create:
-		if command.Before != nil {
-			if err := t.tx.Delete(indexing.SeekPrefix(command.Collection, idx, command.Before.Value()).SetDocumentID(command.DocID).Path()); err != nil {
+		if before != nil {
+			if err := t.tx.Delete(indexing.SeekPrefix(command.Collection, idx, before.Value()).SetDocumentID(docID).Path()); err != nil {
 				return errors.Wrap(
 					err,
 					errors.Internal,
 					"failed to delete document %s/%s index references",
 					command.Collection,
-					command.DocID,
+					docID,
 				)
 			}
 		}
-		if idx.Unique && !idx.Primary && command.After != nil {
+		if idx.Unique && !idx.Primary && command.Document != nil {
 			if err := t.db.kv.Tx(false, func(tx kv.Tx) error {
 				it := tx.NewIterator(kv.IterOpts{
-					Prefix: indexing.SeekPrefix(command.Collection, idx, command.After.Value()).Path(),
+					Prefix: indexing.SeekPrefix(command.Collection, idx, command.Document.Value()).Path(),
 				})
 				defer it.Close()
 				for it.Valid() {
 					item := it.Item()
 					split := bytes.Split(item.Key(), []byte("\x00"))
 					id := split[len(split)-1]
-					if string(id) != command.DocID {
-						return errors.New(errors.Internal, "duplicate value( %s ) found for unique index: %s", command.DocID, idx.Name)
+					if string(id) != docID {
+						return errors.New(errors.Internal, "duplicate value( %s ) found for unique index: %s", docID, idx.Name)
 					}
 					it.Next()
 				}
@@ -195,18 +197,18 @@ func (t *transaction) updateSecondaryIndex(ctx context.Context, idx model.Index,
 					errors.Internal,
 					"failed to set document %s/%s index references",
 					command.Collection,
-					command.DocID,
+					docID,
 				)
 			}
 		}
 		// only persist ids in secondary index - lookup full document in primary index
-		if err := t.tx.Set(indexing.SeekPrefix(command.Collection, idx, command.After.Value()).SetDocumentID(command.DocID).Path(), []byte(command.DocID)); err != nil {
+		if err := t.tx.Set(indexing.SeekPrefix(command.Collection, idx, command.Document.Value()).SetDocumentID(docID).Path(), []byte(docID)); err != nil {
 			return errors.Wrap(
 				err,
 				errors.Internal,
 				"failed to set document %s/%s index references",
 				command.Collection,
-				command.DocID,
+				docID,
 			)
 		}
 	}

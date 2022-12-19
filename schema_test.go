@@ -17,26 +17,11 @@ var (
 )
 
 func TestJSONSchema(t *testing.T) {
-	t.Run("json schema validation - success", func(t *testing.T) {
+	t.Run("json schema validation", func(t *testing.T) {
 		schema, err := newCollectionSchema([]byte(userSchema))
 		assert.Nil(t, err)
-		assert.Nil(t, schema.ValidateCommand(context.Background(), &model.Command{
-			Collection: "user",
-			Action:     model.Set,
-			DocID:      "1",
-			Before:     nil,
-			After:      newUserDoc(),
-		}))
-	})
-	t.Run("json schema validation - fail", func(t *testing.T) {
-		schema, err := newCollectionSchema([]byte(taskSchema))
-		assert.Nil(t, err)
-		assert.NotNil(t, schema.ValidateCommand(context.Background(), &model.Command{
-			Action: model.Set,
-			DocID:  "",
-			Before: nil,
-			After:  newUserDoc(),
-		}))
+		assert.Nil(t, schema.ValidateDocument(context.Background(), newUserDoc()))
+		assert.NotNil(t, schema.ValidateDocument(context.Background(), model.NewDocument()))
 	})
 	t.Run("primary key", func(t *testing.T) {
 		schema, err := newCollectionSchema([]byte(taskSchema))

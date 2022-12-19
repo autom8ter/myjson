@@ -66,16 +66,15 @@ func (t *transaction) Update(ctx context.Context, collection string, id string, 
 	if !t.db.HasCollection(collection) {
 		return errors.New(errors.Validation, "tx: unsupported collection: %s", collection)
 	}
-	doc := model.NewDocument()
-	if err := doc.SetAll(update); err != nil {
-		return err
+	doc, err := model.NewDocumentFrom(update)
+	if err != nil {
+		return errors.Wrap(err, 0, "tx: failed to update")
 	}
 	md, _ := model.GetMetadata(ctx)
 	if err := t.persistCommand(ctx, md, &model.Command{
 		Collection: collection,
 		Action:     model.Update,
-		DocID:      id,
-		After:      doc,
+		Document:   doc,
 		Timestamp:  time.Now(),
 		Metadata:   md,
 	}); err != nil {
@@ -101,8 +100,7 @@ func (t *transaction) Create(ctx context.Context, collection string, document *m
 	if err := t.persistCommand(ctx, md, &model.Command{
 		Collection: collection,
 		Action:     model.Create,
-		DocID:      id,
-		After:      document,
+		Document:   document,
 		Timestamp:  time.Now(),
 		Metadata:   md,
 	}); err != nil {
@@ -119,8 +117,7 @@ func (t *transaction) Set(ctx context.Context, collection string, document *mode
 	if err := t.persistCommand(ctx, md, &model.Command{
 		Collection: collection,
 		Action:     model.Set,
-		DocID:      t.db.collections.Get(collection).GetPrimaryKey(document),
-		After:      document,
+		Document:   document,
 		Timestamp:  time.Now(),
 		Metadata:   md,
 	}); err != nil {
@@ -134,10 +131,13 @@ func (t *transaction) Delete(ctx context.Context, collection string, id string) 
 		return errors.New(errors.Validation, "tx: unsupported collection: %s", collection)
 	}
 	md, _ := model.GetMetadata(ctx)
+	d, _ := model.NewDocumentFrom(map[string]any{
+		t.db.GetSchema(collection).PrimaryKey(): id,
+	})
 	if err := t.persistCommand(ctx, md, &model.Command{
 		Collection: collection,
-		Action:     model.Delete,
-		DocID:      id,
+		Action:     model.Create,
+		Document:   d,
 		Timestamp:  time.Now(),
 		Metadata:   md,
 	}); err != nil {
