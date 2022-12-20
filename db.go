@@ -187,6 +187,14 @@ func (d *DB) ConfigureCollection(ctx context.Context, collectionSchemaBytes []by
 	if err != nil {
 		return err
 	}
+	if d.HasCollection(collection.Collection()) {
+		for _, i := range d.GetSchema(collection.Collection()).Indexing() {
+			if i.IsBuilding {
+				return errors.New(errors.Forbidden, "cannot configure collection during %v indexing", i.Name)
+			}
+		}
+	}
+
 	var (
 		hasPrimary = 0
 	)

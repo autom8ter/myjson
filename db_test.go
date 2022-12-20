@@ -475,7 +475,6 @@ func TestIndexing1(t *testing.T) {
 			assert.Equal(t, 1, page.Count)
 			assert.Equal(t, page.Documents[0].Get("_id"), docs[0].Get("_id"))
 			assert.Equal(t, []string{}, page.Stats.Optimization.MatchedFields)
-
 			assert.Equal(t, true, page.Stats.Optimization.Index.Primary)
 		}))
 	})
