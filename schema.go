@@ -72,7 +72,10 @@ func newCollectionSchema(yamlContent []byte) (CollectionSchema, error) {
 		var i model.Index
 		err = util.Decode(index.Value(), &i)
 		if err != nil {
-			continue
+			return nil, err
+		}
+		if err := i.Validate(); err != nil {
+			return nil, err
 		}
 		if i.Primary {
 			s.primaryIndex = i
@@ -105,6 +108,9 @@ func (c *collectionSchema) Indexing() map[string]model.Index {
 }
 
 func (c *collectionSchema) SetIndex(index model.Index) error {
+	if err := index.Validate(); err != nil {
+		return err
+	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if index.Name == c.primaryIndex.Name {
