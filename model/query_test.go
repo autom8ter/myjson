@@ -4,7 +4,6 @@ import (
 	"context"
 	"testing"
 
-	"github.com/autom8ter/gokvkit/internal/util"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -26,8 +25,8 @@ func TestQuery(t *testing.T) {
 			Select: []Select{
 				{
 					Field:     "age",
-					Aggregate: util.ToPtr(SelectAggregateSum),
-					As:        util.ToPtr("age_sum"),
+					Aggregate: SelectAggregateSum,
+					As:        "age_sum",
 				},
 			},
 			OrderBy: []OrderBy{
@@ -39,13 +38,101 @@ func TestQuery(t *testing.T) {
 		}
 		assert.NotNil(t, a.Validate(context.Background()))
 	})
+	t.Run("validate bad order by", func(t *testing.T) {
+		a := Query{
+			Select: []Select{
+				{
+					Field: "*",
+				},
+			},
+			OrderBy: []OrderBy{
+				{
+					Field:     "account_id",
+					Direction: "dsc",
+				},
+			},
+		}
+		assert.NotNil(t, a.Validate(context.Background()))
+	})
+	t.Run("validate bad where op", func(t *testing.T) {
+		a := Query{
+			Select: []Select{
+				{
+					Field: "*",
+				},
+			},
+			Where: []Where{
+				{
+					Field: "account_id",
+					Op:    "==",
+					Value: 9,
+				},
+			},
+		}
+		assert.NotNil(t, a.Validate(context.Background()))
+	})
+	t.Run("validate bad where field", func(t *testing.T) {
+		a := Query{
+			Select: []Select{
+				{
+					Field: "*",
+				},
+			},
+			Where: []Where{
+				{
+					Field: "",
+					Op:    WhereOpEq,
+					Value: 9,
+				},
+			},
+		}
+		assert.NotNil(t, a.Validate(context.Background()))
+	})
+	t.Run("validate bad where value", func(t *testing.T) {
+		a := Query{
+			Select: []Select{
+				{
+					Field: "*",
+				},
+			},
+			Where: []Where{
+				{
+					Field: "name",
+					Op:    WhereOpEq,
+				},
+			},
+		}
+		assert.NotNil(t, a.Validate(context.Background()))
+	})
+	t.Run("validate bad limit", func(t *testing.T) {
+		a := Query{
+			Select: []Select{
+				{
+					Field: "*",
+				},
+			},
+			Limit: -1,
+		}
+		assert.NotNil(t, a.Validate(context.Background()))
+	})
+	t.Run("validate bad page", func(t *testing.T) {
+		a := Query{
+			Select: []Select{
+				{
+					Field: "*",
+				},
+			},
+			Page: -1,
+		}
+		assert.NotNil(t, a.Validate(context.Background()))
+	})
 	t.Run("validate good query", func(t *testing.T) {
 		a := Query{
 			Select: []Select{
 				{
 					Field:     "test",
-					Aggregate: util.ToPtr(SelectAggregateMax),
-					As:        util.ToPtr("max_test"),
+					Aggregate: SelectAggregateMax,
+					As:        "max_test",
 				},
 			},
 		}

@@ -151,10 +151,10 @@ func aggregateDocs(d model.Documents, selects []model.Select) (*model.Document, 
 		aggregated *model.Document
 	)
 	var aggregates = lo.Filter[model.Select](selects, func(s model.Select, i int) bool {
-		return s.Aggregate != nil
+		return s.Aggregate != ""
 	})
 	var nonAggregates = lo.Filter[model.Select](selects, func(s model.Select, i int) bool {
-		return s.Aggregate == nil
+		return s.Aggregate == ""
 	})
 	for _, next := range d {
 		if aggregated == nil || !aggregated.Valid() {
@@ -166,8 +166,8 @@ func aggregateDocs(d model.Documents, selects []model.Select) (*model.Document, 
 			}
 		}
 		for _, agg := range aggregates {
-			if util.IsNil(agg.As) {
-				agg.As = util.ToPtr(defaultAs(*agg.Aggregate, agg.Field))
+			if agg.As == "" {
+				agg.As = defaultAs(agg.Aggregate, agg.Field)
 			}
 			if err := applyAggregates(agg, aggregated, next); err != nil {
 				return nil, err
@@ -179,12 +179,12 @@ func aggregateDocs(d model.Documents, selects []model.Select) (*model.Document, 
 
 func applyNonAggregates(selct model.Select, aggregated, next *model.Document) error {
 	value := next.Get(selct.Field)
-	if util.IsNil(selct.As) {
+	if selct.As == "" {
 		if err := aggregated.Set(selct.Field, value); err != nil {
 			return err
 		}
 	} else {
-		if err := aggregated.Set(*selct.As, value); err != nil {
+		if err := aggregated.Set(selct.As, value); err != nil {
 			return err
 		}
 	}
@@ -192,8 +192,8 @@ func applyNonAggregates(selct model.Select, aggregated, next *model.Document) er
 }
 
 func applyAggregates(agg model.Select, aggregated, next *model.Document) error {
-	current := aggregated.GetFloat(*agg.As)
-	switch *agg.Aggregate {
+	current := aggregated.GetFloat(agg.As)
+	switch agg.Aggregate {
 	case model.SelectAggregateCount:
 		current++
 	case model.SelectAggregateMax:
@@ -207,9 +207,9 @@ func applyAggregates(agg model.Select, aggregated, next *model.Document) error {
 	case model.SelectAggregateSum:
 		current += next.GetFloat(agg.Field)
 	default:
-		return errors.New(errors.Validation, "unsupported aggregate function: %s/%s", agg.Field, *agg.Aggregate)
+		return errors.New(errors.Validation, "unsupported aggregate function: %s/%s", agg.Field, agg.Aggregate)
 	}
-	if err := aggregated.Set(*agg.As, current); err != nil {
+	if err := aggregated.Set(agg.As, current); err != nil {
 		return err
 	}
 	return nil
@@ -224,15 +224,15 @@ func selectDocument(d *model.Document, fields []model.Select) error {
 	)
 	patch := map[string]interface{}{}
 	for _, f := range fields {
-		if !util.IsNil(f.As) && *f.As == "" {
-			if !util.IsNil(f.Aggregate) {
-				f.As = util.ToPtr(defaultAs(*f.Aggregate, f.Field))
+		if f.As == "" {
+			if f.Aggregate != "" {
+				f.As = defaultAs(f.Aggregate, f.Field)
 			}
 		}
-		if f.As == nil {
+		if f.As == "" {
 			patch[f.Field] = d.Get(f.Field)
 		} else {
-			patch[*f.As] = d.Get(f.Field)
+			patch[f.As] = d.Get(f.Field)
 		}
 	}
 	err := selected.SetAll(patch)

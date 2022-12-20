@@ -96,8 +96,8 @@ func TestUtil(t *testing.T) {
 		reduced, err := aggregateDocs(docs, []model.Select{
 			{
 				Field:     "age",
-				Aggregate: util.ToPtr(model.SelectAggregateSum),
-				As:        util.ToPtr("age_sum"),
+				Aggregate: model.SelectAggregateSum,
+				As:        "age_sum",
 			},
 		})
 		assert.Nil(t, err)

@@ -39,7 +39,13 @@ func (q *QueryBuilder) OrderBy(ob ...model.OrderBy) *QueryBuilder {
 
 // Limit adds the Limit clause(s) to the query
 func (q *QueryBuilder) Limit(limit int) *QueryBuilder {
-	q.query.Limit = &limit
+	q.query.Limit = limit
+	return q
+}
+
+// Page adds the Page clause(s) to the query which controls pagination results
+func (q *QueryBuilder) Page(page int) *QueryBuilder {
+	q.query.Page = page
 	return q
 }
 

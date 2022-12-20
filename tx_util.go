@@ -98,6 +98,9 @@ func (t *transaction) persistCommand(ctx context.Context, md *model.Metadata, co
 		md, _ := model.GetMetadata(ctx)
 		command.Metadata = md
 	}
+	if err := command.Validate(); err != nil {
+		return err
+	}
 	before, _ := t.Get(ctx, command.Collection, docID)
 	if md.Exists(string(isIndexingKey)) {
 		for _, i := range t.db.collections.Get(command.Collection).Indexing() {

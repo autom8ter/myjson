@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/autom8ter/gokvkit"
-	"github.com/autom8ter/gokvkit/internal/util"
 	"github.com/autom8ter/gokvkit/model"
 	"github.com/autom8ter/gokvkit/testutil"
 	"github.com/brianvoe/gofakeit/v6"
@@ -111,7 +110,7 @@ func Test(t *testing.T) {
 						Value: []float64{51, 52, 53, 54, 55, 56, 57, 58, 59, 60},
 					},
 				},
-				Limit: util.ToPtr(10),
+				Limit: 10,
 			})
 			assert.Nil(t, err)
 			assert.Greater(t, len(results.Documents), 1)
@@ -244,7 +243,7 @@ func Benchmark(b *testing.B) {
 							Value: doc.GetString("contact.email"),
 						},
 					},
-					Limit: util.ToPtr(10),
+					Limit: 10,
 				})
 				assert.Nil(b, err)
 				assert.Equal(b, 1, len(results.Documents))
@@ -282,7 +281,7 @@ func Benchmark(b *testing.B) {
 							Value: doc.GetString("John"),
 						},
 					},
-					Limit: util.ToPtr(10),
+					Limit: 10,
 				})
 				assert.Nil(b, err)
 			}
@@ -494,8 +493,8 @@ func TestAggregate(t *testing.T) {
 					},
 					{
 						Field:     "age",
-						Aggregate: util.ToPtr(model.SelectAggregateSum),
-						As:        util.ToPtr("age_sum"),
+						Aggregate: model.SelectAggregateSum,
+						As:        "age_sum",
 					},
 				},
 				OrderBy: []model.OrderBy{

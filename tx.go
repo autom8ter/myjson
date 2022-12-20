@@ -6,7 +6,6 @@ import (
 
 	"github.com/autom8ter/gokvkit/errors"
 	"github.com/autom8ter/gokvkit/internal/indexing"
-	"github.com/autom8ter/gokvkit/internal/util"
 	"github.com/autom8ter/gokvkit/kv"
 	"github.com/autom8ter/gokvkit/model"
 	"github.com/samber/lo"
@@ -170,7 +169,7 @@ func (t *transaction) Query(ctx context.Context, collection string, query model.
 	fullScan := true
 	match, err := t.queryScan(ctx, collection, query.Where, func(d *model.Document) (bool, error) {
 		results = append(results, d)
-		if query.Page != nil && *query.Page == 0 && len(query.OrderBy) == 0 && *query.Limit > 0 && len(results) >= *query.Limit {
+		if query.Page == 0 && len(query.OrderBy) == 0 && query.Limit > 0 && len(results) >= query.Limit {
 			fullScan = false
 			return false, nil
 		}
@@ -181,11 +180,11 @@ func (t *transaction) Query(ctx context.Context, collection string, query model.
 	}
 	results = orderByDocs(results, query.OrderBy)
 
-	if fullScan && !util.IsNil(query.Limit) && !util.IsNil(query.Page) && *query.Limit > 0 && *query.Page > 0 {
-		results = lo.Slice(results, *query.Limit**query.Page, (*query.Limit**query.Page)+*query.Limit)
+	if fullScan && query.Limit > 0 && query.Page > 0 {
+		results = lo.Slice(results, query.Limit*query.Page, (query.Limit*query.Page)+query.Limit)
 	}
-	if !util.IsNil(query.Limit) && *query.Limit > 0 && len(results) > *query.Limit {
-		results = results[:*query.Limit]
+	if query.Limit > 0 && len(results) > query.Limit {
+		results = results[:query.Limit]
 	}
 
 	if len(query.Select) > 0 && query.Select[0].Field != "*" {
@@ -196,12 +195,9 @@ func (t *transaction) Query(ctx context.Context, collection string, query model.
 			}
 		}
 	}
-	if query.Page == nil {
-		query.Page = util.ToPtr(0)
-	}
 	return model.Page{
 		Documents: results,
-		NextPage:  *query.Page + 1,
+		NextPage:  query.Page + 1,
 		Count:     len(results),
 		Stats: model.PageStats{
 			ExecutionTime: time.Since(now),
@@ -269,18 +265,15 @@ func (t *transaction) aggregate(ctx context.Context, collection string, query mo
 		reduced = append(reduced, value)
 	}
 	reduced = orderByDocs(reduced, query.OrderBy)
-	if (!util.IsNil(query.Limit) && *query.Limit > 0) && (!util.IsNil(query.Limit) && *query.Page > 0) {
-		reduced = lo.Slice(reduced, *query.Limit**query.Page, (*query.Limit**query.Page)+*query.Limit)
+	if query.Limit > 0 && query.Page > 0 {
+		reduced = lo.Slice(reduced, query.Limit*query.Page, (query.Limit*query.Page)+query.Limit)
 	}
-	if !util.IsNil(query.Limit) && *query.Limit > 0 && len(reduced) > *query.Limit {
-		reduced = reduced[:*query.Limit]
-	}
-	if query.Page == nil {
-		query.Page = util.ToPtr(0)
+	if query.Limit > 0 && len(reduced) > query.Limit {
+		reduced = reduced[:query.Limit]
 	}
 	return model.Page{
 		Documents: reduced,
-		NextPage:  *query.Page + 1,
+		NextPage:  query.Page + 1,
 		Count:     len(reduced),
 		Stats: model.PageStats{
 			ExecutionTime: time.Since(now),

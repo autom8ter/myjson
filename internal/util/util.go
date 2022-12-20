@@ -6,10 +6,17 @@ import (
 	"fmt"
 
 	"github.com/autom8ter/gokvkit/errors"
+	"github.com/go-playground/validator/v10"
 	"github.com/mitchellh/mapstructure"
 	"github.com/spf13/cast"
 	"gopkg.in/yaml.v2"
 )
+
+var validate = validator.New()
+
+func ValidateStruct(val any) error {
+	return validate.Struct(val)
+}
 
 // Decode decodes the input into the output based on json tags
 func Decode(input any, output any) error {

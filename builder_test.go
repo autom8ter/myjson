@@ -29,6 +29,6 @@ func TestQuery(t *testing.T) {
 		assert.Equal(t, 1, len(q.Where))
 		assert.Equal(t, 1, len(q.GroupBy))
 		assert.Equal(t, 1, len(q.OrderBy))
-		assert.Equal(t, 1, *q.Limit)
+		assert.Equal(t, 1, q.Limit)
 	})
 }

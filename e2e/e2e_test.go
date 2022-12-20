@@ -13,7 +13,7 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-func Test(t *testing.T) {
+func TestConcurrency(t *testing.T) {
 	t.Run("1", func(t *testing.T) {
 		assert.Nil(t, testutil.TestDB(func(ctx context.Context, db *gokvkit.DB) {
 			egp, ctx := errgroup.WithContext(ctx)
