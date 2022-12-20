@@ -41,12 +41,15 @@ type Tx interface {
 	// Scan scans the optimal index for a collection's documents passing its filters.
 	// results will not be ordered unless an index supporting the order by(s) was found by the optimizer
 	// Query should be used when order is more important than performance/resource-usage
-	Scan(ctx context.Context, scan model.Scan, handlerFunc model.ScanFunc) (model.Optimization, error)
+	ForEach(ctx context.Context, collection string, where []model.Where, fn ForEachFunc) (model.Optimization, error)
 }
 
 // TxFunc is a function executed against a transaction - if the function returns an error, all changes will be rolled back.
 // Otherwise, the changes will be commited to the database
 type TxFunc func(ctx context.Context, tx Tx) error
+
+// ForEachFunc returns false to stop scanning and an error if one occurred
+type ForEachFunc func(d *model.Document) (bool, error)
 
 type transaction struct {
 	db      *DB
@@ -162,10 +165,7 @@ func (t *transaction) Query(ctx context.Context, collection string, query model.
 	}
 	var results model.Documents
 	fullScan := true
-	match, err := t.queryScan(ctx, model.Scan{
-		Collection: collection,
-		Where:      query.Where,
-	}, func(d *model.Document) (bool, error) {
+	match, err := t.queryScan(ctx, collection, query.Where, func(d *model.Document) (bool, error) {
 		results = append(results, d)
 		if query.Page != nil && *query.Page == 0 && len(query.OrderBy) == 0 && *query.Limit > 0 && len(results) >= *query.Limit {
 			fullScan = false
@@ -241,10 +241,7 @@ func (t *transaction) aggregate(ctx context.Context, collection string, query mo
 	defer cancel()
 	now := time.Now()
 	var results model.Documents
-	match, err := t.queryScan(ctx, model.Scan{
-		Collection: collection,
-		Where:      query.Where,
-	}, func(d *model.Document) (bool, error) {
+	match, err := t.queryScan(ctx, collection, query.Where, func(d *model.Document) (bool, error) {
 		results = append(results, d)
 		return true, nil
 	})
@@ -280,11 +277,11 @@ func (t *transaction) aggregate(ctx context.Context, collection string, query mo
 	}, nil
 }
 
-func (t *transaction) Scan(ctx context.Context, scan model.Scan, handlerFunc model.ScanFunc) (model.Optimization, error) {
-	if !t.db.HasCollection(scan.Collection) {
-		return model.Optimization{}, errors.New(errors.Validation, "unsupported collection: %s", scan.Collection)
+func (t *transaction) ForEach(ctx context.Context, collection string, where []model.Where, fn ForEachFunc) (model.Optimization, error) {
+	if !t.db.HasCollection(collection) {
+		return model.Optimization{}, errors.New(errors.Validation, "unsupported collection: %s", collection)
 	}
-	return t.queryScan(ctx, scan, handlerFunc)
+	return t.queryScan(ctx, collection, where, fn)
 }
 
 func (t *transaction) Close(ctx context.Context) {

@@ -28,10 +28,7 @@ func (d *DB) addIndex(ctx context.Context, collection string, index model.Index)
 	meta.Set(string(isIndexingKey), true)
 	if !index.Primary {
 		if err := d.Tx(ctx, true, func(ctx context.Context, tx Tx) error {
-			_, err := d.Scan(meta.ToContext(ctx), model.Scan{
-				Collection: collection,
-				Where:      nil,
-			}, func(doc *model.Document) (bool, error) {
+			_, err := d.ForEach(meta.ToContext(ctx), collection, nil, func(doc *model.Document) (bool, error) {
 				if err := tx.Set(meta.ToContext(ctx), collection, doc); err != nil {
 					return false, err
 				}
@@ -67,9 +64,7 @@ func (d *DB) removeIndex(ctx context.Context, collection string, index model.Ind
 	meta.Set(string(isIndexingKey), true)
 	c := d.collections.Get(collection)
 	if err := d.Tx(ctx, true, func(ctx context.Context, tx Tx) error {
-		_, err := tx.Scan(ctx, model.Scan{
-			Collection: collection,
-		}, func(doc *model.Document) (bool, error) {
+		_, err := tx.ForEach(ctx, collection, nil, func(doc *model.Document) (bool, error) {
 			if err := tx.Delete(meta.ToContext(ctx), collection, c.GetPrimaryKey(doc)); err != nil {
 				return false, err
 			}

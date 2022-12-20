@@ -248,26 +248,26 @@ func (t *transaction) applyPersistHooks(ctx context.Context, tx Tx, command *mod
 	return nil
 }
 
-func (t *transaction) queryScan(ctx context.Context, scan model.Scan, handlerFunc model.ScanFunc) (model.Optimization, error) {
-	if handlerFunc == nil {
+func (t *transaction) queryScan(ctx context.Context, collection string, where []model.Where, fn ForEachFunc) (model.Optimization, error) {
+	if fn == nil {
 		return model.Optimization{}, errors.New(errors.Validation, "empty scan handler")
 	}
-	if !t.db.HasCollection(scan.Collection) {
-		return model.Optimization{}, errors.New(errors.Validation, "unsupported collection: %s", scan.Collection)
+	if !t.db.HasCollection(collection) {
+		return model.Optimization{}, errors.New(errors.Validation, "unsupported collection: %s", collection)
 	}
 	var err error
-	scan.Where, err = t.applyWhereHooks(ctx, scan.Collection, scan.Where)
+	where, err = t.applyWhereHooks(ctx, collection, where)
 	if err != nil {
 		return model.Optimization{}, err
 	}
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	optimization, err := t.db.optimizer.Optimize(t.db.collections.Get(scan.Collection), scan.Where)
+	optimization, err := t.db.optimizer.Optimize(t.db.collections.Get(collection), where)
 	if err != nil {
 		return model.Optimization{}, err
 	}
 
-	pfx := indexing.SeekPrefix(scan.Collection, optimization.Index, optimization.MatchedValues)
+	pfx := indexing.SeekPrefix(collection, optimization.Index, optimization.MatchedValues)
 	opts := kv.IterOpts{
 		Prefix:  pfx.Path(),
 		Seek:    nil,
@@ -291,22 +291,22 @@ func (t *transaction) queryScan(ctx context.Context, scan model.Scan, handlerFun
 		} else {
 			split := bytes.Split(item.Key(), []byte("\x00"))
 			id := split[len(split)-1]
-			document, err = t.Get(ctx, scan.Collection, string(id))
+			document, err = t.Get(ctx, collection, string(id))
 			if err != nil {
 				return optimization, err
 			}
 		}
 
-		pass, err := document.Where(scan.Where)
+		pass, err := document.Where(where)
 		if err != nil {
 			return optimization, err
 		}
 		if pass {
-			document, err = t.applyReadHooks(ctx, scan.Collection, document)
+			document, err = t.applyReadHooks(ctx, collection, document)
 			if err != nil {
 				return optimization, err
 			}
-			shouldContinue, err := handlerFunc(document)
+			shouldContinue, err := fn(document)
 			if err != nil {
 				return optimization, err
 			}
