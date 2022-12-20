@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/autom8ter/gokvkit"
 	"github.com/autom8ter/gokvkit/model"
@@ -14,11 +15,10 @@ import (
 )
 
 func Test(t *testing.T) {
-
 	t.Run("1", func(t *testing.T) {
 		assert.Nil(t, testutil.TestDB(func(ctx context.Context, db *gokvkit.DB) {
 			egp, ctx := errgroup.WithContext(ctx)
-			for i := 0; i < 10; i++ {
+			for i := 0; i < 100; i++ {
 				err := db.Tx(ctx, true, func(ctx context.Context, tx gokvkit.Tx) error {
 					return tx.Set(ctx, "user", testutil.NewUserDoc())
 				})
@@ -43,36 +43,30 @@ func Test(t *testing.T) {
 					}
 					return nil
 				})
+				time.Sleep(200 * time.Millisecond)
+			}
+			for i := 0; i < 5; i++ {
 				egp.Go(func() error {
-					schema := db.GetSchema("user")
-					if err := schema.DelIndex("email_idx"); err != nil {
-						return err
-					}
-					bytes, err := schema.Bytes()
-					if err != nil {
-						return err
-					}
-
-					if err := db.ConfigureCollection(ctx, bytes); err != nil {
-						return err
+					{
+						//schema := db.GetSchema("user")
+						//assert.Nil(t, schema.SetIndex(model.Index{
+						//	Name:    "email_idx",
+						//	Fields:  []string{"contact.email"},
+						//	Unique:  true,
+						//	Primary: false,
+						//}))
+						//bytes, err := schema.Bytes()
+						//assert.Nil(t, err)
+						//assert.Nil(t, db.ConfigureCollection(ctx, bytes))
 					}
 					{
-						if err := schema.SetIndex(model.Index{
-							Name:    "email_idx",
-							Fields:  []string{"contact.email"},
-							Unique:  true,
-							Primary: false,
-						}); err != nil {
-							return err
-						}
+						schema := db.GetSchema("user")
+						assert.Nil(t, schema.DelIndex("email_idx"))
 						bytes, err := schema.Bytes()
-						if err != nil {
-							return err
-						}
-						if err := db.ConfigureCollection(ctx, bytes); err != nil {
-							return err
-						}
+						assert.Nil(t, err)
+						assert.Nil(t, db.ConfigureCollection(ctx, bytes))
 					}
+
 					return nil
 				})
 			}
