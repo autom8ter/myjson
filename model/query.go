@@ -57,9 +57,6 @@ type Select struct {
 
 	// the select's field
 	Field string `json:"field"`
-
-	// a function to apply against the field
-	Function *SelectFunction `json:"function,omitempty"`
 }
 
 type SelectAggregate string
@@ -68,11 +65,6 @@ const SelectAggregateCount SelectAggregate = "count"
 const SelectAggregateMax SelectAggregate = "max"
 const SelectAggregateMin SelectAggregate = "min"
 const SelectAggregateSum SelectAggregate = "sum"
-
-type SelectFunction string
-
-const SelectFunctionToLower SelectFunction = "toLower"
-const SelectFunctionToUpper SelectFunction = "toUpper"
 
 // where is a filter applied against a query
 type Where struct {
@@ -93,6 +85,8 @@ const WhereOpEq WhereOp = "eq"
 const WhereOpGt WhereOp = "gt"
 const WhereOpGte WhereOp = "gte"
 const WhereOpIn WhereOp = "in"
+const WhereOpContainsAll WhereOp = "containsAll"
+const WhereOpContainsAny WhereOp = "containsAny"
 
 // UnmarshalJSON implements json.Unmarshaler.
 func (j *OrderByDirection) UnmarshalJSON(b []byte) error {
@@ -123,6 +117,8 @@ var enumValues_WhereOp = []interface{}{
 	"lte",
 	"in",
 	"contains",
+	"containsAll",
+	"containsAny",
 }
 
 // UnmarshalJSON implements json.Unmarshaler.
@@ -217,31 +213,6 @@ func (j *OrderBy) UnmarshalJSON(b []byte) error {
 }
 
 // UnmarshalJSON implements json.Unmarshaler.
-func (j *SelectFunction) UnmarshalJSON(b []byte) error {
-	var v string
-	if err := json.Unmarshal(b, &v); err != nil {
-		return err
-	}
-	var ok bool
-	for _, expected := range enumValues_SelectFunction {
-		if reflect.DeepEqual(v, expected) {
-			ok = true
-			break
-		}
-	}
-	if !ok {
-		return fmt.Errorf("invalid value (expected one of %#v): %#v", enumValues_SelectFunction, v)
-	}
-	*j = SelectFunction(v)
-	return nil
-}
-
-var enumValues_SelectFunction = []interface{}{
-	"toLower",
-	"toUpper",
-}
-
-// UnmarshalJSON implements json.Unmarshaler.
 func (j *Where) UnmarshalJSON(b []byte) error {
 	var raw map[string]interface{}
 	if err := json.Unmarshal(b, &raw); err != nil {
@@ -299,9 +270,6 @@ func (q Query) Validate(ctx context.Context) error {
 			return errors.New(errors.Validation, "empty required field: 'select.field'")
 		}
 		if a.Aggregate != nil {
-			if a.Function != nil {
-				return errors.New(errors.Validation, "select cannot have both a function and an aggregate")
-			}
 			isAggregate = true
 		}
 	}

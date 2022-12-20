@@ -124,9 +124,12 @@ func (c *collectionSchema) DelIndex(name string) error {
 }
 
 func (c *collectionSchema) ValidateDocument(ctx context.Context, doc *model.Document) error {
-	kerrs := c.schema.Validate(ctx, doc.Value()).Errs
-	if kerrs != nil && len(*kerrs) > 0 {
-		return errors.New(errors.Validation, "%v", util.JSONString(*kerrs))
+	kerrs, err := c.schema.ValidateBytes(ctx, doc.Bytes())
+	if err != nil {
+		return errors.Wrap(err, errors.Validation, "%v: failed to validate document", c.collection)
+	}
+	if kerrs != nil && len(kerrs) > 0 {
+		return errors.New(errors.Validation, "%v: invalid document- %v", c.collection, util.JSONString(kerrs))
 	}
 	return nil
 }

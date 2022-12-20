@@ -197,29 +197,54 @@ func (d *Document) DelAll(fields ...string) error {
 
 // Where executes the where clauses against the document and returns true if it passes the clauses
 func (d *Document) Where(wheres []Where) (bool, error) {
+	var selfRefPrefix = "$."
 	for _, w := range wheres {
+		var (
+			isSelf    = strings.HasPrefix(cast.ToString(w.Value), selfRefPrefix)
+			selfField = strings.TrimPrefix(cast.ToString(w.Value), selfRefPrefix)
+		)
+
 		switch w.Op {
 		case WhereOpEq:
+			if isSelf && d.Get(w.Field) != d.Get(selfField) {
+				return false, nil
+			}
 			if w.Value != d.Get(w.Field) {
 				return false, nil
 			}
+
 		case WhereOpNeq:
+			if isSelf && d.Get(w.Field) == d.Get(selfField) {
+				return false, nil
+			}
 			if w.Value == d.Get(w.Field) {
 				return false, nil
 			}
 		case WhereOpLt:
+			if isSelf && d.GetFloat(w.Field) >= d.GetFloat(selfField) {
+				return false, nil
+			}
 			if d.GetFloat(w.Field) >= cast.ToFloat64(w.Value) {
 				return false, nil
 			}
 		case WhereOpLte:
+			if isSelf && d.GetFloat(w.Field) > d.GetFloat(selfField) {
+				return false, nil
+			}
 			if d.GetFloat(w.Field) > cast.ToFloat64(w.Value) {
 				return false, nil
 			}
 		case WhereOpGt:
+			if isSelf && d.GetFloat(w.Field) <= d.GetFloat(selfField) {
+				return false, nil
+			}
 			if d.GetFloat(w.Field) <= cast.ToFloat64(w.Value) {
 				return false, nil
 			}
 		case WhereOpGte:
+			if isSelf && d.GetFloat(w.Field) < d.GetFloat(selfField) {
+				return false, nil
+			}
 			if d.GetFloat(w.Field) < cast.ToFloat64(w.Value) {
 				return false, nil
 			}
@@ -238,8 +263,43 @@ func (d *Document) Where(wheres []Where) (bool, error) {
 			}
 
 		case WhereOpContains:
-			if !strings.Contains(d.GetString(w.Field), cast.ToString(w.Value)) {
-				return false, nil
+			fieldVal := d.Get(w.Field)
+			switch fieldVal := fieldVal.(type) {
+			case []bool:
+				if !lo.Contains(fieldVal, cast.ToBool(w.Value)) {
+					return false, nil
+				}
+			case []float64:
+				if !lo.Contains(fieldVal, cast.ToFloat64(w.Value)) {
+					return false, nil
+				}
+			case []string:
+				if !lo.Contains(fieldVal, cast.ToString(w.Value)) {
+					return false, nil
+				}
+			case string:
+				if !strings.Contains(fieldVal, cast.ToString(w.Value)) {
+					return false, nil
+				}
+			default:
+				if !strings.Contains(util.JSONString(fieldVal), util.JSONString(w.Value)) {
+					return false, nil
+				}
+			}
+
+		case WhereOpContainsAll:
+			fieldVal := cast.ToStringSlice(d.Get(w.Field))
+			for _, v := range cast.ToStringSlice(w.Value) {
+				if !lo.Contains(fieldVal, v) {
+					return false, nil
+				}
+			}
+		case WhereOpContainsAny:
+			fieldVal := cast.ToStringSlice(d.Get(w.Field))
+			for _, v := range cast.ToStringSlice(w.Value) {
+				if lo.Contains(fieldVal, v) {
+					return true, nil
+				}
 			}
 		default:
 			return false, errors.New(errors.Validation, "invalid operator: '%s'", w.Op)
