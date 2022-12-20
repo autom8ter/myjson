@@ -73,6 +73,9 @@ func (t *transaction) Update(ctx context.Context, collection string, id string, 
 	if err != nil {
 		return errors.Wrap(err, 0, "tx: failed to update")
 	}
+	if err := t.db.collections.Get(collection).SetPrimaryKey(doc, id); err != nil {
+		return errors.Wrap(err, 0, "tx: failed to set primary key")
+	}
 	md, _ := model.GetMetadata(ctx)
 	if err := t.persistCommand(ctx, md, &model.Command{
 		Collection: collection,
@@ -139,7 +142,7 @@ func (t *transaction) Delete(ctx context.Context, collection string, id string) 
 	})
 	if err := t.persistCommand(ctx, md, &model.Command{
 		Collection: collection,
-		Action:     model.Create,
+		Action:     model.Delete,
 		Document:   d,
 		Timestamp:  time.Now(),
 		Metadata:   md,

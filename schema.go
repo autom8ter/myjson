@@ -4,8 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"sync"
 
 	"github.com/autom8ter/gokvkit/errors"
+	"github.com/autom8ter/gokvkit/internal/safe"
 	"github.com/autom8ter/gokvkit/internal/util"
 	"github.com/autom8ter/gokvkit/model"
 	"github.com/qri-io/jsonschema"
@@ -33,7 +35,8 @@ type collectionSchema struct {
 	raw          gjson.Result
 	collection   string
 	primaryIndex model.Index
-	indexing     map[string]model.Index
+	indexing     *safe.Map[model.Index]
+	mu           sync.RWMutex
 }
 
 type schemaPath string
@@ -63,7 +66,7 @@ func newCollectionSchema(yamlContent []byte) (CollectionSchema, error) {
 		schema:     schema,
 		raw:        r,
 		collection: r.Get(string(collectionPath)).String(),
-		indexing:   map[string]model.Index{},
+		indexing:   safe.NewMap(map[string]model.Index{}),
 	}
 	for _, index := range s.raw.Get(string(indexingPath)).Map() {
 		var i model.Index
@@ -74,7 +77,7 @@ func newCollectionSchema(yamlContent []byte) (CollectionSchema, error) {
 		if i.Primary {
 			s.primaryIndex = i
 		}
-		s.indexing[i.Name] = i
+		s.indexing.Set(i.Name, i)
 	}
 	if err != nil {
 		return nil, err
@@ -86,18 +89,24 @@ func newCollectionSchema(yamlContent []byte) (CollectionSchema, error) {
 }
 
 func (c *collectionSchema) Bytes() ([]byte, error) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
 	return util.JSONToYAML([]byte(c.raw.Raw))
 }
 
 func (c *collectionSchema) Collection() string {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
 	return c.collection
 }
 
 func (c *collectionSchema) Indexing() map[string]model.Index {
-	return c.indexing
+	return c.indexing.AsMap()
 }
 
 func (c *collectionSchema) SetIndex(index model.Index) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	if index.Name == c.primaryIndex.Name {
 		return errors.New(errors.Forbidden, "forbidden from modifying the primary index: %s", index.Name)
 	}
@@ -106,11 +115,13 @@ func (c *collectionSchema) SetIndex(index model.Index) error {
 		return errors.Wrap(err, 0, "failed to set schema index: %s", index.Name)
 	}
 	c.raw = gjson.Parse(raw)
-	c.indexing[index.Name] = index
+	c.indexing.Set(index.Name, index)
 	return nil
 }
 
 func (c *collectionSchema) DelIndex(name string) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	if name == c.primaryIndex.Name {
 		return errors.New(errors.Forbidden, "forbidden from deleting the primary index: %s", name)
 	}
@@ -119,11 +130,13 @@ func (c *collectionSchema) DelIndex(name string) error {
 		return errors.Wrap(err, 0, "failed to delete schema index: %s", name)
 	}
 	c.raw = gjson.Parse(raw)
-	delete(c.indexing, name)
+	c.indexing.Del(name)
 	return nil
 }
 
 func (c *collectionSchema) ValidateDocument(ctx context.Context, doc *model.Document) error {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
 	kerrs, err := c.schema.ValidateBytes(ctx, doc.Bytes())
 	if err != nil {
 		return errors.Wrap(err, errors.Validation, "%v: failed to validate document", c.collection)

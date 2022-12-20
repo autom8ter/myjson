@@ -130,21 +130,6 @@ func Test(t *testing.T) {
 			assert.Equal(t, 100, len(results.Documents))
 			t.Logf("found %v documents in %s", results.Count, results.Stats.ExecutionTime)
 		})
-		t.Run("paginate all", func(t *testing.T) {
-			//timer := timer()
-			//defer timer(t)
-			//pageCount := 0
-			//err := collection.QueryPaginate(ctx, model.Query{
-			//	Page:    0,
-			//	Limit:   10,
-			//
-			//}, func(page gokvkit.Page) bool {
-			//	pageCount++
-			//	return true
-			//})
-			//assert.Nil(t, err)
-			//assert.Equal(t, 10, pageCount)
-		})
 		t.Run("update contact.email", func(t *testing.T) {
 			for _, u := range usrs {
 				id := u.GetString("_id")
@@ -177,7 +162,6 @@ func Test(t *testing.T) {
 		t.Run("query delete all", func(t *testing.T) {
 			assert.Nil(t, db.Tx(ctx, true, func(ctx context.Context, tx gokvkit.Tx) error {
 				res, err := db.Query(ctx, "user", model.Query{
-
 					Select: []model.Select{{Field: "*"}},
 				})
 				if err != nil {
