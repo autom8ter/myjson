@@ -3,7 +3,6 @@ package gokvkit
 import (
 	"testing"
 
-	"github.com/autom8ter/gokvkit/model"
 	"github.com/brianvoe/gofakeit/v6"
 	"github.com/stretchr/testify/assert"
 )
@@ -14,10 +13,10 @@ func TestOptimizer(t *testing.T) {
 	assert.Nil(t, err)
 	indexes := schema
 	t.Run("select secondary index", func(t *testing.T) {
-		optimization, err := o.Optimize(indexes, []model.Where{
+		optimization, err := o.Optimize(indexes, []Where{
 			{
 				Field: "contact.email",
-				Op:    model.WhereOpEq,
+				Op:    WhereOpEq,
 				Value: gofakeit.Email(),
 			},
 		})
@@ -27,10 +26,10 @@ func TestOptimizer(t *testing.T) {
 	})
 
 	t.Run("select primary index", func(t *testing.T) {
-		optimization, err := o.Optimize(indexes, []model.Where{
+		optimization, err := o.Optimize(indexes, []Where{
 			{
 				Field: "_id",
-				Op:    model.WhereOpEq,
+				Op:    WhereOpEq,
 				Value: gofakeit.Email(),
 			},
 		})
@@ -40,15 +39,15 @@ func TestOptimizer(t *testing.T) {
 	})
 
 	t.Run("select secondary index (multi-field)", func(t *testing.T) {
-		optimization, err := o.Optimize(indexes, []model.Where{
+		optimization, err := o.Optimize(indexes, []Where{
 			{
 				Field: "account_id",
-				Op:    model.WhereOpEq,
+				Op:    WhereOpEq,
 				Value: 1,
 			},
 			{
 				Field: "contact.email",
-				Op:    model.WhereOpEq,
+				Op:    WhereOpEq,
 				Value: gofakeit.Email(),
 			},
 		})
@@ -58,15 +57,15 @@ func TestOptimizer(t *testing.T) {
 		assert.Equal(t, "contact.email", optimization.MatchedFields[1])
 	})
 	t.Run("select secondary index 2", func(t *testing.T) {
-		optimization, err := o.Optimize(indexes, []model.Where{
+		optimization, err := o.Optimize(indexes, []Where{
 			{
 				Field: "contact.email",
-				Op:    model.WhereOpEq,
+				Op:    WhereOpEq,
 				Value: gofakeit.Email(),
 			},
 			{
 				Field: "account_id",
-				Op:    model.WhereOpEq,
+				Op:    WhereOpEq,
 				Value: 1,
 			},
 		})
@@ -75,10 +74,10 @@ func TestOptimizer(t *testing.T) {
 		assert.Equal(t, "contact.email", optimization.MatchedFields[0])
 	})
 	t.Run("select secondary index (multi-field partial match)", func(t *testing.T) {
-		optimization, err := o.Optimize(indexes, []model.Where{
+		optimization, err := o.Optimize(indexes, []Where{
 			{
 				Field: "account_id",
-				Op:    model.WhereOpEq,
+				Op:    WhereOpEq,
 				Value: 1,
 			},
 		})
@@ -87,7 +86,7 @@ func TestOptimizer(t *testing.T) {
 		assert.Equal(t, "account_id", optimization.MatchedFields[0])
 	})
 	t.Run("select secondary index (multi-field partial match (!=))", func(t *testing.T) {
-		optimization, err := o.Optimize(indexes, []model.Where{
+		optimization, err := o.Optimize(indexes, []Where{
 			{
 				Field: "account_id",
 				Op:    "!=",

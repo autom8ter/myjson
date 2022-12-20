@@ -1,4 +1,4 @@
-package model
+package gokvkit
 
 import (
 	"encoding/json"
@@ -13,12 +13,6 @@ import (
 	"github.com/tidwall/gjson"
 	"github.com/tidwall/sjson"
 )
-
-// Ref is a reference to a document
-type Ref struct {
-	Collection string `json:"collection"`
-	ID         string `json:"id"`
-}
 
 // Document is a concurrency safe JSON document
 type Document struct {

@@ -1,10 +1,10 @@
-package model_test
+package gokvkit_test
 
 import (
 	"encoding/json"
 	"testing"
 
-	"github.com/autom8ter/gokvkit/model"
+	"github.com/autom8ter/gokvkit"
 	"github.com/autom8ter/gokvkit/testutil"
 	"github.com/brianvoe/gofakeit/v6"
 	"github.com/stretchr/testify/assert"
@@ -32,7 +32,7 @@ func TestDocument(t *testing.T) {
 		Name: "john smith",
 		Age:  50,
 	}
-	r, err := model.NewDocumentFrom(&usr)
+	r, err := gokvkit.NewDocumentFrom(&usr)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -55,7 +55,7 @@ func TestDocument(t *testing.T) {
 	})
 	t.Run("merge", func(t *testing.T) {
 		usr2 := user{ID: usr.ID, Contact: contact{Email: gofakeit.Email()}, Name: "john smith"}
-		r2, err := model.NewDocumentFrom(&usr2)
+		r2, err := gokvkit.NewDocumentFrom(&usr2)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -65,9 +65,9 @@ func TestDocument(t *testing.T) {
 		assert.Equal(t, usr.Contact.Phone, r.GetString("contact.phone"))
 	})
 	t.Run("valid", func(t *testing.T) {
-		r := model.NewDocument()
+		r := gokvkit.NewDocument()
 		assert.Equal(t, true, r.Valid())
-		r, err := model.NewDocumentFrom([]any{1})
+		r, err := gokvkit.NewDocumentFrom([]any{1})
 		assert.NotNil(t, err)
 	})
 	t.Run("clone", func(t *testing.T) {
@@ -84,7 +84,7 @@ func TestDocument(t *testing.T) {
 		assert.Equal(t, r.String(), string(r.Bytes()))
 	})
 	t.Run("new from bytes", func(t *testing.T) {
-		n, err := model.NewDocumentFromBytes(r.Bytes())
+		n, err := gokvkit.NewDocumentFromBytes(r.Bytes())
 		assert.Nil(t, err)
 		assert.Equal(t, r.String(), string(n.Bytes()))
 	})
@@ -101,141 +101,141 @@ func TestDocument(t *testing.T) {
 	})
 
 	t.Run("where", func(t *testing.T) {
-		r, err = model.NewDocumentFrom(&usr)
+		r, err = gokvkit.NewDocumentFrom(&usr)
 		if err != nil {
 			t.Fatal(err)
 		}
-		pass, err := r.Where([]model.Where{
+		pass, err := r.Where([]gokvkit.Where{
 			{
 				Field: "contact.email",
-				Op:    model.WhereOpEq,
+				Op:    gokvkit.WhereOpEq,
 				Value: email,
 			},
 		})
 		assert.Nil(t, err)
 		assert.True(t, pass)
 
-		pass, err = r.Where([]model.Where{
+		pass, err = r.Where([]gokvkit.Where{
 			{
 				Field: "contact.email",
-				Op:    model.WhereOpContains,
+				Op:    gokvkit.WhereOpContains,
 				Value: email,
 			},
 		})
 		assert.Nil(t, err)
 		assert.True(t, pass)
 
-		pass, err = r.Where([]model.Where{
+		pass, err = r.Where([]gokvkit.Where{
 			{
 				Field: "contact.email",
-				Op:    model.WhereOpEq,
+				Op:    gokvkit.WhereOpEq,
 				Value: gofakeit.Email(),
 			},
 		})
 		assert.Nil(t, err)
 		assert.False(t, pass)
 
-		pass, err = r.Where([]model.Where{
+		pass, err = r.Where([]gokvkit.Where{
 			{
 				Field: "contact.email",
-				Op:    model.WhereOpNeq,
+				Op:    gokvkit.WhereOpNeq,
 				Value: gofakeit.Email(),
 			},
 		})
 		assert.Nil(t, err)
 		assert.True(t, pass)
 
-		pass, err = r.Where([]model.Where{
+		pass, err = r.Where([]gokvkit.Where{
 			{
 				Field: "age",
-				Op:    model.WhereOpGt,
+				Op:    gokvkit.WhereOpGt,
 				Value: 10,
 			},
 		})
 		assert.Nil(t, err)
 		assert.True(t, pass)
 
-		pass, err = r.Where([]model.Where{
+		pass, err = r.Where([]gokvkit.Where{
 			{
 				Field: "age",
-				Op:    model.WhereOpGte,
+				Op:    gokvkit.WhereOpGte,
 				Value: 50,
 			},
 		})
 		assert.Nil(t, err)
 		assert.True(t, pass)
 
-		pass, err = r.Where([]model.Where{
+		pass, err = r.Where([]gokvkit.Where{
 			{
 				Field: "age",
-				Op:    model.WhereOpGte,
+				Op:    gokvkit.WhereOpGte,
 				Value: 51,
 			},
 		})
 		assert.Nil(t, err)
 		assert.False(t, pass)
 
-		pass, err = r.Where([]model.Where{
+		pass, err = r.Where([]gokvkit.Where{
 			{
 				Field: "age",
-				Op:    model.WhereOpLt,
+				Op:    gokvkit.WhereOpLt,
 				Value: 51,
 			},
 		})
 		assert.Nil(t, err)
 		assert.True(t, pass)
 
-		pass, err = r.Where([]model.Where{
+		pass, err = r.Where([]gokvkit.Where{
 			{
 				Field: "age",
-				Op:    model.WhereOpLte,
+				Op:    gokvkit.WhereOpLte,
 				Value: 50,
 			},
 		})
 		assert.Nil(t, err)
 		assert.True(t, pass)
 
-		pass, err = r.Where([]model.Where{
+		pass, err = r.Where([]gokvkit.Where{
 			{
 				Field: "age",
-				Op:    model.WhereOpLte,
+				Op:    gokvkit.WhereOpLte,
 				Value: 50,
 			},
 		})
 		assert.Nil(t, err)
 		assert.True(t, pass)
 
-		pass, err = r.Where([]model.Where{
+		pass, err = r.Where([]gokvkit.Where{
 			{
 				Field: "age",
-				Op:    model.WhereOpGte,
+				Op:    gokvkit.WhereOpGte,
 				Value: 50,
 			},
 		})
 		assert.Nil(t, err)
 		assert.True(t, pass)
 
-		pass, err = r.Where([]model.Where{
+		pass, err = r.Where([]gokvkit.Where{
 			{
 				Field: "age",
-				Op:    model.WhereOpIn,
+				Op:    gokvkit.WhereOpIn,
 				Value: []float64{50},
 			},
 		})
 		assert.Nil(t, err)
 		assert.True(t, pass)
 
-		pass, err = r.Where([]model.Where{
+		pass, err = r.Where([]gokvkit.Where{
 			{
 				Field: "age",
-				Op:    model.WhereOpLt,
+				Op:    gokvkit.WhereOpLt,
 				Value: 49,
 			},
 		})
 		assert.Nil(t, err)
 		assert.False(t, pass)
 
-		pass, err = r.Where([]model.Where{
+		pass, err = r.Where([]gokvkit.Where{
 			{
 				Field: "age",
 				Op:    "8",
@@ -246,12 +246,12 @@ func TestDocument(t *testing.T) {
 		assert.False(t, pass)
 	})
 	t.Run("results", func(t *testing.T) {
-		var docs = []*model.Document{
+		var docs = []*gokvkit.Document{
 			testutil.NewUserDoc(),
 			testutil.NewUserDoc(),
 			testutil.NewUserDoc(),
 		}
-		result := model.Page{
+		result := gokvkit.Page{
 			Documents: docs,
 			NextPage:  0,
 		}
@@ -260,30 +260,30 @@ func TestDocument(t *testing.T) {
 		t.Log(string(bits))
 	})
 	t.Run("documents - for each", func(t *testing.T) {
-		var docs = model.Documents{
+		var docs = gokvkit.Documents{
 			testutil.NewUserDoc(),
 			testutil.NewUserDoc(),
 			testutil.NewUserDoc(),
 		}
 		count := 0
-		docs.ForEach(func(next *model.Document, i int) {
+		docs.ForEach(func(next *gokvkit.Document, i int) {
 			count++
 		})
 		assert.Equal(t, 3, count)
 	})
 	t.Run("documents - filter", func(t *testing.T) {
-		var docs = model.Documents{
+		var docs = gokvkit.Documents{
 			testutil.NewUserDoc(),
 			testutil.NewUserDoc(),
 			testutil.NewUserDoc(),
 		}
-		docs = docs.Filter(func(document *model.Document, i int) bool {
+		docs = docs.Filter(func(document *gokvkit.Document, i int) bool {
 			return document.String() != docs[0].String()
 		})
 		assert.Equal(t, 2, len(docs))
 	})
 	t.Run("documents - slice", func(t *testing.T) {
-		var docs = model.Documents{
+		var docs = gokvkit.Documents{
 			testutil.NewUserDoc(),
 			testutil.NewUserDoc(),
 			testutil.NewUserDoc(),

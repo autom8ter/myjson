@@ -4,12 +4,11 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/autom8ter/gokvkit/model"
 	"github.com/brianvoe/gofakeit/v6"
 )
 
-func newUserDoc() *model.Document {
-	doc, err := model.NewDocumentFrom(map[string]interface{}{
+func newUserDoc() *Document {
+	doc, err := NewDocumentFrom(map[string]interface{}{
 		"_id":  gofakeit.UUID(),
 		"name": gofakeit.Name(),
 		"contact": map[string]interface{}{

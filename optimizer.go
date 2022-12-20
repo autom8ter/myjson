@@ -2,27 +2,27 @@ package gokvkit
 
 import (
 	"github.com/autom8ter/gokvkit/errors"
-	"github.com/autom8ter/gokvkit/model"
+
 	"github.com/samber/lo"
 )
 
 // Optimizer selects the best index from a set of indexes based on where clauses
 type Optimizer interface {
 	// Optimize selects the optimal index to use based on the given where clauses
-	Optimize(c CollectionSchema, where []model.Where) (model.Optimization, error)
+	Optimize(c CollectionSchema, where []Where) (Optimization, error)
 }
 
 type defaultOptimizer struct{}
 
-func (o defaultOptimizer) Optimize(c CollectionSchema, where []model.Where) (model.Optimization, error) {
+func (o defaultOptimizer) Optimize(c CollectionSchema, where []Where) (Optimization, error) {
 	if len(c.PrimaryIndex().Fields) == 0 {
-		return model.Optimization{}, errors.New(errors.Internal, "zero configured indexes")
+		return Optimization{}, errors.New(errors.Internal, "zero configured indexes")
 	}
 	indexes := c.Indexing()
 	if len(indexes) == 0 {
-		return model.Optimization{}, errors.New(errors.Internal, "zero configured indexes")
+		return Optimization{}, errors.New(errors.Internal, "zero configured indexes")
 	}
-	var defaultOptimization = model.Optimization{
+	var defaultOptimization = Optimization{
 		Index:         c.PrimaryIndex(),
 		MatchedFields: []string{},
 		MatchedValues: map[string]any{},
@@ -30,15 +30,15 @@ func (o defaultOptimizer) Optimize(c CollectionSchema, where []model.Where) (mod
 	if len(where) == 0 {
 		return defaultOptimization, nil
 	}
-	if c.PrimaryIndex().Fields[0] == where[0].Field && where[0].Op == model.WhereOpEq {
-		return model.Optimization{
+	if c.PrimaryIndex().Fields[0] == where[0].Field && where[0].Op == WhereOpEq {
+		return Optimization{
 			Index:         c.PrimaryIndex(),
 			MatchedFields: []string{c.PrimaryKey()},
 			MatchedValues: getMatchedFieldValues([]string{c.PrimaryKey()}, where),
 		}, nil
 	}
 	var (
-		i = model.Optimization{}
+		i = Optimization{}
 	)
 	for _, index := range indexes {
 		if len(index.Fields) == 0 {
@@ -50,7 +50,7 @@ func (o defaultOptimizer) Optimize(c CollectionSchema, where []model.Where) (mod
 		var matchedFields []string
 		for i, field := range index.Fields {
 			if len(where) > i {
-				if field == where[i].Field && where[i].Op == model.WhereOpEq {
+				if field == where[i].Field && where[i].Op == WhereOpEq {
 					matchedFields = append(matchedFields, field)
 				}
 			}
@@ -69,12 +69,12 @@ func (o defaultOptimizer) Optimize(c CollectionSchema, where []model.Where) (mod
 	return defaultOptimization, nil
 }
 
-func getMatchedFieldValues(fields []string, where []model.Where) map[string]any {
+func getMatchedFieldValues(fields []string, where []Where) map[string]any {
 	var whereFields []string
 	var whereValues = map[string]any{}
 	for _, f := range fields {
 		for _, w := range where {
-			if w.Op != model.WhereOpEq || w.Field != f {
+			if w.Op != WhereOpEq || w.Field != f {
 				continue
 			}
 			whereFields = append(whereFields, w.Field)

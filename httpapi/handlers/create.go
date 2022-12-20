@@ -9,7 +9,7 @@ import (
 	"github.com/autom8ter/gokvkit/errors"
 	"github.com/autom8ter/gokvkit/httpapi/api"
 	"github.com/autom8ter/gokvkit/httpapi/httpError"
-	"github.com/autom8ter/gokvkit/model"
+
 	"github.com/go-chi/chi/v5"
 )
 
@@ -20,7 +20,7 @@ func CreateDocHandler(o api.OpenAPIServer) http.HandlerFunc {
 			httpError.Error(w, errors.New(errors.NotFound, "collection does not exist"))
 			return
 		}
-		var doc = model.NewDocument()
+		var doc = gokvkit.NewDocument()
 		if err := json.NewDecoder(r.Body).Decode(doc); err != nil {
 			httpError.Error(w, errors.Wrap(err, errors.Validation, "failed to decode query"))
 			return

@@ -3,25 +3,24 @@ package gokvkit
 import (
 	"testing"
 
-	"github.com/autom8ter/gokvkit/model"
 	"github.com/stretchr/testify/assert"
 )
 
-func TestQuery(t *testing.T) {
+func TestQueryBuilder(t *testing.T) {
 	t.Run("query builder 1", func(t *testing.T) {
 		q := NewQueryBuilder().
-			Select(model.Select{
+			Select(Select{
 				Field: "account_id",
 			}).
-			Where(model.Where{
+			Where(Where{
 				Field: "age",
 				Op:    ">",
 				Value: 50,
 			}).
 			GroupBy("account_id").
-			OrderBy(model.OrderBy{
+			OrderBy(OrderBy{
 				Field:     "account_id",
-				Direction: model.OrderByDirectionDesc,
+				Direction: OrderByDirectionDesc,
 			}).
 			Limit(1).
 			Query()

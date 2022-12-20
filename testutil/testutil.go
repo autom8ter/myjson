@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/autom8ter/gokvkit"
-	"github.com/autom8ter/gokvkit/model"
 
 	"github.com/brianvoe/gofakeit/v6"
 
@@ -25,8 +24,8 @@ var (
 	AllCollections = [][]byte{[]byte(UserSchema), []byte(TaskSchema)}
 )
 
-func NewUserDoc() *model.Document {
-	doc, err := model.NewDocumentFrom(map[string]interface{}{
+func NewUserDoc() *gokvkit.Document {
+	doc, err := gokvkit.NewDocumentFrom(map[string]interface{}{
 		"_id":  gofakeit.UUID(),
 		"name": gofakeit.Name(),
 		"contact": map[string]interface{}{
@@ -47,8 +46,8 @@ func NewUserDoc() *model.Document {
 	return doc
 }
 
-func NewTaskDoc(usrID string) *model.Document {
-	doc, err := model.NewDocumentFrom(map[string]interface{}{
+func NewTaskDoc(usrID string) *gokvkit.Document {
+	doc, err := gokvkit.NewDocumentFrom(map[string]interface{}{
 		"_id":     gofakeit.UUID(),
 		"user":    usrID,
 		"content": gofakeit.LoremIpsumSentence(5),

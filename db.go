@@ -8,7 +8,6 @@ import (
 	"github.com/autom8ter/gokvkit/internal/safe"
 	"github.com/autom8ter/gokvkit/kv"
 	"github.com/autom8ter/gokvkit/kv/registry"
-	"github.com/autom8ter/gokvkit/model"
 	"github.com/autom8ter/machine/v4"
 )
 
@@ -113,9 +112,9 @@ func (d *DB) Tx(ctx context.Context, isUpdate bool, fn TxFunc) error {
 }
 
 // Get gets a single document by id
-func (d *DB) Get(ctx context.Context, collection, id string) (*model.Document, error) {
+func (d *DB) Get(ctx context.Context, collection, id string) (*Document, error) {
 	var (
-		document *model.Document
+		document *Document
 		err      error
 	)
 	if err := d.Tx(ctx, false, func(ctx context.Context, tx Tx) error {
@@ -128,8 +127,8 @@ func (d *DB) Get(ctx context.Context, collection, id string) (*model.Document, e
 }
 
 // Get gets 1-many document by id(s)
-func (d *DB) BatchGet(ctx context.Context, collection string, ids []string) (model.Documents, error) {
-	var documents []*model.Document
+func (d *DB) BatchGet(ctx context.Context, collection string, ids []string) (Documents, error) {
+	var documents []*Document
 	if err := d.Tx(ctx, false, func(ctx context.Context, tx Tx) error {
 		for _, id := range ids {
 			document, err := tx.Get(ctx, collection, id)
@@ -146,16 +145,16 @@ func (d *DB) BatchGet(ctx context.Context, collection string, ids []string) (mod
 }
 
 // Query queries a list of documents
-func (d *DB) Query(ctx context.Context, collection string, query model.Query) (model.Page, error) {
+func (d *DB) Query(ctx context.Context, collection string, query Query) (Page, error) {
 	var (
-		page model.Page
+		page Page
 		err  error
 	)
 	if err := d.Tx(ctx, false, func(ctx context.Context, tx Tx) error {
 		page, err = tx.Query(ctx, collection, query)
 		return err
 	}); err != nil {
-		return model.Page{}, err
+		return Page{}, err
 	}
 	return page, nil
 }
@@ -163,9 +162,9 @@ func (d *DB) Query(ctx context.Context, collection string, query model.Query) (m
 // ForEach scans the optimal index for a collection's documents passing its filters.
 // results will not be ordered unless an index supporting the order by(s) was found by the optimizer
 // Query should be used when order is more important than performance/resource-usage
-func (d *DB) ForEach(ctx context.Context, collection string, where []model.Where, fn ForEachFunc) (model.Optimization, error) {
+func (d *DB) ForEach(ctx context.Context, collection string, where []Where, fn ForEachFunc) (Optimization, error) {
 	var (
-		result model.Optimization
+		result Optimization
 		err    error
 	)
 	if err := d.Tx(ctx, false, func(ctx context.Context, tx Tx) error {
@@ -179,7 +178,7 @@ func (d *DB) ForEach(ctx context.Context, collection string, where []model.Where
 
 // ConfigureCollection overwrites a single database collection configuration
 func (d *DB) ConfigureCollection(ctx context.Context, collectionSchemaBytes []byte) error {
-	meta, _ := model.GetMetadata(ctx)
+	meta, _ := GetMetadata(ctx)
 	meta.Set(string(isIndexingKey), true)
 	meta.Set(string(internalKey), true)
 	ctx = meta.ToContext(ctx)
@@ -216,7 +215,7 @@ func (d *DB) ConfigureCollection(ctx context.Context, collectionSchemaBytes []by
 	existing, _ := d.getPersistedCollection(collection.Collection())
 	var diff indexDiff
 	if existing == nil {
-		diff, err = getIndexDiff(collection.Indexing(), map[string]model.Index{})
+		diff, err = getIndexDiff(collection.Indexing(), map[string]Index{})
 		if err != nil {
 			return err
 		}

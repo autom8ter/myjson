@@ -1,16 +1,18 @@
 package gokvkit
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 
 	"github.com/autom8ter/gokvkit/errors"
 	"github.com/autom8ter/gokvkit/internal/safe"
+	"github.com/autom8ter/gokvkit/internal/util"
 	"github.com/autom8ter/gokvkit/kv"
-	"github.com/autom8ter/gokvkit/model"
+	"github.com/nqd/flat"
 )
 
-func (d *DB) addIndex(ctx context.Context, collection string, index model.Index) error {
+func (d *DB) addIndex(ctx context.Context, collection string, index Index) error {
 	if index.Name == "" {
 		return errors.New(errors.Validation, "%s - empty index name", collection)
 	}
@@ -26,12 +28,12 @@ func (d *DB) addIndex(ctx context.Context, collection string, index model.Index)
 	if err != nil {
 		return err
 	}
-	meta, _ := model.GetMetadata(ctx)
+	meta, _ := GetMetadata(ctx)
 	meta.Set(string(internalKey), true)
 	meta.Set(string(isIndexingKey), true)
 	if !index.Primary {
 		if err := d.Tx(ctx, true, func(ctx context.Context, tx Tx) error {
-			_, err := d.ForEach(meta.ToContext(ctx), collection, nil, func(doc *model.Document) (bool, error) {
+			_, err := d.ForEach(meta.ToContext(ctx), collection, nil, func(doc *Document) (bool, error) {
 				if err := tx.Set(meta.ToContext(ctx), collection, doc); err != nil {
 					return false, err
 				}
@@ -53,7 +55,7 @@ func (d *DB) addIndex(ctx context.Context, collection string, index model.Index)
 	return err
 }
 
-func (d *DB) removeIndex(ctx context.Context, collection string, index model.Index) error {
+func (d *DB) removeIndex(ctx context.Context, collection string, index Index) error {
 	var err error
 	if d.collections.Get(collection).Indexing()[index.Name].IsBuilding {
 		return errors.New(errors.Forbidden, "%s - index is already building", collection)
@@ -65,12 +67,12 @@ func (d *DB) removeIndex(ctx context.Context, collection string, index model.Ind
 	if err != nil {
 		return err
 	}
-	meta, _ := model.GetMetadata(ctx)
+	meta, _ := GetMetadata(ctx)
 	meta.Set(string(internalKey), true)
 	meta.Set(string(isIndexingKey), true)
 	c := d.collections.Get(collection)
 	if err := d.Tx(ctx, true, func(ctx context.Context, tx Tx) error {
-		_, err := tx.ForEach(ctx, collection, nil, func(doc *model.Document) (bool, error) {
+		_, err := tx.ForEach(ctx, collection, nil, func(doc *Document) (bool, error) {
 			if err := tx.Delete(meta.ToContext(ctx), collection, c.GetPrimaryKey(doc)); err != nil {
 				return false, err
 			}
@@ -155,4 +157,75 @@ func (d *DB) getPersistedCollection(collection string) (CollectionSchema, error)
 		return nil, errors.New(errors.Validation, "collection not found")
 	}
 	return cfg, nil
+}
+
+// indexFieldValue is a key value pair
+type indexFieldValue struct {
+	Field string `json:"field"`
+	Value any    `json:"value"`
+}
+
+func seekPrefix(collection string, i Index, fields map[string]any) indexPathPrefix {
+	fields, _ = flat.Flatten(fields, nil)
+	var prefix = indexPathPrefix{
+		prefix: [][]byte{
+			[]byte("index"),
+			[]byte(collection),
+			[]byte(i.Name),
+		},
+	}
+	if i.Fields == nil {
+		return prefix
+	}
+	for _, k := range i.Fields {
+		if v, ok := fields[k]; ok {
+			prefix = prefix.Append(k, v)
+		}
+	}
+	return prefix
+}
+
+type indexPathPrefix struct {
+	prefix     [][]byte
+	documentID string
+	fields     [][]byte
+	fieldMap   []indexFieldValue
+}
+
+func (p indexPathPrefix) Append(field string, value any) indexPathPrefix {
+	fields := append(p.fields, []byte(field), util.EncodeIndexValue(value))
+	fieldMap := append(p.fieldMap, indexFieldValue{
+		Field: field,
+		Value: value,
+	})
+	return indexPathPrefix{
+		prefix:   p.prefix,
+		fields:   fields,
+		fieldMap: fieldMap,
+	}
+}
+
+func (p indexPathPrefix) SetDocumentID(id string) indexPathPrefix {
+	return indexPathPrefix{
+		prefix:     p.prefix,
+		documentID: id,
+		fields:     p.fields,
+		fieldMap:   p.fieldMap,
+	}
+}
+
+func (p indexPathPrefix) Path() []byte {
+	var path = append(p.prefix, p.fields...)
+	if p.documentID != "" {
+		path = append(path, []byte(p.documentID))
+	}
+	return bytes.Join(path, []byte("\x00"))
+}
+
+func (i indexPathPrefix) DocumentID() string {
+	return i.documentID
+}
+
+func (i indexPathPrefix) Fields() []indexFieldValue {
+	return i.fieldMap
 }

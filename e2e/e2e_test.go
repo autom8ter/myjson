@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/autom8ter/gokvkit"
-	"github.com/autom8ter/gokvkit/model"
+
 	"github.com/autom8ter/gokvkit/testutil"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/sync/errgroup"
@@ -29,10 +29,10 @@ func TestConcurrency(t *testing.T) {
 				egp.Go(func() error {
 					err := db.Tx(ctx, true, func(ctx context.Context, tx gokvkit.Tx) error {
 						results, err := tx.Query(ctx, "user", gokvkit.NewQueryBuilder().
-							Select(model.Select{Field: "*"}).
-							Where(model.Where{
+							Select(gokvkit.Select{Field: "*"}).
+							Where(gokvkit.Where{
 								Field: "contact.email",
-								Op:    model.WhereOpEq,
+								Op:    gokvkit.WhereOpEq,
 								Value: usrEmail,
 							}).Query())
 						if err != nil {
@@ -61,7 +61,7 @@ func TestConcurrency(t *testing.T) {
 					}
 					{
 						schema := db.GetSchema("user")
-						assert.Nil(t, schema.SetIndex(model.Index{
+						assert.Nil(t, schema.SetIndex(gokvkit.Index{
 							Name:    "email_idx",
 							Fields:  []string{"contact.email"},
 							Unique:  true,

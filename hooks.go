@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/autom8ter/gokvkit/errors"
-	"github.com/autom8ter/gokvkit/model"
 )
 
 // OnPersist is a hook function triggered whenever a command is persisted
@@ -14,7 +13,7 @@ type OnPersist struct {
 	// Before indicates whether the hook should execute before or after the command is persisted
 	Before bool
 	// Func is the function to execute
-	Func func(ctx context.Context, tx Tx, command *model.Command) error
+	Func func(ctx context.Context, tx Tx, command *Command) error
 }
 
 // Valid returns nil if the hook is valid
@@ -31,7 +30,7 @@ func (v OnPersist) Valid() error {
 // OnWhere is a hook function triggered before queries/scans are executed. They may be used for a varietey of purposes (ex: query authorization hooks)
 type OnWhere struct {
 	Name string
-	Func func(ctx context.Context, tx Tx, where []model.Where) ([]model.Where, error)
+	Func func(ctx context.Context, tx Tx, where []Where) ([]Where, error)
 }
 
 // Valid returns nil if the hook is valid
@@ -48,7 +47,7 @@ func (v OnWhere) Valid() error {
 // OnRead is a hook function triggered on each passing result of a read-based request
 type OnRead struct {
 	Name string
-	Func func(ctx context.Context, tx Tx, document *model.Document) (*model.Document, error)
+	Func func(ctx context.Context, tx Tx, document *Document) (*Document, error)
 }
 
 // Valid returns nil if the hook is valid

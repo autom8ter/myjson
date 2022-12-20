@@ -9,7 +9,7 @@ import (
 	"github.com/autom8ter/gokvkit/errors"
 	"github.com/autom8ter/gokvkit/internal/safe"
 	"github.com/autom8ter/gokvkit/internal/util"
-	"github.com/autom8ter/gokvkit/model"
+
 	"github.com/qri-io/jsonschema"
 	"github.com/tidwall/gjson"
 	"github.com/tidwall/sjson"
@@ -17,15 +17,15 @@ import (
 
 type CollectionSchema interface {
 	Collection() string
-	ValidateDocument(ctx context.Context, doc *model.Document) error
-	Indexing() map[string]model.Index
-	SetIndex(index model.Index) error
+	ValidateDocument(ctx context.Context, doc *Document) error
+	Indexing() map[string]Index
+	SetIndex(index Index) error
 	DelIndex(name string) error
-	PrimaryIndex() model.Index
+	PrimaryIndex() Index
 	// PrimaryKey returns the collections primary key
 	PrimaryKey() string
-	GetPrimaryKey(doc *model.Document) string
-	SetPrimaryKey(doc *model.Document, id string) error
+	GetPrimaryKey(doc *Document) string
+	SetPrimaryKey(doc *Document, id string) error
 	RequireQueryIndex() bool
 	Bytes() ([]byte, error)
 }
@@ -34,8 +34,8 @@ type collectionSchema struct {
 	schema       *jsonschema.Schema
 	raw          gjson.Result
 	collection   string
-	primaryIndex model.Index
-	indexing     *safe.Map[model.Index]
+	primaryIndex Index
+	indexing     *safe.Map[Index]
 	mu           sync.RWMutex
 }
 
@@ -66,10 +66,10 @@ func newCollectionSchema(yamlContent []byte) (CollectionSchema, error) {
 		schema:     schema,
 		raw:        r,
 		collection: r.Get(string(collectionPath)).String(),
-		indexing:   safe.NewMap(map[string]model.Index{}),
+		indexing:   safe.NewMap(map[string]Index{}),
 	}
 	for _, index := range s.raw.Get(string(indexingPath)).Map() {
-		var i model.Index
+		var i Index
 		err = util.Decode(index.Value(), &i)
 		if err != nil {
 			return nil, err
@@ -103,11 +103,11 @@ func (c *collectionSchema) Collection() string {
 	return c.collection
 }
 
-func (c *collectionSchema) Indexing() map[string]model.Index {
+func (c *collectionSchema) Indexing() map[string]Index {
 	return c.indexing.AsMap()
 }
 
-func (c *collectionSchema) SetIndex(index model.Index) error {
+func (c *collectionSchema) SetIndex(index Index) error {
 	if err := index.Validate(); err != nil {
 		return err
 	}
@@ -140,7 +140,7 @@ func (c *collectionSchema) DelIndex(name string) error {
 	return nil
 }
 
-func (c *collectionSchema) ValidateDocument(ctx context.Context, doc *model.Document) error {
+func (c *collectionSchema) ValidateDocument(ctx context.Context, doc *Document) error {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	kerrs, err := c.schema.ValidateBytes(ctx, doc.Bytes())
@@ -161,14 +161,14 @@ func (c *collectionSchema) PrimaryKey() string {
 	return fields[0]
 }
 
-func (c *collectionSchema) GetPrimaryKey(doc *model.Document) string {
+func (c *collectionSchema) GetPrimaryKey(doc *Document) string {
 	if doc == nil {
 		return ""
 	}
 	return doc.GetString(c.PrimaryKey())
 }
 
-func (c *collectionSchema) SetPrimaryKey(doc *model.Document, id string) error {
+func (c *collectionSchema) SetPrimaryKey(doc *Document, id string) error {
 	pkey := c.PrimaryKey()
 	return errors.Wrap(doc.Set(pkey, id), 0, "failed to set primary key")
 }
@@ -177,6 +177,6 @@ func (c *collectionSchema) RequireQueryIndex() bool {
 	return c.raw.Get(string(requireIndexPath)).Bool()
 }
 
-func (c *collectionSchema) PrimaryIndex() model.Index {
+func (c *collectionSchema) PrimaryIndex() Index {
 	return c.primaryIndex
 }

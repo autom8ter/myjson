@@ -9,7 +9,7 @@ import (
 	"github.com/autom8ter/gokvkit/errors"
 	"github.com/autom8ter/gokvkit/httpapi/api"
 	"github.com/autom8ter/gokvkit/httpapi/httpError"
-	"github.com/autom8ter/gokvkit/model"
+
 	"github.com/go-chi/chi/v5"
 )
 
@@ -21,7 +21,7 @@ func SetDocHandler(o api.OpenAPIServer) http.HandlerFunc {
 			return
 		}
 		docID := chi.URLParam(r, "docID")
-		var doc = model.NewDocument()
+		var doc = gokvkit.NewDocument()
 		if err := json.NewDecoder(r.Body).Decode(&doc); err != nil {
 			httpError.Error(w, errors.Wrap(err, http.StatusBadRequest, "failed to decode update"))
 			return

@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/autom8ter/gokvkit"
-	"github.com/autom8ter/gokvkit/model"
+
 	"github.com/autom8ter/gokvkit/testutil"
 	"github.com/brianvoe/gofakeit/v6"
 	"github.com/stretchr/testify/assert"
@@ -51,7 +51,7 @@ func Test(t *testing.T) {
 		}))
 	})
 	assert.Nil(t, testutil.TestDB(func(ctx context.Context, db *gokvkit.DB) {
-		var usrs []*model.Document
+		var usrs []*gokvkit.Document
 		var ids []string
 		t.Run("set all", func(t *testing.T) {
 			timer := timer()
@@ -81,12 +81,12 @@ func Test(t *testing.T) {
 		t.Run("query users account_id > 50", func(t *testing.T) {
 			timer := timer()
 			defer timer(t)
-			results, err := db.Query(ctx, "user", model.Query{
-				Select: []model.Select{{Field: "account_id"}},
-				Where: []model.Where{
+			results, err := db.Query(ctx, "user", gokvkit.Query{
+				Select: []gokvkit.Select{{Field: "account_id"}},
+				Where: []gokvkit.Where{
 					{
 						Field: "account_id",
-						Op:    model.WhereOpGt,
+						Op:    gokvkit.WhereOpGt,
 						Value: 50,
 					},
 				},
@@ -101,12 +101,12 @@ func Test(t *testing.T) {
 		t.Run("query users account_id in 51-60", func(t *testing.T) {
 			timer := timer()
 			defer timer(t)
-			results, err := db.Query(ctx, "user", model.Query{
-				Select: []model.Select{{Field: "account_id"}},
-				Where: []model.Where{
+			results, err := db.Query(ctx, "user", gokvkit.Query{
+				Select: []gokvkit.Select{{Field: "account_id"}},
+				Where: []gokvkit.Where{
 					{
 						Field: "account_id",
-						Op:    model.WhereOpIn,
+						Op:    gokvkit.WhereOpIn,
 						Value: []float64{51, 52, 53, 54, 55, 56, 57, 58, 59, 60},
 					},
 				},
@@ -122,8 +122,8 @@ func Test(t *testing.T) {
 		t.Run("query all", func(t *testing.T) {
 			timer := timer()
 			defer timer(t)
-			results, err := db.Query(ctx, "user", model.Query{
-				Select: []model.Select{{Field: "*"}},
+			results, err := db.Query(ctx, "user", gokvkit.Query{
+				Select: []gokvkit.Select{{Field: "*"}},
 			})
 			assert.Nil(t, err)
 			assert.Equal(t, 100, len(results.Documents))
@@ -160,8 +160,8 @@ func Test(t *testing.T) {
 		})
 		t.Run("query delete all", func(t *testing.T) {
 			assert.Nil(t, db.Tx(ctx, true, func(ctx context.Context, tx gokvkit.Tx) error {
-				res, err := db.Query(ctx, "user", model.Query{
-					Select: []model.Select{{Field: "*"}},
+				res, err := db.Query(ctx, "user", gokvkit.Query{
+					Select: []gokvkit.Select{{Field: "*"}},
 				})
 				if err != nil {
 					return err
@@ -221,7 +221,7 @@ func Benchmark(b *testing.B) {
 			assert.Nil(b, db.Tx(ctx, true, func(ctx context.Context, tx gokvkit.Tx) error {
 				return tx.Set(ctx, "user", doc)
 			}))
-			var docs []*model.Document
+			var docs []*gokvkit.Document
 			assert.Nil(b, db.Tx(ctx, true, func(ctx context.Context, tx gokvkit.Tx) error {
 				for i := 0; i < 100000; i++ {
 					usr := testutil.NewUserDoc()
@@ -234,12 +234,12 @@ func Benchmark(b *testing.B) {
 			}))
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				results, err := db.Query(ctx, "user", model.Query{
-					Select: []model.Select{{Field: "*"}},
-					Where: []model.Where{
+				results, err := db.Query(ctx, "user", gokvkit.Query{
+					Select: []gokvkit.Select{{Field: "*"}},
+					Where: []gokvkit.Where{
 						{
 							Field: "contact.email",
-							Op:    model.WhereOpEq,
+							Op:    gokvkit.WhereOpEq,
 							Value: doc.GetString("contact.email"),
 						},
 					},
@@ -259,7 +259,7 @@ func Benchmark(b *testing.B) {
 			assert.Nil(b, db.Tx(ctx, true, func(ctx context.Context, tx gokvkit.Tx) error {
 				return tx.Set(ctx, "user", doc)
 			}))
-			var docs []*model.Document
+			var docs []*gokvkit.Document
 			assert.Nil(b, db.Tx(ctx, true, func(ctx context.Context, tx gokvkit.Tx) error {
 				for i := 0; i < 100000; i++ {
 					usr := testutil.NewUserDoc()
@@ -272,12 +272,12 @@ func Benchmark(b *testing.B) {
 			}))
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				_, err := db.Query(ctx, "user", model.Query{
-					Select: []model.Select{{Field: "*"}},
-					Where: []model.Where{
+				_, err := db.Query(ctx, "user", gokvkit.Query{
+					Select: []gokvkit.Select{{Field: "*"}},
+					Where: []gokvkit.Where{
 						{
 							Field: "name",
-							Op:    model.WhereOpContains,
+							Op:    gokvkit.WhereOpContains,
 							Value: doc.GetString("John"),
 						},
 					},
@@ -292,7 +292,7 @@ func Benchmark(b *testing.B) {
 func TestIndexing1(t *testing.T) {
 	t.Run("matching unique index (contact.email)", func(t *testing.T) {
 		assert.Nil(t, testutil.TestDB(func(ctx context.Context, db *gokvkit.DB) {
-			var docs model.Documents
+			var docs gokvkit.Documents
 			assert.Nil(t, db.Tx(ctx, true, func(ctx context.Context, tx gokvkit.Tx) error {
 				for i := 0; i < 5; i++ {
 					usr := testutil.NewUserDoc()
@@ -303,16 +303,16 @@ func TestIndexing1(t *testing.T) {
 				}
 				return nil
 			}))
-			page, err := db.Query(ctx, "user", model.Query{
-				Select: []model.Select{
+			page, err := db.Query(ctx, "user", gokvkit.Query{
+				Select: []gokvkit.Select{
 					{
 						Field: "contact.email",
 					},
 				},
-				Where: []model.Where{
+				Where: []gokvkit.Where{
 					{
 						Field: "contact.email",
-						Op:    model.WhereOpEq,
+						Op:    gokvkit.WhereOpEq,
 						Value: docs[0].Get("contact.email"),
 					},
 				},
@@ -324,7 +324,7 @@ func TestIndexing1(t *testing.T) {
 			assert.Equal(t, false, page.Stats.Optimization.Index.Primary)
 		}))
 		assert.Nil(t, testutil.TestDB(func(ctx context.Context, db *gokvkit.DB) {
-			var docs model.Documents
+			var docs gokvkit.Documents
 			assert.Nil(t, db.Tx(ctx, true, func(ctx context.Context, tx gokvkit.Tx) error {
 				for i := 0; i < 5; i++ {
 					usr := testutil.NewUserDoc()
@@ -335,17 +335,17 @@ func TestIndexing1(t *testing.T) {
 				}
 				return nil
 			}))
-			page, err := db.Query(ctx, "user", model.Query{
+			page, err := db.Query(ctx, "user", gokvkit.Query{
 
-				Select: []model.Select{
+				Select: []gokvkit.Select{
 					{
 						Field: "name",
 					},
 				},
-				Where: []model.Where{
+				Where: []gokvkit.Where{
 					{
 						Field: "contact.email",
-						Op:    model.WhereOpEq,
+						Op:    gokvkit.WhereOpEq,
 						Value: docs[0].Get("contact.email"),
 					},
 				},
@@ -359,7 +359,7 @@ func TestIndexing1(t *testing.T) {
 	})
 	t.Run("non-matching (name)", func(t *testing.T) {
 		assert.Nil(t, testutil.TestDB(func(ctx context.Context, db *gokvkit.DB) {
-			var docs model.Documents
+			var docs gokvkit.Documents
 			assert.Nil(t, db.Tx(ctx, true, func(ctx context.Context, tx gokvkit.Tx) error {
 				for i := 0; i < 5; i++ {
 					usr := testutil.NewUserDoc()
@@ -370,17 +370,17 @@ func TestIndexing1(t *testing.T) {
 				}
 				return nil
 			}))
-			page, err := db.Query(ctx, "user", model.Query{
+			page, err := db.Query(ctx, "user", gokvkit.Query{
 
-				Select: []model.Select{
+				Select: []gokvkit.Select{
 					{
 						Field: "name",
 					},
 				},
-				Where: []model.Where{
+				Where: []gokvkit.Where{
 					{
 						Field: "name",
-						Op:    model.WhereOpContains,
+						Op:    gokvkit.WhereOpContains,
 						Value: docs[0].Get("name"),
 					},
 				},
@@ -395,7 +395,7 @@ func TestIndexing1(t *testing.T) {
 	})
 	t.Run("matching primary (_id)", func(t *testing.T) {
 		assert.Nil(t, testutil.TestDB(func(ctx context.Context, db *gokvkit.DB) {
-			var docs model.Documents
+			var docs gokvkit.Documents
 			assert.Nil(t, db.Tx(ctx, true, func(ctx context.Context, tx gokvkit.Tx) error {
 				for i := 0; i < 5; i++ {
 					usr := testutil.NewUserDoc()
@@ -406,17 +406,17 @@ func TestIndexing1(t *testing.T) {
 				}
 				return nil
 			}))
-			page, err := db.Query(ctx, "user", model.Query{
+			page, err := db.Query(ctx, "user", gokvkit.Query{
 
-				Select: []model.Select{
+				Select: []gokvkit.Select{
 					{
 						Field: "_id",
 					},
 				},
-				Where: []model.Where{
+				Where: []gokvkit.Where{
 					{
 						Field: "_id",
-						Op:    model.WhereOpEq,
+						Op:    gokvkit.WhereOpEq,
 						Value: docs[0].Get("_id"),
 					},
 				},
@@ -429,7 +429,7 @@ func TestIndexing1(t *testing.T) {
 			assert.Equal(t, true, page.Stats.Optimization.Index.Primary)
 		}))
 		assert.Nil(t, testutil.TestDB(func(ctx context.Context, db *gokvkit.DB) {
-			var docs model.Documents
+			var docs gokvkit.Documents
 			assert.Nil(t, db.Tx(ctx, true, func(ctx context.Context, tx gokvkit.Tx) error {
 				for i := 0; i < 5; i++ {
 					usr := testutil.NewUserDoc()
@@ -440,17 +440,17 @@ func TestIndexing1(t *testing.T) {
 				}
 				return nil
 			}))
-			page, err := db.Query(ctx, "user", model.Query{
+			page, err := db.Query(ctx, "user", gokvkit.Query{
 
-				Select: []model.Select{
+				Select: []gokvkit.Select{
 					{
 						Field: "_id",
 					},
 				},
-				Where: []model.Where{
+				Where: []gokvkit.Where{
 					{
 						Field: "_id",
-						Op:    model.WhereOpContains,
+						Op:    gokvkit.WhereOpContains,
 						Value: docs[0].Get("_id"),
 					},
 				},
@@ -468,7 +468,7 @@ func TestAggregate(t *testing.T) {
 
 	t.Run("sum advanced", func(t *testing.T) {
 		assert.Nil(t, testutil.TestDB(func(ctx context.Context, db *gokvkit.DB) {
-			var usrs model.Documents
+			var usrs gokvkit.Documents
 			ageSum := map[string]float64{}
 			assert.Nil(t, db.Tx(ctx, true, func(ctx context.Context, tx gokvkit.Tx) error {
 				for i := 0; i < 10; i++ {
@@ -480,27 +480,27 @@ func TestAggregate(t *testing.T) {
 				return nil
 			}))
 
-			query := model.Query{
+			query := gokvkit.Query{
 				GroupBy: []string{"account_id"},
 				//Where:      []schema.Where{
 				//	{
 				//
 				//	},
 				//},
-				Select: []model.Select{
+				Select: []gokvkit.Select{
 					{
 						Field: "account_id",
 					},
 					{
 						Field:     "age",
-						Aggregate: model.SelectAggregateSum,
+						Aggregate: gokvkit.SelectAggregateSum,
 						As:        "age_sum",
 					},
 				},
-				OrderBy: []model.OrderBy{
+				OrderBy: []gokvkit.OrderBy{
 					{
 						Field:     "account_id",
-						Direction: model.OrderByDirectionAsc,
+						Direction: gokvkit.OrderByDirectionAsc,
 					},
 				},
 			}

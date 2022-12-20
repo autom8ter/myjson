@@ -9,7 +9,7 @@ import (
 	"github.com/autom8ter/gokvkit/errors"
 	"github.com/autom8ter/gokvkit/httpapi/api"
 	"github.com/autom8ter/gokvkit/httpapi/httpError"
-	"github.com/autom8ter/gokvkit/model"
+
 	"github.com/go-chi/chi/v5"
 )
 
@@ -20,7 +20,7 @@ func BatchSetHandler(o api.OpenAPIServer) http.HandlerFunc {
 			httpError.Error(w, errors.New(errors.Validation, "collection does not exist"))
 			return
 		}
-		var docs []*model.Document
+		var docs []*gokvkit.Document
 		if err := json.NewDecoder(r.Body).Decode(&docs); err != nil {
 			httpError.Error(w, errors.Wrap(err, errors.Validation, "failed to decode query"))
 			return

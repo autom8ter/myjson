@@ -5,10 +5,11 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/autom8ter/gokvkit"
 	"github.com/autom8ter/gokvkit/errors"
 	"github.com/autom8ter/gokvkit/httpapi/api"
 	"github.com/autom8ter/gokvkit/httpapi/httpError"
-	"github.com/autom8ter/gokvkit/model"
+
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/getkin/kin-openapi/openapi3filter"
 	"github.com/getkin/kin-openapi/routers/gorillamux"
@@ -34,7 +35,7 @@ func OpenAPIValidator(o api.OpenAPIServer) func(http.Handler) http.Handler {
 				httpError.Error(w, errors.Wrap(err, http.StatusBadRequest, "failed to configure collection"))
 				return
 			}
-			md, _ := model.GetMetadata(r.Context())
+			md, _ := gokvkit.GetMetadata(r.Context())
 			for k, v := range r.Header {
 				md.Set(fmt.Sprintf("openapi.header.%s", k), v)
 			}

@@ -9,7 +9,7 @@ import (
 	"github.com/autom8ter/gokvkit"
 	"github.com/autom8ter/gokvkit/httpapi"
 	_ "github.com/autom8ter/gokvkit/kv/badger"
-	"github.com/autom8ter/gokvkit/model"
+
 	"github.com/autom8ter/gokvkit/testutil"
 )
 
@@ -61,9 +61,9 @@ func main() {
 	}
 }
 
-func cascadeDelete(ctx context.Context, tx gokvkit.Tx, command *model.Command) error {
-	if command.Action == model.Delete {
-		results, err := tx.Query(ctx, "task", gokvkit.NewQueryBuilder().Where(model.Where{
+func cascadeDelete(ctx context.Context, tx gokvkit.Tx, command *gokvkit.Command) error {
+	if command.Action == gokvkit.Delete {
+		results, err := tx.Query(ctx, "task", gokvkit.NewQueryBuilder().Where(gokvkit.Where{
 			Field: "user",
 			Op:    "==",
 			Value: command.Document.Get("_id"),

@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/autom8ter/gokvkit/internal/util"
-	"github.com/autom8ter/gokvkit/model"
+
 	"github.com/brianvoe/gofakeit/v6"
 	"github.com/stretchr/testify/assert"
 )
@@ -31,18 +31,18 @@ func TestUtil(t *testing.T) {
 		Name: "john smith",
 		Age:  50,
 	}
-	r, err := model.NewDocumentFrom(&usr)
+	r, err := NewDocumentFrom(&usr)
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Run("compareField", func(t *testing.T) {
-		d, err := model.NewDocumentFrom(map[string]any{
+		d, err := NewDocumentFrom(map[string]any{
 			"age":    50,
 			"name":   "coleman",
 			"isMale": true,
 		})
 		assert.Nil(t, err)
-		d1, err := model.NewDocumentFrom(map[string]any{
+		d1, err := NewDocumentFrom(map[string]any{
 			"age":  51,
 			"name": "lacee",
 		})
@@ -67,19 +67,19 @@ func TestUtil(t *testing.T) {
 		})
 	})
 	t.Run("decode", func(t *testing.T) {
-		d, err := model.NewDocumentFrom(map[string]any{
+		d, err := NewDocumentFrom(map[string]any{
 			"age":    50,
 			"name":   "coleman",
 			"isMale": true,
 		})
 		assert.Nil(t, err)
-		d1 := model.NewDocument()
+		d1 := NewDocument()
 		assert.Nil(t, util.Decode(d, d1))
 		assert.Equal(t, d.String(), d1.String())
 	})
 	t.Run("selectDoc", func(t *testing.T) {
 		before := r.Get("contact.email")
-		err := selectDocument(r, []model.Select{{Field: "contact.email"}})
+		err := selectDocument(r, []Select{{Field: "contact.email"}})
 		assert.Nil(t, err)
 		after := r.Get("contact.email")
 		assert.Equal(t, before, after)
@@ -87,16 +87,16 @@ func TestUtil(t *testing.T) {
 	})
 	t.Run("sum age", func(t *testing.T) {
 		var expected = float64(0)
-		var docs model.Documents
+		var docs Documents
 		for i := 0; i < 5; i++ {
 			u := newUserDoc()
 			expected += u.GetFloat("age")
 			docs = append(docs, u)
 		}
-		reduced, err := aggregateDocs(docs, []model.Select{
+		reduced, err := aggregateDocs(docs, []Select{
 			{
 				Field:     "age",
-				Aggregate: model.SelectAggregateSum,
+				Aggregate: SelectAggregateSum,
 				As:        "age_sum",
 			},
 		})
@@ -104,23 +104,23 @@ func TestUtil(t *testing.T) {
 		assert.Equal(t, expected, reduced.GetFloat("age_sum"))
 	})
 	t.Run("documents - orderBy", func(t *testing.T) {
-		var docs model.Documents
+		var docs Documents
 		for i := 0; i < 100; i++ {
 			doc := newUserDoc()
 			assert.Nil(t, doc.Set("account_id", gofakeit.IntRange(1, 5)))
 			docs = append(docs, doc)
 		}
-		docs = orderByDocs(docs, []model.OrderBy{
+		docs = orderByDocs(docs, []OrderBy{
 			{
 				Field:     "account_id",
-				Direction: model.OrderByDirectionDesc,
+				Direction: OrderByDirectionDesc,
 			},
 			{
 				Field:     "age",
-				Direction: model.OrderByDirectionDesc,
+				Direction: OrderByDirectionDesc,
 			},
 		})
-		docs.ForEach(func(next *model.Document, i int) {
+		docs.ForEach(func(next *Document, i int) {
 			if len(docs) > i+1 {
 				assert.GreaterOrEqual(t, next.GetFloat("account_id"), docs[i+1].GetFloat("account_id"), i)
 				if next.GetFloat("account_id") == docs[i+1].GetFloat("account_id") {

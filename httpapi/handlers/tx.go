@@ -4,10 +4,11 @@ import (
 	"context"
 	"net/http"
 
+	"github.com/autom8ter/gokvkit"
 	"github.com/autom8ter/gokvkit/errors"
 	"github.com/autom8ter/gokvkit/httpapi/api"
 	"github.com/autom8ter/gokvkit/httpapi/httpError"
-	"github.com/autom8ter/gokvkit/model"
+
 	"github.com/gorilla/websocket"
 )
 
@@ -24,16 +25,16 @@ const (
 
 // TxInput is an input to a transaction
 type TxInput struct {
-	Action     TxAction        `json:"action,omitempty"`
-	Collection string          `json:"collection,omitempty"`
-	DocID      string          `json:"docID,omitempty"`
-	Value      *model.Document `json:"value,omitempty"`
+	Action     TxAction          `json:"action,omitempty"`
+	Collection string            `json:"collection,omitempty"`
+	DocID      string            `json:"docID,omitempty"`
+	Value      *gokvkit.Document `json:"value,omitempty"`
 }
 
 // TxOutput is an output of a transaction
 type TxOutput struct {
-	Value *model.Document `json:"value,omitempty"`
-	Error *errors.Error   `json:"error,omitempty"`
+	Value *gokvkit.Document `json:"value,omitempty"`
+	Error *errors.Error     `json:"error,omitempty"`
 }
 
 func TxHandler(o api.OpenAPIServer, upgrader websocket.Upgrader) http.HandlerFunc {

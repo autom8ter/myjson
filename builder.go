@@ -1,38 +1,34 @@
 package gokvkit
 
-import (
-	"github.com/autom8ter/gokvkit/model"
-)
-
 // QueryBuilder is a utility for creating queries via chainable methods
 type QueryBuilder struct {
-	query *model.Query
+	query *Query
 }
 
 // NewQueryBuilder creates a new QueryBuilder instance
 func NewQueryBuilder() *QueryBuilder {
-	return &QueryBuilder{query: &model.Query{}}
+	return &QueryBuilder{query: &Query{}}
 }
 
 // Query returns the built query
-func (q *QueryBuilder) Query() model.Query {
+func (q *QueryBuilder) Query() Query {
 	return *q.query
 }
 
 // Select adds the SelectFiel(s) to the query
-func (q *QueryBuilder) Select(fields ...model.Select) *QueryBuilder {
+func (q *QueryBuilder) Select(fields ...Select) *QueryBuilder {
 	q.query.Select = append(q.query.Select, fields...)
 	return q
 }
 
 // Where adds the Where clause(s) to the query
-func (q *QueryBuilder) Where(where ...model.Where) *QueryBuilder {
+func (q *QueryBuilder) Where(where ...Where) *QueryBuilder {
 	q.query.Where = append(q.query.Where, where...)
 	return q
 }
 
 // OrderBy adds the OrderBy clause(s) to the query
-func (q *QueryBuilder) OrderBy(ob ...model.OrderBy) *QueryBuilder {
+func (q *QueryBuilder) OrderBy(ob ...OrderBy) *QueryBuilder {
 	q.query.OrderBy = append(q.query.OrderBy, ob...)
 	return q
 }

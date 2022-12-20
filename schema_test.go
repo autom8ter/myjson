@@ -5,7 +5,6 @@ import (
 	_ "embed"
 	"testing"
 
-	"github.com/autom8ter/gokvkit/model"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -21,7 +20,7 @@ func TestJSONSchema(t *testing.T) {
 		schema, err := newCollectionSchema([]byte(userSchema))
 		assert.Nil(t, err)
 		assert.Nil(t, schema.ValidateDocument(context.Background(), newUserDoc()))
-		assert.NotNil(t, schema.ValidateDocument(context.Background(), model.NewDocument()))
+		assert.NotNil(t, schema.ValidateDocument(context.Background(), NewDocument()))
 	})
 	t.Run("primary key", func(t *testing.T) {
 		schema, err := newCollectionSchema([]byte(taskSchema))
