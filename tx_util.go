@@ -11,7 +11,6 @@ import (
 	"github.com/autom8ter/gokvkit/kv"
 	"github.com/autom8ter/gokvkit/model"
 	"github.com/nqd/flat"
-	"github.com/segmentio/ksuid"
 )
 
 func (t *transaction) updateDocument(ctx context.Context, c CollectionSchema, docID string, before *model.Document, command *model.Command) error {
@@ -55,7 +54,7 @@ func (t *transaction) deleteDocument(ctx context.Context, c CollectionSchema, do
 
 func (t *transaction) createDocument(ctx context.Context, c CollectionSchema, command *model.Command) error {
 	primaryIndex := c.PrimaryIndex()
-	docID := ksuid.New().String()
+	docID := c.GetPrimaryKey(command.Document)
 	if err := c.SetPrimaryKey(command.Document, docID); err != nil {
 		return err
 	}
@@ -67,7 +66,6 @@ func (t *transaction) createDocument(ctx context.Context, c CollectionSchema, co
 	}).SetDocumentID(docID).Path(), command.Document.Bytes()); err != nil {
 		return errors.Wrap(err, errors.Internal, "failed to batch set documents to primary index")
 	}
-
 	return nil
 }
 

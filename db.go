@@ -100,7 +100,7 @@ func (d *DB) NewTx(isUpdate bool) Txn {
 // otherwise, the changes will be commited to the database
 func (d *DB) Tx(ctx context.Context, isUpdate bool, fn TxFunc) error {
 	tx := d.NewTx(isUpdate)
-	defer tx.Close(ctx)
+	//defer tx.Close(ctx)
 	err := fn(ctx, tx)
 	if err != nil {
 		tx.Rollback(ctx)

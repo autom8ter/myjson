@@ -32,7 +32,7 @@ func TestErrors(t *testing.T) {
 		err := errors.New(0, "not found")
 		err = errors.Wrap(err, errors.NotFound, "")
 		e := errors.Extract(err).RemoveError()
-		assert.Nil(t, e.Err)
+		assert.Empty(t, e.Err)
 	})
 	t.Run("error json string", func(t *testing.T) {
 		err := errors.New(0, "not found")
