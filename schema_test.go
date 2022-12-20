@@ -39,6 +39,16 @@ func TestJSONSchema(t *testing.T) {
 		assert.NotNil(t, schema.DelIndex(schema.PrimaryIndex().Name))
 		assert.NotNil(t, schema.SetIndex(schema.PrimaryIndex()))
 	})
+	t.Run("del / set index", func(t *testing.T) {
+		schema, err := newCollectionSchema([]byte(userSchema))
+		assert.Nil(t, err)
+		before := schema.Indexing()["email_idx"]
+		assert.NotEmpty(t, before)
+		assert.Nil(t, schema.DelIndex("email_idx"))
+		assert.Empty(t, schema.Indexing()["email_idx"])
+		assert.Nil(t, schema.SetIndex(before))
+		assert.NotEmpty(t, schema.Indexing()["email_idx"])
+	})
 	schema, err := newCollectionSchema([]byte(userSchema))
 	assert.Nil(t, err)
 	assert.NotNil(t, schema.Indexing())

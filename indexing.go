@@ -14,6 +14,9 @@ func (d *DB) addIndex(ctx context.Context, collection string, index model.Index)
 	if index.Name == "" {
 		return errors.New(errors.Validation, "%s - empty index name", collection)
 	}
+	if d.collections.Get(collection).Indexing()[index.Name].IsBuilding {
+		return errors.New(errors.Forbidden, "%s - index is already building", collection)
+	}
 	index.IsBuilding = true
 	var err error
 	d.collections.SetFunc(collection, func(c CollectionSchema) CollectionSchema {
@@ -52,6 +55,9 @@ func (d *DB) addIndex(ctx context.Context, collection string, index model.Index)
 
 func (d *DB) removeIndex(ctx context.Context, collection string, index model.Index) error {
 	var err error
+	if d.collections.Get(collection).Indexing()[index.Name].IsBuilding {
+		return errors.New(errors.Forbidden, "%s - index is already building", collection)
+	}
 	d.collections.SetFunc(collection, func(c CollectionSchema) CollectionSchema {
 		err = c.DelIndex(index.Name)
 		return c

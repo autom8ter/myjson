@@ -4,8 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-
-	"github.com/samber/lo"
 )
 
 // Code is a code associated with an error
@@ -23,7 +21,7 @@ const (
 type Error struct {
 	Code     Code     `json:"code"`
 	Messages []string `json:"messages"`
-	Err      *string  `json:"err,omitempty"`
+	Err      string   `json:"err,omitempty"`
 }
 
 // Error returns the Error as a json string
@@ -37,7 +35,6 @@ func (e *Error) RemoveError() *Error {
 	return &Error{
 		Code:     e.Code,
 		Messages: e.Messages,
-		Err:      nil,
 	}
 }
 
@@ -51,7 +48,7 @@ func Extract(err error) *Error {
 		return &Error{
 			Code:     0,
 			Messages: nil,
-			Err:      lo.ToPtr(err.Error()),
+			Err:      err.Error(),
 		}
 	}
 	return e
@@ -61,7 +58,6 @@ func Extract(err error) *Error {
 func New(code Code, msg string, args ...any) error {
 	e := &Error{
 		Code: code,
-		Err:  nil,
 	}
 	if msg != "" {
 		e.Messages = append(e.Messages, fmt.Sprintf(msg, args...))
@@ -79,8 +75,8 @@ func Wrap(err error, code Code, msg string, args ...any) error {
 		if msg != "" {
 			e.Messages = append(e.Messages, fmt.Sprintf(msg, args...))
 		}
-		if e.Err == nil {
-			e.Err = lo.ToPtr(err.Error())
+		if e.Err == "" {
+			e.Err = err.Error()
 		}
 		if code > 0 {
 			e.Code = code
@@ -89,7 +85,7 @@ func Wrap(err error, code Code, msg string, args ...any) error {
 	} else {
 		e = &Error{
 			Code: code,
-			Err:  lo.ToPtr(err.Error()),
+			Err:  err.Error(),
 		}
 		if msg != "" {
 			e.Messages = append(e.Messages, fmt.Sprintf(msg, args...))

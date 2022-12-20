@@ -219,15 +219,24 @@ func (t *transaction) Get(ctx context.Context, collection string, id string) (*m
 		c.PrimaryKey(): id,
 	}).SetDocumentID(id).Path())
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, errors.NotFound, "%s not found", id)
+	}
+	if val == nil {
+		return nil, errors.New(errors.NotFound, "%s not found", id)
 	}
 	doc, err := model.NewDocumentFromBytes(val)
 	if err != nil {
 		return nil, err
 	}
+	if doc == nil {
+		return nil, errors.New(errors.NotFound, "%s not found", id)
+	}
 	doc, err = t.applyReadHooks(ctx, collection, doc)
 	if err != nil {
 		return doc, err
+	}
+	if doc == nil {
+		return nil, errors.New(errors.NotFound, "%s not found", id)
 	}
 	return doc, nil
 }

@@ -9,7 +9,6 @@ import (
 	"github.com/autom8ter/gokvkit"
 	"github.com/autom8ter/gokvkit/model"
 	"github.com/autom8ter/gokvkit/testutil"
-	"github.com/brianvoe/gofakeit/v6"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/sync/errgroup"
 )
@@ -18,9 +17,13 @@ func Test(t *testing.T) {
 	t.Run("1", func(t *testing.T) {
 		assert.Nil(t, testutil.TestDB(func(ctx context.Context, db *gokvkit.DB) {
 			egp, ctx := errgroup.WithContext(ctx)
+
 			for i := 0; i < 100; i++ {
+				var usrEmail string
 				err := db.Tx(ctx, true, func(ctx context.Context, tx gokvkit.Tx) error {
-					return tx.Set(ctx, "user", testutil.NewUserDoc())
+					doc := testutil.NewUserDoc()
+					usrEmail = doc.GetString("contact.email")
+					return tx.Set(ctx, "user", doc)
 				})
 				assert.Nil(t, err)
 				egp.Go(func() error {
@@ -30,11 +33,13 @@ func Test(t *testing.T) {
 							Where(model.Where{
 								Field: "contact.email",
 								Op:    model.WhereOpEq,
-								Value: gofakeit.Email(),
+								Value: usrEmail,
 							}).Query())
 						if err != nil {
 							return err
 						}
+						assert.Equal(t, 1, results.Count)
+						assert.Equal(t, usrEmail, results.Documents[0].Get("contact.email"))
 						fmt.Println(results.Stats)
 						return nil
 					})
@@ -43,22 +48,10 @@ func Test(t *testing.T) {
 					}
 					return nil
 				})
-				time.Sleep(200 * time.Millisecond)
+				time.Sleep(50 * time.Millisecond)
 			}
 			for i := 0; i < 5; i++ {
 				egp.Go(func() error {
-					{
-						//schema := db.GetSchema("user")
-						//assert.Nil(t, schema.SetIndex(model.Index{
-						//	Name:    "email_idx",
-						//	Fields:  []string{"contact.email"},
-						//	Unique:  true,
-						//	Primary: false,
-						//}))
-						//bytes, err := schema.Bytes()
-						//assert.Nil(t, err)
-						//assert.Nil(t, db.ConfigureCollection(ctx, bytes))
-					}
 					{
 						schema := db.GetSchema("user")
 						assert.Nil(t, schema.DelIndex("email_idx"))
@@ -66,7 +59,18 @@ func Test(t *testing.T) {
 						assert.Nil(t, err)
 						assert.Nil(t, db.ConfigureCollection(ctx, bytes))
 					}
-
+					{
+						schema := db.GetSchema("user")
+						assert.Nil(t, schema.SetIndex(model.Index{
+							Name:    "email_idx",
+							Fields:  []string{"contact.email"},
+							Unique:  true,
+							Primary: false,
+						}))
+						bytes, err := schema.Bytes()
+						assert.Nil(t, err)
+						assert.Nil(t, db.ConfigureCollection(ctx, bytes))
+					}
 					return nil
 				})
 			}
