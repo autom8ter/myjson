@@ -81,6 +81,9 @@ func New(ctx context.Context, cfg Config, opts ...DBOpt) (*DB, error) {
 		}
 		return true
 	})
+	if err := d.ConfigureCollection(ctx, []byte(cdcSchema)); err != nil {
+		return nil, errors.Wrap(err, errors.Internal, "failed to configure cdc collection")
+	}
 	go func() {
 		ctx, cancel := context.WithCancel(ctx)
 		defer cancel()

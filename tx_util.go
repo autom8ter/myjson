@@ -8,8 +8,8 @@ import (
 
 	"github.com/autom8ter/gokvkit/errors"
 	"github.com/autom8ter/gokvkit/kv"
-
 	"github.com/nqd/flat"
+	"github.com/segmentio/ksuid"
 )
 
 func (t *transaction) updateDocument(ctx context.Context, c CollectionSchema, docID string, before *Document, command *Command) error {
@@ -144,6 +144,31 @@ func (t *transaction) persistCommand(ctx context.Context, md *Metadata, command 
 	}
 	if err := t.applyPersistHooks(ctx, t, command, false); err != nil {
 		return err
+	}
+	if command.Collection != cdcCollectionName {
+		cdc := &CDC{
+			ID:         ksuid.New().String(),
+			Collection: command.Collection,
+			Action:     command.Action,
+			DocumentID: c.GetPrimaryKey(command.Document),
+			Document:   command.Document,
+			Timestamp:  command.Timestamp,
+			Metadata:   command.Metadata,
+		}
+		if before != nil {
+			cdc.Diff = command.Document.Diff(before)
+		}
+		cdcDoc, err := NewDocumentFrom(cdc)
+		if err != nil {
+			return errors.Wrap(err, errors.Internal, "failed to persist cdc")
+		}
+		return t.persistCommand(ctx, md, &Command{
+			Collection: "cdc",
+			Action:     Create,
+			Document:   cdcDoc,
+			Timestamp:  command.Timestamp,
+			Metadata:   command.Metadata,
+		})
 	}
 	return nil
 }

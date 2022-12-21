@@ -3,6 +3,7 @@ package gokvkit
 import (
 	"encoding/json"
 	"io"
+	"reflect"
 	"strings"
 
 	"github.com/autom8ter/gokvkit/errors"
@@ -13,6 +14,8 @@ import (
 	"github.com/tidwall/gjson"
 	"github.com/tidwall/sjson"
 )
+
+const selfRefPrefix = "$."
 
 // Document is a concurrency safe JSON document
 type Document struct {
@@ -191,7 +194,7 @@ func (d *Document) DelAll(fields ...string) error {
 
 // Where executes the where clauses against the document and returns true if it passes the clauses
 func (d *Document) Where(wheres []Where) (bool, error) {
-	var selfRefPrefix = "$."
+
 	for _, w := range wheres {
 		var (
 			isSelf    = strings.HasPrefix(cast.ToString(w.Value), selfRefPrefix)
@@ -300,6 +303,68 @@ func (d *Document) Where(wheres []Where) (bool, error) {
 		}
 	}
 	return true, nil
+}
+
+func (d *Document) Diff(before *Document) []JSONFieldOp {
+	var ops []JSONFieldOp
+	if before == nil {
+		before = NewDocument()
+	}
+	var (
+		beforePaths = before.FieldPaths()
+		afterPaths  = d.FieldPaths()
+	)
+
+	for _, path := range beforePaths {
+		exists := d.result.Get(path).Exists()
+		switch {
+		case !exists:
+			ops = append(ops, JSONFieldOp{
+				Path:        path,
+				Op:          JSONOpRemove,
+				Value:       nil,
+				BeforeValue: before.Get(path),
+			})
+		case exists && !reflect.DeepEqual(d.Get(path), before.Get(path)):
+			ops = append(ops, JSONFieldOp{
+				Path:        path,
+				Op:          JSONOpReplace,
+				Value:       d.Get(path),
+				BeforeValue: before.Get(path),
+			})
+		}
+	}
+	for _, path := range afterPaths {
+		exists := before.result.Get(path).Exists()
+		switch {
+		case !exists:
+			ops = append(ops, JSONFieldOp{
+				Path:        path,
+				Op:          JSONOpAdd,
+				Value:       d.Get(path),
+				BeforeValue: nil,
+			})
+		}
+	}
+	return ops
+}
+
+// FieldPaths returns the paths to fields & nested fields in dot notation format
+func (d *Document) FieldPaths() []string {
+	paths := &[]string{}
+	d.paths(d.result, paths)
+	return *paths
+}
+
+func (d *Document) paths(result gjson.Result, pathValues *[]string) {
+	result.ForEach(func(key, value gjson.Result) bool {
+		if value.IsObject() {
+			d.paths(value, pathValues)
+		} else {
+			*pathValues = append(*pathValues, value.Path(d.result.Raw))
+		}
+		return true
+	})
 }
 
 // Scan scans the json document into the value

@@ -2,10 +2,12 @@ package gokvkit_test
 
 import (
 	"encoding/json"
+	"fmt"
 	"testing"
 
 	"github.com/autom8ter/gokvkit"
 	"github.com/autom8ter/gokvkit/testutil"
+	"github.com/autom8ter/gokvkit/util"
 	"github.com/brianvoe/gofakeit/v6"
 	"github.com/stretchr/testify/assert"
 )
@@ -96,8 +98,40 @@ func TestDocument(t *testing.T) {
 		assert.Nil(t, err)
 		assert.NotEqual(t, r.Get("contact.email"), c.Get("contact.email"))
 	})
-	t.Run("valid", func(t *testing.T) {
-
+	t.Run("diff - none", func(t *testing.T) {
+		before := testutil.NewUserDoc()
+		diff := before.Diff(before)
+		fmt.Println(util.JSONString(&diff))
+	})
+	t.Run("diff - replace contact.email", func(t *testing.T) {
+		before := testutil.NewUserDoc()
+		after := before.Clone()
+		assert.Nil(t, after.Set("contact.email", gofakeit.Email()))
+		diff := after.Diff(before)
+		assert.Len(t, diff, 1)
+		assert.Equal(t, "contact.email", diff[0].Path)
+		assert.Equal(t, gokvkit.JSONOpReplace, diff[0].Op)
+	})
+	t.Run("diff - add contact.email", func(t *testing.T) {
+		before := testutil.NewUserDoc()
+		after := before.Clone()
+		assert.Nil(t, before.Del("contact.email"))
+		assert.Nil(t, after.Set("contact.email", gofakeit.Email()))
+		diff := after.Diff(before)
+		assert.Len(t, diff, 1)
+		assert.Equal(t, "contact.email", diff[0].Path)
+		assert.Equal(t, gokvkit.JSONOpAdd, diff[0].Op)
+		assert.Equal(t, after.Get("contact.email"), diff[0].Value)
+	})
+	t.Run("diff - remove contact.email", func(t *testing.T) {
+		before := testutil.NewUserDoc()
+		after := before.Clone()
+		assert.Nil(t, after.Del("contact.email"))
+		diff := after.Diff(before)
+		assert.Len(t, diff, 1)
+		assert.Equal(t, "contact.email", diff[0].Path)
+		assert.Equal(t, gokvkit.JSONOpRemove, diff[0].Op)
+		assert.Equal(t, before.Get("contact.email"), diff[0].BeforeValue)
 	})
 
 	t.Run("where", func(t *testing.T) {
