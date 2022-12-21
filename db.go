@@ -38,6 +38,7 @@ type DB struct {
 	readHooks    Cache[[]OnRead]
 	onCommit     []OnCommit
 	onRollback   []OnRollback
+	cdcStream    Stream[CDC]
 }
 
 /*
@@ -67,6 +68,7 @@ func New(ctx context.Context, cfg Config, opts ...DBOpt) (*DB, error) {
 		persistHooks: newInMemCache(map[string][]OnPersist{}),
 		whereHooks:   newInMemCache(map[string][]OnWhere{}),
 		readHooks:    newInMemCache(map[string][]OnRead{}),
+		cdcStream:    newStream[CDC](machine.New()),
 	}
 
 	for _, o := range opts {
@@ -274,6 +276,14 @@ func (d *DB) HasCollection(collection string) bool {
 // GetSchema gets a collection schema by name (if it exists)
 func (d *DB) GetSchema(collection string) CollectionSchema {
 	return d.collections.Get(collection)
+}
+
+// ChangeStream streams changes to documents in the given collection.
+func (d *DB) ChangeStream(ctx context.Context, collection string) (<-chan CDC, error) {
+	if collection != "*" && !d.HasCollection(collection) {
+		return nil, errors.New(errors.Validation, "collection does not exist: %s", collection)
+	}
+	return d.cdcStream.Pull(ctx, collection)
 }
 
 // Close closes the database

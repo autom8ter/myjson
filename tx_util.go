@@ -146,7 +146,7 @@ func (t *transaction) persistCommand(ctx context.Context, md *Metadata, command 
 		return err
 	}
 	if command.Collection != cdcCollectionName {
-		cdc := &CDC{
+		cdc := CDC{
 			ID:         ksuid.New().String(),
 			Collection: command.Collection,
 			Action:     command.Action,
@@ -158,17 +158,20 @@ func (t *transaction) persistCommand(ctx context.Context, md *Metadata, command 
 		if before != nil {
 			cdc.Diff = command.Document.Diff(before)
 		}
-		cdcDoc, err := NewDocumentFrom(cdc)
+		cdcDoc, err := NewDocumentFrom(&cdc)
 		if err != nil {
 			return errors.Wrap(err, errors.Internal, "failed to persist cdc")
 		}
-		return t.persistCommand(ctx, md, &Command{
+		if err := t.persistCommand(ctx, md, &Command{
 			Collection: "cdc",
 			Action:     Create,
 			Document:   cdcDoc,
 			Timestamp:  command.Timestamp,
 			Metadata:   command.Metadata,
-		})
+		}); err != nil {
+			return errors.Wrap(err, errors.Internal, "failed to persist cdc")
+		}
+		t.db.cdcStream.Broadcast(ctx, command.Collection, cdc)
 	}
 	return nil
 }

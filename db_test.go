@@ -3,11 +3,11 @@ package gokvkit_test
 import (
 	"context"
 	"runtime"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/autom8ter/gokvkit"
-
 	"github.com/autom8ter/gokvkit/testutil"
 	"github.com/brianvoe/gofakeit/v6"
 	"github.com/stretchr/testify/assert"
@@ -36,6 +36,44 @@ func Test(t *testing.T) {
 			assert.Nil(t, err)
 			assert.NotNil(t, u)
 			assert.Equal(t, id, u.GetString("_id"))
+		}))
+	})
+	t.Run("create & stream", func(t *testing.T) {
+		assert.Nil(t, testutil.TestDB(func(ctx context.Context, db *gokvkit.DB) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			wg := sync.WaitGroup{}
+			wg.Add(1)
+			var received = make(chan struct{}, 1)
+			go func() {
+				defer wg.Done()
+				ctx, cancel := context.WithCancel(context.Background())
+				defer cancel()
+				ch, err := db.ChangeStream(ctx, "user")
+				assert.Nil(t, err)
+				for {
+					select {
+					case <-ctx.Done():
+						return
+					case <-ch:
+						received <- struct{}{}
+					}
+				}
+			}()
+			var (
+				id  string
+				err error
+			)
+			assert.Nil(t, db.Tx(ctx, true, func(ctx context.Context, tx gokvkit.Tx) error {
+				id, err = tx.Create(ctx, "user", testutil.NewUserDoc())
+				_, err := tx.Get(ctx, "user", id)
+				return err
+			}))
+			u, err := db.Get(ctx, "user", id)
+			assert.Nil(t, err)
+			assert.NotNil(t, u)
+			assert.Equal(t, id, u.GetString("_id"))
+			<-received
 		}))
 	})
 	t.Run("set", func(t *testing.T) {
