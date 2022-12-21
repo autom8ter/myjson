@@ -25,21 +25,37 @@ type Config struct {
 	KV KVConfig `json:"kv"`
 }
 
+// Database is a NoSQL database built on top of key value storage
 type Database interface {
+	// Collections returns a list of collection names that are registered in the collection
 	Collections() []string
+	// ConfigureCollection overwrites a single database collection configuration
 	ConfigureCollection(ctx context.Context, collectionSchemaBytes []byte) error
+	// GetSchema gets a collection schema by name (if it exists)
 	GetSchema(collection string) CollectionSchema
+	// HasCollection reports whether a collection exists in the database
 	HasCollection(collection string) bool
+	// DropCollection drops the collection and it's indexes from the database
 	DropCollection(ctx context.Context, collection string) error
-
+	// Tx executes the given function against a new transaction.
+	// if the function returns an error, all changes will be rolled back.
+	// otherwise, the changes will be commited to the database
 	Tx(ctx context.Context, isUpdate bool, fn TxFunc) error
+	// NewTx returns a new transaction. a transaction must call Commit method in order to persist changes
 	NewTx(isUpdate bool) Txn
+	// ChangeStream streams changes to documents in the given collection.
 	ChangeStream(ctx context.Context, collection string) (<-chan CDC, error)
+	// Get gets a single document by id
 	Get(ctx context.Context, collection, id string) (*Document, error)
+	// ForEach scans the optimal index for a collection's documents passing its filters.
+	// results will not be ordered unless an index supporting the order by(s) was found by the optimizer
+	// Query should be used when order is more important than performance/resource-usage
 	ForEach(ctx context.Context, collection string, where []Where, fn ForEachFunc) (Optimization, error)
+	// Query queries a list of documents
 	Query(ctx context.Context, collection string, query Query) (Page, error)
+	// Get gets 1-many document by id(s)
 	BatchGet(ctx context.Context, collection string, ids []string) (Documents, error)
-
+	// Close closes the database
 	Close(ctx context.Context) error
 }
 
@@ -117,7 +133,6 @@ func New(ctx context.Context, cfg Config, opts ...DBOpt) (*DB, error) {
 	return d, err
 }
 
-// NewTx returns a new transaction. a transaction must call Commit method in order to persist changes
 func (d *DB) NewTx(isUpdate bool) Txn {
 	return &transaction{
 		db:      d,
@@ -126,9 +141,6 @@ func (d *DB) NewTx(isUpdate bool) Txn {
 	}
 }
 
-// Tx executes the given function against a new transaction.
-// if the function returns an error, all changes will be rolled back.
-// otherwise, the changes will be commited to the database
 func (d *DB) Tx(ctx context.Context, isUpdate bool, fn TxFunc) error {
 	tx := d.NewTx(isUpdate)
 	defer tx.Close(ctx)
@@ -144,7 +156,6 @@ func (d *DB) Tx(ctx context.Context, isUpdate bool, fn TxFunc) error {
 	return nil
 }
 
-// Get gets a single document by id
 func (d *DB) Get(ctx context.Context, collection, id string) (*Document, error) {
 	var (
 		document *Document
@@ -159,7 +170,6 @@ func (d *DB) Get(ctx context.Context, collection, id string) (*Document, error) 
 	return document, err
 }
 
-// Get gets 1-many document by id(s)
 func (d *DB) BatchGet(ctx context.Context, collection string, ids []string) (Documents, error) {
 	var documents []*Document
 	if err := d.Tx(ctx, false, func(ctx context.Context, tx Tx) error {
@@ -177,7 +187,6 @@ func (d *DB) BatchGet(ctx context.Context, collection string, ids []string) (Doc
 	return documents, nil
 }
 
-// Query queries a list of documents
 func (d *DB) Query(ctx context.Context, collection string, query Query) (Page, error) {
 	var (
 		page Page
@@ -192,9 +201,6 @@ func (d *DB) Query(ctx context.Context, collection string, query Query) (Page, e
 	return page, nil
 }
 
-// ForEach scans the optimal index for a collection's documents passing its filters.
-// results will not be ordered unless an index supporting the order by(s) was found by the optimizer
-// Query should be used when order is more important than performance/resource-usage
 func (d *DB) ForEach(ctx context.Context, collection string, where []Where, fn ForEachFunc) (Optimization, error) {
 	var (
 		result Optimization
@@ -209,7 +215,6 @@ func (d *DB) ForEach(ctx context.Context, collection string, where []Where, fn F
 	return result, nil
 }
 
-// DropCollection drops the collection and it's indexes from the database
 func (d *DB) DropCollection(ctx context.Context, collection string) error {
 	if err := d.kv.DropPrefix(collectionPrefix(collection)); err != nil {
 		return errors.Wrap(err, errors.Internal, "failed to remove collection %s", collection)
@@ -220,7 +225,6 @@ func (d *DB) DropCollection(ctx context.Context, collection string) error {
 	return nil
 }
 
-// ConfigureCollection overwrites a single database collection configuration
 func (d *DB) ConfigureCollection(ctx context.Context, collectionSchemaBytes []byte) error {
 	meta, _ := GetMetadata(ctx)
 	meta.Set(string(isIndexingKey), true)
@@ -272,7 +276,6 @@ func (d *DB) ConfigureCollection(ctx context.Context, collectionSchemaBytes []by
 	return nil
 }
 
-// Collections returns a list of collection names that are registered in the collection
 func (d *DB) Collections() []string {
 	var names []string
 	d.collections.Range(func(key string, c CollectionSchema) bool {
@@ -282,17 +285,14 @@ func (d *DB) Collections() []string {
 	return names
 }
 
-// HasCollection reports whether a collection exists in the database
 func (d *DB) HasCollection(collection string) bool {
 	return d.collections.Exists(collection)
 }
 
-// GetSchema gets a collection schema by name (if it exists)
 func (d *DB) GetSchema(collection string) CollectionSchema {
 	return d.collections.Get(collection)
 }
 
-// ChangeStream streams changes to documents in the given collection.
 func (d *DB) ChangeStream(ctx context.Context, collection string) (<-chan CDC, error) {
 	if collection != "*" && !d.HasCollection(collection) {
 		return nil, errors.New(errors.Validation, "collection does not exist: %s", collection)
@@ -300,7 +300,6 @@ func (d *DB) ChangeStream(ctx context.Context, collection string) (<-chan CDC, e
 	return d.cdcStream.Pull(ctx, collection)
 }
 
-// Close closes the database
 func (d *DB) Close(ctx context.Context) error {
 	return errors.Wrap(d.kv.Close(), 0, "")
 }
