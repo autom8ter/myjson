@@ -11,7 +11,7 @@ import (
 
 func TestTx(t *testing.T) {
 	t.Run("set then get", func(t *testing.T) {
-		assert.Nil(t, testutil.TestDB(func(ctx context.Context, db *gokvkit.DB) {
+		assert.Nil(t, testutil.TestDB(func(ctx context.Context, db gokvkit.Database) {
 			assert.Nil(t, db.Tx(ctx, true, func(ctx context.Context, tx gokvkit.Tx) error {
 				doc := testutil.NewUserDoc()
 				err := tx.Set(ctx, "user", doc)
@@ -25,7 +25,7 @@ func TestTx(t *testing.T) {
 		}))
 	})
 	t.Run("create then get", func(t *testing.T) {
-		assert.Nil(t, testutil.TestDB(func(ctx context.Context, db *gokvkit.DB) {
+		assert.Nil(t, testutil.TestDB(func(ctx context.Context, db gokvkit.Database) {
 			assert.Nil(t, db.Tx(ctx, true, func(ctx context.Context, tx gokvkit.Tx) error {
 				doc := testutil.NewUserDoc()
 				id, err := tx.Create(ctx, "user", doc)
@@ -39,7 +39,7 @@ func TestTx(t *testing.T) {
 		}))
 	})
 	t.Run("create then update then get", func(t *testing.T) {
-		assert.Nil(t, testutil.TestDB(func(ctx context.Context, db *gokvkit.DB) {
+		assert.Nil(t, testutil.TestDB(func(ctx context.Context, db gokvkit.Database) {
 			assert.Nil(t, db.Tx(ctx, true, func(ctx context.Context, tx gokvkit.Tx) error {
 				doc := testutil.NewUserDoc()
 				id, err := tx.Create(ctx, "user", doc)
@@ -57,7 +57,7 @@ func TestTx(t *testing.T) {
 		}))
 	})
 	t.Run("create then delete then get", func(t *testing.T) {
-		assert.Nil(t, testutil.TestDB(func(ctx context.Context, db *gokvkit.DB) {
+		assert.Nil(t, testutil.TestDB(func(ctx context.Context, db gokvkit.Database) {
 			assert.Nil(t, db.Tx(ctx, true, func(ctx context.Context, tx gokvkit.Tx) error {
 				doc := testutil.NewUserDoc()
 				id, err := tx.Create(ctx, "user", doc)

@@ -81,7 +81,7 @@ func cascadeDelete(ctx context.Context, tx gokvkit.Tx, command *gokvkit.Command)
 	return nil
 }
 
-func setupDatabase(ctx context.Context, db *gokvkit.DB) error {
+func setupDatabase(ctx context.Context, db gokvkit.Database) error {
 	fmt.Println("seeding database")
 	for i := 0; i < 1000; i++ {
 		if err := db.Tx(context.Background(), true, func(ctx context.Context, tx gokvkit.Tx) error {

@@ -58,7 +58,7 @@ func NewTaskDoc(usrID string) *gokvkit.Document {
 	return doc
 }
 
-func TestDB(fn func(ctx context.Context, db *gokvkit.DB), collections ...[]byte) error {
+func TestDB(fn func(ctx context.Context, db gokvkit.Database), collections ...[]byte) error {
 	collections = append(collections, AllCollections...)
 	os.MkdirAll("tmp", 0700)
 	dir, err := ioutil.TempDir("./tmp", "")

@@ -31,13 +31,13 @@ type OpenAPIParams struct {
 }
 
 type openAPIServer struct {
-	db     *gokvkit.DB
+	db     gokvkit.Database
 	params *OpenAPIParams
 	router chi.Router
 }
 
 // New creates a new openapi server
-func New(db *gokvkit.DB, params *OpenAPIParams, mwares ...func(http.Handler) http.Handler) (api.OpenAPIServer, error) {
+func New(db gokvkit.Database, params *OpenAPIParams, mwares ...func(http.Handler) http.Handler) (api.OpenAPIServer, error) {
 	if params == nil {
 		return nil, fmt.Errorf("empty openapi params")
 	}
@@ -73,7 +73,7 @@ func New(db *gokvkit.DB, params *OpenAPIParams, mwares ...func(http.Handler) htt
 	return o, nil
 }
 
-func (o *openAPIServer) DB() *gokvkit.DB {
+func (o *openAPIServer) DB() gokvkit.Database {
 	return o.db
 }
 

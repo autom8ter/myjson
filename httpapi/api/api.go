@@ -8,7 +8,7 @@ import (
 )
 
 type OpenAPIServer interface {
-	DB() *gokvkit.DB
+	DB() gokvkit.Database
 	Spec() ([]byte, error)
 	Handler() http.Handler
 	Serve(ctx context.Context, port int) error

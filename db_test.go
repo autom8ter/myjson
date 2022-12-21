@@ -22,7 +22,7 @@ func timer() func(t *testing.T) {
 
 func Test(t *testing.T) {
 	t.Run("create", func(t *testing.T) {
-		assert.Nil(t, testutil.TestDB(func(ctx context.Context, db *gokvkit.DB) {
+		assert.Nil(t, testutil.TestDB(func(ctx context.Context, db gokvkit.Database) {
 			var (
 				id  string
 				err error
@@ -39,7 +39,7 @@ func Test(t *testing.T) {
 		}))
 	})
 	t.Run("create & stream", func(t *testing.T) {
-		assert.Nil(t, testutil.TestDB(func(ctx context.Context, db *gokvkit.DB) {
+		assert.Nil(t, testutil.TestDB(func(ctx context.Context, db gokvkit.Database) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 			wg := sync.WaitGroup{}
@@ -77,7 +77,7 @@ func Test(t *testing.T) {
 		}))
 	})
 	t.Run("set", func(t *testing.T) {
-		assert.Nil(t, testutil.TestDB(func(ctx context.Context, db *gokvkit.DB) {
+		assert.Nil(t, testutil.TestDB(func(ctx context.Context, db gokvkit.Database) {
 			timer := timer()
 			defer timer(t)
 			assert.Nil(t, db.Tx(ctx, true, func(ctx context.Context, tx gokvkit.Tx) error {
@@ -88,7 +88,7 @@ func Test(t *testing.T) {
 			}))
 		}))
 	})
-	assert.Nil(t, testutil.TestDB(func(ctx context.Context, db *gokvkit.DB) {
+	assert.Nil(t, testutil.TestDB(func(ctx context.Context, db gokvkit.Database) {
 		var usrs []*gokvkit.Document
 		var ids []string
 		t.Run("set all", func(t *testing.T) {
@@ -227,7 +227,7 @@ func Benchmark(b *testing.B) {
 	b.Run("set", func(b *testing.B) {
 		b.ReportAllocs()
 		doc := testutil.NewUserDoc()
-		assert.Nil(b, testutil.TestDB(func(ctx context.Context, db *gokvkit.DB) {
+		assert.Nil(b, testutil.TestDB(func(ctx context.Context, db gokvkit.Database) {
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
 				assert.Nil(b, db.Tx(ctx, true, func(ctx context.Context, tx gokvkit.Tx) error {
@@ -240,7 +240,7 @@ func Benchmark(b *testing.B) {
 	b.Run("get", func(b *testing.B) {
 		b.ReportAllocs()
 		doc := testutil.NewUserDoc()
-		assert.Nil(b, testutil.TestDB(func(ctx context.Context, db *gokvkit.DB) {
+		assert.Nil(b, testutil.TestDB(func(ctx context.Context, db gokvkit.Database) {
 			assert.Nil(b, db.Tx(ctx, true, func(ctx context.Context, tx gokvkit.Tx) error {
 				return tx.Set(ctx, "user", doc)
 			}))
@@ -255,7 +255,7 @@ func Benchmark(b *testing.B) {
 	b.Run("query with index", func(b *testing.B) {
 		b.ReportAllocs()
 		doc := testutil.NewUserDoc()
-		assert.Nil(b, testutil.TestDB(func(ctx context.Context, db *gokvkit.DB) {
+		assert.Nil(b, testutil.TestDB(func(ctx context.Context, db gokvkit.Database) {
 			assert.Nil(b, db.Tx(ctx, true, func(ctx context.Context, tx gokvkit.Tx) error {
 				return tx.Set(ctx, "user", doc)
 			}))
@@ -293,7 +293,7 @@ func Benchmark(b *testing.B) {
 	b.Run("query without index", func(b *testing.B) {
 		b.ReportAllocs()
 		doc := testutil.NewUserDoc()
-		assert.Nil(b, testutil.TestDB(func(ctx context.Context, db *gokvkit.DB) {
+		assert.Nil(b, testutil.TestDB(func(ctx context.Context, db gokvkit.Database) {
 			assert.Nil(b, db.Tx(ctx, true, func(ctx context.Context, tx gokvkit.Tx) error {
 				return tx.Set(ctx, "user", doc)
 			}))
@@ -329,7 +329,7 @@ func Benchmark(b *testing.B) {
 
 func TestIndexing1(t *testing.T) {
 	t.Run("matching unique index (contact.email)", func(t *testing.T) {
-		assert.Nil(t, testutil.TestDB(func(ctx context.Context, db *gokvkit.DB) {
+		assert.Nil(t, testutil.TestDB(func(ctx context.Context, db gokvkit.Database) {
 			var docs gokvkit.Documents
 			assert.Nil(t, db.Tx(ctx, true, func(ctx context.Context, tx gokvkit.Tx) error {
 				for i := 0; i < 5; i++ {
@@ -361,7 +361,7 @@ func TestIndexing1(t *testing.T) {
 			assert.Equal(t, "contact.email", page.Stats.Optimization.MatchedFields[0])
 			assert.Equal(t, false, page.Stats.Optimization.Index.Primary)
 		}))
-		assert.Nil(t, testutil.TestDB(func(ctx context.Context, db *gokvkit.DB) {
+		assert.Nil(t, testutil.TestDB(func(ctx context.Context, db gokvkit.Database) {
 			var docs gokvkit.Documents
 			assert.Nil(t, db.Tx(ctx, true, func(ctx context.Context, tx gokvkit.Tx) error {
 				for i := 0; i < 5; i++ {
@@ -396,7 +396,7 @@ func TestIndexing1(t *testing.T) {
 		}))
 	})
 	t.Run("non-matching (name)", func(t *testing.T) {
-		assert.Nil(t, testutil.TestDB(func(ctx context.Context, db *gokvkit.DB) {
+		assert.Nil(t, testutil.TestDB(func(ctx context.Context, db gokvkit.Database) {
 			var docs gokvkit.Documents
 			assert.Nil(t, db.Tx(ctx, true, func(ctx context.Context, tx gokvkit.Tx) error {
 				for i := 0; i < 5; i++ {
@@ -432,7 +432,7 @@ func TestIndexing1(t *testing.T) {
 		}))
 	})
 	t.Run("matching primary (_id)", func(t *testing.T) {
-		assert.Nil(t, testutil.TestDB(func(ctx context.Context, db *gokvkit.DB) {
+		assert.Nil(t, testutil.TestDB(func(ctx context.Context, db gokvkit.Database) {
 			var docs gokvkit.Documents
 			assert.Nil(t, db.Tx(ctx, true, func(ctx context.Context, tx gokvkit.Tx) error {
 				for i := 0; i < 5; i++ {
@@ -466,7 +466,7 @@ func TestIndexing1(t *testing.T) {
 
 			assert.Equal(t, true, page.Stats.Optimization.Index.Primary)
 		}))
-		assert.Nil(t, testutil.TestDB(func(ctx context.Context, db *gokvkit.DB) {
+		assert.Nil(t, testutil.TestDB(func(ctx context.Context, db gokvkit.Database) {
 			var docs gokvkit.Documents
 			assert.Nil(t, db.Tx(ctx, true, func(ctx context.Context, tx gokvkit.Tx) error {
 				for i := 0; i < 5; i++ {
@@ -505,7 +505,7 @@ func TestIndexing1(t *testing.T) {
 func TestAggregate(t *testing.T) {
 
 	t.Run("sum advanced", func(t *testing.T) {
-		assert.Nil(t, testutil.TestDB(func(ctx context.Context, db *gokvkit.DB) {
+		assert.Nil(t, testutil.TestDB(func(ctx context.Context, db gokvkit.Database) {
 			var usrs gokvkit.Documents
 			ageSum := map[string]float64{}
 			assert.Nil(t, db.Tx(ctx, true, func(ctx context.Context, tx gokvkit.Tx) error {

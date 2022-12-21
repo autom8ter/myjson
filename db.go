@@ -19,6 +19,17 @@ type KVConfig struct {
 	Params map[string]any `json:"params"`
 }
 
+/*
+OpenKV opens a kv database. supported providers:
+badger(default):
+
+	  params:
+		storage_path: string (leave empty for in-memory)
+*/
+func OpenKV(cfg KVConfig) (kv.DB, error) {
+	return registry.Open(cfg.Provider, cfg.Params)
+}
+
 // Config configures a database instance
 type Config struct {
 	// KV is the key value configuration
@@ -73,19 +84,8 @@ type DB struct {
 	cdcStream    Stream[CDC]
 }
 
-/*
-OpenKV opens a kv database. supported providers:
-badger(default):
-
-	  params:
-		storage_path: string (leave empty for in-memory)
-*/
-func OpenKV(cfg KVConfig) (kv.DB, error) {
-	return registry.Open(cfg.Provider, cfg.Params)
-}
-
 // New creates a new database instance from the given config
-func New(ctx context.Context, cfg Config, opts ...DBOpt) (*DB, error) {
+func New(ctx context.Context, cfg Config, opts ...DBOpt) (Database, error) {
 	db, err := OpenKV(cfg.KV)
 	if err != nil {
 		return nil, errors.Wrap(err, errors.Internal, "failed to open kv database")

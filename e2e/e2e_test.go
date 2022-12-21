@@ -15,7 +15,7 @@ import (
 
 func TestConcurrency(t *testing.T) {
 	t.Run("1", func(t *testing.T) {
-		assert.Nil(t, testutil.TestDB(func(ctx context.Context, db *gokvkit.DB) {
+		assert.Nil(t, testutil.TestDB(func(ctx context.Context, db gokvkit.Database) {
 			egp, ctx := errgroup.WithContext(ctx)
 
 			for i := 0; i < 100; i++ {
