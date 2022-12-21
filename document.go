@@ -193,7 +193,8 @@ func (d *Document) DelAll(fields ...string) error {
 	return nil
 }
 
-// Where executes the where clauses against the document and returns true if it passes the clauses
+// Where executes the where clauses against the document and returns true if it passes the clauses.
+// If the value of a where clause is prefixed with $. it will compare where.field to the same document's $.{field}.
 func (d *Document) Where(wheres []Where) (bool, error) {
 
 	for _, w := range wheres {
@@ -317,6 +318,7 @@ func (d *Document) Where(wheres []Where) (bool, error) {
 	return true, nil
 }
 
+// Diff calculates a json diff between the document and the input document
 func (d *Document) Diff(before *Document) []JSONFieldOp {
 	var ops []JSONFieldOp
 	if before == nil {
