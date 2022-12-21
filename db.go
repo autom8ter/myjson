@@ -3,9 +3,9 @@ package gokvkit
 import (
 	"context"
 	_ "embed"
+	"time"
 
 	"github.com/autom8ter/gokvkit/errors"
-	"github.com/autom8ter/gokvkit/internal/safe"
 	"github.com/autom8ter/gokvkit/kv"
 	"github.com/autom8ter/gokvkit/kv/registry"
 	"github.com/autom8ter/machine/v4"
@@ -30,12 +30,14 @@ type DB struct {
 	config       Config
 	kv           kv.DB
 	machine      machine.Machine
-	collections  *safe.Map[CollectionSchema]
+	collections  Cache[CollectionSchema]
 	optimizer    Optimizer
-	initHooks    *safe.Map[OnInit]
-	persistHooks *safe.Map[[]OnPersist]
-	whereHooks   *safe.Map[[]OnWhere]
-	readHooks    *safe.Map[[]OnRead]
+	initHooks    Cache[OnInit]
+	persistHooks Cache[[]OnPersist]
+	whereHooks   Cache[[]OnWhere]
+	readHooks    Cache[[]OnRead]
+	onCommit     []OnCommit
+	onRollback   []OnRollback
 }
 
 /*
@@ -59,29 +61,40 @@ func New(ctx context.Context, cfg Config, opts ...DBOpt) (*DB, error) {
 		config:       cfg,
 		kv:           db,
 		machine:      machine.New(),
-		collections:  safe.NewMap(map[string]CollectionSchema{}),
+		collections:  newInMemCache(map[string]CollectionSchema{}),
 		optimizer:    defaultOptimizer{},
-		initHooks:    safe.NewMap(map[string]OnInit{}),
-		persistHooks: safe.NewMap(map[string][]OnPersist{}),
-		whereHooks:   safe.NewMap(map[string][]OnWhere{}),
-		readHooks:    safe.NewMap(map[string][]OnRead{}),
+		initHooks:    newInMemCache(map[string]OnInit{}),
+		persistHooks: newInMemCache(map[string][]OnPersist{}),
+		whereHooks:   newInMemCache(map[string][]OnWhere{}),
+		readHooks:    newInMemCache(map[string][]OnRead{}),
 	}
-	coll, err := d.getPersistedCollections()
-	if err != nil {
-		return nil, errors.Wrap(err, errors.Internal, "failed to get existing collections")
-	}
-	d.collections = coll
+
 	for _, o := range opts {
 		o(d)
 	}
-
+	if err := d.refreshCollections(); err != nil {
+		return nil, errors.Wrap(err, errors.Internal, "failed to get load collections")
+	}
 	d.initHooks.Range(func(key string, h OnInit) bool {
 		if err = h.Func(ctx, d); err != nil {
 			return false
 		}
 		return true
 	})
-
+	go func() {
+		ctx, cancel := context.WithCancel(ctx)
+		defer cancel()
+		ticker := time.NewTicker(1 * time.Minute)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				d.refreshCollections()
+			}
+		}
+	}()
 	return d, err
 }
 
@@ -106,7 +119,8 @@ func (d *DB) Tx(ctx context.Context, isUpdate bool, fn TxFunc) error {
 		return errors.Wrap(err, 0, "tx: rolled back transaction")
 	}
 	if err := tx.Commit(ctx); err != nil {
-		return errors.Wrap(err, 0, "tx: failed to commit transaction")
+		tx.Rollback(ctx)
+		return errors.Wrap(err, 0, "tx: failed to commit transaction - rolled back")
 	}
 	return nil
 }
@@ -259,16 +273,17 @@ func (d *DB) Collections() []string {
 	return names
 }
 
+// HasCollection reports whether a collection exists in the database
 func (d *DB) HasCollection(collection string) bool {
 	return d.collections.Exists(collection)
-}
-
-// Close closes the database
-func (d *DB) Close(ctx context.Context) error {
-	return errors.Wrap(d.kv.Close(), 0, "")
 }
 
 // GetSchema gets a collection schema by name (if it exists)
 func (d *DB) GetSchema(collection string) CollectionSchema {
 	return d.collections.Get(collection)
+}
+
+// Close closes the database
+func (d *DB) Close(ctx context.Context) error {
+	return errors.Wrap(d.kv.Close(), 0, "")
 }

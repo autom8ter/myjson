@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/autom8ter/gokvkit/errors"
-	"github.com/autom8ter/gokvkit/internal/util"
+	"github.com/autom8ter/gokvkit/util"
 
 	"github.com/samber/lo"
 	"github.com/spf13/cast"

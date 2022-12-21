@@ -17,11 +17,11 @@ type OnPersist struct {
 }
 
 // Valid returns nil if the hook is valid
-func (v OnPersist) Valid() error {
-	if v.Name == "" {
+func (o OnPersist) Valid() error {
+	if o.Name == "" {
 		return errors.New(errors.Validation, "empty hook name")
 	}
-	if v.Func == nil {
+	if o.Func == nil {
 		return errors.New(errors.Validation, "empty hook function")
 	}
 	return nil
@@ -34,11 +34,11 @@ type OnWhere struct {
 }
 
 // Valid returns nil if the hook is valid
-func (v OnWhere) Valid() error {
-	if v.Name == "" {
+func (o OnWhere) Valid() error {
+	if o.Name == "" {
 		return errors.New(errors.Validation, "empty hook name")
 	}
-	if v.Func == nil {
+	if o.Func == nil {
 		return errors.New(errors.Validation, "empty hook function")
 	}
 	return nil
@@ -51,11 +51,11 @@ type OnRead struct {
 }
 
 // Valid returns nil if the hook is valid
-func (v OnRead) Valid() error {
-	if v.Name == "" {
+func (o OnRead) Valid() error {
+	if o.Name == "" {
 		return errors.New(errors.Validation, "empty hook name")
 	}
-	if v.Func == nil {
+	if o.Func == nil {
 		return errors.New(errors.Validation, "empty hook function")
 	}
 	return nil
@@ -68,11 +68,49 @@ type OnInit struct {
 }
 
 // Valid returns nil if the hook is valid
-func (v OnInit) Valid() error {
-	if v.Name == "" {
+func (o OnInit) Valid() error {
+	if o.Name == "" {
 		return errors.New(errors.Validation, "empty hook name")
 	}
-	if v.Func == nil {
+	if o.Func == nil {
+		return errors.New(errors.Validation, "empty hook function")
+	}
+	return nil
+}
+
+// OnCommit is a hook function triggered before a transaction is commited
+type OnCommit struct {
+	// Name is the name of the hook
+	Name string
+	// Func is the function to execute
+	Func func(ctx context.Context, tx Tx) error
+}
+
+// Valid returns nil if the hook is valid
+func (o OnCommit) Valid() error {
+	if o.Name == "" {
+		return errors.New(errors.Validation, "empty hook name")
+	}
+	if o.Func == nil {
+		return errors.New(errors.Validation, "empty hook function")
+	}
+	return nil
+}
+
+// OnRollback is a hook function triggered whenever a transaction is rolled back
+type OnRollback struct {
+	// Name is the name of the hook
+	Name string
+	// Func is the function to execute
+	Func func(ctx context.Context, tx Tx)
+}
+
+// Valid returns nil if the hook is valid
+func (o OnRollback) Valid() error {
+	if o.Name == "" {
+		return errors.New(errors.Validation, "empty hook name")
+	}
+	if o.Func == nil {
 		return errors.New(errors.Validation, "empty hook function")
 	}
 	return nil

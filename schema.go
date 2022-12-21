@@ -7,8 +7,7 @@ import (
 	"sync"
 
 	"github.com/autom8ter/gokvkit/errors"
-	"github.com/autom8ter/gokvkit/internal/safe"
-	"github.com/autom8ter/gokvkit/internal/util"
+	"github.com/autom8ter/gokvkit/util"
 
 	"github.com/qri-io/jsonschema"
 	"github.com/tidwall/gjson"
@@ -35,7 +34,7 @@ type collectionSchema struct {
 	raw          gjson.Result
 	collection   string
 	primaryIndex Index
-	indexing     *safe.Map[Index]
+	indexing     map[string]Index
 	mu           sync.RWMutex
 }
 
@@ -66,7 +65,7 @@ func newCollectionSchema(yamlContent []byte) (CollectionSchema, error) {
 		schema:     schema,
 		raw:        r,
 		collection: r.Get(string(collectionPath)).String(),
-		indexing:   safe.NewMap(map[string]Index{}),
+		indexing:   map[string]Index{},
 	}
 	for _, index := range s.raw.Get(string(indexingPath)).Map() {
 		var i Index
@@ -80,7 +79,7 @@ func newCollectionSchema(yamlContent []byte) (CollectionSchema, error) {
 		if i.Primary {
 			s.primaryIndex = i
 		}
-		s.indexing.Set(i.Name, i)
+		s.indexing[i.Name] = i
 	}
 	if err != nil {
 		return nil, err
@@ -104,7 +103,13 @@ func (c *collectionSchema) Collection() string {
 }
 
 func (c *collectionSchema) Indexing() map[string]Index {
-	return c.indexing.AsMap()
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	var i = map[string]Index{}
+	for k, v := range c.indexing {
+		i[k] = v
+	}
+	return i
 }
 
 func (c *collectionSchema) SetIndex(index Index) error {
@@ -121,7 +126,7 @@ func (c *collectionSchema) SetIndex(index Index) error {
 		return errors.Wrap(err, 0, "failed to set schema index: %s", index.Name)
 	}
 	c.raw = gjson.Parse(raw)
-	c.indexing.Set(index.Name, index)
+	c.indexing[index.Name] = index
 	return nil
 }
 
@@ -136,7 +141,7 @@ func (c *collectionSchema) DelIndex(name string) error {
 		return errors.Wrap(err, 0, "failed to delete schema index: %s", name)
 	}
 	c.raw = gjson.Parse(raw)
-	c.indexing.Del(name)
+	delete(c.indexing, name)
 	return nil
 }
 

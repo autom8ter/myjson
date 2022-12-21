@@ -56,10 +56,18 @@ type transaction struct {
 }
 
 func (t *transaction) Commit(ctx context.Context) error {
+	for _, h := range t.db.onCommit {
+		if err := h.Func(ctx, t); err != nil {
+			return err
+		}
+	}
 	return t.tx.Commit()
 }
 
 func (t *transaction) Rollback(ctx context.Context) {
+	for _, h := range t.db.onRollback {
+		h.Func(ctx, t)
+	}
 	t.tx.Rollback()
 }
 

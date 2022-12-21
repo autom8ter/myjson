@@ -9,7 +9,7 @@ package httpapi
 //		assert.Nil(t, err)
 //		tsk, err := newCollectionSchema([]byte(taskSchema))
 //		assert.Nil(t, err)
-//		bits, err := getOpenAPISpec(safe.NewMap(map[string]*collectionSchema{
+//		bits, err := getOpenAPISpec(NewMap(map[string]*collectionSchema{
 //			"user": u,
 //			"task": tsk,
 //		}), &openAPIParams{

@@ -1,16 +1,15 @@
-package safe_test
+package gokvkit
 
 import (
 	"fmt"
 	"testing"
 
-	"github.com/autom8ter/gokvkit/internal/safe"
 	"github.com/spf13/cast"
 	"github.com/stretchr/testify/assert"
 )
 
-func Test(t *testing.T) {
-	m := safe.Map[map[string]any]{}
+func TestCache(t *testing.T) {
+	m := newInMemCache[map[string]any](map[string]map[string]any{})
 	assert.False(t, m.Exists("1"))
 	for i := 0; i < 10; i++ {
 		m.Set(fmt.Sprint(i), map[string]any{

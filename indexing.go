@@ -6,9 +6,8 @@ import (
 	"fmt"
 
 	"github.com/autom8ter/gokvkit/errors"
-	"github.com/autom8ter/gokvkit/internal/safe"
-	"github.com/autom8ter/gokvkit/internal/util"
 	"github.com/autom8ter/gokvkit/kv"
+	"github.com/autom8ter/gokvkit/util"
 	"github.com/nqd/flat"
 )
 
@@ -106,10 +105,8 @@ func (d *DB) persistCollectionConfig(val CollectionSchema) error {
 	return nil
 }
 
-func (d *DB) getPersistedCollections() (*safe.Map[CollectionSchema], error) {
-	var (
-		collections = safe.NewMap(map[string]CollectionSchema{})
-	)
+func (d *DB) refreshCollections() error {
+	var existing map[string]struct{}
 	if err := d.kv.Tx(false, func(tx kv.Tx) error {
 		i := tx.NewIterator(kv.IterOpts{
 			Prefix: []byte("internal.collections."),
@@ -127,15 +124,26 @@ func (d *DB) getPersistedCollections() (*safe.Map[CollectionSchema], error) {
 				if err != nil {
 					return err
 				}
-				collections.Set(cfg.Collection(), cfg)
+				existing[cfg.Collection()] = struct{}{}
+				d.collections.Set(cfg.Collection(), cfg)
 			}
 			i.Next()
 		}
 		return nil
 	}); err != nil {
-		return nil, err
+		return err
 	}
-	return collections, nil
+	var toDelete []string
+	d.collections.Range(func(key string, c CollectionSchema) bool {
+		if _, ok := existing[key]; !ok {
+			toDelete = append(toDelete, key)
+		}
+		return true
+	})
+	for _, del := range toDelete {
+		d.collections.Del(del)
+	}
+	return nil
 }
 
 func (d *DB) getPersistedCollection(collection string) (CollectionSchema, error) {

@@ -3,7 +3,7 @@ package gokvkit
 import (
 	"testing"
 
-	"github.com/autom8ter/gokvkit/internal/util"
+	"github.com/autom8ter/gokvkit/util"
 
 	"github.com/brianvoe/gofakeit/v6"
 	"github.com/stretchr/testify/assert"
