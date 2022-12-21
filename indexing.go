@@ -69,19 +69,7 @@ func (d *DB) removeIndex(ctx context.Context, collection string, index Index) er
 	meta, _ := GetMetadata(ctx)
 	meta.Set(string(internalKey), true)
 	meta.Set(string(isIndexingKey), true)
-	c := d.collections.Get(collection)
-	if err := d.Tx(ctx, true, func(ctx context.Context, tx Tx) error {
-		_, err := tx.ForEach(ctx, collection, nil, func(doc *Document) (bool, error) {
-			if err := tx.Delete(meta.ToContext(ctx), collection, c.GetPrimaryKey(doc)); err != nil {
-				return false, err
-			}
-			return true, nil
-		})
-		if err != nil {
-			return err
-		}
-		return nil
-	}); err != nil {
+	if err := d.kv.DropPrefix(indexPrefix(collection, index.Name)); err != nil {
 		return errors.Wrap(err, 0, "indexing: failed to remove index %s - %s", collection, index.Name)
 	}
 	return nil
@@ -102,6 +90,20 @@ func (d *DB) persistCollectionConfig(val CollectionSchema) error {
 		return err
 	}
 	d.collections.Set(val.Collection(), val)
+	return nil
+}
+
+func (d *DB) deleteCollectionConfig(collection string) error {
+	if err := d.kv.Tx(true, func(tx kv.Tx) error {
+		err := tx.Delete([]byte(fmt.Sprintf("internal.collections.%s", collection)))
+		if err != nil {
+			return err
+		}
+		return nil
+	}); err != nil {
+		return err
+	}
+	d.collections.Del(collection)
 	return nil
 }
 
@@ -236,4 +238,21 @@ func (i indexPathPrefix) DocumentID() string {
 
 func (i indexPathPrefix) Fields() []indexFieldValue {
 	return i.fieldMap
+}
+
+func indexPrefix(collection, index string) []byte {
+	path := [][]byte{
+		[]byte("index"),
+		[]byte(collection),
+		[]byte(index),
+	}
+	return bytes.Join(path, []byte("\x00"))
+}
+
+func collectionPrefix(collection string) []byte {
+	path := [][]byte{
+		[]byte("index"),
+		[]byte(collection),
+	}
+	return bytes.Join(path, []byte("\x00"))
 }

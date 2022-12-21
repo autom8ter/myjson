@@ -36,7 +36,7 @@ type Tx interface {
 	Set(ctx context.Context, collection string, document *Document) error
 	// Delete deletes the specified key from the database
 	Delete(ctx context.Context, collection string, id string) error
-	// Scan scans the optimal index for a collection's documents passing its filters.
+	// ForEach scans the optimal index for a collection's documents passing its filters.
 	// results will not be ordered unless an index supporting the order by(s) was found by the optimizer
 	// Query should be used when order is more important than performance/resource-usage
 	ForEach(ctx context.Context, collection string, where []Where, fn ForEachFunc) (Optimization, error)

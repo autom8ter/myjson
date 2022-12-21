@@ -26,12 +26,10 @@ func Decode(input any, output any) error {
 		TagName:              "json",
 		IgnoreUntaggedFields: true,
 	}
-
 	decoder, err := mapstructure.NewDecoder(config)
 	if err != nil {
 		return err
 	}
-
 	return decoder.Decode(input)
 }
 
@@ -55,20 +53,8 @@ func EncodeIndexValue(value any) []byte {
 		binary.BigEndian.PutUint64(buf, cast.ToUint64(value))
 		return buf
 	default:
-		bits, _ := json.Marshal(value)
-		if len(bits) == 0 {
-			bits = []byte(cast.ToString(value))
-		}
-		return bits
+		return EncodeIndexValue(JSONString(value))
 	}
-}
-
-func IsNil[T any](obj *T) bool {
-	return obj == nil
-}
-
-func ToPtr[T any](obj T) *T {
-	return &obj
 }
 
 func convertMap(m map[interface{}]interface{}) map[string]interface{} {

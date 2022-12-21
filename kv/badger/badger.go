@@ -57,3 +57,7 @@ func (b *badgerKV) Close() error {
 	}
 	return b.db.Close()
 }
+
+func (b *badgerKV) DropPrefix(prefix ...[]byte) error {
+	return b.db.DropPrefix(prefix...)
+}

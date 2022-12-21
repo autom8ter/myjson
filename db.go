@@ -190,6 +190,17 @@ func (d *DB) ForEach(ctx context.Context, collection string, where []Where, fn F
 	return result, nil
 }
 
+// DropCollection drops the collection and it's indexes from the database
+func (d *DB) DropCollection(ctx context.Context, collection string) error {
+	if err := d.kv.DropPrefix(collectionPrefix(collection)); err != nil {
+		return errors.Wrap(err, errors.Internal, "failed to remove collection %s", collection)
+	}
+	if err := d.deleteCollectionConfig(collection); err != nil {
+		return errors.Wrap(err, errors.Internal, "failed to remove collection %s", collection)
+	}
+	return nil
+}
+
 // ConfigureCollection overwrites a single database collection configuration
 func (d *DB) ConfigureCollection(ctx context.Context, collectionSchemaBytes []byte) error {
 	meta, _ := GetMetadata(ctx)
@@ -200,28 +211,7 @@ func (d *DB) ConfigureCollection(ctx context.Context, collectionSchemaBytes []by
 	if err != nil {
 		return err
 	}
-	if d.HasCollection(collection.Collection()) {
-		for _, i := range d.GetSchema(collection.Collection()).Indexing() {
-			if i.IsBuilding {
-				return errors.New(errors.Forbidden, "cannot configure collection during %v indexing", i.Name)
-			}
-		}
-	}
 
-	var (
-		hasPrimary = 0
-	)
-	for _, v := range collection.Indexing() {
-		if v.Primary {
-			hasPrimary++
-		}
-	}
-	if hasPrimary > 1 {
-		return errors.New(errors.Validation, "%s: only a single primary index is supported", collection.Collection())
-	}
-	if hasPrimary == 0 {
-		return errors.New(errors.Validation, "%s: a primary index is required", collection.Collection())
-	}
 	if err := d.persistCollectionConfig(collection); err != nil {
 		return err
 	}

@@ -8,6 +8,8 @@ type DB interface {
 	NewTx(isUpdate bool) Tx
 	// NewBatch returns a batch kv writer
 	NewBatch() Batch
+	// DropPrefix drops keys with the given prefix(s) from the database
+	DropPrefix(prefix ...[]byte) error
 	// Close closes the key value database
 	Close() error
 }
