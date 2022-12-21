@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"io"
 	"reflect"
+	"regexp"
 	"strings"
 
 	"github.com/autom8ter/gokvkit/errors"
@@ -298,8 +299,17 @@ func (d *Document) Where(wheres []Where) (bool, error) {
 					return true, nil
 				}
 			}
-		default:
-			return false, errors.New(errors.Validation, "invalid operator: '%s'", w.Op)
+		case WhereOpHasPrefix:
+			fieldVal := d.Get(w.Field)
+			if !strings.HasPrefix(cast.ToString(fieldVal), cast.ToString(w.Value)) {
+				return false, nil
+			}
+		case WhereOpRegex:
+			fieldVal := d.Get(w.Field)
+			match, _ := regexp.Match(cast.ToString(w.Value), []byte(cast.ToString(fieldVal)))
+			if !match {
+				return false, nil
+			}
 		}
 	}
 	return true, nil

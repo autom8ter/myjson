@@ -23,6 +23,9 @@ const WhereOpContainsAny WhereOp = "containsAny"
 const WhereOpNeq WhereOp = "neq"
 const WhereOpLt WhereOp = "lt"
 const WhereOpLte WhereOp = "lte"
+const WhereOpHasPrefix WhereOp = "hasPrefix"
+const WhereOpHasSuffix WhereOp = "hasSuffix"
+const WhereOpRegex WhereOp = "regex"
 
 type OrderByDirection string
 
