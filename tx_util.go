@@ -270,7 +270,7 @@ func (t *transaction) queryScan(ctx context.Context, collection string, where []
 	pfx := seekPrefix(collection, optimization.Index, optimization.MatchedValues)
 	opts := kv.IterOpts{
 		Prefix:  pfx.Path(),
-		Seek:    nil,
+		Seek:    pfx.Path(),
 		Reverse: false,
 	}
 	it := t.tx.NewIterator(opts)

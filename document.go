@@ -310,6 +310,8 @@ func (d *Document) Where(wheres []Where) (bool, error) {
 			if !match {
 				return false, nil
 			}
+		default:
+			return false, errors.New(errors.Validation, "unsupported operator: %s", w.Op)
 		}
 	}
 	return true, nil
