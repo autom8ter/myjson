@@ -40,6 +40,8 @@ type Tx interface {
 	// results will not be ordered unless an index supporting the order by(s) was found by the optimizer
 	// Query should be used when order is more important than performance/resource-usage
 	ForEach(ctx context.Context, collection string, where []Where, fn ForEachFunc) (Optimization, error)
+	// CDC returns the change data capture array associated with the transaction. CDC's are persisted before the transaction is commited.
+	CDC() []CDC
 }
 
 // TxFunc is a function executed against a transaction - if the function returns an error, all changes will be rolled back.
@@ -53,6 +55,7 @@ type transaction struct {
 	db      *DB
 	tx      kv.Tx
 	isBatch bool
+	cdc     []CDC
 }
 
 func (t *transaction) Commit(ctx context.Context) error {
@@ -60,6 +63,22 @@ func (t *transaction) Commit(ctx context.Context) error {
 		if err := h.Func(ctx, t); err != nil {
 			return err
 		}
+	}
+	for _, cdc := range t.cdc {
+		cdcDoc, err := NewDocumentFrom(&cdc)
+		if err != nil {
+			return errors.Wrap(err, errors.Internal, "failed to persist cdc")
+		}
+		if err := t.persistCommand(ctx, cdc.Metadata, &Command{
+			Collection: "cdc",
+			Action:     Create,
+			Document:   cdcDoc,
+			Timestamp:  cdc.Timestamp,
+			Metadata:   cdc.Metadata,
+		}); err != nil {
+			return errors.Wrap(err, errors.Internal, "failed to persist cdc")
+		}
+		t.db.cdcStream.Broadcast(ctx, cdc.Collection, cdc)
 	}
 	return t.tx.Commit()
 }
@@ -69,6 +88,7 @@ func (t *transaction) Rollback(ctx context.Context) {
 		h.Func(ctx, t)
 	}
 	t.tx.Rollback()
+	t.cdc = []CDC{}
 }
 
 func (t *transaction) Update(ctx context.Context, collection string, id string, update map[string]any) error {
@@ -298,4 +318,9 @@ func (t *transaction) ForEach(ctx context.Context, collection string, where []Wh
 
 func (t *transaction) Close(ctx context.Context) {
 	t.tx.Close()
+	t.cdc = []CDC{}
+}
+
+func (t *transaction) CDC() []CDC {
+	return t.cdc
 }

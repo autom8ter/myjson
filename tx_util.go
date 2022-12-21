@@ -154,24 +154,9 @@ func (t *transaction) persistCommand(ctx context.Context, md *Metadata, command 
 			Document:   command.Document,
 			Timestamp:  command.Timestamp,
 			Metadata:   command.Metadata,
+			Diff:       command.Document.Diff(before),
 		}
-		if before != nil {
-			cdc.Diff = command.Document.Diff(before)
-		}
-		cdcDoc, err := NewDocumentFrom(&cdc)
-		if err != nil {
-			return errors.Wrap(err, errors.Internal, "failed to persist cdc")
-		}
-		if err := t.persistCommand(ctx, md, &Command{
-			Collection: "cdc",
-			Action:     Create,
-			Document:   cdcDoc,
-			Timestamp:  command.Timestamp,
-			Metadata:   command.Metadata,
-		}); err != nil {
-			return errors.Wrap(err, errors.Internal, "failed to persist cdc")
-		}
-		t.db.cdcStream.Broadcast(ctx, command.Collection, cdc)
+		t.cdc = append(t.cdc, cdc)
 	}
 	return nil
 }
