@@ -82,6 +82,8 @@ func (o OnInit) Valid() error {
 type OnCommit struct {
 	// Name is the name of the hook
 	Name string
+	// Before indicates whether the hook should execute before or after the transaction is commited
+	Before bool
 	// Func is the function to execute
 	Func func(ctx context.Context, tx Tx) error
 }
@@ -101,6 +103,8 @@ func (o OnCommit) Valid() error {
 type OnRollback struct {
 	// Name is the name of the hook
 	Name string
+	// Before indicates whether the hook should execute before or after the transaction is rolled back
+	Before bool
 	// Func is the function to execute
 	Func func(ctx context.Context, tx Tx)
 }

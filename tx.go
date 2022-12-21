@@ -60,34 +60,41 @@ type transaction struct {
 
 func (t *transaction) Commit(ctx context.Context) error {
 	for _, h := range t.db.onCommit {
-		if err := h.Func(ctx, t); err != nil {
-			return err
+		if h.Before {
+			if err := h.Func(ctx, t); err != nil {
+				return err
+			}
 		}
 	}
 	for _, cdc := range t.cdc {
-		cdcDoc, err := NewDocumentFrom(&cdc)
-		if err != nil {
-			return errors.Wrap(err, errors.Internal, "failed to persist cdc")
-		}
-		if err := t.persistCommand(ctx, cdc.Metadata, &Command{
-			Collection: "cdc",
-			Action:     Create,
-			Document:   cdcDoc,
-			Timestamp:  cdc.Timestamp,
-			Metadata:   cdc.Metadata,
-		}); err != nil {
-			return errors.Wrap(err, errors.Internal, "failed to persist cdc")
-		}
 		t.db.cdcStream.Broadcast(ctx, cdc.Collection, cdc)
 	}
-	return t.tx.Commit()
+	if err := t.tx.Commit(); err != nil {
+		return err
+	}
+	for _, h := range t.db.onCommit {
+		if !h.Before {
+			if err := h.Func(ctx, t); err != nil {
+				return err
+			}
+		}
+	}
+	t.cdc = []CDC{}
+	return nil
 }
 
 func (t *transaction) Rollback(ctx context.Context) {
 	for _, h := range t.db.onRollback {
-		h.Func(ctx, t)
+		if h.Before {
+			h.Func(ctx, t)
+		}
 	}
 	t.tx.Rollback()
+	for _, h := range t.db.onRollback {
+		if !h.Before {
+			h.Func(ctx, t)
+		}
+	}
 	t.cdc = []CDC{}
 }
 

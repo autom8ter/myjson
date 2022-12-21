@@ -45,16 +45,23 @@ func WithOnRollback(onRollback ...OnRollback) DBOpt {
 	}
 }
 
-// WithOptimizer overrides the default query optimizer
+// WithOptimizer overrides the default query optimizer provider
 func WithOptimizer(o Optimizer) DBOpt {
 	return func(d *DB) {
 		d.optimizer = o
 	}
 }
 
-// WithCollectionCache overrides the default collection cache
+// WithCollectionCache overrides the default collection cache provider
 func WithCollectionCache(c Cache[CollectionSchema]) DBOpt {
 	return func(d *DB) {
 		d.collections = c
+	}
+}
+
+// WithChangeStream overrides the default change stream provider
+func WithChangeStream(c Stream[CDC]) DBOpt {
+	return func(d *DB) {
+		d.cdcStream = c
 	}
 }
