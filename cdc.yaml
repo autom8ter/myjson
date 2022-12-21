@@ -35,8 +35,7 @@ properties:
           type: string
         path:
           type: string
-        value:
-          type: {}
+        value: {}
   timestamp:
     type: string
     description: The timestamp when the change was commited
