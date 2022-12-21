@@ -3,24 +3,10 @@ package gokvkit
 // DBOpt is an option for configuring a collection
 type DBOpt func(d *DB)
 
-// WithOnRead adds document read hook(s) to the collection
-func WithOnRead(readHooks map[string][]OnRead) DBOpt {
-	return func(d *DB) {
-		d.readHooks = newInMemCache(readHooks)
-	}
-}
-
 // WithOnPersist adds a hook to the collections configuration that executes on changes as commands are persisted
 func WithOnPersist(sideEffects map[string][]OnPersist) DBOpt {
 	return func(d *DB) {
 		d.persistHooks = newInMemCache(sideEffects)
-	}
-}
-
-// WithOnWhere adds a wherre effect to the collections configuration that executes on on where clauses before queries are executed.
-func WithOnWhere(whereHook map[string][]OnWhere) DBOpt {
-	return func(d *DB) {
-		d.whereHooks = newInMemCache(whereHook)
 	}
 }
 

@@ -241,28 +241,6 @@ func (t *transaction) updateSecondaryIndex(ctx context.Context, idx Index, docID
 	return nil
 }
 
-func (t *transaction) applyWhereHooks(ctx context.Context, collection string, where []Where) ([]Where, error) {
-	var err error
-	for _, whereHook := range t.db.whereHooks.Get(collection) {
-		where, err = whereHook.Func(ctx, t, where)
-		if err != nil {
-			return nil, err
-		}
-	}
-	return where, nil
-}
-
-func (t *transaction) applyReadHooks(ctx context.Context, collection string, doc *Document) (*Document, error) {
-	var err error
-	for _, readHook := range t.db.readHooks.Get(collection) {
-		doc, err = readHook.Func(ctx, t, doc)
-		if err != nil {
-			return nil, err
-		}
-	}
-	return doc, nil
-}
-
 func (t *transaction) applyPersistHooks(ctx context.Context, tx Tx, command *Command, before bool) error {
 	for _, sideEffect := range t.db.persistHooks.Get(command.Collection) {
 		if sideEffect.Before == before {
@@ -282,10 +260,6 @@ func (t *transaction) queryScan(ctx context.Context, collection string, where []
 		return Optimization{}, errors.New(errors.Validation, "unsupported collection: %s", collection)
 	}
 	var err error
-	where, err = t.applyWhereHooks(ctx, collection, where)
-	if err != nil {
-		return Optimization{}, err
-	}
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	optimization, err := t.db.optimizer.Optimize(t.db.collections.Get(collection), where)
@@ -328,10 +302,6 @@ func (t *transaction) queryScan(ctx context.Context, collection string, where []
 			return optimization, err
 		}
 		if pass {
-			document, err = t.applyReadHooks(ctx, collection, document)
-			if err != nil {
-				return optimization, err
-			}
 			shouldContinue, err := fn(document)
 			if err != nil {
 				return optimization, err

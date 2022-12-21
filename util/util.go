@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"github.com/autom8ter/gokvkit/errors"
 	"github.com/go-playground/validator/v10"
@@ -52,6 +53,10 @@ func EncodeIndexValue(value any) []byte {
 		buf := make([]byte, 8)
 		binary.BigEndian.PutUint64(buf, cast.ToUint64(value))
 		return buf
+	case time.Time:
+		return EncodeIndexValue(value.UnixNano())
+	case time.Duration:
+		return EncodeIndexValue(int(value))
 	default:
 		return EncodeIndexValue(JSONString(value))
 	}

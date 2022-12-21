@@ -40,7 +40,8 @@ type Tx interface {
 	// results will not be ordered unless an index supporting the order by(s) was found by the optimizer
 	// Query should be used when order is more important than performance/resource-usage
 	ForEach(ctx context.Context, collection string, where []Where, fn ForEachFunc) (Optimization, error)
-	// CDC returns the change data capture array associated with the transaction. CDC's are persisted before the transaction is commited.
+	// CDC returns the change data capture array associated with the transaction.
+	// CDC's are persisted to the cdc collection when the transaction is commited.
 	CDC() []CDC
 }
 
@@ -263,10 +264,6 @@ func (t *transaction) Get(ctx context.Context, collection string, id string) (*D
 	}
 	if doc == nil {
 		return nil, errors.New(errors.NotFound, "%s not found", id)
-	}
-	doc, err = t.applyReadHooks(ctx, collection, doc)
-	if err != nil {
-		return doc, err
 	}
 	if doc == nil {
 		return nil, errors.New(errors.NotFound, "%s not found", id)

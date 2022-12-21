@@ -25,6 +25,24 @@ type Config struct {
 	KV KVConfig `json:"kv"`
 }
 
+type Database interface {
+	Collections() []string
+	ConfigureCollection(ctx context.Context, collectionSchemaBytes []byte) error
+	GetSchema(collection string) CollectionSchema
+	HasCollection(collection string) bool
+	DropCollection(ctx context.Context, collection string) error
+
+	Tx(ctx context.Context, isUpdate bool, fn TxFunc) error
+	NewTx(isUpdate bool) Txn
+	ChangeStream(ctx context.Context, collection string) (<-chan CDC, error)
+	Get(ctx context.Context, collection, id string) (*Document, error)
+	ForEach(ctx context.Context, collection string, where []Where, fn ForEachFunc) (Optimization, error)
+	Query(ctx context.Context, collection string, query Query) (Page, error)
+	BatchGet(ctx context.Context, collection string, ids []string) (Documents, error)
+
+	Close(ctx context.Context) error
+}
+
 // DB is an embedded, durable NoSQL database with support for schemas, indexing, and aggregation
 type DB struct {
 	config       Config
@@ -34,8 +52,6 @@ type DB struct {
 	optimizer    Optimizer
 	initHooks    Cache[OnInit]
 	persistHooks Cache[[]OnPersist]
-	whereHooks   Cache[[]OnWhere]
-	readHooks    Cache[[]OnRead]
 	onCommit     []OnCommit
 	onRollback   []OnRollback
 	cdcStream    Stream[CDC]
@@ -66,8 +82,6 @@ func New(ctx context.Context, cfg Config, opts ...DBOpt) (*DB, error) {
 		optimizer:    defaultOptimizer{},
 		initHooks:    newInMemCache(map[string]OnInit{}),
 		persistHooks: newInMemCache(map[string][]OnPersist{}),
-		whereHooks:   newInMemCache(map[string][]OnWhere{}),
-		readHooks:    newInMemCache(map[string][]OnRead{}),
 		cdcStream:    newStream[CDC](machine.New()),
 	}
 
