@@ -4,24 +4,6 @@ import (
 	"sync"
 )
 
-// Cache is a caching interface for in-memory state
-type Cache[T any] interface {
-	// Get gets a value, it returns nil if no value was found
-	Get(key string) T
-	// Exists returns true if the key has a value
-	Exists(key string) bool
-	// Set sets the key value pair
-	Set(key string, value T)
-	// SetFunc sets the key value pair within a callback function
-	SetFunc(key string, fn func(T) T)
-	// Del deletes a key if it exists
-	Del(key string)
-	// Range
-	Range(fn func(key string, t T) bool)
-	// AsMap returns the cache kv pairs as a map
-	AsMap() map[string]T
-}
-
 func newInMemCache[T any](data map[string]T) Cache[T] {
 	if data == nil {
 		data = map[string]T{}

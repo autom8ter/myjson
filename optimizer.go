@@ -6,12 +6,6 @@ import (
 	"github.com/samber/lo"
 )
 
-// Optimizer selects the best index from a set of indexes based on where clauses
-type Optimizer interface {
-	// Optimize selects the optimal index to use based on the given where clauses
-	Optimize(c CollectionSchema, where []Where) (Optimization, error)
-}
-
 type defaultOptimizer struct{}
 
 func (o defaultOptimizer) Optimize(c CollectionSchema, where []Where) (Optimization, error) {

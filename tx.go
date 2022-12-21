@@ -11,40 +11,6 @@ import (
 	"github.com/segmentio/ksuid"
 )
 
-// Txn is a database transaction interface - it holds the methods used while using a transaction + commit,rollback,and close functionality
-type Txn interface {
-	// Commit commits the transaction to the database
-	Commit(ctx context.Context) error
-	// Rollback rollsback all changes made to the datbase
-	Rollback(ctx context.Context)
-	// Close closes the transaction - it should be deferred after
-	Close(ctx context.Context)
-	Tx
-}
-
-// Tx is a database transaction interface - it holds the methods used while using a transaction
-type Tx interface {
-	// Query executes a query against the database
-	Query(ctx context.Context, collection string, query Query) (Page, error)
-	// Get returns a document by id
-	Get(ctx context.Context, collection string, id string) (*Document, error)
-	// Create creates a new document - if the documents primary key is unset, it will be set as a sortable unique id
-	Create(ctx context.Context, collection string, document *Document) (string, error)
-	// Update updates a value in the database
-	Update(ctx context.Context, collection, id string, document map[string]any) error
-	// Set sets the specified key/value in the database
-	Set(ctx context.Context, collection string, document *Document) error
-	// Delete deletes the specified key from the database
-	Delete(ctx context.Context, collection string, id string) error
-	// ForEach scans the optimal index for a collection's documents passing its filters.
-	// results will not be ordered unless an index supporting the order by(s) was found by the optimizer
-	// Query should be used when order is more important than performance/resource-usage
-	ForEach(ctx context.Context, collection string, where []Where, fn ForEachFunc) (Optimization, error)
-	// CDC returns the change data capture array associated with the transaction.
-	// CDC's are persisted to the cdc collection when the transaction is commited.
-	CDC() []CDC
-}
-
 // TxFunc is a function executed against a transaction - if the function returns an error, all changes will be rolled back.
 // Otherwise, the changes will be commited to the database
 type TxFunc func(ctx context.Context, tx Tx) error
@@ -53,7 +19,7 @@ type TxFunc func(ctx context.Context, tx Tx) error
 type ForEachFunc func(d *Document) (bool, error)
 
 type transaction struct {
-	db      *DB
+	db      *defaultDB
 	tx      kv.Tx
 	isBatch bool
 	cdc     []CDC

@@ -14,21 +14,6 @@ import (
 	"github.com/tidwall/sjson"
 )
 
-type CollectionSchema interface {
-	Collection() string
-	ValidateDocument(ctx context.Context, doc *Document) error
-	Indexing() map[string]Index
-	SetIndex(index Index) error
-	DelIndex(name string) error
-	PrimaryIndex() Index
-	// PrimaryKey returns the collections primary key
-	PrimaryKey() string
-	GetPrimaryKey(doc *Document) string
-	SetPrimaryKey(doc *Document, id string) error
-	RequireQueryIndex() bool
-	Bytes() ([]byte, error)
-}
-
 type collectionSchema struct {
 	schema       *jsonschema.Schema
 	raw          gjson.Result
@@ -90,10 +75,68 @@ func newCollectionSchema(yamlContent []byte) (CollectionSchema, error) {
 	return s, nil
 }
 
-func (c *collectionSchema) Bytes() ([]byte, error) {
+func (c *collectionSchema) refreshSchema(jsonContent []byte) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if len(jsonContent) == 0 {
+		return errors.New(errors.Validation, "empty schema content")
+	}
+	var (
+		schema = &jsonschema.Schema{}
+	)
+	if err := json.Unmarshal(jsonContent, schema); err != nil {
+		return errors.Wrap(err, errors.Validation, "failed to decode json schema")
+	}
+	c.raw = gjson.ParseBytes(jsonContent)
+	c.schema = schema
+	c.indexing = map[string]Index{}
+	c.collection = c.raw.Get(string(collectionPath)).String()
+	for _, index := range c.raw.Get(string(indexingPath)).Map() {
+		var i Index
+		err := util.Decode(index.Value(), &i)
+		if err != nil {
+			return errors.Wrap(err, errors.Validation, "failed to decode index")
+		}
+		if err := i.Validate(); err != nil {
+			return err
+		}
+		if i.Primary {
+			c.primaryIndex = i
+		}
+		c.indexing[i.Name] = i
+	}
+	if len(c.primaryIndex.Fields) == 0 {
+		return errors.New(errors.Validation, "primary index is required")
+	}
+	return nil
+}
+
+func (c *collectionSchema) MarshalYAML() ([]byte, error) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	return util.JSONToYAML([]byte(c.raw.Raw))
+}
+
+func (c *collectionSchema) UnmarshalYAML(bytes []byte) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	bits, err := util.YAMLToJSON(bytes)
+	if err != nil {
+		return err
+	}
+	return c.refreshSchema(bits)
+}
+
+func (c *collectionSchema) MarshalJSON() ([]byte, error) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return []byte(c.raw.Raw), nil
+}
+
+func (c *collectionSchema) UnmarshalJSON(bytes []byte) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.refreshSchema(bytes)
 }
 
 func (c *collectionSchema) Collection() string {

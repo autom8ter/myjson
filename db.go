@@ -8,71 +8,12 @@ import (
 	"github.com/autom8ter/gokvkit/errors"
 	"github.com/autom8ter/gokvkit/kv"
 	"github.com/autom8ter/gokvkit/kv/registry"
+	"github.com/autom8ter/gokvkit/util"
 	"github.com/autom8ter/machine/v4"
 )
 
-// KVConfig configures a key value database from the given provider
-type KVConfig struct {
-	// Provider is the name of the kv provider (badger)
-	Provider string `json:"provider"`
-	// Params are the kv providers params
-	Params map[string]any `json:"params"`
-}
-
-/*
-OpenKV opens a kv database. supported providers:
-badger(default):
-
-	  params:
-		storage_path: string (leave empty for in-memory)
-*/
-func OpenKV(cfg KVConfig) (kv.DB, error) {
-	return registry.Open(cfg.Provider, cfg.Params)
-}
-
-// Config configures a database instance
-type Config struct {
-	// KV is the key value configuration
-	KV KVConfig `json:"kv"`
-}
-
-// Database is a NoSQL database built on top of key value storage
-type Database interface {
-	// Collections returns a list of collection names that are registered in the collection
-	Collections() []string
-	// ConfigureCollection overwrites a single database collection configuration
-	ConfigureCollection(ctx context.Context, collectionSchemaBytes []byte) error
-	// GetSchema gets a collection schema by name (if it exists)
-	GetSchema(collection string) CollectionSchema
-	// HasCollection reports whether a collection exists in the database
-	HasCollection(collection string) bool
-	// DropCollection drops the collection and it's indexes from the database
-	DropCollection(ctx context.Context, collection string) error
-	// Tx executes the given function against a new transaction.
-	// if the function returns an error, all changes will be rolled back.
-	// otherwise, the changes will be commited to the database
-	Tx(ctx context.Context, isUpdate bool, fn TxFunc) error
-	// NewTx returns a new transaction. a transaction must call Commit method in order to persist changes
-	NewTx(isUpdate bool) Txn
-	// ChangeStream streams changes to documents in the given collection.
-	ChangeStream(ctx context.Context, collection string) (<-chan CDC, error)
-	// Get gets a single document by id
-	Get(ctx context.Context, collection, id string) (*Document, error)
-	// ForEach scans the optimal index for a collection's documents passing its filters.
-	// results will not be ordered unless an index supporting the order by(s) was found by the optimizer
-	// Query should be used when order is more important than performance/resource-usage
-	ForEach(ctx context.Context, collection string, where []Where, fn ForEachFunc) (Optimization, error)
-	// Query queries a list of documents
-	Query(ctx context.Context, collection string, query Query) (Page, error)
-	// Get gets 1-many document by id(s)
-	BatchGet(ctx context.Context, collection string, ids []string) (Documents, error)
-	// Close closes the database
-	Close(ctx context.Context) error
-}
-
-// DB is an embedded, durable NoSQL database with support for schemas, indexing, and aggregation
-type DB struct {
-	config       Config
+// defaultDB is an embedded, durable NoSQL database with support for schemas, indexing, and aggregation
+type defaultDB struct {
 	kv           kv.DB
 	machine      machine.Machine
 	collections  Cache[CollectionSchema]
@@ -85,13 +26,12 @@ type DB struct {
 }
 
 // New creates a new database instance from the given config
-func New(ctx context.Context, cfg Config, opts ...DBOpt) (Database, error) {
-	db, err := OpenKV(cfg.KV)
+func New(ctx context.Context, provider string, providerParams map[string]any, opts ...DBOpt) (Database, error) {
+	db, err := registry.Open(provider, providerParams)
 	if err != nil {
 		return nil, errors.Wrap(err, errors.Internal, "failed to open kv database")
 	}
-	d := &DB{
-		config:       cfg,
+	d := &defaultDB{
 		kv:           db,
 		machine:      machine.New(),
 		collections:  newInMemCache(map[string]CollectionSchema{}),
@@ -133,7 +73,7 @@ func New(ctx context.Context, cfg Config, opts ...DBOpt) (Database, error) {
 	return d, err
 }
 
-func (d *DB) NewTx(isUpdate bool) Txn {
+func (d *defaultDB) NewTx(isUpdate bool) Txn {
 	return &transaction{
 		db:      d,
 		tx:      d.kv.NewTx(isUpdate),
@@ -141,7 +81,7 @@ func (d *DB) NewTx(isUpdate bool) Txn {
 	}
 }
 
-func (d *DB) Tx(ctx context.Context, isUpdate bool, fn TxFunc) error {
+func (d *defaultDB) Tx(ctx context.Context, isUpdate bool, fn TxFunc) error {
 	tx := d.NewTx(isUpdate)
 	defer tx.Close(ctx)
 	err := fn(ctx, tx)
@@ -156,7 +96,7 @@ func (d *DB) Tx(ctx context.Context, isUpdate bool, fn TxFunc) error {
 	return nil
 }
 
-func (d *DB) Get(ctx context.Context, collection, id string) (*Document, error) {
+func (d *defaultDB) Get(ctx context.Context, collection, id string) (*Document, error) {
 	var (
 		document *Document
 		err      error
@@ -170,7 +110,7 @@ func (d *DB) Get(ctx context.Context, collection, id string) (*Document, error) 
 	return document, err
 }
 
-func (d *DB) BatchGet(ctx context.Context, collection string, ids []string) (Documents, error) {
+func (d *defaultDB) BatchGet(ctx context.Context, collection string, ids []string) (Documents, error) {
 	var documents []*Document
 	if err := d.Tx(ctx, false, func(ctx context.Context, tx Tx) error {
 		for _, id := range ids {
@@ -187,7 +127,7 @@ func (d *DB) BatchGet(ctx context.Context, collection string, ids []string) (Doc
 	return documents, nil
 }
 
-func (d *DB) Query(ctx context.Context, collection string, query Query) (Page, error) {
+func (d *defaultDB) Query(ctx context.Context, collection string, query Query) (Page, error) {
 	var (
 		page Page
 		err  error
@@ -201,7 +141,7 @@ func (d *DB) Query(ctx context.Context, collection string, query Query) (Page, e
 	return page, nil
 }
 
-func (d *DB) ForEach(ctx context.Context, collection string, where []Where, fn ForEachFunc) (Optimization, error) {
+func (d *defaultDB) ForEach(ctx context.Context, collection string, where []Where, fn ForEachFunc) (Optimization, error) {
 	var (
 		result Optimization
 		err    error
@@ -215,7 +155,7 @@ func (d *DB) ForEach(ctx context.Context, collection string, where []Where, fn F
 	return result, nil
 }
 
-func (d *DB) DropCollection(ctx context.Context, collection string) error {
+func (d *defaultDB) DropCollection(ctx context.Context, collection string) error {
 	if err := d.kv.DropPrefix(collectionPrefix(collection)); err != nil {
 		return errors.Wrap(err, errors.Internal, "failed to remove collection %s", collection)
 	}
@@ -225,12 +165,16 @@ func (d *DB) DropCollection(ctx context.Context, collection string) error {
 	return nil
 }
 
-func (d *DB) ConfigureCollection(ctx context.Context, collectionSchemaBytes []byte) error {
+func (d *defaultDB) ConfigureCollection(ctx context.Context, collectionSchemaBytes []byte) error {
+	jsonBytes, err := util.YAMLToJSON(collectionSchemaBytes)
+	if err != nil {
+		jsonBytes = collectionSchemaBytes
+	}
 	meta, _ := GetMetadata(ctx)
 	meta.Set(string(isIndexingKey), true)
 	meta.Set(string(internalKey), true)
 	ctx = meta.ToContext(ctx)
-	collection, err := newCollectionSchema(collectionSchemaBytes)
+	collection, err := newCollectionSchema(jsonBytes)
 	if err != nil {
 		return err
 	}
@@ -276,7 +220,7 @@ func (d *DB) ConfigureCollection(ctx context.Context, collectionSchemaBytes []by
 	return nil
 }
 
-func (d *DB) Collections() []string {
+func (d *defaultDB) Collections() []string {
 	var names []string
 	d.collections.Range(func(key string, c CollectionSchema) bool {
 		names = append(names, c.Collection())
@@ -285,21 +229,21 @@ func (d *DB) Collections() []string {
 	return names
 }
 
-func (d *DB) HasCollection(collection string) bool {
+func (d *defaultDB) HasCollection(collection string) bool {
 	return d.collections.Exists(collection)
 }
 
-func (d *DB) GetSchema(collection string) CollectionSchema {
+func (d *defaultDB) GetSchema(collection string) CollectionSchema {
 	return d.collections.Get(collection)
 }
 
-func (d *DB) ChangeStream(ctx context.Context, collection string) (<-chan CDC, error) {
+func (d *defaultDB) ChangeStream(ctx context.Context, collection string) (<-chan CDC, error) {
 	if collection != "*" && !d.HasCollection(collection) {
 		return nil, errors.New(errors.Validation, "collection does not exist: %s", collection)
 	}
 	return d.cdcStream.Pull(ctx, collection)
 }
 
-func (d *DB) Close(ctx context.Context) error {
+func (d *defaultDB) Close(ctx context.Context) error {
 	return errors.Wrap(d.kv.Close(), 0, "")
 }

@@ -23,13 +23,8 @@ var (
 func main() {
 	ctx := context.Background()
 	os.MkdirAll("./tmp/crm", 0700)
-	db, err := gokvkit.New(ctx, gokvkit.Config{
-		KV: gokvkit.KVConfig{
-			Provider: "badger",
-			Params: map[string]any{
-				"storage_path": "./tmp/crm",
-			},
-		},
+	db, err := gokvkit.New(ctx, "badger", map[string]any{
+		"storage_path": "./tmp/crm",
 	}, gokvkit.WithOnPersist(map[string][]gokvkit.OnPersist{
 		"user": {
 			{

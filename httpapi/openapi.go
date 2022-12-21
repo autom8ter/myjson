@@ -85,7 +85,7 @@ func (o *openAPIServer) Spec() ([]byte, error) {
 	var coll []map[string]interface{}
 	var collections = o.db.Collections()
 	for _, c := range collections {
-		schema, _ := o.db.GetSchema(c).Bytes()
+		schema, _ := o.db.GetSchema(c).MarshalYAML()
 		coll = append(coll, map[string]interface{}{
 			"collection": c,
 			"schema":     string(schema),

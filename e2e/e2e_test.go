@@ -55,7 +55,7 @@ func TestConcurrency(t *testing.T) {
 					{
 						schema := db.GetSchema("user")
 						assert.Nil(t, schema.DelIndex("email_idx"))
-						bytes, err := schema.Bytes()
+						bytes, err := schema.MarshalJSON()
 						assert.Nil(t, err)
 						assert.Nil(t, db.ConfigureCollection(ctx, bytes))
 					}
@@ -67,7 +67,7 @@ func TestConcurrency(t *testing.T) {
 							Unique:  true,
 							Primary: false,
 						}))
-						bytes, err := schema.Bytes()
+						bytes, err := schema.MarshalYAML()
 						assert.Nil(t, err)
 						assert.Nil(t, db.ConfigureCollection(ctx, bytes))
 					}

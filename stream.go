@@ -6,11 +6,6 @@ import (
 	"github.com/autom8ter/machine/v4"
 )
 
-type Stream[T any] interface {
-	Broadcast(ctx context.Context, channel string, msg T)
-	Pull(ctx context.Context, channel string) (<-chan T, error)
-}
-
 type defaultStream[T any] struct {
 	machine machine.Machine
 }

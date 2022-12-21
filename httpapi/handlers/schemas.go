@@ -16,7 +16,7 @@ func GetSchemasHandler(o api.OpenAPIServer) http.HandlerFunc {
 		var resp = map[string]any{}
 		var collections = o.DB().Collections()
 		for _, c := range collections {
-			schema, _ := o.DB().GetSchema(c).Bytes()
+			schema, _ := o.DB().GetSchema(c).MarshalYAML()
 			resp[c] = string(schema)
 		}
 		w.WriteHeader(http.StatusOK)
@@ -31,7 +31,7 @@ func GetSchemaHandler(o api.OpenAPIServer) http.HandlerFunc {
 			httpError.Error(w, errors.New(errors.Validation, "collection does not exist"))
 			return
 		}
-		schema, _ := o.DB().GetSchema(collection).Bytes()
+		schema, _ := o.DB().GetSchema(collection).MarshalYAML()
 		w.WriteHeader(http.StatusOK)
 		w.Write(schema)
 	})
