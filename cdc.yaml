@@ -27,12 +27,16 @@ properties:
     description: The document being changed
   diff:
     type: array
-    description: An array of changes made to the document
+    description: An array of changes made to a document
     items:
       type: object
       properties:
         op:
           type: string
+          enum:
+            - replace
+            - add
+            - remove
         path:
           type: string
         value: {}
