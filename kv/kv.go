@@ -1,5 +1,7 @@
 package kv
 
+import "time"
+
 // DB is a key value database implementation
 type DB interface {
 	// Tx executes the given function against a database transaction
@@ -8,6 +10,8 @@ type DB interface {
 	NewTx(isUpdate bool) Tx
 	// NewBatch returns a batch kv writer
 	NewBatch() Batch
+	// NewLocker returns a mutex/locker with the given lease duration
+	NewLocker(key []byte, leaseInterval time.Duration) Locker
 	// DropPrefix drops keys with the given prefix(s) from the database
 	DropPrefix(prefix ...[]byte) error
 	// Close closes the key value database
@@ -91,6 +95,11 @@ type Batch interface {
 	Flush() error
 	// Mutator executes mutations against the database
 	Mutator
+}
+
+type Locker interface {
+	TryLock() (bool, error)
+	Unlock()
 }
 
 // KVConfig configures a key value database from the given provider

@@ -2,11 +2,13 @@ package badger
 
 import (
 	"bytes"
+	"time"
 
 	"github.com/autom8ter/gokvkit/kv"
 	"github.com/autom8ter/gokvkit/kv/registry"
 	"github.com/dgraph-io/badger/v3"
 	"github.com/dgraph-io/ristretto"
+	"github.com/segmentio/ksuid"
 	"github.com/spf13/cast"
 )
 
@@ -82,4 +84,15 @@ func (b *badgerKV) DropPrefix(prefix ...[]byte) error {
 		}
 	}
 	return b.db.DropPrefix(prefix...)
+}
+
+func (b *badgerKV) NewLocker(key []byte, leaseInterval time.Duration) kv.Locker {
+	return &badgerLock{
+		id:            ksuid.New().String(),
+		key:           key,
+		db:            b,
+		leaseInterval: leaseInterval,
+		unlock:        make(chan struct{}),
+		hasUnlocked:   make(chan struct{}),
+	}
 }

@@ -3,6 +3,7 @@ package badger
 import (
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/autom8ter/gokvkit/kv"
 	"github.com/stretchr/testify/assert"
@@ -99,5 +100,31 @@ func Test(t *testing.T) {
 			}
 			return nil
 		}))
+	})
+	t.Run("locker", func(t *testing.T) {
+		lock := db.NewLocker([]byte("testing"), 1*time.Second)
+		{
+			gotLock, err := lock.TryLock()
+			assert.Nil(t, err)
+			assert.True(t, gotLock)
+		}
+		{
+			gotLock, err := lock.TryLock()
+			assert.Nil(t, err)
+			assert.False(t, gotLock)
+		}
+		{
+			lock.Unlock()
+			assert.Nil(t, err)
+		}
+
+		newLock := db.NewLocker([]byte("testing"), 1*time.Second)
+		gotLock, err := newLock.TryLock()
+		assert.Nil(t, err)
+		assert.True(t, gotLock)
+
+		gotLock, err = lock.TryLock()
+		assert.Nil(t, err)
+		assert.False(t, gotLock)
 	})
 }
