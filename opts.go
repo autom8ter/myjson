@@ -4,16 +4,16 @@ package gokvkit
 type DBOpt func(d *defaultDB)
 
 // WithOnPersist adds a hook to the collections configuration that executes on changes as commands are persisted
-func WithOnPersist(sideEffects map[string][]OnPersist) DBOpt {
+func WithOnPersist(onPersist []OnPersist) DBOpt {
 	return func(d *defaultDB) {
-		d.persistHooks = newInMemCache(sideEffects)
+		d.persistHooks = append(d.persistHooks, onPersist...)
 	}
 }
 
 // WithOnInit adds database initializers(s) to the database.
-func WithOnInit(inits map[string]OnInit) DBOpt {
+func WithOnInit(onInit []OnInit) DBOpt {
 	return func(d *defaultDB) {
-		d.initHooks = newInMemCache(inits)
+		d.initHooks = append(d.initHooks, onInit...)
 	}
 }
 
@@ -35,13 +35,6 @@ func WithOnRollback(onRollback ...OnRollback) DBOpt {
 func WithOptimizer(o Optimizer) DBOpt {
 	return func(d *defaultDB) {
 		d.optimizer = o
-	}
-}
-
-// WithCollectionCache overrides the default collection cache provider
-func WithCollectionCache(c Cache[CollectionSchema]) DBOpt {
-	return func(d *defaultDB) {
-		d.collections = c
 	}
 }
 

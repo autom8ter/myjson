@@ -14,9 +14,9 @@ import (
 func GetSchemasHandler(o api.OpenAPIServer) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var resp = map[string]any{}
-		var collections = o.DB().Collections()
+		var collections = o.DB().Collections(r.Context())
 		for _, c := range collections {
-			schema, _ := o.DB().GetSchema(c).MarshalYAML()
+			schema, _ := o.DB().GetSchema(r.Context(), c).MarshalYAML()
 			resp[c] = string(schema)
 		}
 		w.WriteHeader(http.StatusOK)
@@ -27,11 +27,11 @@ func GetSchemasHandler(o api.OpenAPIServer) http.HandlerFunc {
 func GetSchemaHandler(o api.OpenAPIServer) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		collection := chi.URLParam(r, "collection")
-		if !o.DB().HasCollection(collection) {
+		if !o.DB().HasCollection(r.Context(), collection) {
 			httpError.Error(w, errors.New(errors.Validation, "collection does not exist"))
 			return
 		}
-		schema, _ := o.DB().GetSchema(collection).MarshalYAML()
+		schema, _ := o.DB().GetSchema(r.Context(), collection).MarshalYAML()
 		w.WriteHeader(http.StatusOK)
 		w.Write(schema)
 	})

@@ -16,7 +16,7 @@ import (
 func CreateDocHandler(o api.OpenAPIServer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		collection := chi.URLParam(r, "collection")
-		if !o.DB().HasCollection(collection) {
+		if !o.DB().HasCollection(r.Context(), collection) {
 			httpError.Error(w, errors.New(errors.NotFound, "collection does not exist"))
 			return
 		}
@@ -30,7 +30,7 @@ func CreateDocHandler(o api.OpenAPIServer) http.HandlerFunc {
 			if err != nil {
 				return err
 			}
-			if err := o.DB().GetSchema(collection).SetPrimaryKey(doc, id); err != nil {
+			if err := o.DB().GetSchema(ctx, collection).SetPrimaryKey(doc, id); err != nil {
 				return err
 			}
 			return nil

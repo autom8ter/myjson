@@ -16,7 +16,7 @@ import (
 func SetDocHandler(o api.OpenAPIServer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		collection := chi.URLParam(r, "collection")
-		if !o.DB().HasCollection(collection) {
+		if !o.DB().HasCollection(r.Context(), collection) {
 			httpError.Error(w, errors.New(errors.Validation, "collection does not exist"))
 			return
 		}
@@ -26,7 +26,7 @@ func SetDocHandler(o api.OpenAPIServer) http.HandlerFunc {
 			httpError.Error(w, errors.Wrap(err, http.StatusBadRequest, "failed to decode update"))
 			return
 		}
-		if err := o.DB().GetSchema(collection).SetPrimaryKey(doc, docID); err != nil {
+		if err := o.DB().GetSchema(r.Context(), collection).SetPrimaryKey(doc, docID); err != nil {
 			httpError.Error(w, errors.New(errors.Validation, "bad id: %s", docID))
 			return
 		}

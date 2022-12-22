@@ -53,14 +53,14 @@ func TestConcurrency(t *testing.T) {
 			for i := 0; i < 5; i++ {
 				egp.Go(func() error {
 					{
-						schema := db.GetSchema("user")
+						schema := db.GetSchema(ctx, "user")
 						assert.Nil(t, schema.DelIndex("email_idx"))
 						bytes, err := schema.MarshalJSON()
 						assert.Nil(t, err)
 						assert.Nil(t, db.ConfigureCollection(ctx, bytes))
 					}
 					{
-						schema := db.GetSchema("user")
+						schema := db.GetSchema(ctx, "user")
 						assert.Nil(t, schema.SetIndex(gokvkit.Index{
 							Name:    "email_idx",
 							Fields:  []string{"contact.email"},

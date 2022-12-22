@@ -85,7 +85,7 @@ func (t *transaction) setDocument(ctx context.Context, c CollectionSchema, docID
 }
 
 func (t *transaction) persistCommand(ctx context.Context, md *Metadata, command *Command) error {
-	c := t.db.collections.Get(command.Collection)
+	c := t.db.GetSchema(ctx, command.Collection)
 	if c == nil {
 		return fmt.Errorf("tx: collection: %s does not exist", command.Collection)
 	}
@@ -102,7 +102,7 @@ func (t *transaction) persistCommand(ctx context.Context, md *Metadata, command 
 	}
 	before, _ := t.Get(ctx, command.Collection, docID)
 	if md.Exists(string(isIndexingKey)) {
-		for _, i := range t.db.collections.Get(command.Collection).Indexing() {
+		for _, i := range t.db.GetSchema(ctx, command.Collection).Indexing() {
 			if i.Primary {
 				continue
 			}
@@ -134,10 +134,7 @@ func (t *transaction) persistCommand(ctx context.Context, md *Metadata, command 
 			return err
 		}
 	}
-	for _, i := range t.db.collections.Get(command.Collection).Indexing() {
-		if i.Primary {
-			continue
-		}
+	for _, i := range t.db.GetSchema(ctx, command.Collection).Indexing() {
 		if err := t.updateSecondaryIndex(ctx, i, docID, before, command); err != nil {
 			return errors.Wrap(err, errors.Internal, "")
 		}
@@ -151,7 +148,6 @@ func (t *transaction) persistCommand(ctx context.Context, md *Metadata, command 
 			Collection: command.Collection,
 			Action:     command.Action,
 			DocumentID: c.GetPrimaryKey(command.Document),
-			Document:   command.Document,
 			Timestamp:  command.Timestamp,
 			Metadata:   command.Metadata,
 			Diff:       command.Document.Diff(before),
@@ -242,7 +238,7 @@ func (t *transaction) updateSecondaryIndex(ctx context.Context, idx Index, docID
 }
 
 func (t *transaction) applyPersistHooks(ctx context.Context, tx Tx, command *Command, before bool) error {
-	for _, sideEffect := range t.db.persistHooks.Get(command.Collection) {
+	for _, sideEffect := range t.db.persistHooks {
 		if sideEffect.Before == before {
 			if err := sideEffect.Func(ctx, tx, command); err != nil {
 				return err
@@ -256,13 +252,13 @@ func (t *transaction) queryScan(ctx context.Context, collection string, where []
 	if fn == nil {
 		return Optimization{}, errors.New(errors.Validation, "empty scan handler")
 	}
-	if !t.db.HasCollection(collection) {
+	if !t.db.HasCollection(ctx, collection) {
 		return Optimization{}, errors.New(errors.Validation, "unsupported collection: %s", collection)
 	}
 	var err error
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	optimization, err := t.db.optimizer.Optimize(t.db.collections.Get(collection), where)
+	optimization, err := t.db.optimizer.Optimize(t.db.GetSchema(ctx, collection), where)
 	if err != nil {
 		return Optimization{}, err
 	}

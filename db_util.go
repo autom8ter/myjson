@@ -2,7 +2,6 @@ package gokvkit
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/autom8ter/gokvkit/errors"
 	"github.com/autom8ter/gokvkit/kv"
@@ -12,15 +11,18 @@ func (d *defaultDB) addIndex(ctx context.Context, collection string, index Index
 	if index.Name == "" {
 		return errors.New(errors.Validation, "%s - empty index name", collection)
 	}
-	if d.collections.Get(collection).Indexing()[index.Name].IsBuilding {
+	schema := d.getSchema(ctx, collection)
+	if schema.Indexing()[index.Name].IsBuilding {
 		return errors.New(errors.Forbidden, "%s - index is already building", collection)
 	}
 	index.IsBuilding = true
+	if err := schema.SetIndex(index); err != nil {
+		return err
+	}
 	var err error
-	d.collections.SetFunc(collection, func(c CollectionSchema) CollectionSchema {
-		err = c.SetIndex(index)
-		return c
-	})
+	if err := d.persistCollectionConfig(schema); err != nil {
+		return err
+	}
 	if err != nil {
 		return err
 	}
@@ -44,29 +46,37 @@ func (d *defaultDB) addIndex(ctx context.Context, collection string, index Index
 		}
 	}
 	index.IsBuilding = false
-	d.collections.SetFunc(collection, func(c CollectionSchema) CollectionSchema {
-		err = c.SetIndex(index)
-		return c
-	})
+	if err := schema.SetIndex(index); err != nil {
+		return err
+	}
+	if err := d.persistCollectionConfig(schema); err != nil {
+		return err
+	}
 	return err
+}
+
+func (d *defaultDB) getSchema(ctx context.Context, collection string) CollectionSchema {
+	schema := schemaFromCtx(ctx)
+	if schema == nil {
+		c, _ := d.getPersistedCollection(collection)
+		return c
+	}
+	return schema
 }
 
 func (d *defaultDB) removeIndex(ctx context.Context, collection string, index Index) error {
 	var err error
-	if d.collections.Get(collection).Indexing()[index.Name].IsBuilding {
+	schema := d.getSchema(ctx, collection)
+	if schema.Indexing()[index.Name].IsBuilding {
 		return errors.New(errors.Forbidden, "%s - index is already building", collection)
 	}
-	d.collections.SetFunc(collection, func(c CollectionSchema) CollectionSchema {
-		err = c.DelIndex(index.Name)
-		return c
-	})
 	if err != nil {
 		return err
 	}
 	meta, _ := GetMetadata(ctx)
 	meta.Set(string(internalKey), true)
 	meta.Set(string(isIndexingKey), true)
-	if err := d.kv.DropPrefix(indexPrefix(collection, index.Name)); err != nil {
+	if err := d.kv.DropPrefix(indexPrefix(schema.Collection(), index.Name)); err != nil {
 		return errors.Wrap(err, 0, "indexing: failed to remove index %s - %s", collection, index.Name)
 	}
 	return nil
@@ -78,7 +88,7 @@ func (d *defaultDB) persistCollectionConfig(val CollectionSchema) error {
 		if err != nil {
 			return err
 		}
-		err = tx.Set([]byte(fmt.Sprintf("internal.collections.%s", val.Collection())), bits)
+		err = tx.Set(collectionConfigKey(val.Collection()), bits)
 		if err != nil {
 			return err
 		}
@@ -86,13 +96,12 @@ func (d *defaultDB) persistCollectionConfig(val CollectionSchema) error {
 	}); err != nil {
 		return err
 	}
-	d.collections.Set(val.Collection(), val)
 	return nil
 }
 
 func (d *defaultDB) deleteCollectionConfig(collection string) error {
 	if err := d.kv.Tx(true, func(tx kv.Tx) error {
-		err := tx.Delete([]byte(fmt.Sprintf("internal.collections.%s", collection)))
+		err := tx.Delete(collectionConfigKey(collection))
 		if err != nil {
 			return err
 		}
@@ -100,15 +109,14 @@ func (d *defaultDB) deleteCollectionConfig(collection string) error {
 	}); err != nil {
 		return err
 	}
-	d.collections.Del(collection)
 	return nil
 }
 
-func (d *defaultDB) refreshCollections() error {
-	var existing map[string]struct{}
+func (d *defaultDB) getCollectionConfigs() ([]CollectionSchema, error) {
+	var existing []CollectionSchema
 	if err := d.kv.Tx(false, func(tx kv.Tx) error {
 		i := tx.NewIterator(kv.IterOpts{
-			Prefix: []byte("internal.collections."),
+			Prefix: collectionConfigPrefix(),
 		})
 		defer i.Close()
 		for i.Valid() {
@@ -123,32 +131,21 @@ func (d *defaultDB) refreshCollections() error {
 				if err != nil {
 					return err
 				}
-				existing[cfg.Collection()] = struct{}{}
-				d.collections.Set(cfg.Collection(), cfg)
+				existing = append(existing, cfg)
 			}
 			i.Next()
 		}
 		return nil
 	}); err != nil {
-		return err
+		return nil, err
 	}
-	var toDelete []string
-	d.collections.Range(func(key string, c CollectionSchema) bool {
-		if _, ok := existing[key]; !ok {
-			toDelete = append(toDelete, key)
-		}
-		return true
-	})
-	for _, del := range toDelete {
-		d.collections.Del(del)
-	}
-	return nil
+	return existing, nil
 }
 
 func (d *defaultDB) getPersistedCollection(collection string) (CollectionSchema, error) {
 	var cfg CollectionSchema
 	if err := d.kv.Tx(false, func(tx kv.Tx) error {
-		bits, err := tx.Get([]byte(fmt.Sprintf("internal.collections.%s", collection)))
+		bits, err := tx.Get(collectionConfigKey(collection))
 		if err != nil {
 			return err
 		}

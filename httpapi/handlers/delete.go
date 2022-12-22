@@ -14,7 +14,7 @@ import (
 func DeleteDocHandler(o api.OpenAPIServer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		collection := chi.URLParam(r, "collection")
-		if !o.DB().HasCollection(collection) {
+		if !o.DB().HasCollection(r.Context(), collection) {
 			httpError.Error(w, errors.New(errors.Validation, "collection does not exist"))
 			return
 		}

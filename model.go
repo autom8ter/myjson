@@ -350,7 +350,6 @@ type CDC struct {
 	Collection string        `json:"collection" validate:"required"`
 	Action     Action        `json:"action" validate:"required,oneof='create' 'update' 'delete' 'set'"`
 	DocumentID string        `json:"documentID" validate:"required"`
-	Document   *Document     `json:"document" validate:"required"`
 	Diff       []JSONFieldOp `json:"diff,omitempty"`
 	Timestamp  time.Time     `json:"timestamp" validate:"required"`
 	Metadata   *Metadata     `json:"metadata" validate:"required"`

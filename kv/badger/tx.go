@@ -1,6 +1,8 @@
 package badger
 
 import (
+	"bytes"
+
 	"github.com/autom8ter/gokvkit/kv"
 	"github.com/autom8ter/gokvkit/kv/kvutil"
 	"github.com/dgraph-io/badger/v3"
@@ -8,6 +10,7 @@ import (
 
 type badgerTx struct {
 	txn *badger.Txn
+	db  *badgerKV
 }
 
 func (b *badgerTx) NewIterator(kopts kv.IterOpts) kv.Iterator {
@@ -25,6 +28,12 @@ func (b *badgerTx) NewIterator(kopts kv.IterOpts) kv.Iterator {
 }
 
 func (b *badgerTx) Get(key []byte) ([]byte, error) {
+	if bytes.HasPrefix(key, []byte("internal.")) {
+		val, ok := b.db.cache.Get(key)
+		if ok {
+			return val.([]byte), nil
+		}
+	}
 	i, err := b.txn.Get(key)
 	if err != nil {
 		return nil, err
@@ -34,10 +43,19 @@ func (b *badgerTx) Get(key []byte) ([]byte, error) {
 }
 
 func (b *badgerTx) Set(key, value []byte) error {
-	return b.txn.Set(key, value)
+	if err := b.txn.Set(key, value); err != nil {
+		return err
+	}
+	if bytes.HasPrefix(key, []byte("internal.")) {
+		b.db.cache.Set(key, value, 1)
+	}
+	return nil
 }
 
 func (b *badgerTx) Delete(key []byte) error {
+	if bytes.HasPrefix(key, []byte("internal.")) {
+		b.db.cache.Del(key)
+	}
 	return b.txn.Delete(key)
 }
 

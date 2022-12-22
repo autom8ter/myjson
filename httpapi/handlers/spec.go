@@ -8,7 +8,7 @@ import (
 
 func SpecHandler(o api.OpenAPIServer) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		bits, _ := o.Spec()
+		bits, _ := o.Spec(r.Context())
 		w.WriteHeader(http.StatusOK)
 		w.Write(bits)
 	})

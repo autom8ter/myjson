@@ -25,13 +25,11 @@ func main() {
 	os.MkdirAll("./tmp/crm", 0700)
 	db, err := gokvkit.New(ctx, "badger", map[string]any{
 		"storage_path": "./tmp/crm",
-	}, gokvkit.WithOnPersist(map[string][]gokvkit.OnPersist{
-		"user": {
-			{
-				Name:   "cascade_delete_task",
-				Before: true,
-				Func:   cascadeDelete,
-			},
+	}, gokvkit.WithOnPersist([]gokvkit.OnPersist{
+		{
+			Name:   "cascade_delete_task",
+			Before: true,
+			Func:   cascadeDelete,
 		},
 	}))
 	if err != nil {

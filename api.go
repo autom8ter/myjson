@@ -38,13 +38,13 @@ type CollectionSchema interface {
 // Database is a NoSQL database built on top of key value storage
 type Database interface {
 	// Collections returns a list of collection names that are registered in the collection
-	Collections() []string
+	Collections(ctx context.Context) []string
 	// ConfigureCollection overwrites a single database collection configuration
 	ConfigureCollection(ctx context.Context, collectionSchemaBytes []byte) error
 	// GetSchema gets a collection schema by name (if it exists)
-	GetSchema(collection string) CollectionSchema
+	GetSchema(ctx context.Context, collection string) CollectionSchema
 	// HasCollection reports whether a collection exists in the database
-	HasCollection(collection string) bool
+	HasCollection(ctx context.Context, collection string) bool
 	// DropCollection drops the collection and it's indexes from the database
 	DropCollection(ctx context.Context, collection string) error
 	// Tx executes the given function against a new transaction.

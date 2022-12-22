@@ -1,6 +1,7 @@
 package gokvkit
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"sort"
@@ -251,4 +252,24 @@ func selectDocument(d *Document, fields []Select) error {
 	}
 	*d = *selected
 	return nil
+}
+
+func collectionConfigKey(collection string) []byte {
+	return []byte(fmt.Sprintf("internal.collections.%s", collection))
+}
+
+func collectionConfigPrefix() []byte {
+	return []byte("internal.collections.")
+}
+
+func schemaToCtx(ctx context.Context, schema CollectionSchema) context.Context {
+	return context.WithValue(ctx, "collection_schema", schema)
+}
+
+func schemaFromCtx(ctx context.Context) CollectionSchema {
+	c, ok := ctx.Value("collection_schema").(CollectionSchema)
+	if !ok {
+		return nil
+	}
+	return c
 }

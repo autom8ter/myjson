@@ -77,15 +77,15 @@ func (o *openAPIServer) DB() gokvkit.Database {
 	return o.db
 }
 
-func (o *openAPIServer) Spec() ([]byte, error) {
+func (o *openAPIServer) Spec(ctx context.Context) ([]byte, error) {
 	t, err := template.New("").Funcs(sprig.FuncMap()).Parse(openapiTemplate)
 	if err != nil {
 		return nil, err
 	}
 	var coll []map[string]interface{}
-	var collections = o.db.Collections()
+	var collections = o.db.Collections(ctx)
 	for _, c := range collections {
-		schema, _ := o.db.GetSchema(c).MarshalYAML()
+		schema, _ := o.db.GetSchema(ctx, c).MarshalYAML()
 		coll = append(coll, map[string]interface{}{
 			"collection": c,
 			"schema":     string(schema),

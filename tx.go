@@ -66,14 +66,14 @@ func (t *transaction) Rollback(ctx context.Context) {
 }
 
 func (t *transaction) Update(ctx context.Context, collection string, id string, update map[string]any) error {
-	if !t.db.HasCollection(collection) {
+	if !t.db.HasCollection(ctx, collection) {
 		return errors.New(errors.Validation, "tx: unsupported collection: %s", collection)
 	}
 	doc, err := NewDocumentFrom(update)
 	if err != nil {
 		return errors.Wrap(err, 0, "tx: failed to update")
 	}
-	if err := t.db.collections.Get(collection).SetPrimaryKey(doc, id); err != nil {
+	if err := t.db.GetSchema(ctx, collection).SetPrimaryKey(doc, id); err != nil {
 		return errors.Wrap(err, 0, "tx: failed to set primary key")
 	}
 	md, _ := GetMetadata(ctx)
@@ -90,10 +90,10 @@ func (t *transaction) Update(ctx context.Context, collection string, id string, 
 }
 
 func (t *transaction) Create(ctx context.Context, collection string, document *Document) (string, error) {
-	if !t.db.HasCollection(collection) {
+	if !t.db.HasCollection(ctx, collection) {
 		return "", errors.New(errors.Validation, "unsupported collection: %s", collection)
 	}
-	var c = t.db.collections.Get(collection)
+	var c = t.db.GetSchema(ctx, collection)
 	var id = c.GetPrimaryKey(document)
 	if id == "" {
 		id = ksuid.New().String()
@@ -116,7 +116,7 @@ func (t *transaction) Create(ctx context.Context, collection string, document *D
 }
 
 func (t *transaction) Set(ctx context.Context, collection string, document *Document) error {
-	if !t.db.HasCollection(collection) {
+	if !t.db.HasCollection(ctx, collection) {
 		return errors.New(errors.Validation, "tx: unsupported collection: %s", collection)
 	}
 	md, _ := GetMetadata(ctx)
@@ -133,12 +133,12 @@ func (t *transaction) Set(ctx context.Context, collection string, document *Docu
 }
 
 func (t *transaction) Delete(ctx context.Context, collection string, id string) error {
-	if !t.db.HasCollection(collection) {
+	if !t.db.HasCollection(ctx, collection) {
 		return errors.New(errors.Validation, "tx: unsupported collection: %s", collection)
 	}
 	md, _ := GetMetadata(ctx)
 	d, _ := NewDocumentFrom(map[string]any{
-		t.db.GetSchema(collection).PrimaryKey(): id,
+		t.db.GetSchema(ctx, collection).PrimaryKey(): id,
 	})
 	if err := t.persistCommand(ctx, md, &Command{
 		Collection: collection,
@@ -163,7 +163,7 @@ func (t *transaction) Query(ctx context.Context, collection string, query Query)
 	defer cancel()
 	now := time.Now()
 
-	if !t.db.HasCollection(collection) {
+	if !t.db.HasCollection(ctx, collection) {
 		return Page{}, errors.New(errors.Validation, "unsupported collection: %s", collection)
 	}
 	var results Documents
@@ -208,12 +208,12 @@ func (t *transaction) Query(ctx context.Context, collection string, query Query)
 }
 
 func (t *transaction) Get(ctx context.Context, collection string, id string) (*Document, error) {
-	if !t.db.HasCollection(collection) {
+	if !t.db.HasCollection(ctx, collection) {
 		return nil, errors.New(errors.Validation, "unsupported collection: %s", collection)
 	}
 	md, _ := GetMetadata(ctx)
 	md.Set(string(txCtx), t.tx)
-	var c = t.db.collections.Get(collection)
+	var c = t.db.GetSchema(ctx, collection)
 	primaryIndex := c.PrimaryIndex()
 	val, err := t.tx.Get(seekPrefix(collection, primaryIndex, map[string]any{
 		c.PrimaryKey(): id,
@@ -239,7 +239,7 @@ func (t *transaction) Get(ctx context.Context, collection string, id string) (*D
 
 // aggregate performs aggregations against the collection
 func (t *transaction) aggregate(ctx context.Context, collection string, query Query) (Page, error) {
-	if !t.db.HasCollection(collection) {
+	if !t.db.HasCollection(ctx, collection) {
 		return Page{}, errors.New(errors.Validation, "unsupported collection: %s", collection)
 	}
 	ctx, cancel := context.WithCancel(ctx)
@@ -280,7 +280,7 @@ func (t *transaction) aggregate(ctx context.Context, collection string, query Qu
 }
 
 func (t *transaction) ForEach(ctx context.Context, collection string, where []Where, fn ForEachFunc) (Optimization, error) {
-	if !t.db.HasCollection(collection) {
+	if !t.db.HasCollection(ctx, collection) {
 		return Optimization{}, errors.New(errors.Validation, "unsupported collection: %s", collection)
 	}
 	return t.queryScan(ctx, collection, where, fn)

@@ -3,7 +3,7 @@ x-collection: cdc
 required:
   - collection
   - action
-  - document
+  - diff
 properties:
   _id:
     type: string
@@ -22,9 +22,6 @@ properties:
   documentID:
     type: string
     description: The id of the document being changed
-  document:
-    type: object
-    description: The document being changed
   diff:
     type: array
     description: An array of changes made to a document

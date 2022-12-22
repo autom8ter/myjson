@@ -195,8 +195,9 @@ func (c *collectionSchema) ValidateDocument(ctx context.Context, doc *Document) 
 	if err != nil {
 		return errors.Wrap(err, errors.Validation, "%v: failed to validate document", c.collection)
 	}
+
 	if kerrs != nil && len(kerrs) > 0 {
-		return errors.New(errors.Validation, "%v: invalid document- %v", c.collection, util.JSONString(kerrs))
+		return errors.New(errors.Validation, "%v: invalid document- %s", c.collection, util.JSONString(kerrs))
 	}
 	return nil
 }

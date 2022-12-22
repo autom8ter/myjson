@@ -22,7 +22,7 @@ import (
 func OpenAPIValidator(o api.OpenAPIServer) func(http.Handler) http.Handler {
 	return func(handler http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			bits, _ := o.Spec()
+			bits, _ := o.Spec(r.Context())
 			loader := openapi3.NewLoader()
 			doc, _ := loader.LoadFromData(bits)
 			err := doc.Validate(loader.Context)

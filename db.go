@@ -3,7 +3,6 @@ package gokvkit
 import (
 	"context"
 	_ "embed"
-	"time"
 
 	"github.com/autom8ter/gokvkit/errors"
 	"github.com/autom8ter/gokvkit/kv"
@@ -16,10 +15,9 @@ import (
 type defaultDB struct {
 	kv           kv.DB
 	machine      machine.Machine
-	collections  Cache[CollectionSchema]
 	optimizer    Optimizer
-	initHooks    Cache[OnInit]
-	persistHooks Cache[[]OnPersist]
+	initHooks    []OnInit
+	persistHooks []OnPersist
 	onCommit     []OnCommit
 	onRollback   []OnRollback
 	cdcStream    Stream[CDC]
@@ -32,44 +30,23 @@ func New(ctx context.Context, provider string, providerParams map[string]any, op
 		return nil, errors.Wrap(err, errors.Internal, "failed to open kv database")
 	}
 	d := &defaultDB{
-		kv:           db,
-		machine:      machine.New(),
-		collections:  newInMemCache(map[string]CollectionSchema{}),
-		optimizer:    defaultOptimizer{},
-		initHooks:    newInMemCache(map[string]OnInit{}),
-		persistHooks: newInMemCache(map[string][]OnPersist{}),
-		cdcStream:    newStream[CDC](machine.New()),
+		kv:        db,
+		machine:   machine.New(),
+		optimizer: defaultOptimizer{},
+		cdcStream: newStream[CDC](machine.New()),
 	}
 
 	for _, o := range opts {
 		o(d)
 	}
-	if err := d.refreshCollections(); err != nil {
-		return nil, errors.Wrap(err, errors.Internal, "failed to get load collections")
-	}
-	d.initHooks.Range(func(key string, h OnInit) bool {
+	for _, h := range d.initHooks {
 		if err = h.Func(ctx, d); err != nil {
-			return false
+			return nil, errors.Wrap(err, errors.Internal, "init hook failure")
 		}
-		return true
-	})
+	}
 	if err := d.ConfigureCollection(ctx, []byte(cdcSchema)); err != nil {
 		return nil, errors.Wrap(err, errors.Internal, "failed to configure cdc collection")
 	}
-	go func() {
-		ctx, cancel := context.WithCancel(ctx)
-		defer cancel()
-		ticker := time.NewTicker(1 * time.Minute)
-		defer ticker.Stop()
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case <-ticker.C:
-				d.refreshCollections()
-			}
-		}
-	}()
 	return d, err
 }
 
@@ -220,25 +197,25 @@ func (d *defaultDB) ConfigureCollection(ctx context.Context, collectionSchemaByt
 	return nil
 }
 
-func (d *defaultDB) Collections() []string {
+func (d *defaultDB) Collections(ctx context.Context) []string {
 	var names []string
-	d.collections.Range(func(key string, c CollectionSchema) bool {
+	cfgs, _ := d.getCollectionConfigs()
+	for _, c := range cfgs {
 		names = append(names, c.Collection())
-		return true
-	})
+	}
 	return names
 }
 
-func (d *defaultDB) HasCollection(collection string) bool {
-	return d.collections.Exists(collection)
+func (d *defaultDB) HasCollection(ctx context.Context, collection string) bool {
+	return d.getSchema(ctx, collection) != nil
 }
 
-func (d *defaultDB) GetSchema(collection string) CollectionSchema {
-	return d.collections.Get(collection)
+func (d *defaultDB) GetSchema(ctx context.Context, collection string) CollectionSchema {
+	return d.getSchema(ctx, collection)
 }
 
 func (d *defaultDB) ChangeStream(ctx context.Context, collection string) (<-chan CDC, error) {
-	if collection != "*" && !d.HasCollection(collection) {
+	if collection != "*" && !d.HasCollection(ctx, collection) {
 		return nil, errors.New(errors.Validation, "collection does not exist: %s", collection)
 	}
 	return d.cdcStream.Pull(ctx, collection)
