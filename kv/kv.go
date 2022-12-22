@@ -100,6 +100,7 @@ type Batch interface {
 type Locker interface {
 	TryLock() (bool, error)
 	Unlock()
+	IsLocked() (bool, error)
 }
 
 // KVConfig configures a key value database from the given provider

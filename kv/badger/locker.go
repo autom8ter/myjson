@@ -25,11 +25,33 @@ type lockMeta struct {
 	Key        []byte    `json:"key"`
 }
 
+func (b *badgerLock) IsLocked() (bool, error) {
+	isLocked := true
+	err := b.db.Tx(true, func(tx kv.Tx) error {
+		val, err := tx.Get(b.key)
+		if err != nil {
+			if err != badger.ErrKeyNotFound {
+				return err
+			}
+			isLocked = false
+			return nil
+		}
+		var current lockMeta
+		json.Unmarshal(val, &current)
+		if time.Since(current.LastUpdate) > 4*b.leaseInterval && current.ID != b.id {
+			isLocked = false
+			return nil
+		}
+		return nil
+	})
+	return isLocked, err
+}
+
 func (b *badgerLock) TryLock() (bool, error) {
 	b.start = time.Now()
 	gotLock := false
 	err := b.db.Tx(true, func(tx kv.Tx) error {
-		val, err := tx.Get([]byte(b.key))
+		val, err := tx.Get(b.key)
 		if err != nil {
 			if err != badger.ErrKeyNotFound {
 				return err
@@ -71,7 +93,7 @@ func (b *badgerLock) setLock(tx kv.Tx) error {
 	}
 	bytes, _ := json.Marshal(meta)
 	if err := tx.Set(
-		[]byte(b.key),
+		b.key,
 		bytes,
 	); err != nil {
 		return err
@@ -80,11 +102,11 @@ func (b *badgerLock) setLock(tx kv.Tx) error {
 }
 
 func (b *badgerLock) delLock(tx kv.Tx) error {
-	return tx.Delete([]byte(b.key))
+	return tx.Delete(b.key)
 }
 
 func (b *badgerLock) getLock(tx kv.Tx) (*lockMeta, error) {
-	val, err := tx.Get([]byte(b.key))
+	val, err := tx.Get(b.key)
 	if err != nil {
 		return nil, err
 	}
