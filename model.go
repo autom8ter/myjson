@@ -276,8 +276,6 @@ type Index struct {
 	Unique bool `json:"unique"`
 	// Unique indicates that it's a primary index
 	Primary bool `json:"primary"`
-	// IsBuilding indicates that the index is currently building
-	IsBuilding bool `json:"isBuilding"`
 }
 
 // Validate validates the index
@@ -355,19 +353,28 @@ type CDC struct {
 	Metadata   *Metadata     `json:"metadata" validate:"required"`
 }
 
+// ForeignKey is a reference/relationship to another collection's field
 type ForeignKey struct {
 	Collection string `json:"collection"`
 	Field      string `json:"field"`
 	Cascade    bool   `json:"cascade"`
 }
 
+// SchemaProperty is a property belonging to a JSON Schema
 type SchemaProperty struct {
 	Primary     bool                      `json:"x-primary,omitempty"`
 	Name        string                    `json:"name" validate:"required"`
 	Description string                    `json:"description,omitempty"`
 	Type        string                    `json:"type" validate:"required"`
 	Path        string                    `json:"path" validate:"required"`
+	SchemaPath  string                    `json:"schemaPath" validate:"required"`
 	Properties  map[string]SchemaProperty `json:"properties,omitempty"`
-	Unique      bool                      `json:"unique,omitempty"`
-	ForeignKey  ForeignKey                `json:"foreignKey,omitempty"`
+	Unique      bool                      `json:"x-unique,omitempty"`
+	ForeignKey  *ForeignKey               `json:"x-foreign,omitempty"`
+	Index       *PropertyIndex            `json:"x-index,omitempty"`
+}
+
+type PropertyIndex struct {
+	Enabled          bool     `json:"enabled"`
+	AdditionalFields []string `json:"additional_fields,omitempty"`
 }

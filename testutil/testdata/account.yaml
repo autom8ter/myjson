@@ -1,0 +1,13 @@
+type: object
+x-collection: account
+required:
+  - _id
+  - name
+properties:
+  _id:
+    type: string
+    description: The user's id.
+    x-primary: true
+  name:
+    type: string
+    description: The user's name.

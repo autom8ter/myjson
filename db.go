@@ -145,7 +145,7 @@ func (d *defaultDB) DropCollection(ctx context.Context, collection string) error
 func (d *defaultDB) ConfigureCollection(ctx context.Context, collectionSchemaBytes []byte) error {
 	jsonBytes, err := util.YAMLToJSON(collectionSchemaBytes)
 	if err != nil {
-		jsonBytes = collectionSchemaBytes
+		return err
 	}
 	meta, _ := GetMetadata(ctx)
 	meta.Set(string(isIndexingKey), true)
@@ -155,6 +155,11 @@ func (d *defaultDB) ConfigureCollection(ctx context.Context, collectionSchemaByt
 	if err != nil {
 		return err
 	}
+	unlock, err := d.lockCollection(collection.Collection())
+	if err != nil {
+		return err
+	}
+	defer unlock()
 
 	if err := d.persistCollectionConfig(collection); err != nil {
 		return err

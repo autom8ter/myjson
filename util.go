@@ -41,16 +41,6 @@ func getIndexDiff(after, before map[string]Index) (indexDiff, error) {
 			}
 		}
 	}
-	for _, r := range toRemove {
-		if r.IsBuilding {
-			return indexDiff{}, errors.New(errors.Forbidden, "index: %s is rebuilding", r.Name)
-		}
-	}
-	for _, u := range toUpdate {
-		if u.IsBuilding {
-			return indexDiff{}, errors.New(errors.Forbidden, "index: %s is rebuilding", u.Name)
-		}
-	}
 	return indexDiff{
 		toRemove: toRemove,
 		toAdd:    toAdd,

@@ -16,7 +16,7 @@ import (
 var validate = validator.New()
 
 func ValidateStruct(val any) error {
-	return validate.Struct(val)
+	return errors.Wrap(validate.Struct(val), errors.Validation, "")
 }
 
 // Decode decodes the input into the output based on json tags
@@ -76,13 +76,16 @@ func convertMap(m map[interface{}]interface{}) map[string]interface{} {
 }
 
 func YAMLToJSON(yamlContent []byte) ([]byte, error) {
+	if isJSON(string(yamlContent)) {
+		return yamlContent, nil
+	}
 	var body map[interface{}]interface{}
 	if err := yaml.Unmarshal(yamlContent, &body); err != nil {
-		return nil, errors.Wrap(err, 0, "failed to convert yaml to json")
+		return nil, errors.Wrap(err, errors.Validation, "failed to convert yaml to json")
 	}
 	jsonContent, err := json.Marshal(convertMap(body))
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, errors.Validation, "failed to convert yaml to json")
 	}
 	return jsonContent, nil
 }
@@ -97,4 +100,9 @@ func JSONToYAML(jsonContent []byte) ([]byte, error) {
 		return nil, err
 	}
 	return yamlContent, nil
+}
+
+func isJSON(str string) bool {
+	var js json.RawMessage
+	return json.Unmarshal([]byte(str), &js) == nil
 }

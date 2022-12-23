@@ -11,14 +11,12 @@ type CollectionSchema interface {
 	Collection() string
 	// ValidateDocument validates the input document against the collection's JSON schema
 	ValidateDocument(ctx context.Context, doc *Document) error
-	// Indexing returns a copy of the collections indexes as a map
+	// Indexing returns a copy the schemas indexing
 	Indexing() map[string]Index
+	// Properties returns a copy the schemas properties
 	Properties() map[string]SchemaProperty
+	// HasPropertyPath returns true if the property path exists in the schema
 	HasPropertyPath(p string) bool
-	// SetIndex overwrites the configured index
-	SetIndex(index Index) error
-	// DelIndex deletes an existing index
-	DelIndex(name string) error
 	// PrimaryIndex returns the collection's primary index
 	PrimaryIndex() Index
 	// PrimaryKey returns the collection's primary key

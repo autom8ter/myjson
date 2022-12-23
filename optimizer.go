@@ -38,9 +38,6 @@ func (o defaultOptimizer) Optimize(c CollectionSchema, where []Where) (Optimizat
 		if len(index.Fields) == 0 {
 			continue
 		}
-		if index.IsBuilding {
-			continue
-		}
 		var matchedFields []string
 		for i, field := range index.Fields {
 			if len(where) > i {

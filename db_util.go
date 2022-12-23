@@ -2,28 +2,37 @@ package gokvkit
 
 import (
 	"context"
+	"fmt"
+	"time"
 
 	"github.com/autom8ter/gokvkit/errors"
 	"github.com/autom8ter/gokvkit/kv"
 )
+
+func (d *defaultDB) lockCollection(collection string) (func(), error) {
+	lock := d.kv.NewLocker([]byte(fmt.Sprintf("internal.locks.%s", collection)), 1*time.Minute)
+	gotLock, err := lock.TryLock()
+	if err != nil {
+		return nil, errors.Wrap(err, errors.Internal, "failed to acquire lock on collection %s", cdcCollectionName)
+	}
+	if !gotLock {
+		return nil, errors.New(errors.Forbidden, "collection: %s is locked", cdcCollectionName)
+	}
+	return lock.Unlock, nil
+}
+
+func (d *defaultDB) collectionIsLocked(collection string) bool {
+	lock := d.kv.NewLocker([]byte(fmt.Sprintf("internal.locks.%s", collection)), 1*time.Minute)
+	is, _ := lock.IsLocked()
+	return is
+}
 
 func (d *defaultDB) addIndex(ctx context.Context, collection string, index Index) error {
 	if index.Name == "" {
 		return errors.New(errors.Validation, "%s - empty index name", collection)
 	}
 	schema := d.getSchema(ctx, collection)
-	if schema.Indexing()[index.Name].IsBuilding {
-		return errors.New(errors.Forbidden, "%s - index is already building", collection)
-	}
-	index.IsBuilding = true
-	if err := schema.SetIndex(index); err != nil {
-		return err
-	}
-	var err error
 	if err := d.persistCollectionConfig(schema); err != nil {
-		return err
-	}
-	if err != nil {
 		return err
 	}
 	meta, _ := GetMetadata(ctx)
@@ -45,14 +54,7 @@ func (d *defaultDB) addIndex(ctx context.Context, collection string, index Index
 			return errors.Wrap(err, 0, "indexing: failed to add index %s - %s", collection, index.Name)
 		}
 	}
-	index.IsBuilding = false
-	if err := schema.SetIndex(index); err != nil {
-		return err
-	}
-	if err := d.persistCollectionConfig(schema); err != nil {
-		return err
-	}
-	return err
+	return nil
 }
 
 func (d *defaultDB) getSchema(ctx context.Context, collection string) CollectionSchema {
@@ -65,17 +67,7 @@ func (d *defaultDB) getSchema(ctx context.Context, collection string) Collection
 }
 
 func (d *defaultDB) removeIndex(ctx context.Context, collection string, index Index) error {
-	var err error
 	schema := d.getSchema(ctx, collection)
-	if schema.Indexing()[index.Name].IsBuilding {
-		return errors.New(errors.Forbidden, "%s - index is already building", collection)
-	}
-	if err != nil {
-		return err
-	}
-	meta, _ := GetMetadata(ctx)
-	meta.Set(string(internalKey), true)
-	meta.Set(string(isIndexingKey), true)
 	if err := d.kv.DropPrefix(indexPrefix(schema.Collection(), index.Name)); err != nil {
 		return errors.Wrap(err, 0, "indexing: failed to remove index %s - %s", collection, index.Name)
 	}

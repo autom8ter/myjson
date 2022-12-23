@@ -85,6 +85,7 @@ func (t *transaction) setDocument(ctx context.Context, c CollectionSchema, docID
 }
 
 func (t *transaction) persistCommand(ctx context.Context, md *Metadata, command *Command) error {
+
 	c := t.db.GetSchema(ctx, command.Collection)
 	if c == nil {
 		return fmt.Errorf("tx: collection: %s does not exist", command.Collection)
@@ -111,6 +112,9 @@ func (t *transaction) persistCommand(ctx context.Context, md *Metadata, command 
 			}
 		}
 		return nil
+	}
+	if t.db.collectionIsLocked(command.Collection) {
+		return errors.New(errors.Forbidden, "collection %s is locked", command.Collection)
 	}
 	if err := t.applyPersistHooks(ctx, t, command, true); err != nil {
 		return err
@@ -258,6 +262,9 @@ func (t *transaction) queryScan(ctx context.Context, collection string, where []
 	var err error
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
+	if t.db.collectionIsLocked(collection) {
+		return Optimization{}, errors.New(errors.Forbidden, "collection %s is locked", collection)
+	}
 	optimization, err := t.db.optimizer.Optimize(t.db.GetSchema(ctx, collection), where)
 	if err != nil {
 		return Optimization{}, err

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/autom8ter/gokvkit"
+	"github.com/tidwall/sjson"
 
 	"github.com/autom8ter/gokvkit/testutil"
 	"github.com/stretchr/testify/assert"
@@ -54,22 +55,20 @@ func TestConcurrency(t *testing.T) {
 				egp.Go(func() error {
 					{
 						schema := db.GetSchema(ctx, "user")
-						assert.Nil(t, schema.DelIndex("email_idx"))
 						bytes, err := schema.MarshalJSON()
 						assert.Nil(t, err)
-						assert.Nil(t, db.ConfigureCollection(ctx, bytes))
+						newSchema, err := sjson.Set(string(bytes), "properties.contact.properties.email.x-unique", false)
+						assert.Nil(t, err)
+						assert.Nil(t, err)
+						assert.Nil(t, db.ConfigureCollection(ctx, []byte(newSchema)))
 					}
 					{
 						schema := db.GetSchema(ctx, "user")
-						assert.Nil(t, schema.SetIndex(gokvkit.Index{
-							Name:    "email_idx",
-							Fields:  []string{"contact.email"},
-							Unique:  true,
-							Primary: false,
-						}))
-						bytes, err := schema.MarshalYAML()
+						bytes, err := schema.MarshalJSON()
 						assert.Nil(t, err)
-						assert.Nil(t, db.ConfigureCollection(ctx, bytes))
+						newSchema, err := sjson.Set(string(bytes), "properties.contact.properties.email.x-unique", true)
+						assert.Nil(t, err)
+						assert.Nil(t, db.ConfigureCollection(ctx, []byte(newSchema)))
 					}
 					return nil
 				})

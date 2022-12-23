@@ -4,13 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"sync"
 
 	"github.com/autom8ter/gokvkit/errors"
 	"github.com/autom8ter/gokvkit/util"
 	"github.com/qri-io/jsonschema"
 	"github.com/tidwall/gjson"
-	"github.com/tidwall/sjson"
 )
 
 type collectionSchema struct {
@@ -28,9 +28,11 @@ type schemaPath string
 
 const (
 	collectionPath   schemaPath = "x-collection"
-	indexingPath     schemaPath = "x-indexing"
 	requireIndexPath schemaPath = "x-require-index"
-	propertiesPath   schemaPath = "properties"
+	foreignKeyPath   schemaPath = "x-foreign"
+	indexPath        schemaPath = "x-index"
+	primaryPath      schemaPath = "x-primary"
+	uniquePath       schemaPath = "x-unique"
 )
 
 func newCollectionSchema(yamlContent []byte) (CollectionSchema, error) {
@@ -56,27 +58,12 @@ func newCollectionSchema(yamlContent []byte) (CollectionSchema, error) {
 		properties:    map[string]SchemaProperty{},
 		propertyPaths: map[string]SchemaProperty{},
 	}
-	for _, index := range s.raw.Get(string(indexingPath)).Map() {
-		var i Index
-		err = util.Decode(index.Value(), &i)
-		if err != nil {
-			return nil, err
-		}
-		if err := i.Validate(); err != nil {
-			return nil, err
-		}
-		if i.Primary {
-			s.primaryIndex = i
-		}
-		s.indexing[i.Name] = i
-	}
 	if err != nil {
 		return nil, err
 	}
-	if len(s.primaryIndex.Fields) == 0 {
-		return nil, errors.New(errors.Validation, "primary index is required")
+	if err := s.loadProperties(s.raw.Get("properties")); err != nil {
+		return nil, err
 	}
-	s.loadProperties(s.raw.Get(string(propertiesPath)))
 	if err != nil {
 		return nil, err
 	}
@@ -85,103 +72,114 @@ func newCollectionSchema(yamlContent []byte) (CollectionSchema, error) {
 			return nil, err
 		}
 	}
+	for _, i := range s.indexing {
+		if err := util.ValidateStruct(i); err != nil {
+			return nil, err
+		}
+	}
+	if len(s.primaryIndex.Fields) == 0 {
+		return nil, errors.New(errors.Validation, "primary index is required")
+	}
 	return s, nil
 }
 
-func (s *collectionSchema) loadProperties(r gjson.Result) {
+func (s *collectionSchema) loadProperties(r gjson.Result) error {
 	if !r.Exists() {
-		return
+		return nil
 	}
 	for key, value := range r.Map() {
 		schema := SchemaProperty{
-			Primary:     value.Get("x-primary").Bool(),
+			Primary:     value.Get(string(primaryPath)).Bool(),
 			Name:        key,
 			Description: value.Get("description").String(),
 			Type:        value.Get("type").String(),
-			Path:        value.Path(s.raw.Raw),
-			Unique:      value.Get("x-unique").Bool(),
+			SchemaPath:  value.Path(s.raw.Raw),
+			Path:        strings.ReplaceAll(value.Path(s.raw.Raw), "properties.", ""),
+			Unique:      value.Get(string(uniquePath)).Bool(),
 			Properties:  map[string]SchemaProperty{},
 		}
 		if properties := value.Get("properties"); properties.Exists() && schema.Type == "object" {
-			s.loadProperties(properties)
+			if err := s.loadProperties(properties); err != nil {
+				return err
+			}
+		}
+		if fkey := value.Get(string(foreignKeyPath)); fkey.Exists() && schema.Type != "object" {
+			var foreign ForeignKey
+			if err := util.Decode(fkey.Value(), &foreign); err != nil {
+				return errors.Wrap(err, errors.Validation, "failed to decode foreignKey on property: %s", fkey.String())
+			}
+			schema.ForeignKey = &foreign
+		}
+		if !schema.Primary && !schema.Unique && schema.ForeignKey == nil {
+			var index PropertyIndex
+			if i := value.Get(string(indexPath)); i.Exists() && schema.Type != "object" {
+				if err := util.Decode(i.Value(), &i); err != nil {
+					return errors.Wrap(err, errors.Validation, "failed to decode index on property: %s", i.String())
+				}
+				schema.Index = &index
+				idxName := fmt.Sprintf("%s.idx", schema.Path)
+				if len(schema.Index.AdditionalFields) > 0 {
+					idxName = fmt.Sprintf("%s.%s.idx", schema.Path, strings.Join(schema.Index.AdditionalFields, "."))
+				}
+				fields := []string{schema.Path}
+				fields = append(fields, schema.Index.AdditionalFields...)
+				s.indexing[idxName] = Index{
+					Name:    idxName,
+					Fields:  fields,
+					Unique:  false,
+					Primary: false,
+				}
+			}
 		}
 		s.properties[key] = schema
 		s.propertyPaths[schema.Path] = schema
+		switch {
+		case schema.Primary:
+			if s.primaryIndex.Name != "" {
+				return errors.New(errors.Validation, "multiple primary keys found")
+			}
+			idxName := fmt.Sprintf("%s.primaryidx", schema.Path)
+			s.indexing[idxName] = Index{
+				Name:    idxName,
+				Fields:  []string{schema.Path},
+				Unique:  true,
+				Primary: true,
+			}
+			s.primaryIndex = s.indexing[idxName]
+		case schema.Unique:
+			idxName := fmt.Sprintf("%s.uniqueidx", schema.Path)
+			s.indexing[idxName] = Index{
+				Name:    idxName,
+				Fields:  []string{schema.Path},
+				Unique:  true,
+				Primary: false,
+			}
+		case schema.ForeignKey != nil:
+			idxName := fmt.Sprintf("%s.foreignidx", schema.Path)
+			s.indexing[idxName] = Index{
+				Name:    idxName,
+				Fields:  []string{schema.Path},
+				Unique:  schema.Unique,
+				Primary: false,
+			}
+		}
 	}
-	return
-	//result.ForEach(func(key, value gjson.Result) bool {
-	//	if !og.Exists() {
-	//		return false
-	//	}
-	//	fmt.Println("path=", og.Paths(value.Raw))
-	//	schema := SchemaProperty{
-	//		Primary:     value.Get("x-primary").Bool(),
-	//		Name:        key.String(),
-	//		Description: value.Get("description").String(),
-	//		Type:        value.Get("type").String(),
-	//		Path:        og.Path(value.Raw),
-	//		Unique:      value.Get("x-unique").Bool(),
-	//		Properties:  map[string]SchemaProperty{},
-	//	}
-	//	if properties := value.Get("properties"); properties.Exists() && schema.Type == "object" {
-	//		loadProperties(og, properties, schema.Properties, paths)
-	//	}
-	//	if fkey := value.Get("x-foreign"); fkey.Exists() && schema.Type != "object" {
-	//		util.Decode(fkey.Map(), &schema.ForeignKey)
-	//	}
-	//	props[key.String()] = schema
-	//	paths[schema.Path] = schema
-	//	return true
-
+	return nil
 }
 
 func (c *collectionSchema) refreshSchema(jsonContent []byte) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	if len(jsonContent) == 0 {
-		return errors.New(errors.Validation, "empty schema content")
+	s, err := newCollectionSchema(jsonContent)
+	if err != nil {
+		return err
 	}
-	var (
-		schema = &jsonschema.Schema{}
-	)
-	if err := json.Unmarshal(jsonContent, schema); err != nil {
-		return errors.Wrap(err, errors.Validation, "failed to decode json schema")
-	}
-	c.raw = gjson.ParseBytes(jsonContent)
-	c.schema = schema
-	c.indexing = map[string]Index{}
-	c.collection = c.raw.Get(string(collectionPath)).String()
-	for _, index := range c.raw.Get(string(indexingPath)).Map() {
-		var i Index
-		err := util.Decode(index.Value(), &i)
-		if err != nil {
-			return errors.Wrap(err, errors.Validation, "failed to decode index")
-		}
-		if err := i.Validate(); err != nil {
-			return err
-		}
-		if i.Primary {
-			c.primaryIndex = i
-		}
-		c.indexing[i.Name] = i
-	}
-	if len(c.primaryIndex.Fields) == 0 {
-		return errors.New(errors.Validation, "primary index is required")
-	}
-	for _, index := range c.raw.Get(string(indexingPath)).Map() {
-		var i Index
-		err := util.Decode(index.Value(), &i)
-		if err != nil {
-			return errors.Wrap(err, errors.Validation, "failed to decode index")
-		}
-		if err := i.Validate(); err != nil {
-			return err
-		}
-		if i.Primary {
-			c.primaryIndex = i
-		}
-		c.indexing[i.Name] = i
-	}
+	newSchema := s.(*collectionSchema)
+	c.raw = newSchema.raw
+	c.schema = newSchema.schema
+	c.indexing = newSchema.indexing
+	c.propertyPaths = newSchema.propertyPaths
+	c.properties = newSchema.properties
 	return nil
 }
 
@@ -229,39 +227,6 @@ func (c *collectionSchema) Indexing() map[string]Index {
 	return i
 }
 
-func (c *collectionSchema) SetIndex(index Index) error {
-	if err := index.Validate(); err != nil {
-		return err
-	}
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	if index.Name == c.primaryIndex.Name {
-		return errors.New(errors.Forbidden, "forbidden from modifying the primary index: %s", index.Name)
-	}
-	raw, err := sjson.Set(c.raw.Raw, fmt.Sprintf("%s.%s", string(indexingPath), index.Name), index)
-	if err != nil {
-		return errors.Wrap(err, 0, "failed to set schema index: %s", index.Name)
-	}
-	c.raw = gjson.Parse(raw)
-	c.indexing[index.Name] = index
-	return nil
-}
-
-func (c *collectionSchema) DelIndex(name string) error {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	if name == c.primaryIndex.Name {
-		return errors.New(errors.Forbidden, "forbidden from deleting the primary index: %s", name)
-	}
-	raw, err := sjson.Delete(c.raw.Raw, fmt.Sprintf("%s.%s", string(indexingPath), name))
-	if err != nil {
-		return errors.Wrap(err, 0, "failed to delete schema index: %s", name)
-	}
-	c.raw = gjson.Parse(raw)
-	delete(c.indexing, name)
-	return nil
-}
-
 func (c *collectionSchema) ValidateDocument(ctx context.Context, doc *Document) error {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
@@ -307,27 +272,11 @@ func (c *collectionSchema) PrimaryIndex() Index {
 func (c *collectionSchema) Properties() map[string]SchemaProperty {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	var i = map[string]SchemaProperty{}
-	for k, v := range c.properties {
-		i[k] = v
-	}
-	return i
-}
-
-func (c *collectionSchema) ForeignKeys() map[string]SchemaProperty {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-	var i = map[string]SchemaProperty{}
-	for k, v := range c.properties {
-		if v.ForeignKey.Collection != "" {
-			i[k] = v
-		}
-	}
-	return i
+	return c.properties
 }
 
 func (c *collectionSchema) HasPropertyPath(p string) bool {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	return c.properties[p].Name != ""
+	return c.propertyPaths[p].Name != ""
 }
