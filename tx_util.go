@@ -134,6 +134,9 @@ func (t *transaction) persistCommand(ctx context.Context, md *Metadata, command 
 		if err := t.deleteDocument(ctx, c, docID); err != nil {
 			return err
 		}
+		if err := t.cascadeDelete(ctx, c, command); err != nil {
+			return err
+		}
 	case Set:
 		if err := t.setDocument(ctx, c, docID, command); err != nil {
 			return err
@@ -175,56 +178,52 @@ func (t *transaction) persistCommand(ctx context.Context, md *Metadata, command 
 	return nil
 }
 
+func (t *transaction) cascadeDelete(ctx context.Context, schema CollectionSchema, command *Command) error {
+	configs, err := t.db.getCollectionConfigs()
+	if err != nil {
+		return err
+	}
+	egp, ctx := errgroup.WithContext(ctx)
+	for _, c := range configs {
+		c := c
+		egp.Go(func() error {
+			for _, i := range c.Indexing() {
+				if i.ForeignKey != nil && i.ForeignKey.Collection == command.Collection {
+					results, err := t.Query(ctx, c.Collection(), Query{
+						Select: []Select{{Field: "*"}},
+						Where: []Where{
+							{
+								Field: i.Fields[0],
+								Op:    WhereOpEq,
+								Value: schema.GetPrimaryKey(command.Document),
+							},
+						},
+					})
+					if err != nil {
+						return err
+					}
+					for _, d := range results.Documents {
+						if err := t.Delete(ctx, c.Collection(), c.GetPrimaryKey(d)); err != nil {
+							return err
+						}
+					}
+				}
+			}
+			return nil
+		})
+	}
+	if err := egp.Wait(); err != nil {
+		return errors.Wrap(err, errors.Internal, "%s failed to cascade delete reference documents", schema.Collection())
+	}
+	return nil
+}
+
 func (t *transaction) updateSecondaryIndex(ctx context.Context, schema CollectionSchema, idx Index, docID string, before *Document, command *Command) error {
 	if idx.Primary {
 		return nil
 	}
 	switch command.Action {
 	case Delete:
-		configs, err := t.db.getCollectionConfigs()
-		if err != nil {
-			return err
-		}
-		collectionChan := make(chan CollectionSchema)
-		egp, ctx := errgroup.WithContext(ctx)
-		egp.Go(func() error {
-			for _, c := range configs {
-				collectionChan <- c
-			}
-			return nil
-		})
-
-		for _, c := range configs {
-			c := c
-			egp.Go(func() error {
-				for _, i := range c.Indexing() {
-					if i.ForeignKey != nil && i.ForeignKey.Collection == command.Collection {
-						results, err := t.Query(ctx, c.Collection(), Query{
-							Select: []Select{{Field: "*"}},
-							Where: []Where{
-								{
-									Field: i.Fields[0],
-									Op:    WhereOpEq,
-									Value: schema.GetPrimaryKey(command.Document),
-								},
-							},
-						})
-						if err != nil {
-							return err
-						}
-						for _, d := range results.Documents {
-							if err := t.Delete(ctx, c.Collection(), c.GetPrimaryKey(d)); err != nil {
-								return err
-							}
-						}
-					}
-				}
-				return nil
-			})
-		}
-		if err := egp.Wait(); err != nil {
-			return errors.Wrap(err, errors.Internal, "failed to cascade delete reference documents")
-		}
 		if err := t.tx.Delete(seekPrefix(command.Collection, idx, before.Value()).SetDocumentID(docID).Path()); err != nil {
 			return errors.Wrap(
 				err,
