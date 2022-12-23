@@ -29,7 +29,7 @@ func TestConcurrency(t *testing.T) {
 				assert.Nil(t, err)
 				egp.Go(func() error {
 					err := db.Tx(ctx, true, func(ctx context.Context, tx gokvkit.Tx) error {
-						results, err := tx.Query(ctx, "user", gokvkit.NewQueryBuilder().
+						results, err := tx.Query(ctx, "user", gokvkit.Q().
 							Select(gokvkit.Select{Field: "*"}).
 							Where(gokvkit.Where{
 								Field: "contact.email",

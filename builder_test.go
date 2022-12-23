@@ -8,7 +8,7 @@ import (
 
 func TestQueryBuilder(t *testing.T) {
 	t.Run("query builder 1", func(t *testing.T) {
-		q := NewQueryBuilder().
+		q := Q().
 			Select(Select{
 				Field: "account_id",
 			}).

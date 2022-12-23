@@ -5,8 +5,8 @@ type QueryBuilder struct {
 	query *Query
 }
 
-// NewQueryBuilder creates a new QueryBuilder instance
-func NewQueryBuilder() *QueryBuilder {
+// Q creates a new QueryBuilder instance
+func Q() *QueryBuilder {
 	return &QueryBuilder{query: &Query{}}
 }
 
@@ -48,5 +48,11 @@ func (q *QueryBuilder) Page(page int) *QueryBuilder {
 // GroupBy adds the GroupBy clause(s) to the query
 func (q *QueryBuilder) GroupBy(groups ...string) *QueryBuilder {
 	q.query.GroupBy = append(q.query.GroupBy, groups...)
+	return q
+}
+
+// Having adds the Where clause(s) to the query - they execute after all other clauses have resolved
+func (q *QueryBuilder) Having(where ...Where) *QueryBuilder {
+	q.query.Having = append(q.query.Having, where...)
 	return q
 }

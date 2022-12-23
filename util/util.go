@@ -106,3 +106,9 @@ func isJSON(str string) bool {
 	var js json.RawMessage
 	return json.Unmarshal([]byte(str), &js) == nil
 }
+
+func RemoveElement[T any](index int, results []T) {
+	// Remove the element at index i from results
+	copy(results[index:], results[index+1:])
+	results = results[:len(results)-1] // Truncate slice.
+}

@@ -6,7 +6,7 @@ import (
 
 	"github.com/autom8ter/gokvkit/errors"
 	"github.com/autom8ter/gokvkit/kv"
-
+	"github.com/autom8ter/gokvkit/util"
 	"github.com/samber/lo"
 	"github.com/segmentio/ksuid"
 )
@@ -196,6 +196,7 @@ func (t *transaction) Query(ctx context.Context, collection string, query Query)
 			}
 		}
 	}
+
 	return Page{
 		Documents: results,
 		NextPage:  query.Page + 1,
@@ -254,12 +255,8 @@ func (t *transaction) aggregate(ctx context.Context, collection string, query Qu
 		return Page{}, err
 	}
 	var reduced Documents
-	for _, values := range groupByDocs(results, query.GroupBy) {
-		value, err := aggregateDocs(values, query.Select)
-		if err != nil {
-			return Page{}, err
-		}
-		reduced = append(reduced, value)
+	if err := docsHaving(query.Having, reduced); err != nil {
+		return Page{}, errors.Wrap(err, errors.Internal, "")
 	}
 	reduced = orderByDocs(reduced, query.OrderBy)
 	if query.Limit > 0 && query.Page > 0 {
@@ -277,6 +274,21 @@ func (t *transaction) aggregate(ctx context.Context, collection string, query Qu
 			Optimization:  match,
 		},
 	}, nil
+}
+
+func docsHaving(where []Where, results Documents) error {
+	if len(where) > 0 {
+		for i, document := range results {
+			pass, err := document.Where(where)
+			if err != nil {
+				return err
+			}
+			if pass {
+				util.RemoveElement(i, results)
+			}
+		}
+	}
+	return nil
 }
 
 func (t *transaction) ForEach(ctx context.Context, collection string, where []Where, fn ForEachFunc) (Optimization, error) {
