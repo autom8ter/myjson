@@ -2,6 +2,7 @@ package gokvkit
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"reflect"
 	"regexp"
@@ -174,6 +175,23 @@ func (d *Document) Merge(with *Document) error {
 		return err
 	}
 	return d.SetAll(flattened)
+}
+
+func (d *Document) MergeJoin(with *Document, alias string) error {
+	if !with.Valid() {
+		return errors.New(errors.Validation, "invalid document")
+	}
+	withMap := with.Value()
+	flattened, err := flat2.Flatten(withMap, nil)
+	if err != nil {
+		return err
+	}
+	for k, v := range flattened {
+		if err := d.Set(fmt.Sprintf("%s.%s", alias, k), v); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // Del deletes a field from the document

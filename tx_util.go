@@ -357,7 +357,11 @@ func (t *transaction) queryScan(ctx context.Context, collection string, where []
 		if len(join) > 0 {
 			for _, j := range join {
 				_, err := t.queryScan(ctx, j.Collection, j.On, []Join{}, func(d *Document) (bool, error) {
-					if err := d.Merge(document); err != nil {
+					alias := j.As
+					if alias == "" {
+						alias = j.Collection
+					}
+					if err := d.MergeJoin(document, alias); err != nil {
 						return false, err
 					}
 					pass, err := d.Where(where)
