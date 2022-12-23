@@ -168,7 +168,7 @@ func (t *transaction) Query(ctx context.Context, collection string, query Query)
 	}
 	var results Documents
 	fullScan := true
-	match, err := t.queryScan(ctx, collection, query.Where, func(d *Document) (bool, error) {
+	match, err := t.queryScan(ctx, collection, query.Where, query.Join, func(d *Document) (bool, error) {
 		results = append(results, d)
 		if query.Page == 0 && len(query.OrderBy) == 0 && query.Limit > 0 && len(results) >= query.Limit {
 			fullScan = false
@@ -247,7 +247,7 @@ func (t *transaction) aggregate(ctx context.Context, collection string, query Qu
 	defer cancel()
 	now := time.Now()
 	var results Documents
-	match, err := t.queryScan(ctx, collection, query.Where, func(d *Document) (bool, error) {
+	match, err := t.queryScan(ctx, collection, query.Where, query.Join, func(d *Document) (bool, error) {
 		results = append(results, d)
 		return true, nil
 	})
@@ -295,7 +295,7 @@ func (t *transaction) ForEach(ctx context.Context, collection string, where []Wh
 	if !t.db.HasCollection(ctx, collection) {
 		return Optimization{}, errors.New(errors.Validation, "unsupported collection: %s", collection)
 	}
-	return t.queryScan(ctx, collection, where, fn)
+	return t.queryScan(ctx, collection, where, nil, fn)
 }
 
 func (t *transaction) Close(ctx context.Context) {

@@ -308,7 +308,7 @@ func (t *transaction) applyPersistHooks(ctx context.Context, tx Tx, command *Com
 	return nil
 }
 
-func (t *transaction) queryScan(ctx context.Context, collection string, where []Where, fn ForEachFunc) (Optimization, error) {
+func (t *transaction) queryScan(ctx context.Context, collection string, where []Where, join []Join, fn ForEachFunc) (Optimization, error) {
 	if fn == nil {
 		return Optimization{}, errors.New(errors.Validation, "empty scan handler")
 	}
@@ -336,7 +336,6 @@ func (t *transaction) queryScan(ctx context.Context, collection string, where []
 	defer it.Close()
 	for it.Valid() {
 		item := it.Item()
-
 		var document *Document
 		if optimization.Index.Primary {
 			bits, err := item.Value()
@@ -355,18 +354,44 @@ func (t *transaction) queryScan(ctx context.Context, collection string, where []
 				return optimization, err
 			}
 		}
-
-		pass, err := document.Where(where)
-		if err != nil {
-			return optimization, err
-		}
-		if pass {
-			shouldContinue, err := fn(document)
-			if err != nil {
-				return optimization, err
+		if len(join) > 0 {
+			for _, j := range join {
+				_, err := t.queryScan(ctx, j.Collection, j.On, []Join{}, func(d *Document) (bool, error) {
+					if err := d.Merge(document); err != nil {
+						return false, err
+					}
+					pass, err := d.Where(where)
+					if err != nil {
+						return false, err
+					}
+					if pass {
+						shouldContinue, err := fn(d)
+						if err != nil {
+							return false, err
+						}
+						if !shouldContinue {
+							return false, nil
+						}
+					}
+					return true, nil
+				})
+				if err != nil {
+					return Optimization{}, err
+				}
 			}
-			if !shouldContinue {
-				return optimization, err
+		} else {
+			pass, err := document.Where(where)
+			if err != nil {
+				return Optimization{}, err
+			}
+			if pass {
+				shouldContinue, err := fn(document)
+				if err != nil {
+					return Optimization{}, err
+				}
+				if !shouldContinue {
+					return Optimization{}, nil
+				}
 			}
 		}
 		it.Next()

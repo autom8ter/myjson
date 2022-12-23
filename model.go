@@ -44,6 +44,7 @@ const SelectAggregateSum SelectAggregate = "sum"
 // Query is a query against the NOSQL database
 type Query struct {
 	Select  []Select  `json:"select" validate:"min=1,required"`
+	Join    []Join    `json:"join,omitempty" validate:"dive"`
 	Where   []Where   `json:"where,omitempty" validate:"dive"`
 	GroupBy []string  `json:"groupBy,omitempty"`
 	Page    int       `json:"page" validate:"min=0"`
@@ -67,6 +68,12 @@ type Where struct {
 	Field string      `json:"field" validate:"required"`
 	Op    WhereOp     `json:"op" validate:"oneof='eq' 'neq' 'gt' 'gte' 'lt' 'lte' 'contains' 'containsAny' 'containsAll' 'in'"`
 	Value interface{} `json:"value" validate:"required"`
+}
+
+type Join struct {
+	Collection string  `json:"collection" validate:"required"`
+	On         []Where `json:"on" validate:"required,min=1"`
+	As         string  `json:"as,omitempty"`
 }
 
 // Validate validates the query and returns a validation error if one exists
