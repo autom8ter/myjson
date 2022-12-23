@@ -14,13 +14,32 @@ import (
 	"github.com/tidwall/sjson"
 )
 
+type ForeignKey struct {
+	Collection string `json:"collection"`
+	Field      string `json:"field"`
+	Cascade    bool   `json:"cascade"`
+}
+
+type SchemaProperty struct {
+	Primary     bool                      `json:"primary,omitempty"`
+	Name        string                    `json:"name" validate:"required"`
+	Description string                    `json:"description,omitempty"`
+	Type        string                    `json:"type" validate:"required"`
+	Path        string                    `json:"path"`
+	Properties  map[string]SchemaProperty `json:"properties,omitempty"`
+	Unique      bool                      `json:"unique,omitempty"`
+	ForeignKey  ForeignKey                `json:"foreignKey,omitempty"`
+}
+
 type collectionSchema struct {
-	schema       *jsonschema.Schema
-	raw          gjson.Result
-	collection   string
-	primaryIndex Index
-	indexing     map[string]Index
-	mu           sync.RWMutex
+	schema        *jsonschema.Schema
+	raw           gjson.Result
+	collection    string
+	primaryIndex  Index
+	indexing      map[string]Index
+	properties    map[string]SchemaProperty
+	propertyPaths map[string]SchemaProperty
+	mu            sync.RWMutex
 }
 
 type schemaPath string
@@ -29,6 +48,7 @@ const (
 	collectionPath   schemaPath = "x-collection"
 	indexingPath     schemaPath = "x-indexing"
 	requireIndexPath schemaPath = "x-require-index"
+	propertiesPath   schemaPath = "properties"
 )
 
 func newCollectionSchema(yamlContent []byte) (CollectionSchema, error) {
@@ -47,10 +67,12 @@ func newCollectionSchema(yamlContent []byte) (CollectionSchema, error) {
 	}
 	r := gjson.ParseBytes(jsonContent)
 	s := &collectionSchema{
-		schema:     schema,
-		raw:        r,
-		collection: r.Get(string(collectionPath)).String(),
-		indexing:   map[string]Index{},
+		schema:        schema,
+		raw:           r,
+		collection:    r.Get(string(collectionPath)).String(),
+		indexing:      map[string]Index{},
+		properties:    map[string]SchemaProperty{},
+		propertyPaths: map[string]SchemaProperty{},
 	}
 	for _, index := range s.raw.Get(string(indexingPath)).Map() {
 		var i Index
@@ -72,7 +94,38 @@ func newCollectionSchema(yamlContent []byte) (CollectionSchema, error) {
 	if len(s.primaryIndex.Fields) == 0 {
 		return nil, errors.New(errors.Validation, "primary index is required")
 	}
+	loadProperties(s.raw.Get(string(propertiesPath)), s.raw.Get(string(propertiesPath)), s.properties, s.propertyPaths)
+	if err != nil {
+		return nil, err
+	}
 	return s, nil
+}
+
+func loadProperties(og gjson.Result, result gjson.Result, props map[string]SchemaProperty, paths map[string]SchemaProperty) {
+	if !og.IsObject() {
+		loadProperties(result, result, props, paths)
+		return
+	}
+	result.ForEach(func(key, value gjson.Result) bool {
+		schema := SchemaProperty{
+			Primary:     value.Get("x-primary").Bool(),
+			Name:        key.String(),
+			Description: value.Get("description").String(),
+			Type:        value.Get("type").String(),
+			Path:        value.Path(result.Raw),
+			Unique:      value.Get("x-unique").Bool(),
+			Properties:  map[string]SchemaProperty{},
+		}
+		if properties := value.Get("properties"); properties.Exists() && schema.Type == "object" {
+			loadProperties(og, properties, schema.Properties, paths)
+		}
+		if fkey := value.Get("x-foreign"); fkey.Exists() && schema.Type != "object" {
+			util.Decode(fkey.Map(), &schema.ForeignKey)
+		}
+		props[key.String()] = schema
+		paths[schema.Path] = schema
+		return true
+	})
 }
 
 func (c *collectionSchema) refreshSchema(jsonContent []byte) error {
@@ -107,6 +160,20 @@ func (c *collectionSchema) refreshSchema(jsonContent []byte) error {
 	}
 	if len(c.primaryIndex.Fields) == 0 {
 		return errors.New(errors.Validation, "primary index is required")
+	}
+	for _, index := range c.raw.Get(string(indexingPath)).Map() {
+		var i Index
+		err := util.Decode(index.Value(), &i)
+		if err != nil {
+			return errors.Wrap(err, errors.Validation, "failed to decode index")
+		}
+		if err := i.Validate(); err != nil {
+			return err
+		}
+		if i.Primary {
+			c.primaryIndex = i
+		}
+		c.indexing[i.Name] = i
 	}
 	return nil
 }
@@ -228,4 +295,32 @@ func (c *collectionSchema) RequireQueryIndex() bool {
 
 func (c *collectionSchema) PrimaryIndex() Index {
 	return c.primaryIndex
+}
+
+func (c *collectionSchema) Properties() map[string]SchemaProperty {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	var i = map[string]SchemaProperty{}
+	for k, v := range c.properties {
+		i[k] = v
+	}
+	return i
+}
+
+func (c *collectionSchema) ForeignKeys() map[string]SchemaProperty {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	var i = map[string]SchemaProperty{}
+	for k, v := range c.properties {
+		if v.ForeignKey.Collection != "" {
+			i[k] = v
+		}
+	}
+	return i
+}
+
+func (c *collectionSchema) HasPropertyPath(p string) bool {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.properties[p].Name != ""
 }

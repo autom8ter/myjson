@@ -13,6 +13,8 @@ type CollectionSchema interface {
 	ValidateDocument(ctx context.Context, doc *Document) error
 	// Indexing returns a copy of the collections indexes as a map
 	Indexing() map[string]Index
+	Properties() map[string]SchemaProperty
+	HasPropertyPath(p string) bool
 	// SetIndex overwrites the configured index
 	SetIndex(index Index) error
 	// DelIndex deletes an existing index

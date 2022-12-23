@@ -11,6 +11,7 @@ properties:
   _id:
     type: string
     description: The user's id.
+    x-primary: true
   name:
     type: string
     description: The user's name.
@@ -20,6 +21,7 @@ properties:
       email:
         type: string
         description: The user's email.
+        x-unique: true
   age:
     description: Age in years which must be equal to or greater than zero.
     type: integer

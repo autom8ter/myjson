@@ -3,8 +3,10 @@ package gokvkit
 import (
 	"context"
 	_ "embed"
+	"fmt"
 	"testing"
 
+	"github.com/autom8ter/gokvkit/util"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -48,9 +50,11 @@ func TestJSONSchema(t *testing.T) {
 		assert.Nil(t, schema.SetIndex(before))
 		assert.NotEmpty(t, schema.Indexing()["email_idx"])
 	})
+
 	schema, err := newCollectionSchema([]byte(userSchema))
 	assert.Nil(t, err)
 	assert.NotNil(t, schema.Indexing())
+	assert.NotNil(t, schema.Properties())
 	for k, v := range schema.Indexing() {
 		assert.NotEmpty(t, k)
 		assert.NotEmpty(t, v.Fields)
@@ -60,5 +64,9 @@ func TestJSONSchema(t *testing.T) {
 		} else {
 			assert.Nil(t, schema.SetIndex(v))
 		}
+	}
+	assert.Equal(t, 9, len(schema.Properties()))
+	for k, v := range schema.Properties() {
+		fmt.Println(k, util.JSONString(v))
 	}
 }
