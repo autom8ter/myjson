@@ -99,5 +99,15 @@ func TestDB(fn func(ctx context.Context, db gokvkit.Database), collections ...[]
 
 	defer db.Close(ctx)
 	fn(ctx, db)
+	if err := db.Tx(ctx, true, func(ctx context.Context, tx gokvkit.Tx) error {
+		for i := 0; i <= 100; i++ {
+			if err := tx.Delete(ctx, "account", fmt.Sprint(i)); err != nil {
+				return err
+			}
+		}
+		return nil
+	}); err != nil {
+		return err
+	}
 	return nil
 }

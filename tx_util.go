@@ -10,6 +10,7 @@ import (
 	"github.com/autom8ter/gokvkit/kv"
 	"github.com/nqd/flat"
 	"github.com/segmentio/ksuid"
+	"golang.org/x/sync/errgroup"
 )
 
 func (t *transaction) updateDocument(ctx context.Context, c CollectionSchema, docID string, before *Document, command *Command) error {
@@ -107,7 +108,7 @@ func (t *transaction) persistCommand(ctx context.Context, md *Metadata, command 
 			if i.Primary {
 				continue
 			}
-			if err := t.updateSecondaryIndex(ctx, i, docID, before, command); err != nil {
+			if err := t.updateSecondaryIndex(ctx, c, i, docID, before, command); err != nil {
 				return errors.Wrap(err, errors.Internal, "")
 			}
 		}
@@ -139,7 +140,7 @@ func (t *transaction) persistCommand(ctx context.Context, md *Metadata, command 
 		}
 	}
 	for _, i := range t.db.GetSchema(ctx, command.Collection).Indexing() {
-		if err := t.updateSecondaryIndex(ctx, i, docID, before, command); err != nil {
+		if err := t.updateSecondaryIndex(ctx, c, i, docID, before, command); err != nil {
 			return errors.Wrap(err, 0, "failed to update secondary index")
 		}
 	}
@@ -174,12 +175,56 @@ func (t *transaction) persistCommand(ctx context.Context, md *Metadata, command 
 	return nil
 }
 
-func (t *transaction) updateSecondaryIndex(ctx context.Context, idx Index, docID string, before *Document, command *Command) error {
+func (t *transaction) updateSecondaryIndex(ctx context.Context, schema CollectionSchema, idx Index, docID string, before *Document, command *Command) error {
 	if idx.Primary {
 		return nil
 	}
 	switch command.Action {
 	case Delete:
+		configs, err := t.db.getCollectionConfigs()
+		if err != nil {
+			return err
+		}
+		collectionChan := make(chan CollectionSchema)
+		egp, ctx := errgroup.WithContext(ctx)
+		egp.Go(func() error {
+			for _, c := range configs {
+				collectionChan <- c
+			}
+			return nil
+		})
+
+		for _, c := range configs {
+			c := c
+			egp.Go(func() error {
+				for _, i := range c.Indexing() {
+					if i.ForeignKey != nil && i.ForeignKey.Collection == command.Collection {
+						results, err := t.Query(ctx, c.Collection(), Query{
+							Select: []Select{{Field: "*"}},
+							Where: []Where{
+								{
+									Field: i.Fields[0],
+									Op:    WhereOpEq,
+									Value: schema.GetPrimaryKey(command.Document),
+								},
+							},
+						})
+						if err != nil {
+							return err
+						}
+						for _, d := range results.Documents {
+							if err := t.Delete(ctx, c.Collection(), c.GetPrimaryKey(d)); err != nil {
+								return err
+							}
+						}
+					}
+				}
+				return nil
+			})
+		}
+		if err := egp.Wait(); err != nil {
+			return errors.Wrap(err, errors.Internal, "failed to cascade delete reference documents")
+		}
 		if err := t.tx.Delete(seekPrefix(command.Collection, idx, before.Value()).SetDocumentID(docID).Path()); err != nil {
 			return errors.Wrap(
 				err,
@@ -202,28 +247,25 @@ func (t *transaction) updateSecondaryIndex(ctx context.Context, idx Index, docID
 			}
 		}
 		if idx.ForeignKey != nil && command.Document.Get(idx.Fields[0]) != nil {
+			fcollection := t.db.getSchema(ctx, idx.ForeignKey.Collection)
 			results, err := t.Query(ctx, idx.ForeignKey.Collection, Query{
 				Select: []Select{{Field: "*"}},
 				Where: []Where{
 					{
-						Field: idx.ForeignKey.Field,
+						Field: fcollection.PrimaryKey(),
 						Op:    WhereOpEq,
 						Value: command.Document.Get(idx.Fields[0]),
 					},
 				},
 			})
 			if err != nil {
-				return errors.Wrap(err, errors.Validation, "foreign key with value %v does not exist: %s/%s",
-					command.Document.Get(idx.Fields[0]),
-					idx.ForeignKey.Collection,
-					idx.ForeignKey.Field,
-				)
+				return errors.Wrap(err, errors.Internal, "")
 			}
 			if results.Count == 0 {
 				return errors.New(errors.Validation, "foreign key with value %v does not exist: %s/%s",
 					command.Document.Get(idx.Fields[0]),
 					idx.ForeignKey.Collection,
-					idx.ForeignKey.Field,
+					fcollection.PrimaryKey(),
 				)
 			}
 		}

@@ -49,6 +49,7 @@ type Query struct {
 	Page    int       `json:"page" validate:"min=0"`
 	Limit   int       `json:"limit,omitempty" validate:"min=0"`
 	OrderBy []OrderBy `json:"orderBy,omitempty" validate:"dive"`
+	Having  []Where   `json:"having,omitempty" validate:"dive"`
 }
 
 type OrderBy struct {
@@ -355,10 +356,9 @@ type CDC struct {
 	Metadata   *Metadata     `json:"metadata" validate:"required"`
 }
 
-// ForeignKey is a reference/relationship to another collection's field
+// ForeignKey is a reference/relationship to another collection by primary key
 type ForeignKey struct {
 	Collection string `json:"collection"`
-	Field      string `json:"field"`
 	Cascade    bool   `json:"cascade"`
 }
 
