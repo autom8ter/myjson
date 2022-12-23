@@ -110,7 +110,7 @@ func (t *transaction) Create(ctx context.Context, collection string, document *D
 		Timestamp:  time.Now(),
 		Metadata:   md,
 	}); err != nil {
-		return "", errors.Wrap(err, 0, "tx: failed to commit delete")
+		return "", errors.Wrap(err, 0, "tx: failed to commit create")
 	}
 	return id, nil
 }

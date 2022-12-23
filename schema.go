@@ -111,23 +111,21 @@ func (s *collectionSchema) loadProperties(r gjson.Result) error {
 			schema.ForeignKey = &foreign
 		}
 		if !schema.Primary && !schema.Unique && schema.ForeignKey == nil {
-			var index PropertyIndex
+			var index map[string]PropertyIndex
 			if i := value.Get(string(indexPath)); i.Exists() && schema.Type != "object" {
 				if err := util.Decode(i.Value(), &i); err != nil {
 					return errors.Wrap(err, errors.Validation, "failed to decode index on property: %s", i.String())
 				}
-				schema.Index = &index
-				idxName := fmt.Sprintf("%s.idx", schema.Path)
-				if len(schema.Index.AdditionalFields) > 0 {
-					idxName = fmt.Sprintf("%s.%s.idx", schema.Path, strings.Join(schema.Index.AdditionalFields, "."))
-				}
-				fields := []string{schema.Path}
-				fields = append(fields, schema.Index.AdditionalFields...)
-				s.indexing[idxName] = Index{
-					Name:    idxName,
-					Fields:  fields,
-					Unique:  false,
-					Primary: false,
+				schema.Index = index
+				for name, idx := range index {
+					fields := []string{schema.Path}
+					fields = append(fields, idx.AdditionalFields...)
+					s.indexing[name] = Index{
+						Name:    name,
+						Fields:  fields,
+						Unique:  false,
+						Primary: false,
+					}
 				}
 			}
 		}
@@ -157,10 +155,11 @@ func (s *collectionSchema) loadProperties(r gjson.Result) error {
 		case schema.ForeignKey != nil:
 			idxName := fmt.Sprintf("%s.foreignidx", schema.Path)
 			s.indexing[idxName] = Index{
-				Name:    idxName,
-				Fields:  []string{schema.Path},
-				Unique:  schema.Unique,
-				Primary: false,
+				Name:       idxName,
+				Fields:     []string{schema.Path},
+				Unique:     schema.Unique,
+				Primary:    false,
+				ForeignKey: schema.ForeignKey,
 			}
 		}
 	}

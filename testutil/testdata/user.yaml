@@ -27,23 +27,23 @@ properties:
     type: integer
     minimum: 0
   account_id:
-    type: integer
+    type: string
     minimum: 0
     x-foreign:
       collection: account
       field: _id
       cascade: true
     x-index:
-      enabled: true
-      additional_fields:
-        - contact.email
+      account_email_idx:
+        enabled: true
+        additional_fields:
+          - contact.email
   language:
     type: string
     description: The user's first language.
     x-index:
-      enabled: true
-      additional_fields:
-        - contact.email
+      language_idx:
+        enabled: true
   gender:
     type: string
     description: The user's gender.

@@ -29,6 +29,7 @@ func Test(t *testing.T) {
 			)
 			assert.Nil(t, db.Tx(ctx, true, func(ctx context.Context, tx gokvkit.Tx) error {
 				id, err = tx.Create(ctx, "user", testutil.NewUserDoc())
+				assert.Nil(t, err)
 				_, err := tx.Get(ctx, "user", id)
 				return err
 			}))
@@ -145,7 +146,7 @@ func Test(t *testing.T) {
 					{
 						Field: "account_id",
 						Op:    gokvkit.WhereOpIn,
-						Value: []float64{51, 52, 53, 54, 55, 56, 57, 58, 59, 60},
+						Value: []string{"51", "52", "53", "54", "55", "56", "57", "58", "59", "60"},
 					},
 				},
 				Limit: 10,

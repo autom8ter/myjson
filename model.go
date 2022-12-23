@@ -276,6 +276,8 @@ type Index struct {
 	Unique bool `json:"unique"`
 	// Unique indicates that it's a primary index
 	Primary bool `json:"primary"`
+	// ForeignKey indecates that it's an index for a foreign key
+	ForeignKey *ForeignKey `json:"foreignKey,omitempty"`
 }
 
 // Validate validates the index
@@ -371,7 +373,7 @@ type SchemaProperty struct {
 	Properties  map[string]SchemaProperty `json:"properties,omitempty"`
 	Unique      bool                      `json:"x-unique,omitempty"`
 	ForeignKey  *ForeignKey               `json:"x-foreign,omitempty"`
-	Index       *PropertyIndex            `json:"x-index,omitempty"`
+	Index       map[string]PropertyIndex  `json:"x-index,omitempty"`
 }
 
 type PropertyIndex struct {

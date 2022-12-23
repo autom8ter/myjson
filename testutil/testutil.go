@@ -20,8 +20,10 @@ var (
 	//go:embed testdata/task.yaml
 	TaskSchema string
 	//go:embed testdata/user.yaml
-	UserSchema     string
-	AllCollections = [][]byte{[]byte(UserSchema), []byte(TaskSchema)}
+	UserSchema string
+	//go:embed testdata/account.yaml
+	AccountSchema  string
+	AllCollections = [][]byte{[]byte(UserSchema), []byte(TaskSchema), []byte(AccountSchema)}
 )
 
 func NewUserDoc() *gokvkit.Document {
@@ -31,7 +33,7 @@ func NewUserDoc() *gokvkit.Document {
 		"contact": map[string]interface{}{
 			"email": fmt.Sprintf("%v.%s", gofakeit.IntRange(0, 100), gofakeit.Email()),
 		},
-		"account_id":      gofakeit.IntRange(0, 100),
+		"account_id":      fmt.Sprint(gofakeit.IntRange(0, 100)),
 		"language":        gofakeit.Language(),
 		"birthday_month":  gofakeit.Month(),
 		"favorite_number": gofakeit.Second(),
@@ -79,7 +81,22 @@ func TestDB(fn func(ctx context.Context, db gokvkit.Database), collections ...[]
 			return err
 		}
 	}
-	time.Sleep(1 * time.Second)
+
+	if err := db.Tx(ctx, true, func(ctx context.Context, tx gokvkit.Tx) error {
+		for i := 0; i <= 100; i++ {
+			d, _ := gokvkit.NewDocumentFrom(map[string]any{
+				"_id":  fmt.Sprint(i),
+				"name": gofakeit.Company(),
+			})
+			if err := tx.Set(ctx, "account", d); err != nil {
+				return err
+			}
+		}
+		return nil
+	}); err != nil {
+		return err
+	}
+
 	defer db.Close(ctx)
 	fn(ctx, db)
 	return nil

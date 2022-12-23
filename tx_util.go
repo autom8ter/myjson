@@ -140,7 +140,7 @@ func (t *transaction) persistCommand(ctx context.Context, md *Metadata, command 
 	}
 	for _, i := range t.db.GetSchema(ctx, command.Collection).Indexing() {
 		if err := t.updateSecondaryIndex(ctx, i, docID, before, command); err != nil {
-			return errors.Wrap(err, errors.Internal, "")
+			return errors.Wrap(err, 0, "failed to update secondary index")
 		}
 	}
 	if err := t.applyPersistHooks(ctx, t, command, false); err != nil {
@@ -201,30 +201,45 @@ func (t *transaction) updateSecondaryIndex(ctx context.Context, idx Index, docID
 				)
 			}
 		}
-		if idx.Unique && !idx.Primary && command.Document != nil {
-			if err := t.db.kv.Tx(false, func(tx kv.Tx) error {
-				it := tx.NewIterator(kv.IterOpts{
-					Prefix: seekPrefix(command.Collection, idx, command.Document.Value()).Path(),
-				})
-				defer it.Close()
-				for it.Valid() {
-					item := it.Item()
-					split := bytes.Split(item.Key(), []byte("\x00"))
-					id := split[len(split)-1]
-					if string(id) != docID {
-						return errors.New(errors.Internal, "duplicate value( %s ) found for unique index: %s", docID, idx.Name)
-					}
-					it.Next()
-				}
-				return nil
-			}); err != nil {
-				return errors.Wrap(
-					err,
-					errors.Internal,
-					"failed to set document %s/%s index references",
-					command.Collection,
-					docID,
+		if idx.ForeignKey != nil && command.Document.Get(idx.Fields[0]) != nil {
+			results, err := t.Query(ctx, idx.ForeignKey.Collection, Query{
+				Select: []Select{{Field: "*"}},
+				Where: []Where{
+					{
+						Field: idx.ForeignKey.Field,
+						Op:    WhereOpEq,
+						Value: command.Document.Get(idx.Fields[0]),
+					},
+				},
+			})
+			if err != nil {
+				return errors.Wrap(err, errors.Validation, "foreign key with value %v does not exist: %s/%s",
+					command.Document.Get(idx.Fields[0]),
+					idx.ForeignKey.Collection,
+					idx.ForeignKey.Field,
 				)
+			}
+			if results.Count == 0 {
+				return errors.New(errors.Validation, "foreign key with value %v does not exist: %s/%s",
+					command.Document.Get(idx.Fields[0]),
+					idx.ForeignKey.Collection,
+					idx.ForeignKey.Field,
+				)
+			}
+		}
+		if idx.Unique && !idx.Primary && command.Document != nil {
+			it := t.tx.NewIterator(kv.IterOpts{
+				Prefix: seekPrefix(command.Collection, idx, command.Document.Value()).Path(),
+			})
+			defer it.Close()
+			for it.Valid() {
+				item := it.Item()
+				split := bytes.Split(item.Key(), []byte("\x00"))
+				id := split[len(split)-1]
+				if string(id) != docID {
+					return errors.New(errors.Validation, "duplicate value( %s ) found for unique index: %s", docID, idx.Name)
+				}
+				it.Next()
 			}
 		}
 		// only persist ids in secondary index - lookup full document in primary index

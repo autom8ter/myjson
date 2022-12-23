@@ -8,9 +8,15 @@ properties:
   _id:
     type: string
     description: The cdc entry id.
+    x-primary: true
   collection:
     type: string
     description: The collection the document belongs to
+    x-index:
+      collection_document_idx:
+        enabled: true
+        additional_fields:
+          - documentID
   action:
     type: string
     description: The action taken upon the document
@@ -22,6 +28,9 @@ properties:
   documentID:
     type: string
     description: The id of the document being changed
+    x-index:
+      document_idx:
+        enabled: true
   diff:
     type: array
     description: An array of changes made to a document
@@ -36,37 +45,13 @@ properties:
             - remove
         path:
           type: string
-        value: {}
+        value: { }
   timestamp:
     type: string
     description: The timestamp when the change was commited
+    x-index:
+      timestamp_idx:
+        enabled: true
   metadata:
     type: object
     description: The context metadata when the change was commited
-x-indexing:
-  primary_idx:
-    name: primary_idx
-    unique: true
-    primary: true
-    fields:
-      - _id
-  collection_timestamp_idx:
-    name: collection_idx
-    unique: false
-    primary: false
-    fields:
-      - collection
-      - timestamp
-  timestamp_idx:
-    name: timestamp_idx
-    unique: false
-    primary: false
-    fields:
-      - timestamp
-  collection_doc_id_idx:
-    name: collection_idx
-    unique: false
-    primary: false
-    fields:
-      - collection
-      - document_id
