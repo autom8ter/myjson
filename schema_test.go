@@ -20,9 +20,9 @@ var (
 func TestJSONSchema(t *testing.T) {
 	t.Run("json schema validation", func(t *testing.T) {
 		schema, err := newCollectionSchema([]byte(userSchema))
-		assert.Nil(t, err)
-		assert.Nil(t, schema.ValidateDocument(context.Background(), newUserDoc()))
-		assert.NotNil(t, schema.ValidateDocument(context.Background(), NewDocument()))
+		assert.NoError(t, err)
+		assert.NoError(t, schema.ValidateDocument(context.Background(), newUserDoc()))
+		assert.Error(t, schema.ValidateDocument(context.Background(), NewDocument()))
 	})
 	t.Run("primary key", func(t *testing.T) {
 		schema, err := newCollectionSchema([]byte(taskSchema))

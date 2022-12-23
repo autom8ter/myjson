@@ -8,28 +8,10 @@ import (
 
 	"github.com/autom8ter/gokvkit/errors"
 	"github.com/autom8ter/gokvkit/util"
-
 	"github.com/qri-io/jsonschema"
 	"github.com/tidwall/gjson"
 	"github.com/tidwall/sjson"
 )
-
-type ForeignKey struct {
-	Collection string `json:"collection"`
-	Field      string `json:"field"`
-	Cascade    bool   `json:"cascade"`
-}
-
-type SchemaProperty struct {
-	Primary     bool                      `json:"primary,omitempty"`
-	Name        string                    `json:"name" validate:"required"`
-	Description string                    `json:"description,omitempty"`
-	Type        string                    `json:"type" validate:"required"`
-	Path        string                    `json:"path"`
-	Properties  map[string]SchemaProperty `json:"properties,omitempty"`
-	Unique      bool                      `json:"unique,omitempty"`
-	ForeignKey  ForeignKey                `json:"foreignKey,omitempty"`
-}
 
 type collectionSchema struct {
 	schema        *jsonschema.Schema
@@ -94,38 +76,63 @@ func newCollectionSchema(yamlContent []byte) (CollectionSchema, error) {
 	if len(s.primaryIndex.Fields) == 0 {
 		return nil, errors.New(errors.Validation, "primary index is required")
 	}
-	loadProperties(s.raw.Get(string(propertiesPath)), s.raw.Get(string(propertiesPath)), s.properties, s.propertyPaths)
+	s.loadProperties(s.raw.Get(string(propertiesPath)))
 	if err != nil {
 		return nil, err
+	}
+	for _, f := range s.propertyPaths {
+		if err := util.ValidateStruct(f); err != nil {
+			return nil, err
+		}
 	}
 	return s, nil
 }
 
-func loadProperties(og gjson.Result, result gjson.Result, props map[string]SchemaProperty, paths map[string]SchemaProperty) {
-	if !og.IsObject() {
-		loadProperties(result, result, props, paths)
+func (s *collectionSchema) loadProperties(r gjson.Result) {
+	if !r.Exists() {
 		return
 	}
-	result.ForEach(func(key, value gjson.Result) bool {
+	for key, value := range r.Map() {
 		schema := SchemaProperty{
 			Primary:     value.Get("x-primary").Bool(),
-			Name:        key.String(),
+			Name:        key,
 			Description: value.Get("description").String(),
 			Type:        value.Get("type").String(),
-			Path:        value.Path(result.Raw),
+			Path:        value.Path(s.raw.Raw),
 			Unique:      value.Get("x-unique").Bool(),
 			Properties:  map[string]SchemaProperty{},
 		}
 		if properties := value.Get("properties"); properties.Exists() && schema.Type == "object" {
-			loadProperties(og, properties, schema.Properties, paths)
+			s.loadProperties(properties)
 		}
-		if fkey := value.Get("x-foreign"); fkey.Exists() && schema.Type != "object" {
-			util.Decode(fkey.Map(), &schema.ForeignKey)
-		}
-		props[key.String()] = schema
-		paths[schema.Path] = schema
-		return true
-	})
+		s.properties[key] = schema
+		s.propertyPaths[schema.Path] = schema
+	}
+	return
+	//result.ForEach(func(key, value gjson.Result) bool {
+	//	if !og.Exists() {
+	//		return false
+	//	}
+	//	fmt.Println("path=", og.Paths(value.Raw))
+	//	schema := SchemaProperty{
+	//		Primary:     value.Get("x-primary").Bool(),
+	//		Name:        key.String(),
+	//		Description: value.Get("description").String(),
+	//		Type:        value.Get("type").String(),
+	//		Path:        og.Path(value.Raw),
+	//		Unique:      value.Get("x-unique").Bool(),
+	//		Properties:  map[string]SchemaProperty{},
+	//	}
+	//	if properties := value.Get("properties"); properties.Exists() && schema.Type == "object" {
+	//		loadProperties(og, properties, schema.Properties, paths)
+	//	}
+	//	if fkey := value.Get("x-foreign"); fkey.Exists() && schema.Type != "object" {
+	//		util.Decode(fkey.Map(), &schema.ForeignKey)
+	//	}
+	//	props[key.String()] = schema
+	//	paths[schema.Path] = schema
+	//	return true
+
 }
 
 func (c *collectionSchema) refreshSchema(jsonContent []byte) error {

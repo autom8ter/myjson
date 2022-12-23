@@ -354,3 +354,20 @@ type CDC struct {
 	Timestamp  time.Time     `json:"timestamp" validate:"required"`
 	Metadata   *Metadata     `json:"metadata" validate:"required"`
 }
+
+type ForeignKey struct {
+	Collection string `json:"collection"`
+	Field      string `json:"field"`
+	Cascade    bool   `json:"cascade"`
+}
+
+type SchemaProperty struct {
+	Primary     bool                      `json:"x-primary,omitempty"`
+	Name        string                    `json:"name" validate:"required"`
+	Description string                    `json:"description,omitempty"`
+	Type        string                    `json:"type" validate:"required"`
+	Path        string                    `json:"path" validate:"required"`
+	Properties  map[string]SchemaProperty `json:"properties,omitempty"`
+	Unique      bool                      `json:"unique,omitempty"`
+	ForeignKey  ForeignKey                `json:"foreignKey,omitempty"`
+}
