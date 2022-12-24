@@ -11,8 +11,8 @@ import (
 )
 
 func TestJoin(t *testing.T) {
-	assert.NoError(t, testutil.TestDB(func(ctx context.Context, db gokvkit.Database) {
-		t.Run("", func(t *testing.T) {
+	t.Run("join user to account", func(t *testing.T) {
+		assert.NoError(t, testutil.TestDB(func(ctx context.Context, db gokvkit.Database) {
 			var usrs = map[string]*gokvkit.Document{}
 			assert.NoError(t, db.Tx(ctx, true, func(ctx context.Context, tx gokvkit.Tx) error {
 				for i := 0; i < 1000; i++ {
@@ -22,8 +22,6 @@ func TestJoin(t *testing.T) {
 				}
 				return nil
 			}))
-		})
-		t.Run("join user to account", func(t *testing.T) {
 			assert.NoError(t, db.Tx(ctx, true, func(ctx context.Context, tx gokvkit.Tx) error {
 				assert.NoError(t, tx.Set(ctx, "user", testutil.NewUserDoc()))
 				return nil
@@ -54,32 +52,31 @@ func TestJoin(t *testing.T) {
 				assert.True(t, r.Exists("account_id"))
 				assert.True(t, r.Exists("user_id"))
 			}
-
-		})
-		t.Run("join account to user", func(t *testing.T) {
+		}))
+	})
+	t.Run("join account to user", func(t *testing.T) {
+		assert.NoError(t, testutil.TestDB(func(ctx context.Context, db gokvkit.Database) {
 			accID := ""
 			assert.NoError(t, db.Tx(ctx, true, func(ctx context.Context, tx gokvkit.Tx) error {
 				doc := testutil.NewUserDoc()
 				accID = doc.GetString("account_id")
+				doc2 := testutil.NewUserDoc()
+				assert.Nil(t, doc2.Set("account_id", accID))
 				assert.NoError(t, tx.Set(ctx, "user", doc))
+				assert.NoError(t, tx.Set(ctx, "user", doc2))
 				return nil
 			}))
 			results, err := db.Query(ctx, "account", gokvkit.Q().
 				Select(
 					gokvkit.Select{Field: "_id", As: "account_id"},
 					gokvkit.Select{Field: "name", As: "account_name"},
-					gokvkit.Select{Field: "usr"},
+					gokvkit.Select{Field: "usr.name"},
 				).
 				Where(
 					gokvkit.Where{
 						Field: "_id",
 						Op:    gokvkit.WhereOpEq,
 						Value: accID,
-					},
-					gokvkit.Where{
-						Field: "usr",
-						Op:    gokvkit.WhereOpNeq,
-						Value: "null",
 					},
 				).
 				Join(gokvkit.Join{
@@ -103,7 +100,7 @@ func TestJoin(t *testing.T) {
 				assert.True(t, r.Exists("account_id"))
 				assert.True(t, r.Exists("usr"))
 			}
-
-		})
-	}))
+			assert.Equal(t, 2, results.Count)
+		}))
+	})
 }

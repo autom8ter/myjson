@@ -356,7 +356,9 @@ func (t *transaction) queryScan(ctx context.Context, collection string, where []
 				return optimization, err
 			}
 		}
+		var documents []*Document
 		if len(join) > 0 {
+
 			for _, j := range join {
 				jo := &j
 				for i, o := range j.On {
@@ -368,30 +370,35 @@ func (t *transaction) queryScan(ctx context.Context, collection string, where []
 				if alias == "" {
 					alias = j.Collection
 				}
-				var results []*Document
 				_, err := t.queryScan(ctx, j.Collection, jo.On, []Join{}, func(d *Document) (bool, error) {
-					results = append(results, d)
+					cloned := document.Clone()
+					if err := cloned.MergeJoin(d, j.As); err != nil {
+						return false, err
+					}
+					documents = append(documents, cloned)
 					return true, nil
 				})
 				if err != nil {
 					return Optimization{}, err
 				}
-				if err := document.Set(j.As, results); err != nil {
-					return Optimization{}, err
-				}
 			}
 		}
-		pass, err := document.Where(where)
-		if err != nil {
-			return Optimization{}, err
+		if len(documents) == 0 {
+			documents = []*Document{document}
 		}
-		if pass {
-			shouldContinue, err := fn(document)
+		for _, d := range documents {
+			pass, err := d.Where(where)
 			if err != nil {
 				return Optimization{}, err
 			}
-			if !shouldContinue {
-				return Optimization{}, nil
+			if pass {
+				shouldContinue, err := fn(d)
+				if err != nil {
+					return Optimization{}, err
+				}
+				if !shouldContinue {
+					return Optimization{}, nil
+				}
 			}
 		}
 		it.Next()
