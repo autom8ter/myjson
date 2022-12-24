@@ -15,7 +15,7 @@ func TestJoin(t *testing.T) {
 		assert.NoError(t, testutil.TestDB(func(ctx context.Context, db gokvkit.Database) {
 			var usrs = map[string]*gokvkit.Document{}
 			assert.NoError(t, db.Tx(ctx, true, func(ctx context.Context, tx gokvkit.Tx) error {
-				for i := 0; i < 1000; i++ {
+				for i := 0; i < 100; i++ {
 					u := testutil.NewUserDoc()
 					usrs[u.GetString("_id")] = u
 					assert.NoError(t, tx.Set(ctx, "user", u))
@@ -51,6 +51,8 @@ func TestJoin(t *testing.T) {
 				assert.True(t, r.Exists("account_name"))
 				assert.True(t, r.Exists("account_id"))
 				assert.True(t, r.Exists("user_id"))
+				assert.NotEmpty(t, usrs[r.GetString("user_id")])
+				assert.Equal(t, usrs[r.GetString("user_id")].Get("account_id"), r.GetString("account_id"))
 			}
 		}))
 	})
@@ -95,7 +97,6 @@ func TestJoin(t *testing.T) {
 			assert.NoError(t, err)
 
 			for _, r := range results.Documents {
-				fmt.Println(r)
 				assert.True(t, r.Exists("account_name"))
 				assert.True(t, r.Exists("account_id"))
 				assert.True(t, r.Exists("usr"))

@@ -78,7 +78,7 @@ func (d *Document) Valid() bool {
 
 // String returns the document as a json string
 func (d *Document) String() string {
-	return d.result.Raw
+	return d.result.Get("@pretty").Raw
 }
 
 // Bytes returns the document as json bytes
@@ -137,26 +137,30 @@ func (d *Document) Set(field string, val any) error {
 	})
 }
 
+var setOpts = &sjson.Options{
+	Optimistic:     true,
+	ReplaceInPlace: true,
+}
+
 func (d *Document) set(field string, val any) error {
 	var (
-		result string
+		result []byte
 		err    error
 	)
 	switch val := val.(type) {
 	case gjson.Result:
-		result, err = sjson.Set(d.result.Raw, field, val.Value())
+		result, err = sjson.SetBytesOptions([]byte(d.result.Raw), field, val.Value(), setOpts)
 	case []byte:
-		result, err = sjson.SetRaw(d.result.Raw, field, string(val))
+		result, err = sjson.SetRawBytesOptions([]byte(d.result.Raw), field, val, setOpts)
 	default:
-		result, err = sjson.Set(d.result.Raw, field, val)
+		result, err = sjson.SetBytesOptions([]byte(d.result.Raw), field, val, setOpts)
 	}
 	if err != nil {
 		return err
 	}
-	if !gjson.Valid(result) {
-		return errors.New(errors.Validation, "invalid document")
+	if d.result.Raw != string(result) {
+		d.result = gjson.ParseBytes(result)
 	}
-	d.result = gjson.Parse(result)
 	return nil
 }
 

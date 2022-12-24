@@ -363,13 +363,18 @@ func BenchmarkDocument(b *testing.B) {
 	b.ReportAllocs()
 	doc := testutil.NewUserDoc()
 
-	// BenchmarkDocument/set-12             	  545349	      2145 ns/op	    1744 B/op	       7 allocs/op
+	// BenchmarkDocument/set-12         	  509811	      2330 ns/op	    1481 B/op	       6 allocs/op
 	b.Run("set", func(b *testing.B) {
 		b.ReportAllocs()
 		email := gofakeit.Email()
+		name := gofakeit.Name()
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
-			err := doc.Set("contact.email", email)
+			err := doc.SetAll(map[string]any{
+				"contact.email": email,
+				"name":          name,
+				"age":           10,
+			})
 			assert.Nil(b, err)
 		}
 	})
