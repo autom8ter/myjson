@@ -360,26 +360,40 @@ func (t *transaction) queryScan(ctx context.Context, collection string, where []
 		if len(join) > 0 {
 
 			for _, j := range join {
-				jo := &j
-				for i, o := range j.On {
-					if strings.HasPrefix(cast.ToString(o.Value), selfRefPrefix) {
-						jo.On[i].Value = document.Get(strings.TrimPrefix(cast.ToString(o.Value), selfRefPrefix))
-					}
-				}
 				alias := j.As
 				if alias == "" {
 					alias = j.Collection
 				}
-				_, err := t.queryScan(ctx, j.Collection, jo.On, []Join{}, func(d *Document) (bool, error) {
-					cloned := document.Clone()
-					if err := cloned.MergeJoin(d, j.As); err != nil {
-						return false, err
+				var newJoin = Join{
+					Collection: j.Collection,
+					On:         nil,
+					As:         alias,
+				}
+				for i, o := range j.On {
+					if strings.HasPrefix(cast.ToString(o.Value), selfRefPrefix) {
+						newJoin.On = append(newJoin.On, Where{
+							Field: j.On[i].Field,
+							Op:    j.On[i].Op,
+							Value: document.Get(strings.TrimPrefix(cast.ToString(o.Value), selfRefPrefix)),
+						})
+					} else {
+						newJoin.On = append(newJoin.On, o)
 					}
-					documents = append(documents, cloned)
-					return true, nil
+				}
+				results, err := t.Query(ctx, j.Collection, Query{
+					Select: []Select{{Field: "*"}},
+					Join:   nil,
+					Where:  newJoin.On,
 				})
 				if err != nil {
 					return Optimization{}, err
+				}
+				for _, d := range results.Documents {
+					cloned := document.Clone()
+					if err := cloned.MergeJoin(d, j.As); err != nil {
+						return Optimization{}, err
+					}
+					documents = append(documents, cloned)
 				}
 			}
 		}

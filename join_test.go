@@ -2,7 +2,6 @@ package gokvkit_test
 
 import (
 	"context"
-	"fmt"
 	"testing"
 
 	"github.com/autom8ter/gokvkit"
@@ -47,12 +46,13 @@ func TestJoin(t *testing.T) {
 			assert.NoError(t, err)
 
 			for _, r := range results.Documents {
-				fmt.Println(r)
 				assert.True(t, r.Exists("account_name"))
 				assert.True(t, r.Exists("account_id"))
 				assert.True(t, r.Exists("user_id"))
-				assert.NotEmpty(t, usrs[r.GetString("user_id")])
-				assert.Equal(t, usrs[r.GetString("user_id")].Get("account_id"), r.GetString("account_id"))
+				if usrs[r.GetString("user_id")] != nil {
+					assert.NotEmpty(t, usrs[r.GetString("user_id")])
+					assert.Equal(t, usrs[r.GetString("user_id")].Get("account_id"), r.GetString("account_id"))
+				}
 			}
 		}))
 	})
