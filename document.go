@@ -17,7 +17,7 @@ import (
 	"github.com/tidwall/sjson"
 )
 
-const selfRefPrefix = "$."
+const selfRefPrefix = "$"
 
 // Document is a concurrency safe JSON document
 type Document struct {
@@ -99,12 +99,20 @@ func (d *Document) Clone() *Document {
 
 // Get gets a field on the document. Get has GJSON syntax support and supports dot notation
 func (d *Document) Get(field string) any {
-	return d.result.Get(field).Value()
+	if d.result.Get(field).Exists() {
+		return d.result.Get(field).Value()
+	}
+	return nil
 }
 
 // GetString gets a string field value on the document. Get has GJSON syntax support and supports dot notation
 func (d *Document) GetString(field string) string {
-	return d.result.Get(field).String()
+	return cast.ToString(d.Get(field))
+}
+
+// Exists returns true if the fieldPath has a value in the json document
+func (d *Document) Exists(field string) bool {
+	return d.result.Get(field).Exists()
 }
 
 // GetBool gets a bool field value on the document. GetBool has GJSON syntax support and supports dot notation
@@ -223,47 +231,67 @@ func (d *Document) Where(wheres []Where) (bool, error) {
 
 		switch w.Op {
 		case WhereOpEq:
-			if isSelf && d.Get(w.Field) != d.Get(selfField) {
-				return false, nil
-			}
-			if w.Value != d.Get(w.Field) {
-				return false, nil
-			}
+			if w.Value == "null" && d.Get(selfField) != nil {
 
-		case WhereOpNeq:
-			if isSelf && d.Get(w.Field) == d.Get(selfField) {
-				return false, nil
 			}
-			if w.Value == d.Get(w.Field) {
-				return false, nil
+			if isSelf {
+				if d.Get(w.Field) != d.Get(selfField) || w.Value == "null" && d.Get(selfField) != nil {
+					return false, nil
+				}
+			} else {
+				if w.Value != d.Get(w.Field) || w.Value == "null" && d.Get(w.Field) != nil {
+					return false, nil
+				}
+			}
+		case WhereOpNeq:
+			if isSelf {
+				if d.Get(w.Field) == d.Get(selfField) || w.Value == "null" && d.Get(selfField) == nil {
+					return false, nil
+				}
+			} else {
+				if w.Value == d.Get(w.Field) || w.Value == "null" && d.Get(w.Field) == nil {
+					return false, nil
+				}
 			}
 		case WhereOpLt:
-			if isSelf && d.GetFloat(w.Field) >= d.GetFloat(selfField) {
-				return false, nil
-			}
-			if d.GetFloat(w.Field) >= cast.ToFloat64(w.Value) {
-				return false, nil
+			if isSelf {
+				if d.GetFloat(w.Field) >= d.GetFloat(selfField) {
+					return false, nil
+				}
+			} else {
+				if d.GetFloat(w.Field) >= cast.ToFloat64(w.Value) {
+					return false, nil
+				}
 			}
 		case WhereOpLte:
-			if isSelf && d.GetFloat(w.Field) > d.GetFloat(selfField) {
-				return false, nil
-			}
-			if d.GetFloat(w.Field) > cast.ToFloat64(w.Value) {
-				return false, nil
+			if isSelf {
+				if d.GetFloat(w.Field) > d.GetFloat(selfField) {
+					return false, nil
+				}
+			} else {
+				if d.GetFloat(w.Field) > cast.ToFloat64(w.Value) {
+					return false, nil
+				}
 			}
 		case WhereOpGt:
-			if isSelf && d.GetFloat(w.Field) <= d.GetFloat(selfField) {
-				return false, nil
-			}
-			if d.GetFloat(w.Field) <= cast.ToFloat64(w.Value) {
-				return false, nil
+			if isSelf {
+				if d.GetFloat(w.Field) <= d.GetFloat(selfField) {
+					return false, nil
+				}
+			} else {
+				if d.GetFloat(w.Field) <= cast.ToFloat64(w.Value) {
+					return false, nil
+				}
 			}
 		case WhereOpGte:
-			if isSelf && d.GetFloat(w.Field) < d.GetFloat(selfField) {
-				return false, nil
-			}
-			if d.GetFloat(w.Field) < cast.ToFloat64(w.Value) {
-				return false, nil
+			if isSelf {
+				if d.GetFloat(w.Field) < d.GetFloat(selfField) {
+					return false, nil
+				}
+			} else {
+				if d.GetFloat(w.Field) < cast.ToFloat64(w.Value) {
+					return false, nil
+				}
 			}
 		case WhereOpIn:
 			bits, _ := json.Marshal(w.Value)

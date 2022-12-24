@@ -17,6 +17,17 @@ func TestQueryBuilder(t *testing.T) {
 				Op:    ">",
 				Value: 50,
 			}).
+			Join(Join{
+				Collection: "account",
+				On: []Where{
+					{
+						Field: "_id",
+						Op:    "eq",
+						Value: "id",
+					},
+				},
+				As: "a",
+			}).
 			GroupBy("account_id").
 			OrderBy(OrderBy{
 				Field:     "account_id",
@@ -29,5 +40,6 @@ func TestQueryBuilder(t *testing.T) {
 		assert.Equal(t, 1, len(q.GroupBy))
 		assert.Equal(t, 1, len(q.OrderBy))
 		assert.Equal(t, 1, q.Limit)
+		assert.Equal(t, 1, len(q.Join))
 	})
 }

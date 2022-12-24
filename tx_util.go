@@ -4,12 +4,14 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/autom8ter/gokvkit/errors"
 	"github.com/autom8ter/gokvkit/kv"
 	"github.com/nqd/flat"
 	"github.com/segmentio/ksuid"
+	"github.com/spf13/cast"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -356,46 +358,40 @@ func (t *transaction) queryScan(ctx context.Context, collection string, where []
 		}
 		if len(join) > 0 {
 			for _, j := range join {
-				_, err := t.queryScan(ctx, j.Collection, j.On, []Join{}, func(d *Document) (bool, error) {
-					alias := j.As
-					if alias == "" {
-						alias = j.Collection
+				jo := &j
+				for i, o := range j.On {
+					if strings.HasPrefix(cast.ToString(o.Value), selfRefPrefix) {
+						jo.On[i].Value = document.Get(strings.TrimPrefix(cast.ToString(o.Value), selfRefPrefix))
 					}
-					if err := d.MergeJoin(document, alias); err != nil {
-						return false, err
-					}
-					pass, err := d.Where(where)
-					if err != nil {
-						return false, err
-					}
-					if pass {
-						shouldContinue, err := fn(d)
-						if err != nil {
-							return false, err
-						}
-						if !shouldContinue {
-							return false, nil
-						}
-					}
+				}
+				alias := j.As
+				if alias == "" {
+					alias = j.Collection
+				}
+				var results []*Document
+				_, err := t.queryScan(ctx, j.Collection, jo.On, []Join{}, func(d *Document) (bool, error) {
+					results = append(results, d)
 					return true, nil
 				})
 				if err != nil {
 					return Optimization{}, err
 				}
+				if err := document.Set(j.As, results); err != nil {
+					return Optimization{}, err
+				}
 			}
-		} else {
-			pass, err := document.Where(where)
+		}
+		pass, err := document.Where(where)
+		if err != nil {
+			return Optimization{}, err
+		}
+		if pass {
+			shouldContinue, err := fn(document)
 			if err != nil {
 				return Optimization{}, err
 			}
-			if pass {
-				shouldContinue, err := fn(document)
-				if err != nil {
-					return Optimization{}, err
-				}
-				if !shouldContinue {
-					return Optimization{}, nil
-				}
+			if !shouldContinue {
+				return Optimization{}, nil
 			}
 		}
 		it.Next()

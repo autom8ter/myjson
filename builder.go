@@ -27,6 +27,12 @@ func (q *QueryBuilder) Where(where ...Where) *QueryBuilder {
 	return q
 }
 
+// Join adds the Join clause(s) to the query
+func (q *QueryBuilder) Join(join ...Join) *QueryBuilder {
+	q.query.Join = append(q.query.Join, join...)
+	return q
+}
+
 // OrderBy adds the OrderBy clause(s) to the query
 func (q *QueryBuilder) OrderBy(ob ...OrderBy) *QueryBuilder {
 	q.query.OrderBy = append(q.query.OrderBy, ob...)

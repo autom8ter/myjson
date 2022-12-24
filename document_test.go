@@ -279,6 +279,37 @@ func TestDocument(t *testing.T) {
 		assert.NotNil(t, err)
 		assert.False(t, pass)
 	})
+	t.Run("self ref", func(t *testing.T) {
+		usr := testutil.NewUserDoc()
+		assert.NoError(t, usr.Set("contact.email", usr.Get("name")))
+		pass, err := usr.Where([]gokvkit.Where{
+			{
+				Field: "name",
+				Op:    gokvkit.WhereOpEq,
+				Value: "$contact.email",
+			},
+		})
+		assert.NoError(t, err)
+		assert.True(t, pass)
+
+		pass, err = usr.Where([]gokvkit.Where{
+			{
+				Field: "name",
+				Op:    gokvkit.WhereOpNeq,
+				Value: "$contact.email",
+			},
+		})
+		assert.NoError(t, err)
+		assert.False(t, pass)
+	})
+	t.Run("mergeJoin", func(t *testing.T) {
+		usr := testutil.NewUserDoc()
+		tsk := testutil.NewTaskDoc(usr.GetString("_id"))
+		assert.Nil(t, usr.MergeJoin(tsk, "tsk"))
+		assert.True(t, usr.Exists("tsk"))
+		assert.True(t, usr.Exists("tsk.user"))
+		assert.True(t, usr.Exists("tsk._id"))
+	})
 	t.Run("results", func(t *testing.T) {
 		var docs = []*gokvkit.Document{
 			testutil.NewUserDoc(),

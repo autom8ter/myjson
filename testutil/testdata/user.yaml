@@ -28,7 +28,6 @@ properties:
     minimum: 0
   account_id:
     type: string
-    minimum: 0
     x-foreign:
       collection: account
       field: _id
