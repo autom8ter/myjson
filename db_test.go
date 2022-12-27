@@ -29,12 +29,12 @@ func Test(t *testing.T) {
 			)
 			assert.Nil(t, db.Tx(ctx, true, func(ctx context.Context, tx gokvkit.Tx) error {
 				id, err = tx.Create(ctx, "user", testutil.NewUserDoc())
-				assert.Nil(t, err)
+				assert.NoError(t, err)
 				_, err := tx.Get(ctx, "user", id)
 				return err
 			}))
 			u, err := db.Get(ctx, "user", id)
-			assert.Nil(t, err)
+			assert.NoError(t, err)
 			assert.NotNil(t, u)
 			assert.Equal(t, id, u.GetString("_id"))
 		}))
@@ -51,7 +51,7 @@ func Test(t *testing.T) {
 				ctx, cancel := context.WithCancel(context.Background())
 				defer cancel()
 				ch, err := db.ChangeStream(ctx, "user")
-				assert.Nil(t, err)
+				assert.NoError(t, err)
 				for {
 					select {
 					case <-ctx.Done():
@@ -71,7 +71,7 @@ func Test(t *testing.T) {
 				return err
 			}))
 			u, err := db.Get(ctx, "user", id)
-			assert.Nil(t, err)
+			assert.NoError(t, err)
 			assert.NotNil(t, u)
 			assert.Equal(t, id, u.GetString("_id"))
 			<-received
@@ -130,7 +130,7 @@ func Test(t *testing.T) {
 					},
 				},
 			})
-			assert.Nil(t, err)
+			assert.NoError(t, err)
 			assert.Greater(t, len(results.Documents), 1)
 			for _, result := range results.Documents {
 				assert.Greater(t, result.GetFloat("account_id"), float64(50))
@@ -151,7 +151,7 @@ func Test(t *testing.T) {
 				},
 				Limit: 10,
 			})
-			assert.Nil(t, err)
+			assert.NoError(t, err)
 			assert.Greater(t, len(results.Documents), 1)
 			for _, result := range results.Documents {
 				assert.Greater(t, result.GetFloat("account_id"), float64(50))
@@ -164,7 +164,7 @@ func Test(t *testing.T) {
 			results, err := db.Query(ctx, "user", gokvkit.Query{
 				Select: []gokvkit.Select{{Field: "*"}},
 			})
-			assert.Nil(t, err)
+			assert.NoError(t, err)
 			assert.Equal(t, 100, len(results.Documents))
 			t.Logf("found %v documents in %s", results.Count, results.Stats.ExecutionTime)
 		})
@@ -179,7 +179,7 @@ func Test(t *testing.T) {
 					return nil
 				}))
 				doc, err := db.Get(ctx, "user", id)
-				assert.Nil(t, err)
+				assert.NoError(t, err)
 				assert.Equal(t, email, doc.GetString("contact.email"))
 				assert.Equal(t, u.GetString("name"), doc.GetString("name"))
 			}
@@ -356,7 +356,7 @@ func TestIndexing1(t *testing.T) {
 					},
 				},
 			})
-			assert.Nil(t, err)
+			assert.NoError(t, err)
 			assert.Equal(t, 1, page.Count)
 			assert.Equal(t, page.Documents[0].Get("contact.email"), docs[0].Get("contact.email"))
 			assert.Equal(t, "contact.email", page.Stats.Optimization.MatchedFields[0])
@@ -389,7 +389,7 @@ func TestIndexing1(t *testing.T) {
 					},
 				},
 			})
-			assert.Nil(t, err)
+			assert.NoError(t, err)
 			assert.Equal(t, 1, page.Count)
 			assert.Equal(t, "contact.email", page.Stats.Optimization.MatchedFields[0])
 
@@ -424,7 +424,7 @@ func TestIndexing1(t *testing.T) {
 					},
 				},
 			})
-			assert.Nil(t, err)
+			assert.NoError(t, err)
 			assert.Equal(t, 1, page.Count)
 			assert.Equal(t, page.Documents[0].Get("name"), docs[0].Get("name"))
 			assert.Equal(t, []string{}, page.Stats.Optimization.MatchedFields)
@@ -460,7 +460,7 @@ func TestIndexing1(t *testing.T) {
 					},
 				},
 			})
-			assert.Nil(t, err)
+			assert.NoError(t, err)
 			assert.Equal(t, 1, page.Count)
 			assert.Equal(t, page.Documents[0].Get("_id"), docs[0].Get("_id"))
 			assert.Equal(t, []string{"_id"}, page.Stats.Optimization.MatchedFields)
@@ -494,7 +494,7 @@ func TestIndexing1(t *testing.T) {
 					},
 				},
 			})
-			assert.Nil(t, err)
+			assert.NoError(t, err)
 			assert.Equal(t, 1, page.Count)
 			assert.Equal(t, page.Documents[0].Get("_id"), docs[0].Get("_id"))
 			assert.Equal(t, []string{}, page.Stats.Optimization.MatchedFields)

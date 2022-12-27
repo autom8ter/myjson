@@ -11,7 +11,7 @@ import (
 
 func Test(t *testing.T) {
 	db, err := open("")
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	data := map[string]string{}
 	for i := 0; i < 10; i++ {
 		data[fmt.Sprint(i)] = fmt.Sprint(i)
@@ -29,7 +29,7 @@ func Test(t *testing.T) {
 		assert.Nil(t, db.Tx(false, func(tx kv.Tx) error {
 			for k, v := range data {
 				data, err := tx.Get([]byte(k))
-				assert.Nil(t, err)
+				assert.NoError(t, err)
 				assert.EqualValues(t, string(v), string(data))
 			}
 			return nil
@@ -44,7 +44,7 @@ func Test(t *testing.T) {
 		assert.Nil(t, db.Tx(false, func(tx kv.Tx) error {
 			for k, v := range data {
 				data, err := tx.Get([]byte(k))
-				assert.Nil(t, err)
+				assert.NoError(t, err)
 				assert.EqualValues(t, string(v), string(data))
 			}
 			return nil
@@ -105,26 +105,26 @@ func Test(t *testing.T) {
 		lock := db.NewLocker([]byte("testing"), 1*time.Second)
 		{
 			gotLock, err := lock.TryLock()
-			assert.Nil(t, err)
+			assert.NoError(t, err)
 			assert.True(t, gotLock)
 		}
 		{
 			gotLock, err := lock.TryLock()
-			assert.Nil(t, err)
+			assert.NoError(t, err)
 			assert.False(t, gotLock)
 		}
 		{
 			lock.Unlock()
-			assert.Nil(t, err)
+			assert.NoError(t, err)
 		}
 
 		newLock := db.NewLocker([]byte("testing"), 1*time.Second)
 		gotLock, err := newLock.TryLock()
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 		assert.True(t, gotLock)
 
 		gotLock, err = lock.TryLock()
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 		assert.False(t, gotLock)
 	})
 }

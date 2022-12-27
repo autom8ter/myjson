@@ -62,7 +62,7 @@ func TestDocument(t *testing.T) {
 			t.Fatal(err)
 		}
 		err = r.Merge(r2)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 		assert.Equal(t, usr2.Contact.Email, r.GetString("contact.email"))
 		assert.Equal(t, usr.Contact.Phone, r.GetString("contact.phone"))
 	})
@@ -78,7 +78,7 @@ func TestDocument(t *testing.T) {
 	})
 	t.Run("del", func(t *testing.T) {
 		err := r.Del("annotations")
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 		val := r.Get("annotations")
 		assert.Nil(t, val)
 	})
@@ -87,7 +87,7 @@ func TestDocument(t *testing.T) {
 	})
 	t.Run("new from bytes", func(t *testing.T) {
 		n, err := gokvkit.NewDocumentFromBytes(r.Bytes())
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 		assert.Equal(t, true, n.Valid())
 	})
 	t.Run("set all", func(t *testing.T) {
@@ -95,7 +95,7 @@ func TestDocument(t *testing.T) {
 		err = c.SetAll(map[string]any{
 			"contact.email": gofakeit.Email(),
 		})
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 		assert.NotEqual(t, r.Get("contact.email"), c.Get("contact.email"))
 	})
 	t.Run("diff - none", func(t *testing.T) {
@@ -146,7 +146,7 @@ func TestDocument(t *testing.T) {
 				Value: email,
 			},
 		})
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 		assert.True(t, pass)
 
 		pass, err = r.Where([]gokvkit.Where{
@@ -156,7 +156,7 @@ func TestDocument(t *testing.T) {
 				Value: email,
 			},
 		})
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 		assert.True(t, pass)
 
 		pass, err = r.Where([]gokvkit.Where{
@@ -166,7 +166,7 @@ func TestDocument(t *testing.T) {
 				Value: gofakeit.Email(),
 			},
 		})
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 		assert.False(t, pass)
 
 		pass, err = r.Where([]gokvkit.Where{
@@ -176,7 +176,7 @@ func TestDocument(t *testing.T) {
 				Value: gofakeit.Email(),
 			},
 		})
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 		assert.True(t, pass)
 
 		pass, err = r.Where([]gokvkit.Where{
@@ -186,7 +186,7 @@ func TestDocument(t *testing.T) {
 				Value: 10,
 			},
 		})
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 		assert.True(t, pass)
 
 		pass, err = r.Where([]gokvkit.Where{
@@ -196,7 +196,7 @@ func TestDocument(t *testing.T) {
 				Value: 50,
 			},
 		})
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 		assert.True(t, pass)
 
 		pass, err = r.Where([]gokvkit.Where{
@@ -206,7 +206,7 @@ func TestDocument(t *testing.T) {
 				Value: 51,
 			},
 		})
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 		assert.False(t, pass)
 
 		pass, err = r.Where([]gokvkit.Where{
@@ -216,7 +216,7 @@ func TestDocument(t *testing.T) {
 				Value: 51,
 			},
 		})
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 		assert.True(t, pass)
 
 		pass, err = r.Where([]gokvkit.Where{
@@ -226,7 +226,7 @@ func TestDocument(t *testing.T) {
 				Value: 50,
 			},
 		})
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 		assert.True(t, pass)
 
 		pass, err = r.Where([]gokvkit.Where{
@@ -236,7 +236,7 @@ func TestDocument(t *testing.T) {
 				Value: 50,
 			},
 		})
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 		assert.True(t, pass)
 
 		pass, err = r.Where([]gokvkit.Where{
@@ -246,7 +246,7 @@ func TestDocument(t *testing.T) {
 				Value: 50,
 			},
 		})
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 		assert.True(t, pass)
 
 		pass, err = r.Where([]gokvkit.Where{
@@ -256,7 +256,7 @@ func TestDocument(t *testing.T) {
 				Value: []float64{50},
 			},
 		})
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 		assert.True(t, pass)
 
 		pass, err = r.Where([]gokvkit.Where{
@@ -266,7 +266,7 @@ func TestDocument(t *testing.T) {
 				Value: 49,
 			},
 		})
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 		assert.False(t, pass)
 
 		pass, err = r.Where([]gokvkit.Where{
@@ -321,7 +321,7 @@ func TestDocument(t *testing.T) {
 			NextPage:  0,
 		}
 		bits, err := json.Marshal(result)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 		t.Log(string(bits))
 	})
 	t.Run("documents - for each", func(t *testing.T) {

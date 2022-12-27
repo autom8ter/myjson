@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"time"
 
+	_ "embed"
+
 	"github.com/brianvoe/gofakeit/v6"
 )
 
@@ -28,3 +30,13 @@ func newUserDoc() *Document {
 	}
 	return doc
 }
+
+var (
+	//go:embed testutil/testdata/task.yaml
+	taskSchema string
+	//go:embed testutil/testdata/user.yaml
+	userSchema string
+	//go:embed testutil/testdata/account.yaml
+	accountSchema  string
+	allCollections = [][]byte{[]byte(userSchema), []byte(taskSchema), []byte(accountSchema)}
+)

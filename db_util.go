@@ -62,7 +62,7 @@ func (d *defaultDB) addIndex(ctx context.Context, collection string, index Index
 	meta.Set(string(isIndexingKey), true)
 	if !index.Primary {
 		if err := d.Tx(ctx, true, func(ctx context.Context, tx Tx) error {
-			_, err := d.ForEach(meta.ToContext(ctx), collection, nil, func(doc *Document) (bool, error) {
+			_, err := d.ForEach(meta.ToContext(ctx), collection, ForEachOpts{}, func(doc *Document) (bool, error) {
 				if err := tx.Set(meta.ToContext(ctx), collection, doc); err != nil {
 					return false, err
 				}

@@ -10,13 +10,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-var (
-	//go:embed testutil/testdata/task.yaml
-	taskSchema string
-	//go:embed testutil/testdata/user.yaml
-	userSchema string
-)
-
 func TestJSONSchema(t *testing.T) {
 	t.Run("json schema validation", func(t *testing.T) {
 		schema, err := newCollectionSchema([]byte(userSchema))
@@ -26,17 +19,17 @@ func TestJSONSchema(t *testing.T) {
 	})
 	t.Run("primary key", func(t *testing.T) {
 		schema, err := newCollectionSchema([]byte(taskSchema))
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 		assert.Equal(t, "_id", schema.PrimaryKey())
 	})
 	t.Run("collection", func(t *testing.T) {
 		schema, err := newCollectionSchema([]byte(taskSchema))
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 		assert.Equal(t, "task", schema.Collection())
 	})
 
 	schema, err := newCollectionSchema([]byte(userSchema))
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	assert.NotNil(t, schema.Indexing())
 	assert.NotNil(t, schema.Properties())
 	assert.Equal(t, 10, len(schema.Properties()))
@@ -48,7 +41,7 @@ func TestJSONSchema(t *testing.T) {
 func TestSchema(t *testing.T) {
 	t.Run("basic", func(t *testing.T) {
 		schema, err := newCollectionSchema([]byte(userSchema))
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 		assert.NotNil(t, schema.Indexing())
 		assert.NotEmpty(t, schema.Indexing()["_id.primaryidx"])
 		assert.NotEmpty(t, schema.Indexing()["account_id.foreignidx"])

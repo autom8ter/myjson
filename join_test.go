@@ -2,6 +2,7 @@ package gokvkit_test
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/autom8ter/gokvkit"
@@ -102,6 +103,40 @@ func TestJoin(t *testing.T) {
 				assert.True(t, r.Exists("usr"))
 			}
 			assert.Equal(t, 2, results.Count)
+		}))
+	})
+	t.Run("cascade delete", func(t *testing.T) {
+		assert.NoError(t, testutil.TestDB(func(ctx context.Context, db gokvkit.Database) {
+			assert.NoError(t, db.Tx(ctx, true, func(ctx context.Context, tx gokvkit.Tx) error {
+				for i := 0; i <= 100; i++ {
+					u := testutil.NewUserDoc()
+					if err := tx.Set(ctx, "user", u); err != nil {
+						return err
+					}
+					tsk := testutil.NewTaskDoc(u.GetString("_id"))
+					if err := tx.Set(ctx, "task", tsk); err != nil {
+						return err
+					}
+				}
+				return nil
+			}))
+			assert.NoError(t, db.Tx(ctx, true, func(ctx context.Context, tx gokvkit.Tx) error {
+				for i := 0; i <= 100; i++ {
+					if err := tx.Delete(ctx, "account", fmt.Sprint(i)); err != nil {
+						return err
+					}
+				}
+				return nil
+			}))
+			results, err := db.Query(ctx, "account", gokvkit.Query{Select: []gokvkit.Select{{Field: "*"}}})
+			assert.NoError(t, err)
+			assert.Equal(t, 0, results.Count, "failed to delete accounts")
+			results, err = db.Query(ctx, "user", gokvkit.Query{Select: []gokvkit.Select{{Field: "*"}}})
+			assert.NoError(t, err)
+			assert.Equal(t, 0, results.Count, "failed to cascade delete users")
+			results, err = db.Query(ctx, "task", gokvkit.Query{Select: []gokvkit.Select{{Field: "*"}}})
+			assert.NoError(t, err)
+			assert.Equal(t, 0, results.Count, "failed to cascade delete tasks")
 		}))
 	})
 }

@@ -160,7 +160,7 @@ func TestContext(t *testing.T) {
 	assert.NotNil(t, c.Map())
 	assert.True(t, c.Exists("testing"))
 	bits, err := json.Marshal(c)
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	assert.Equal(t, "{\"testing\":false}", string(bits))
 	assert.Equal(t, "{\"testing\":false}", c.String())
 

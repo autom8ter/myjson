@@ -262,7 +262,8 @@ func (t *transaction) aggregate(ctx context.Context, collection string, query Qu
 		}
 		reduced = append(reduced, value)
 	}
-	if err := docsHaving(query.Having, reduced); err != nil {
+	reduced, err = docsHaving(query.Having, reduced)
+	if err != nil {
 		return Page{}, errors.Wrap(err, errors.Internal, "")
 	}
 	reduced = orderByDocs(reduced, query.OrderBy)
@@ -283,26 +284,26 @@ func (t *transaction) aggregate(ctx context.Context, collection string, query Qu
 	}, nil
 }
 
-func docsHaving(where []Where, results Documents) error {
+func docsHaving(where []Where, results Documents) (Documents, error) {
 	if len(where) > 0 {
 		for i, document := range results {
 			pass, err := document.Where(where)
 			if err != nil {
-				return err
+				return nil, err
 			}
 			if pass {
-				util.RemoveElement(i, results)
+				results = util.RemoveElement(i, results)
 			}
 		}
 	}
-	return nil
+	return results, nil
 }
 
-func (t *transaction) ForEach(ctx context.Context, collection string, where []Where, fn ForEachFunc) (Optimization, error) {
+func (t *transaction) ForEach(ctx context.Context, collection string, opts ForEachOpts, fn ForEachFunc) (Optimization, error) {
 	if !t.db.HasCollection(ctx, collection) {
 		return Optimization{}, errors.New(errors.Validation, "unsupported collection: %s", collection)
 	}
-	return t.queryScan(ctx, collection, where, nil, fn)
+	return t.queryScan(ctx, collection, opts.Where, opts.Join, fn)
 }
 
 func (t *transaction) Close(ctx context.Context) {

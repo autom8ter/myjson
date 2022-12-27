@@ -16,7 +16,7 @@ func TestStream(t *testing.T) {
 		values := make(chan int, 5)
 		go func() {
 			ch, err := s.Pull(ctx, "testing")
-			assert.Nil(t, err)
+			assert.NoError(t, err)
 			for i := range ch {
 				values <- i
 			}

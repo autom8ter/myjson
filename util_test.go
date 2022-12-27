@@ -1,6 +1,7 @@
 package gokvkit
 
 import (
+	"context"
 	"testing"
 
 	"github.com/autom8ter/gokvkit/util"
@@ -41,12 +42,12 @@ func TestUtil(t *testing.T) {
 			"name":   "coleman",
 			"isMale": true,
 		})
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 		d1, err := NewDocumentFrom(map[string]any{
 			"age":  51,
 			"name": "lacee",
 		})
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 		t.Run("compare age", func(t *testing.T) {
 			assert.False(t, compareField("age", d, d1))
 		})
@@ -72,7 +73,7 @@ func TestUtil(t *testing.T) {
 			"name":   "coleman",
 			"isMale": true,
 		})
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 		d1 := NewDocument()
 		assert.Nil(t, util.Decode(d, d1))
 		assert.Equal(t, d.String(), d1.String())
@@ -80,7 +81,7 @@ func TestUtil(t *testing.T) {
 	t.Run("selectDoc", func(t *testing.T) {
 		before := r.Get("contact.email")
 		err := selectDocument(r, []Select{{Field: "contact.email"}})
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 		after := r.Get("contact.email")
 		assert.Equal(t, before, after)
 		assert.Nil(t, r.Get("name"))
@@ -100,7 +101,7 @@ func TestUtil(t *testing.T) {
 				As:        "age_sum",
 			},
 		})
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 		assert.Equal(t, expected, reduced.GetFloat("age_sum"))
 	})
 	t.Run("documents - orderBy", func(t *testing.T) {
@@ -128,5 +129,16 @@ func TestUtil(t *testing.T) {
 				}
 			}
 		})
+	})
+	t.Run("schemaToCtx", func(t *testing.T) {
+		ctx := context.Background()
+		s, err := newCollectionSchema([]byte(userSchema))
+		assert.NoError(t, err)
+		ctx = schemaToCtx(ctx, s)
+		s2 := schemaFromCtx(ctx)
+		assert.Equal(t, util.JSONString(s), util.JSONString(s2))
+	})
+	t.Run("defaultAs", func(t *testing.T) {
+		assert.Equal(t, "count_account_id", defaultAs(SelectAggregateCount, "account_id"))
 	})
 }

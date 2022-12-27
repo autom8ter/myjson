@@ -3,6 +3,7 @@ package util_test
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"testing"
 
 	"github.com/autom8ter/gokvkit"
@@ -15,11 +16,11 @@ func TestUtil(t *testing.T) {
 	t.Run("yaml / json conversions", func(t *testing.T) {
 		doc := testutil.NewUserDoc()
 		yml, err := util.JSONToYAML([]byte(doc.String()))
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 		jsonData, err := util.YAMLToJSON(yml)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 		doc2, err := gokvkit.NewDocumentFromBytes(jsonData)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 		assert.Equal(t, doc.String(), doc2.String())
 	})
 	t.Run("json string", func(t *testing.T) {
@@ -32,7 +33,7 @@ func TestUtil(t *testing.T) {
 		data := map[string]any{}
 		assert.Nil(t, util.Decode(doc.Value(), &data))
 		doc2, err := gokvkit.NewDocumentFrom(data)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 		assert.Equal(t, doc.String(), doc2.String())
 	})
 
@@ -78,5 +79,11 @@ func TestUtil(t *testing.T) {
 		val2 := util.EncodeIndexValue(nil)
 		compare := bytes.Compare(val1, val2)
 		assert.Equal(t, 0, compare)
+	})
+	t.Run("remove element", func(t *testing.T) {
+		var index = []int{1, 2, 3, 4, 5}
+		index = util.RemoveElement(1, index)
+		fmt.Println(util.JSONString(index))
+		assert.Equal(t, 4, len(index))
 	})
 }

@@ -17,7 +17,7 @@ func TestConcurrency(t *testing.T) {
 	//				tx.Set(ctx, "user", doc)
 	//				return nil
 	//			})
-	//			assert.Nil(t, err)
+	//			assert.NoError(t, err)
 	//			egp.Go(func() error {
 	//				db.Tx(ctx, true, func(ctx context.Context, tx gokvkit.Tx) error {
 	//					results, _ := tx.Query(ctx, "user", gokvkit.Q().
@@ -41,18 +41,18 @@ func TestConcurrency(t *testing.T) {
 	//				{
 	//					schema := db.GetSchema(ctx, "user")
 	//					bytes, err := schema.MarshalJSON()
-	//					assert.Nil(t, err)
+	//					assert.NoError(t, err)
 	//					newSchema, err := sjson.Set(string(bytes), "properties.contact.properties.email.x-unique", false)
-	//					assert.Nil(t, err)
-	//					assert.Nil(t, err)
+	//					assert.NoError(t, err)
+	//					assert.NoError(t, err)
 	//					db.ConfigureCollection(ctx, []byte(newSchema))
 	//				}
 	//				{
 	//					schema := db.GetSchema(ctx, "user")
 	//					bytes, err := schema.MarshalJSON()
-	//					assert.Nil(t, err)
+	//					assert.NoError(t, err)
 	//					newSchema, err := sjson.Set(string(bytes), "properties.contact.properties.email.x-unique", true)
-	//					assert.Nil(t, err)
+	//					assert.NoError(t, err)
 	//					db.ConfigureCollection(ctx, []byte(newSchema))
 	//				}
 	//				return nil

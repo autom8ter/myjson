@@ -10,7 +10,7 @@ import (
 func TestOptimizer(t *testing.T) {
 	o := defaultOptimizer{}
 	schema, err := newCollectionSchema([]byte(userSchema))
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	indexes := schema
 	t.Run("select secondary index", func(t *testing.T) {
 		optimization, err := o.Optimize(indexes, []Where{
@@ -20,7 +20,7 @@ func TestOptimizer(t *testing.T) {
 				Value: gofakeit.Email(),
 			},
 		})
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 		assert.Equal(t, false, optimization.Index.Primary)
 		assert.Equal(t, "contact.email", optimization.MatchedFields[0])
 	})
@@ -33,7 +33,7 @@ func TestOptimizer(t *testing.T) {
 				Value: gofakeit.Email(),
 			},
 		})
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 		assert.Equal(t, true, optimization.Index.Primary, optimization.MatchedFields)
 		assert.Equal(t, "_id", optimization.MatchedFields[0], optimization.MatchedFields)
 	})
@@ -51,7 +51,7 @@ func TestOptimizer(t *testing.T) {
 				Value: gofakeit.Email(),
 			},
 		})
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 		assert.Equal(t, false, optimization.Index.Primary)
 		assert.Equal(t, "account_id", optimization.MatchedFields[0])
 		assert.Equal(t, "contact.email", optimization.MatchedFields[1])
@@ -69,7 +69,7 @@ func TestOptimizer(t *testing.T) {
 				Value: "1",
 			},
 		})
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 		assert.EqualValues(t, false, optimization.Index.Primary)
 		assert.Equal(t, "contact.email", optimization.MatchedFields[0])
 	})
@@ -81,7 +81,7 @@ func TestOptimizer(t *testing.T) {
 				Value: "1",
 			},
 		})
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 		assert.Equal(t, false, optimization.Index.Primary)
 		assert.Equal(t, "account_id", optimization.MatchedFields[0])
 	})
@@ -93,7 +93,7 @@ func TestOptimizer(t *testing.T) {
 				Value: "1",
 			},
 		})
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 		assert.Equal(t, true, optimization.Index.Primary)
 		assert.Equal(t, 0, len(optimization.MatchedFields))
 	})

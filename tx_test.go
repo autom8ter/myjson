@@ -2,7 +2,6 @@ package gokvkit_test
 
 import (
 	"context"
-	"fmt"
 	"testing"
 
 	"github.com/autom8ter/gokvkit"
@@ -16,9 +15,9 @@ func TestTx(t *testing.T) {
 			assert.Nil(t, db.Tx(ctx, true, func(ctx context.Context, tx gokvkit.Tx) error {
 				doc := testutil.NewUserDoc()
 				err := tx.Set(ctx, "user", doc)
-				assert.Nil(t, err)
+				assert.NoError(t, err)
 				d, err := tx.Get(ctx, "user", doc.GetString("_id"))
-				assert.Nil(t, err)
+				assert.NoError(t, err)
 				assert.NotNil(t, d)
 				assert.Equal(t, doc.Get("contact.email"), d.GetString("contact.email"))
 				return nil
@@ -30,9 +29,9 @@ func TestTx(t *testing.T) {
 			assert.Nil(t, db.Tx(ctx, true, func(ctx context.Context, tx gokvkit.Tx) error {
 				doc := testutil.NewUserDoc()
 				id, err := tx.Create(ctx, "user", doc)
-				assert.Nil(t, err)
+				assert.NoError(t, err)
 				d, err := tx.Get(ctx, "user", id)
-				assert.Nil(t, err)
+				assert.NoError(t, err)
 				assert.NotNil(t, d)
 				assert.Equal(t, doc.Get("contact.email"), d.GetString("contact.email"))
 				return nil
@@ -44,13 +43,13 @@ func TestTx(t *testing.T) {
 			assert.Nil(t, db.Tx(ctx, true, func(ctx context.Context, tx gokvkit.Tx) error {
 				doc := testutil.NewUserDoc()
 				id, err := tx.Create(ctx, "user", doc)
-				assert.Nil(t, err)
+				assert.NoError(t, err)
 				err = tx.Update(ctx, "user", id, map[string]any{
 					"age": 10,
 				})
-				assert.Nil(t, err)
+				assert.NoError(t, err)
 				d, err := tx.Get(ctx, "user", id)
-				assert.Nil(t, err)
+				assert.NoError(t, err)
 				assert.NotNil(t, d)
 				assert.Equal(t, doc.Get("contact.email"), d.GetString("contact.email"))
 				return nil
@@ -62,9 +61,9 @@ func TestTx(t *testing.T) {
 			assert.Nil(t, db.Tx(ctx, true, func(ctx context.Context, tx gokvkit.Tx) error {
 				doc := testutil.NewUserDoc()
 				id, err := tx.Create(ctx, "user", doc)
-				assert.Nil(t, err)
+				assert.NoError(t, err)
 				err = tx.Delete(ctx, "user", id)
-				assert.Nil(t, err)
+				assert.NoError(t, err)
 				d, err := tx.Get(ctx, "user", id)
 				assert.NotNil(t, err)
 				assert.Nil(t, d)
@@ -72,38 +71,51 @@ func TestTx(t *testing.T) {
 			}))
 		}))
 	})
-	t.Run("cascade delete", func(t *testing.T) {
-		assert.NoError(t, testutil.TestDB(func(ctx context.Context, db gokvkit.Database) {
-			assert.NoError(t, db.Tx(ctx, true, func(ctx context.Context, tx gokvkit.Tx) error {
-				for i := 0; i <= 100; i++ {
-					u := testutil.NewUserDoc()
-					if err := tx.Set(ctx, "user", u); err != nil {
-						return err
-					}
-					tsk := testutil.NewTaskDoc(u.GetString("_id"))
-					if err := tx.Set(ctx, "task", tsk); err != nil {
-						return err
-					}
+	t.Run("set 10 then forEach", func(t *testing.T) {
+		assert.Nil(t, testutil.TestDB(func(ctx context.Context, db gokvkit.Database) {
+			assert.Nil(t, db.Tx(ctx, true, func(ctx context.Context, tx gokvkit.Tx) error {
+				var usrs = map[string]*gokvkit.Document{}
+				for i := 0; i < 10; i++ {
+					doc := testutil.NewUserDoc()
+					err := tx.Set(ctx, "user", doc)
+					assert.NoError(t, err)
+					usrs[doc.GetString("_id")] = doc
 				}
+				var count = 0
+				_, err := tx.ForEach(ctx, "user", gokvkit.ForEachOpts{}, func(d *gokvkit.Document) (bool, error) {
+					assert.NotEmpty(t, usrs[d.GetString("_id")])
+					count++
+					return true, nil
+				})
+				assert.NoError(t, err)
+				assert.Equal(t, 10, count)
 				return nil
 			}))
-			assert.NoError(t, db.Tx(ctx, true, func(ctx context.Context, tx gokvkit.Tx) error {
-				for i := 0; i <= 100; i++ {
-					if err := tx.Delete(ctx, "account", fmt.Sprint(i)); err != nil {
-						return err
-					}
+		}))
+	})
+	t.Run("set 10 then check cdc", func(t *testing.T) {
+		assert.Nil(t, testutil.TestDB(func(ctx context.Context, db gokvkit.Database) {
+			assert.Nil(t, db.Tx(ctx, true, func(ctx context.Context, tx gokvkit.Tx) error {
+				md := gokvkit.NewMetadata(map[string]any{
+					"testing": true,
+				})
+				var usrs = map[string]*gokvkit.Document{}
+				for i := 0; i < 10; i++ {
+					doc := testutil.NewUserDoc()
+					err := tx.Set(md.ToContext(ctx), "user", doc)
+					assert.NoError(t, err)
+					usrs[doc.GetString("_id")] = doc
+					assert.Equal(t, "user", tx.CDC()[i].Collection)
+					assert.EqualValues(t, gokvkit.Set, tx.CDC()[i].Action)
+					assert.EqualValues(t, doc.Get("_id"), tx.CDC()[i].DocumentID)
+					assert.NotEmpty(t, tx.CDC()[i].Metadata)
+					assert.NotEmpty(t, tx.CDC()[i].Diff)
+					v, _ := tx.CDC()[i].Metadata.Get("testing")
+					assert.Equal(t, true, v)
 				}
+				assert.Equal(t, 10, len(tx.CDC()))
 				return nil
 			}))
-			results, err := db.Query(ctx, "account", gokvkit.Query{Select: []gokvkit.Select{{Field: "*"}}})
-			assert.NoError(t, err)
-			assert.Equal(t, 0, results.Count, "failed to delete accounts")
-			results, err = db.Query(ctx, "user", gokvkit.Query{Select: []gokvkit.Select{{Field: "*"}}})
-			assert.NoError(t, err)
-			assert.Equal(t, 0, results.Count, "failed to cascade delete users")
-			results, err = db.Query(ctx, "task", gokvkit.Query{Select: []gokvkit.Select{{Field: "*"}}})
-			assert.NoError(t, err)
-			assert.Equal(t, 0, results.Count, "failed to cascade delete tasks")
 		}))
 	})
 }

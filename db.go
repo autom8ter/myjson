@@ -118,13 +118,13 @@ func (d *defaultDB) Query(ctx context.Context, collection string, query Query) (
 	return page, nil
 }
 
-func (d *defaultDB) ForEach(ctx context.Context, collection string, where []Where, fn ForEachFunc) (Optimization, error) {
+func (d *defaultDB) ForEach(ctx context.Context, collection string, opts ForEachOpts, fn ForEachFunc) (Optimization, error) {
 	var (
 		result Optimization
 		err    error
 	)
 	if err := d.Tx(ctx, false, func(ctx context.Context, tx Tx) error {
-		result, err = tx.ForEach(ctx, collection, where, fn)
+		result, err = tx.ForEach(ctx, collection, opts, fn)
 		return err
 	}); err != nil {
 		return result, err

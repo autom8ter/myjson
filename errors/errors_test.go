@@ -12,7 +12,7 @@ func TestErrors(t *testing.T) {
 	t.Run("wrap nil error", func(t *testing.T) {
 		var err error
 		err = errors.Wrap(err, errors.NotFound, "")
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 	})
 	t.Run("wrap error", func(t *testing.T) {
 		var err = fmt.Errorf("not found")
