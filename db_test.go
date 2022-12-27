@@ -504,7 +504,6 @@ func TestIndexing1(t *testing.T) {
 }
 
 func TestAggregate(t *testing.T) {
-
 	t.Run("sum advanced", func(t *testing.T) {
 		assert.Nil(t, testutil.TestDB(func(ctx context.Context, db gokvkit.Database) {
 			var usrs gokvkit.Documents
@@ -518,7 +517,6 @@ func TestAggregate(t *testing.T) {
 				}
 				return nil
 			}))
-
 			query := gokvkit.Query{
 				GroupBy: []string{"account_id"},
 				//Where:      []schema.Where{

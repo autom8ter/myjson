@@ -44,3 +44,16 @@ func TestJSONSchema(t *testing.T) {
 		fmt.Println(util.JSONString(v))
 	}
 }
+
+func TestSchema(t *testing.T) {
+	t.Run("basic", func(t *testing.T) {
+		schema, err := newCollectionSchema([]byte(userSchema))
+		assert.Nil(t, err)
+		assert.NotNil(t, schema.Indexing())
+		assert.NotEmpty(t, schema.Indexing()["_id.primaryidx"])
+		assert.NotEmpty(t, schema.Indexing()["account_id.foreignidx"])
+		assert.NotEmpty(t, schema.Indexing()["contact.email.uniqueidx"])
+		assert.NotEmpty(t, schema.Indexing()["account_email_idx"])
+		assert.NotEmpty(t, schema.Indexing()["language_idx"])
+	})
+}

@@ -99,36 +99,5 @@ func TestDB(fn func(ctx context.Context, db gokvkit.Database), collections ...[]
 
 	defer db.Close(ctx)
 	fn(ctx, db)
-	if err := db.Tx(ctx, true, func(ctx context.Context, tx gokvkit.Tx) error {
-		for i := 0; i <= 100; i++ {
-			if err := tx.Delete(ctx, "account", fmt.Sprint(i)); err != nil {
-				return err
-			}
-		}
-		return nil
-	}); err != nil {
-		return err
-	}
-	results, err := db.Query(ctx, "account", gokvkit.Query{Select: []gokvkit.Select{{Field: "*"}}})
-	if err != nil {
-		return err
-	}
-	if results.Count != 0 {
-		return fmt.Errorf("failed to delete accounts")
-	}
-	results, err = db.Query(ctx, "user", gokvkit.Query{Select: []gokvkit.Select{{Field: "*"}}})
-	if err != nil {
-		return err
-	}
-	if results.Count != 0 {
-		return fmt.Errorf("failed to delete users")
-	}
-	results, err = db.Query(ctx, "task", gokvkit.Query{Select: []gokvkit.Select{{Field: "*"}}})
-	if err != nil {
-		return err
-	}
-	if results.Count != 0 {
-		return fmt.Errorf("failed to delete tasks")
-	}
 	return nil
 }

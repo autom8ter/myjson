@@ -13,12 +13,34 @@ func (d *defaultDB) lockCollection(collection string) (func(), error) {
 	lock := d.kv.NewLocker([]byte(fmt.Sprintf("internal.locks.%s", collection)), 1*time.Minute)
 	gotLock, err := lock.TryLock()
 	if err != nil {
-		return nil, errors.Wrap(err, errors.Internal, "failed to acquire lock on collection %s", cdcCollectionName)
+		return nil, errors.Wrap(err, errors.Internal, "failed to acquire lock on collection %s", collection)
 	}
 	if !gotLock {
-		return nil, errors.New(errors.Forbidden, "collection: %s is locked", cdcCollectionName)
+		return nil, errors.New(errors.Forbidden, "collection: %s is locked", collection)
 	}
 	return lock.Unlock, nil
+}
+
+func (d *defaultDB) awaitCollectionLock(ctx context.Context, ttl time.Duration, collection string) (func(), error) {
+	ctx, cancel := context.WithTimeout(ctx, ttl)
+	defer cancel()
+	ticker := time.NewTicker(50 * time.Millisecond)
+	lock := d.kv.NewLocker([]byte(fmt.Sprintf("internal.locks.%s", collection)), 1*time.Minute)
+	for {
+		select {
+		case <-ctx.Done():
+			return nil, errors.New(errors.Forbidden, "failed to await lock release on collection: %s", collection)
+		case <-ticker.C:
+			gotLock, err := lock.TryLock()
+			if err != nil {
+				return nil, errors.Wrap(err, errors.Internal, "failed to acquire lock on collection %s", collection)
+			}
+			if !gotLock {
+				continue
+			}
+			return lock.Unlock, nil
+		}
+	}
 }
 
 func (d *defaultDB) collectionIsLocked(collection string) bool {

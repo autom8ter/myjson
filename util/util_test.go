@@ -2,6 +2,7 @@ package util_test
 
 import (
 	"bytes"
+	"encoding/json"
 	"testing"
 
 	"github.com/autom8ter/gokvkit"
@@ -23,7 +24,8 @@ func TestUtil(t *testing.T) {
 	})
 	t.Run("json string", func(t *testing.T) {
 		doc := testutil.NewUserDoc()
-		assert.Equal(t, doc.String(), util.JSONString(doc))
+		bits, _ := json.Marshal(doc)
+		assert.Equal(t, string(bits), util.JSONString(doc))
 	})
 	t.Run("decode", func(t *testing.T) {
 		doc := testutil.NewUserDoc()

@@ -14,7 +14,7 @@ func newUserDoc() *Document {
 		"contact": map[string]interface{}{
 			"email": fmt.Sprintf("%v.%s", gofakeit.IntRange(0, 100), gofakeit.Email()),
 		},
-		"account_id":      gofakeit.IntRange(0, 100),
+		"account_id":      fmt.Sprint(gofakeit.IntRange(0, 100)),
 		"language":        gofakeit.Language(),
 		"birthday_month":  gofakeit.Month(),
 		"favorite_number": gofakeit.Second(),

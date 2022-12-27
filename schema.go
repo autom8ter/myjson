@@ -110,14 +110,13 @@ func (s *collectionSchema) loadProperties(r gjson.Result) error {
 			}
 			schema.ForeignKey = &foreign
 		}
-		if !schema.Primary && !schema.Unique && schema.ForeignKey == nil {
-			var index map[string]PropertyIndex
+		if i := value.Get(string(indexPath)); i.Exists() && schema.Type != "object" {
+			var indexing = map[string]PropertyIndex{}
 			if i := value.Get(string(indexPath)); i.Exists() && schema.Type != "object" {
-				if err := util.Decode(i.Value(), &i); err != nil {
+				if err := util.Decode(i.Value(), &indexing); err != nil {
 					return errors.Wrap(err, errors.Validation, "failed to decode index on property: %s", i.String())
 				}
-				schema.Index = index
-				for name, idx := range index {
+				for name, idx := range indexing {
 					fields := []string{schema.Path}
 					fields = append(fields, idx.AdditionalFields...)
 					s.indexing[name] = Index{

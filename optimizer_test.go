@@ -43,7 +43,7 @@ func TestOptimizer(t *testing.T) {
 			{
 				Field: "account_id",
 				Op:    WhereOpEq,
-				Value: 1,
+				Value: "1",
 			},
 			{
 				Field: "contact.email",
@@ -66,7 +66,7 @@ func TestOptimizer(t *testing.T) {
 			{
 				Field: "account_id",
 				Op:    WhereOpEq,
-				Value: 1,
+				Value: "1",
 			},
 		})
 		assert.Nil(t, err)
@@ -78,7 +78,7 @@ func TestOptimizer(t *testing.T) {
 			{
 				Field: "account_id",
 				Op:    WhereOpEq,
-				Value: 1,
+				Value: "1",
 			},
 		})
 		assert.Nil(t, err)
@@ -90,7 +90,7 @@ func TestOptimizer(t *testing.T) {
 			{
 				Field: "account_id",
 				Op:    "!=",
-				Value: 1,
+				Value: "1",
 			},
 		})
 		assert.Nil(t, err)

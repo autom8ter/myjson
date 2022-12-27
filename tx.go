@@ -156,6 +156,9 @@ func (t *transaction) Query(ctx context.Context, collection string, query Query)
 	if err := query.Validate(ctx); err != nil {
 		return Page{}, err
 	}
+	if !t.db.HasCollection(ctx, collection) {
+		return Page{}, errors.New(errors.Validation, "unsupported collection: %s", collection)
+	}
 	if query.IsAggregate() {
 		return t.aggregate(ctx, collection, query)
 	}
@@ -163,9 +166,6 @@ func (t *transaction) Query(ctx context.Context, collection string, query Query)
 	defer cancel()
 	now := time.Now()
 
-	if !t.db.HasCollection(ctx, collection) {
-		return Page{}, errors.New(errors.Validation, "unsupported collection: %s", collection)
-	}
 	var results Documents
 	fullScan := true
 	match, err := t.queryScan(ctx, collection, query.Where, query.Join, func(d *Document) (bool, error) {
@@ -255,6 +255,13 @@ func (t *transaction) aggregate(ctx context.Context, collection string, query Qu
 		return Page{}, err
 	}
 	var reduced Documents
+	for _, values := range groupByDocs(results, query.GroupBy) {
+		value, err := aggregateDocs(values, query.Select)
+		if err != nil {
+			return Page{}, err
+		}
+		reduced = append(reduced, value)
+	}
 	if err := docsHaving(query.Having, reduced); err != nil {
 		return Page{}, errors.Wrap(err, errors.Internal, "")
 	}
