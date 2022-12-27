@@ -44,7 +44,7 @@ type Tx interface {
 	Close()
 }
 
-// Getter gets the specified key in the database(if it exists)
+// Getter gets the specified key in the database(if it exists). If the key does not exist, a nil byte slice and no error is returned
 type Getter interface {
 	Get(key []byte) ([]byte, error)
 }

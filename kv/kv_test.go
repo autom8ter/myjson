@@ -81,8 +81,8 @@ func Test(t *testing.T) {
 						assert.Nil(t, tx.Delete([]byte(k)))
 					}
 					for k, _ := range data {
-						_, err := tx.Get([]byte(k))
-						assert.NotNil(t, err)
+						bytes, _ := tx.Get([]byte(k))
+						assert.Nil(t, bytes)
 					}
 					return nil
 				}))
@@ -100,8 +100,8 @@ func Test(t *testing.T) {
 				assert.Nil(t, batch2.Flush())
 				assert.Nil(t, db.Tx(false, func(tx kv.Tx) error {
 					for k, _ := range data {
-						_, err := tx.Get([]byte(k))
-						assert.NotNil(t, err)
+						bytes, _ := tx.Get([]byte(k))
+						assert.Nil(t, bytes)
 					}
 					return nil
 				}))

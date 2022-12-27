@@ -37,6 +37,9 @@ func (b *badgerTx) Get(key []byte) ([]byte, error) {
 	}
 	i, err := b.txn.Get(key)
 	if err != nil {
+		if err == badger.ErrKeyNotFound {
+			return nil, nil
+		}
 		return nil, err
 	}
 	val, err := i.ValueCopy(nil)
@@ -54,8 +57,10 @@ func (b *badgerTx) Set(key, value []byte, ttl time.Duration) error {
 	if err := b.txn.SetEntry(e); err != nil {
 		return err
 	}
-	if bytes.HasPrefix(key, []byte("cache.")) {
-		b.db.cache.Set(key, value, 1)
+	if ttl == 0 {
+		if bytes.HasPrefix(key, []byte("cache.")) {
+			b.db.cache.Set(key, value, 1)
+		}
 	}
 	return nil
 }
