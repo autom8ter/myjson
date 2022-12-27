@@ -3,6 +3,8 @@ package gokvkit
 import (
 	"context"
 	"encoding/json"
+
+	"github.com/autom8ter/gokvkit/kv"
 )
 
 // CollectionSchema is a database collection configuration
@@ -65,26 +67,10 @@ type Database interface {
 	Query(ctx context.Context, collection string, query Query) (Page, error)
 	// Get gets 1-many document by id(s)
 	BatchGet(ctx context.Context, collection string, ids []string) (Documents, error)
+	// RawKV returns the database key value provider - it should be used with caution and only when standard database functionality is insufficient.
+	RawKV() kv.DB
 	// Close closes the database
 	Close(ctx context.Context) error
-}
-
-// Cache is a caching interface for in-memory state
-type Cache[T any] interface {
-	// Get gets a value, it returns nil if no value was found
-	Get(key string) T
-	// Exists returns true if the key has a value
-	Exists(key string) bool
-	// Set sets the key value pair
-	Set(key string, value T)
-	// SetFunc sets the key value pair within a callback function
-	SetFunc(key string, fn func(T) T)
-	// Del deletes a key if it exists
-	Del(key string)
-	// Range
-	Range(fn func(key string, t T) bool)
-	// AsMap returns the cache kv pairs as a map
-	AsMap() map[string]T
 }
 
 // Optimizer selects the best index from a set of indexes based on where clauses
@@ -134,9 +120,5 @@ type Tx interface {
 	// CDC returns the change data capture array associated with the transaction.
 	// CDC's are persisted to the cdc collection when the transaction is commited.
 	CDC() []CDC
-}
-
-type ForEachOpts struct {
-	Where []Where `json:"where,omitempty"`
-	Join  []Join  `json:"join,omitempty"`
+	DB() Database
 }

@@ -314,3 +314,7 @@ func (t *transaction) Close(ctx context.Context) {
 func (t *transaction) CDC() []CDC {
 	return t.cdc
 }
+
+func (t *transaction) DB() Database {
+	return t.db
+}

@@ -2,6 +2,7 @@ package badger
 
 import (
 	"bytes"
+	"time"
 
 	"github.com/autom8ter/gokvkit/kv"
 	"github.com/autom8ter/gokvkit/kv/kvutil"
@@ -28,7 +29,7 @@ func (b *badgerTx) NewIterator(kopts kv.IterOpts) kv.Iterator {
 }
 
 func (b *badgerTx) Get(key []byte) ([]byte, error) {
-	if bytes.HasPrefix(key, []byte("internal.")) {
+	if bytes.HasPrefix(key, []byte("cache.")) {
 		val, ok := b.db.cache.Get(key)
 		if ok {
 			return val.([]byte), nil
@@ -42,18 +43,25 @@ func (b *badgerTx) Get(key []byte) ([]byte, error) {
 	return val, err
 }
 
-func (b *badgerTx) Set(key, value []byte) error {
-	if err := b.txn.Set(key, value); err != nil {
+func (b *badgerTx) Set(key, value []byte, ttl time.Duration) error {
+	var e = &badger.Entry{
+		Key:   key,
+		Value: value,
+	}
+	if ttl != 0 {
+		e.ExpiresAt = uint64(time.Now().Add(ttl).Unix())
+	}
+	if err := b.txn.SetEntry(e); err != nil {
 		return err
 	}
-	if bytes.HasPrefix(key, []byte("internal.")) {
+	if bytes.HasPrefix(key, []byte("cache.")) {
 		b.db.cache.Set(key, value, 1)
 	}
 	return nil
 }
 
 func (b *badgerTx) Delete(key []byte) error {
-	if bytes.HasPrefix(key, []byte("internal.")) {
+	if bytes.HasPrefix(key, []byte("cache.")) {
 		b.db.cache.Del(key)
 	}
 	return b.txn.Delete(key)

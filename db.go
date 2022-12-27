@@ -226,6 +226,10 @@ func (d *defaultDB) ChangeStream(ctx context.Context, collection string) (<-chan
 	return d.cdcStream.Pull(ctx, collection)
 }
 
+func (d *defaultDB) RawKV() kv.DB {
+	return d.kv
+}
+
 func (d *defaultDB) Close(ctx context.Context) error {
 	return errors.Wrap(d.kv.Close(), 0, "")
 }

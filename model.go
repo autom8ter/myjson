@@ -387,3 +387,8 @@ type PropertyIndex struct {
 	Enabled          bool     `json:"enabled"`
 	AdditionalFields []string `json:"additional_fields,omitempty"`
 }
+
+type ForEachOpts struct {
+	Where []Where `json:"where,omitempty"`
+	Join  []Join  `json:"join,omitempty"`
+}

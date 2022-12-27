@@ -95,6 +95,8 @@ func (b *badgerLock) setLock(tx kv.Tx) error {
 	if err := tx.Set(
 		b.key,
 		bytes,
+
+		0,
 	); err != nil {
 		return err
 	}

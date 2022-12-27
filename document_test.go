@@ -310,6 +310,20 @@ func TestDocument(t *testing.T) {
 		assert.True(t, usr.Exists("tsk.user"))
 		assert.True(t, usr.Exists("tsk._id"))
 	})
+	t.Run("hasPropertyPath", func(t *testing.T) {
+		usr := testutil.NewUserDoc()
+		assert.NoError(t, usr.Set("tags", []string{"#colorado"}))
+		assert.NotEmpty(t, usr.GetArray("tags"))
+		assert.Len(t, usr.GetArray("tags"), 1)
+	})
+	t.Run("unmarshalJSON", func(t *testing.T) {
+		usr := testutil.NewUserDoc()
+		bits, err := usr.MarshalJSON()
+		assert.NoError(t, err)
+		usr2 := gokvkit.NewDocument()
+		assert.NoError(t, usr2.UnmarshalJSON(bits))
+		assert.Equal(t, usr.String(), usr2.String())
+	})
 	t.Run("results", func(t *testing.T) {
 		var docs = []*gokvkit.Document{
 			testutil.NewUserDoc(),
@@ -355,6 +369,20 @@ func TestDocument(t *testing.T) {
 		}
 		docs = docs.Slice(1, 3)
 		assert.Equal(t, 2, len(docs))
+	})
+	t.Run("documents - map", func(t *testing.T) {
+		var docs = gokvkit.Documents{
+			testutil.NewUserDoc(),
+			testutil.NewUserDoc(),
+			testutil.NewUserDoc(),
+		}
+		docs.Map(func(t *gokvkit.Document, i int) *gokvkit.Document {
+			t.Set("age", 1)
+			return t
+		})
+		docs.ForEach(func(next *gokvkit.Document, i int) {
+			assert.Equal(t, float64(1), next.Get("age"))
+		})
 	})
 
 }

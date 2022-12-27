@@ -19,7 +19,7 @@ func Test(t *testing.T) {
 	t.Run("set", func(t *testing.T) {
 		assert.Nil(t, db.Tx(true, func(tx kv.Tx) error {
 			for k, v := range data {
-				assert.Nil(t, tx.Set([]byte(k), []byte(v)))
+				assert.Nil(t, tx.Set([]byte(k), []byte(v), 0))
 			}
 			return nil
 		}))
@@ -38,7 +38,7 @@ func Test(t *testing.T) {
 	t.Run("batch", func(t *testing.T) {
 		batch := db.NewBatch()
 		for k, v := range data {
-			assert.Nil(t, batch.Set([]byte(k), []byte(v)))
+			assert.Nil(t, batch.Set([]byte(k), []byte(v), 0))
 		}
 		assert.Nil(t, batch.Flush())
 		assert.Nil(t, db.Tx(false, func(tx kv.Tx) error {
@@ -85,7 +85,7 @@ func Test(t *testing.T) {
 	t.Run("batch set then delete", func(t *testing.T) {
 		batch := db.NewBatch()
 		for k, v := range data {
-			assert.Nil(t, batch.Set([]byte(k), []byte(v)))
+			assert.Nil(t, batch.Set([]byte(k), []byte(v), 0))
 		}
 		assert.Nil(t, batch.Flush())
 		batch2 := db.NewBatch()
@@ -127,4 +127,22 @@ func Test(t *testing.T) {
 		assert.NoError(t, err)
 		assert.False(t, gotLock)
 	})
+	t.Run("set", func(t *testing.T) {
+		assert.Nil(t, db.Tx(true, func(tx kv.Tx) error {
+			for k, v := range data {
+				assert.Nil(t, tx.Set([]byte(k), []byte(v), 3*time.Second))
+			}
+			for k, _ := range data {
+				_, err := tx.Get([]byte(k))
+				assert.NoError(t, err)
+			}
+			time.Sleep(3 * time.Second)
+			for k, _ := range data {
+				_, err := tx.Get([]byte(k))
+				assert.Error(t, err)
+			}
+			return nil
+		}))
+	})
+
 }

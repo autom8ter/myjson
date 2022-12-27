@@ -71,9 +71,9 @@ type Item interface {
 	Value() ([]byte, error)
 }
 
-// Setter sets specified key/value in the database
+// Setter sets specified key/value in the database. If ttl is empty, the key should never expire
 type Setter interface {
-	Set(key, value []byte) error
+	Set(key, value []byte, ttl time.Duration) error
 }
 
 // Deleter deletes specified keys from the database

@@ -33,13 +33,21 @@ func TestQueryBuilder(t *testing.T) {
 				Field:     "account_id",
 				Direction: OrderByDirectionDesc,
 			}).
+			Having(Where{
+				Field: "account_id",
+				Op:    ">",
+				Value: "50",
+			}).
 			Limit(1).
+			Page(1).
 			Query()
 		assert.Equal(t, 1, len(q.Select))
 		assert.Equal(t, 1, len(q.Where))
 		assert.Equal(t, 1, len(q.GroupBy))
 		assert.Equal(t, 1, len(q.OrderBy))
 		assert.Equal(t, 1, q.Limit)
+		assert.Equal(t, 1, q.Page)
+		assert.Equal(t, 1, len(q.Having))
 		assert.Equal(t, 1, len(q.Join))
 	})
 }

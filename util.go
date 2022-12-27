@@ -245,11 +245,11 @@ func selectDocument(d *Document, fields []Select) error {
 }
 
 func collectionConfigKey(collection string) []byte {
-	return []byte(fmt.Sprintf("internal.collections.%s", collection))
+	return []byte(fmt.Sprintf("cache.internal.collections.%s", collection))
 }
 
 func collectionConfigPrefix() []byte {
-	return []byte("internal.collections.")
+	return []byte("cache.internal.collections.")
 }
 
 func schemaToCtx(ctx context.Context, schema CollectionSchema) context.Context {

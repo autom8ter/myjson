@@ -78,7 +78,7 @@ func (b *badgerKV) Close() error {
 
 func (b *badgerKV) DropPrefix(prefix ...[]byte) error {
 	for _, p := range prefix {
-		if bytes.HasPrefix(p, []byte("internal.")) {
+		if bytes.HasPrefix(p, []byte("cache.")) {
 			b.cache.Clear()
 			break
 		}

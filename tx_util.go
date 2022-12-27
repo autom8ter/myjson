@@ -35,7 +35,7 @@ func (t *transaction) updateDocument(ctx context.Context, c CollectionSchema, do
 	}
 	if err := t.tx.Set(seekPrefix(c.Collection(), primaryIndex, map[string]any{
 		c.PrimaryKey(): docID,
-	}).SetDocumentID(docID).Path(), after.Bytes()); err != nil {
+	}).SetDocumentID(docID).Path(), after.Bytes(), 0); err != nil {
 		return errors.Wrap(err, errors.Internal, "failed to batch set documents to primary index")
 	}
 	return nil
@@ -65,7 +65,7 @@ func (t *transaction) createDocument(ctx context.Context, c CollectionSchema, co
 	}
 	if err := t.tx.Set(seekPrefix(c.Collection(), primaryIndex, map[string]any{
 		c.PrimaryKey(): docID,
-	}).SetDocumentID(docID).Path(), command.Document.Bytes()); err != nil {
+	}).SetDocumentID(docID).Path(), command.Document.Bytes(), 0); err != nil {
 		return errors.Wrap(err, errors.Internal, "failed to batch set documents to primary index")
 	}
 	return nil
@@ -81,7 +81,7 @@ func (t *transaction) setDocument(ctx context.Context, c CollectionSchema, docID
 	primaryIndex := c.PrimaryIndex()
 	if err := t.tx.Set(seekPrefix(c.Collection(), primaryIndex, map[string]any{
 		c.PrimaryKey(): docID,
-	}).SetDocumentID(docID).Path(), command.Document.Bytes()); err != nil {
+	}).SetDocumentID(docID).Path(), command.Document.Bytes(), 0); err != nil {
 		return errors.Wrap(err, errors.Internal, "failed to set documents to primary index")
 	}
 	return nil
@@ -286,7 +286,7 @@ func (t *transaction) updateSecondaryIndex(ctx context.Context, schema Collectio
 			}
 		}
 		// only persist ids in secondary index - lookup full document in primary index
-		if err := t.tx.Set(seekPrefix(command.Collection, idx, command.Document.Value()).SetDocumentID(docID).Path(), []byte(docID)); err != nil {
+		if err := t.tx.Set(seekPrefix(command.Collection, idx, command.Document.Value()).SetDocumentID(docID).Path(), []byte(docID), 0); err != nil {
 			return errors.Wrap(
 				err,
 				errors.Internal,
