@@ -11,6 +11,7 @@ import (
 	"github.com/autom8ter/gokvkit/errors"
 	"github.com/autom8ter/gokvkit/util"
 	"github.com/samber/lo"
+	"github.com/spf13/cast"
 )
 
 type WhereOp string
@@ -174,6 +175,22 @@ func (m *Metadata) Set(key string, value any) {
 	m.SetAll(map[string]any{
 		key: value,
 	})
+}
+
+// SetNamespace sets the namespace on the context metadata
+func (m *Metadata) SetNamespace(value string) {
+	m.SetAll(map[string]any{
+		"namespace": value,
+	})
+}
+
+// GetNamespace gets the namespace from the metadata, or 'default' if it does not exist
+func (m *Metadata) GetNamespace() string {
+	val, ok := m.tags.Load("namespace")
+	if !ok {
+		return "default"
+	}
+	return cast.ToString(val)
 }
 
 // Del deletes a key from the metadata

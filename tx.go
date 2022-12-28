@@ -216,7 +216,7 @@ func (t *transaction) Get(ctx context.Context, collection string, id string) (*D
 	md.Set(string(txCtx), t.tx)
 	var c = t.db.GetSchema(ctx, collection)
 	primaryIndex := c.PrimaryIndex()
-	val, err := t.tx.Get(seekPrefix(collection, primaryIndex, map[string]any{
+	val, err := t.tx.Get(seekPrefix(ctx, collection, primaryIndex, map[string]any{
 		c.PrimaryKey(): id,
 	}).Seek(id).Path())
 	if err != nil {

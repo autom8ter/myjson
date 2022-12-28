@@ -7,6 +7,7 @@ import (
 	"reflect"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/autom8ter/gokvkit/errors"
 	"github.com/autom8ter/gokvkit/util"
@@ -120,9 +121,14 @@ func (d *Document) GetBool(field string) bool {
 	return cast.ToBool(d.Get(field))
 }
 
-// GetFloat gets a bool field value on the document. GetFloat has GJSON syntax support and supports dot notation
+// GetFloat gets a float64 field value on the document. GetFloat has GJSON syntax support and supports dot notation
 func (d *Document) GetFloat(field string) float64 {
 	return cast.ToFloat64(d.Get(field))
+}
+
+// GetTime gets a time.Time field value on the document. GetTime has GJSON syntax support and supports dot notation
+func (d *Document) GetTime(field string) time.Time {
+	return cast.ToTime(d.Get(field))
 }
 
 // GetArray gets an array field on the document. Get has GJSON syntax support and supports dot notation

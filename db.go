@@ -133,10 +133,10 @@ func (d *defaultDB) ForEach(ctx context.Context, collection string, opts ForEach
 }
 
 func (d *defaultDB) DropCollection(ctx context.Context, collection string) error {
-	if err := d.kv.DropPrefix(collectionPrefix(collection)); err != nil {
+	if err := d.kv.DropPrefix(collectionPrefix(ctx, collection)); err != nil {
 		return errors.Wrap(err, errors.Internal, "failed to remove collection %s", collection)
 	}
-	if err := d.deleteCollectionConfig(collection); err != nil {
+	if err := d.deleteCollectionConfig(ctx, collection); err != nil {
 		return errors.Wrap(err, errors.Internal, "failed to remove collection %s", collection)
 	}
 	return nil
@@ -155,17 +155,17 @@ func (d *defaultDB) ConfigureCollection(ctx context.Context, collectionSchemaByt
 	if err != nil {
 		return err
 	}
-	unlock, err := d.lockCollection(collection.Collection())
+	unlock, err := d.lockCollection(ctx, collection.Collection())
 	if err != nil {
 		return err
 	}
 	defer unlock()
 
-	if err := d.persistCollectionConfig(collection); err != nil {
+	if err := d.persistCollectionConfig(ctx, collection); err != nil {
 		return err
 	}
 
-	existing, _ := d.getPersistedCollection(collection.Collection())
+	existing, _ := d.getPersistedCollection(ctx, collection.Collection())
 	var diff indexDiff
 	if existing == nil {
 		diff, err = getIndexDiff(collection.Indexing(), map[string]Index{})
@@ -196,7 +196,7 @@ func (d *defaultDB) ConfigureCollection(ctx context.Context, collectionSchemaByt
 			return err
 		}
 	}
-	if err := d.persistCollectionConfig(collection); err != nil {
+	if err := d.persistCollectionConfig(ctx, collection); err != nil {
 		return err
 	}
 	return nil
@@ -204,7 +204,7 @@ func (d *defaultDB) ConfigureCollection(ctx context.Context, collectionSchemaByt
 
 func (d *defaultDB) Collections(ctx context.Context) []string {
 	var names []string
-	cfgs, _ := d.getCollectionConfigs()
+	cfgs, _ := d.getCollectionConfigs(ctx)
 	for _, c := range cfgs {
 		names = append(names, c.Collection())
 	}

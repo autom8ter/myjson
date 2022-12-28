@@ -2,6 +2,7 @@ package gokvkit
 
 import (
 	"bytes"
+	"context"
 
 	"github.com/autom8ter/gokvkit/util"
 	"github.com/nqd/flat"
@@ -15,10 +16,12 @@ type indexFieldValue struct {
 	Value any    `json:"value"`
 }
 
-func seekPrefix(collection string, i Index, fields map[string]any) indexPathPrefix {
+func seekPrefix(ctx context.Context, collection string, i Index, fields map[string]any) indexPathPrefix {
+	md, _ := GetMetadata(ctx)
 	fields, _ = flat.Flatten(fields, nil)
 	var prefix = indexPathPrefix{
 		prefix: [][]byte{
+			[]byte(md.GetNamespace()),
 			[]byte("index"),
 			[]byte(collection),
 			[]byte(i.Name),
@@ -80,8 +83,10 @@ func (i indexPathPrefix) Fields() []indexFieldValue {
 	return i.fieldMap
 }
 
-func indexPrefix(collection, index string) []byte {
+func indexPrefix(ctx context.Context, collection, index string) []byte {
+	md, _ := GetMetadata(ctx)
 	path := [][]byte{
+		[]byte(md.GetNamespace()),
 		[]byte("index"),
 		[]byte(collection),
 		[]byte(index),
@@ -89,8 +94,10 @@ func indexPrefix(collection, index string) []byte {
 	return bytes.Join(path, nullByte)
 }
 
-func collectionPrefix(collection string) []byte {
+func collectionPrefix(ctx context.Context, collection string) []byte {
+	md, _ := GetMetadata(ctx)
 	path := [][]byte{
+		[]byte(md.GetNamespace()),
 		[]byte("index"),
 		[]byte(collection),
 	}

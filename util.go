@@ -246,12 +246,14 @@ func selectDocument(d *Document, fields []Select) error {
 	return nil
 }
 
-func collectionConfigKey(collection string) []byte {
-	return []byte(fmt.Sprintf("cache.internal.collections.%s", collection))
+func collectionConfigKey(ctx context.Context, collection string) []byte {
+	md, _ := GetMetadata(ctx)
+	return []byte(fmt.Sprintf("%s.cache.internal.collections.%s", md.GetNamespace(), collection))
 }
 
-func collectionConfigPrefix() []byte {
-	return []byte("cache.internal.collections.")
+func collectionConfigPrefix(ctx context.Context) []byte {
+	md, _ := GetMetadata(ctx)
+	return []byte(fmt.Sprintf("%s.cache.internal.collections.", md.GetNamespace()))
 }
 
 func schemaToCtx(ctx context.Context, schema CollectionSchema) context.Context {
