@@ -31,17 +31,13 @@ func TestJSONSchema(t *testing.T) {
 	schema, err := newCollectionSchema([]byte(userSchema))
 	assert.NoError(t, err)
 	assert.NotNil(t, schema.Indexing())
-	assert.NotNil(t, schema.Properties())
-	assert.Equal(t, 10, len(schema.Properties()))
-	for _, v := range schema.Properties() {
-		fmt.Println(util.JSONString(v))
-	}
 }
 
 func TestSchema(t *testing.T) {
 	t.Run("basic", func(t *testing.T) {
 		schema, err := newCollectionSchema([]byte(userSchema))
 		assert.NoError(t, err)
+		fmt.Println(util.JSONString(schema.Indexing()))
 		assert.NotNil(t, schema.Indexing())
 		assert.NotEmpty(t, schema.Indexing()["_id.primaryidx"])
 		assert.NotEmpty(t, schema.Indexing()["account_id.foreignidx"])

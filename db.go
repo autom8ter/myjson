@@ -212,11 +212,13 @@ func (d *defaultDB) Collections(ctx context.Context) []string {
 }
 
 func (d *defaultDB) HasCollection(ctx context.Context, collection string) bool {
-	return d.getSchema(ctx, collection) != nil
+	s, _ := d.getSchema(ctx, collection)
+	return s != nil && s.Collection() != ""
 }
 
 func (d *defaultDB) GetSchema(ctx context.Context, collection string) CollectionSchema {
-	return d.getSchema(ctx, collection)
+	s, _ := d.getSchema(ctx, collection)
+	return s
 }
 
 func (d *defaultDB) ChangeStream(ctx context.Context, collection string) (<-chan CDC, error) {

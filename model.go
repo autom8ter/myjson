@@ -393,16 +393,16 @@ type ForeignKey struct {
 
 // SchemaProperty is a property belonging to a JSON Schema
 type SchemaProperty struct {
-	Primary     bool                      `json:"x-primary,omitempty"`
-	Name        string                    `json:"name" validate:"required"`
-	Description string                    `json:"description,omitempty"`
-	Type        string                    `json:"type" validate:"required"`
-	Path        string                    `json:"path" validate:"required"`
-	SchemaPath  string                    `json:"schemaPath" validate:"required"`
-	Properties  map[string]SchemaProperty `json:"properties,omitempty"`
-	Unique      bool                      `json:"x-unique,omitempty"`
-	ForeignKey  *ForeignKey               `json:"x-foreign,omitempty"`
-	Index       map[string]PropertyIndex  `json:"x-index,omitempty"`
+	Primary     bool   `json:"x-primary,omitempty"`
+	Name        string `json:"name" validate:"required"`
+	Description string `json:"description,omitempty"`
+	Type        string `json:"type" validate:"required"`
+	//Path        string                    `json:"path" validate:"required"`
+	//SchemaPath  string                    `json:"schemaPath" validate:"required"`
+	//Properties  map[string]SchemaProperty `json:"properties,omitempty"`
+	Unique     bool                     `json:"x-unique,omitempty"`
+	ForeignKey *ForeignKey              `json:"x-foreign,omitempty"`
+	Index      map[string]PropertyIndex `json:"x-index,omitempty"`
 }
 
 type PropertyIndex struct {

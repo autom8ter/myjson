@@ -135,7 +135,7 @@ func TestUtil(t *testing.T) {
 		s, err := newCollectionSchema([]byte(userSchema))
 		assert.NoError(t, err)
 		ctx = schemaToCtx(ctx, s)
-		s2 := schemaFromCtx(ctx)
+		s2 := schemaFromCtx(ctx, "user")
 		assert.Equal(t, util.JSONString(s), util.JSONString(s2))
 	})
 	t.Run("defaultAs", func(t *testing.T) {

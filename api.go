@@ -15,10 +15,6 @@ type CollectionSchema interface {
 	ValidateDocument(ctx context.Context, doc *Document) error
 	// Indexing returns a copy the schemas indexing
 	Indexing() map[string]Index
-	// Properties returns a copy the schemas properties
-	Properties() map[string]SchemaProperty
-	// HasPropertyPath returns true if the property path exists in the schema
-	HasPropertyPath(p string) bool
 	// PrimaryIndex returns the collection's primary index
 	PrimaryIndex() Index
 	// PrimaryKey returns the collection's primary key

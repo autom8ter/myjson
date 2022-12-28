@@ -248,7 +248,10 @@ func (t *transaction) updateSecondaryIndex(ctx context.Context, schema Collectio
 			}
 		}
 		if idx.ForeignKey != nil && command.Document.Get(idx.Fields[0]) != nil {
-			fcollection := t.db.getSchema(ctx, idx.ForeignKey.Collection)
+			fcollection, ctx := t.db.getSchema(ctx, idx.ForeignKey.Collection)
+			if fcollection == nil {
+				return errors.New(errors.Validation, "foreign_key collection does not exist: %s", idx.ForeignKey.Collection)
+			}
 			results, err := t.Query(ctx, idx.ForeignKey.Collection, Query{
 				Select: []Select{{Field: "*"}},
 				Where: []Where{
@@ -314,8 +317,9 @@ func (t *transaction) queryScan(ctx context.Context, collection string, where []
 	if fn == nil {
 		return Optimization{}, errors.New(errors.Validation, "empty scan handler")
 	}
-	if !t.db.HasCollection(ctx, collection) {
-		return Optimization{}, errors.New(errors.Validation, "unsupported collection: %s", collection)
+	c, ctx := t.db.getSchema(ctx, collection)
+	if c == nil {
+		return Optimization{}, errors.New(errors.Validation, "tx: unsupported collection: %s", collection)
 	}
 	var err error
 	ctx, cancel := context.WithCancel(ctx)

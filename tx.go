@@ -66,14 +66,15 @@ func (t *transaction) Rollback(ctx context.Context) {
 }
 
 func (t *transaction) Update(ctx context.Context, collection string, id string, update map[string]any) error {
-	if !t.db.HasCollection(ctx, collection) {
+	schema, ctx := t.db.getSchema(ctx, collection)
+	if schema == nil {
 		return errors.New(errors.Validation, "tx: unsupported collection: %s", collection)
 	}
 	doc, err := NewDocumentFrom(update)
 	if err != nil {
 		return errors.Wrap(err, 0, "tx: failed to update")
 	}
-	if err := t.db.GetSchema(ctx, collection).SetPrimaryKey(doc, id); err != nil {
+	if err := schema.SetPrimaryKey(doc, id); err != nil {
 		return errors.Wrap(err, 0, "tx: failed to set primary key")
 	}
 	md, _ := GetMetadata(ctx)
@@ -90,10 +91,10 @@ func (t *transaction) Update(ctx context.Context, collection string, id string, 
 }
 
 func (t *transaction) Create(ctx context.Context, collection string, document *Document) (string, error) {
-	if !t.db.HasCollection(ctx, collection) {
-		return "", errors.New(errors.Validation, "unsupported collection: %s", collection)
+	c, ctx := t.db.getSchema(ctx, collection)
+	if c == nil {
+		return "", errors.New(errors.Validation, "tx: unsupported collection: %s", collection)
 	}
-	var c = t.db.GetSchema(ctx, collection)
 	var id = c.GetPrimaryKey(document)
 	if id == "" {
 		id = ksuid.New().String()
@@ -116,7 +117,8 @@ func (t *transaction) Create(ctx context.Context, collection string, document *D
 }
 
 func (t *transaction) Set(ctx context.Context, collection string, document *Document) error {
-	if !t.db.HasCollection(ctx, collection) {
+	schema, ctx := t.db.getSchema(ctx, collection)
+	if schema == nil {
 		return errors.New(errors.Validation, "tx: unsupported collection: %s", collection)
 	}
 	md, _ := GetMetadata(ctx)
@@ -133,7 +135,8 @@ func (t *transaction) Set(ctx context.Context, collection string, document *Docu
 }
 
 func (t *transaction) Delete(ctx context.Context, collection string, id string) error {
-	if !t.db.HasCollection(ctx, collection) {
+	schema, ctx := t.db.getSchema(ctx, collection)
+	if schema == nil {
 		return errors.New(errors.Validation, "tx: unsupported collection: %s", collection)
 	}
 	md, _ := GetMetadata(ctx)
@@ -156,8 +159,9 @@ func (t *transaction) Query(ctx context.Context, collection string, query Query)
 	if err := query.Validate(ctx); err != nil {
 		return Page{}, err
 	}
-	if !t.db.HasCollection(ctx, collection) {
-		return Page{}, errors.New(errors.Validation, "unsupported collection: %s", collection)
+	schema, ctx := t.db.getSchema(ctx, collection)
+	if schema == nil {
+		return Page{}, errors.New(errors.Validation, "tx: unsupported collection: %s", collection)
 	}
 	if query.IsAggregate() {
 		return t.aggregate(ctx, collection, query)
@@ -209,12 +213,12 @@ func (t *transaction) Query(ctx context.Context, collection string, query Query)
 }
 
 func (t *transaction) Get(ctx context.Context, collection string, id string) (*Document, error) {
-	if !t.db.HasCollection(ctx, collection) {
-		return nil, errors.New(errors.Validation, "unsupported collection: %s", collection)
+	c, ctx := t.db.getSchema(ctx, collection)
+	if c == nil {
+		return nil, errors.New(errors.Validation, "tx: unsupported collection: %s", collection)
 	}
 	md, _ := GetMetadata(ctx)
 	md.Set(string(txCtx), t.tx)
-	var c = t.db.GetSchema(ctx, collection)
 	primaryIndex := c.PrimaryIndex()
 	val, err := t.tx.Get(seekPrefix(ctx, collection, primaryIndex, map[string]any{
 		c.PrimaryKey(): id,
@@ -240,8 +244,9 @@ func (t *transaction) Get(ctx context.Context, collection string, id string) (*D
 
 // aggregate performs aggregations against the collection
 func (t *transaction) aggregate(ctx context.Context, collection string, query Query) (Page, error) {
-	if !t.db.HasCollection(ctx, collection) {
-		return Page{}, errors.New(errors.Validation, "unsupported collection: %s", collection)
+	c, ctx := t.db.getSchema(ctx, collection)
+	if c == nil {
+		return Page{}, errors.New(errors.Validation, "tx: unsupported collection: %s", collection)
 	}
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -300,9 +305,6 @@ func docsHaving(where []Where, results Documents) (Documents, error) {
 }
 
 func (t *transaction) ForEach(ctx context.Context, collection string, opts ForEachOpts, fn ForEachFunc) (Optimization, error) {
-	if !t.db.HasCollection(ctx, collection) {
-		return Optimization{}, errors.New(errors.Validation, "unsupported collection: %s", collection)
-	}
 	return t.queryScan(ctx, collection, opts.Where, opts.Join, fn)
 }
 

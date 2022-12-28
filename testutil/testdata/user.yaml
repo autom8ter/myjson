@@ -16,12 +16,7 @@ properties:
     type: string
     description: The user's name.
   contact:
-    type: object
-    properties:
-      email:
-        type: string
-        description: The user's email.
-        x-unique: true
+    $ref: "#/common/contact"
   age:
     description: Age in years which must be equal to or greater than zero.
     type: integer
@@ -53,3 +48,11 @@ properties:
     type: string
   annotations:
     type: object
+common:
+  contact:
+    type: object
+    properties:
+      email:
+        type: string
+        description: The user's email.
+        x-unique: true

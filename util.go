@@ -257,11 +257,11 @@ func collectionConfigPrefix(ctx context.Context) []byte {
 }
 
 func schemaToCtx(ctx context.Context, schema CollectionSchema) context.Context {
-	return context.WithValue(ctx, "collection_schema", schema)
+	return context.WithValue(ctx, fmt.Sprintf("%s.schema", schema.Collection()), schema)
 }
 
-func schemaFromCtx(ctx context.Context) CollectionSchema {
-	c, ok := ctx.Value("collection_schema").(CollectionSchema)
+func schemaFromCtx(ctx context.Context, collection string) CollectionSchema {
+	c, ok := ctx.Value(fmt.Sprintf("%s.schema", collection)).(CollectionSchema)
 	if !ok {
 		return nil
 	}

@@ -55,7 +55,7 @@ func (d *defaultDB) addIndex(ctx context.Context, collection string, index Index
 	if index.Name == "" {
 		return errors.New(errors.Validation, "%s - empty index name", collection)
 	}
-	schema := d.getSchema(ctx, collection)
+	schema, ctx := d.getSchema(ctx, collection)
 	if err := d.persistCollectionConfig(ctx, schema); err != nil {
 		return err
 	}
@@ -81,17 +81,17 @@ func (d *defaultDB) addIndex(ctx context.Context, collection string, index Index
 	return nil
 }
 
-func (d *defaultDB) getSchema(ctx context.Context, collection string) CollectionSchema {
-	schema := schemaFromCtx(ctx)
+func (d *defaultDB) getSchema(ctx context.Context, collection string) (CollectionSchema, context.Context) {
+	schema := schemaFromCtx(ctx, collection)
 	if schema == nil {
 		c, _ := d.getPersistedCollection(ctx, collection)
-		return c
+		return c, schemaToCtx(ctx, c)
 	}
-	return schema
+	return schema, ctx
 }
 
 func (d *defaultDB) removeIndex(ctx context.Context, collection string, index Index) error {
-	schema := d.getSchema(ctx, collection)
+	schema, ctx := d.getSchema(ctx, collection)
 	if err := d.kv.DropPrefix(indexPrefix(ctx, schema.Collection(), index.Name)); err != nil {
 		return errors.Wrap(err, 0, "indexing: failed to remove index %s - %s", collection, index.Name)
 	}

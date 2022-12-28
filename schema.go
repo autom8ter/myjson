@@ -2,19 +2,18 @@ package gokvkit
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"strings"
 	"sync"
 
 	"github.com/autom8ter/gokvkit/errors"
 	"github.com/autom8ter/gokvkit/util"
-	"github.com/qri-io/jsonschema"
 	"github.com/tidwall/gjson"
+	"github.com/xeipuuv/gojsonschema"
 )
 
 type collectionSchema struct {
-	schema        *jsonschema.Schema
+	schema        *gojsonschema.Schema
 	raw           gjson.Result
 	collection    string
 	primaryIndex  Index
@@ -39,15 +38,13 @@ func newCollectionSchema(yamlContent []byte) (CollectionSchema, error) {
 	if len(yamlContent) == 0 {
 		return nil, errors.New(errors.Validation, "empty schema content")
 	}
-	var (
-		schema = &jsonschema.Schema{}
-	)
 	jsonContent, err := util.YAMLToJSON(yamlContent)
 	if err != nil {
 		return nil, err
 	}
-	if err := json.Unmarshal(jsonContent, schema); err != nil {
-		return nil, errors.Wrap(err, 0, "failed to decode json schema")
+	schema, err := gojsonschema.NewSchema(gojsonschema.NewBytesLoader(jsonContent))
+	if err != nil {
+		return nil, errors.Wrap(err, errors.Validation, "invalid json schema")
 	}
 	r := gjson.ParseBytes(jsonContent)
 	s := &collectionSchema{
@@ -83,21 +80,43 @@ func newCollectionSchema(yamlContent []byte) (CollectionSchema, error) {
 	return s, nil
 }
 
+var refPrefix = "common."
+
+func (c *collectionSchema) loadRef(fieldPath string, ref string) (gjson.Result, error) {
+	fieldPath = strings.ReplaceAll(fieldPath, "properties.", "")
+	path := strings.TrimPrefix(ref, "#/")
+	path = strings.ReplaceAll(path, "/", ".")
+	if !strings.HasPrefix(path, refPrefix) {
+		return gjson.Result{}, errors.New(errors.Validation, "references may only exist under #/common got: %s", path)
+	}
+	return c.raw.Get(path), nil
+}
+
 func (s *collectionSchema) loadProperties(r gjson.Result) error {
 	if !r.Exists() {
 		return nil
 	}
+	var err error
 	for key, value := range r.Map() {
+		path := strings.ReplaceAll(value.Path(s.raw.Raw), "properties.", "")
+		if value.Get("$ref").Exists() {
+			value, err = s.loadRef(value.Path(s.raw.Raw), value.Get("$ref").String())
+			if err != nil {
+				return err
+			}
+
+		}
+		if strings.HasPrefix(path, refPrefix) {
+			path = strings.TrimPrefix(path, refPrefix)
+		}
 		schema := SchemaProperty{
 			Primary:     value.Get(string(primaryPath)).Bool(),
 			Name:        key,
 			Description: value.Get("description").String(),
 			Type:        value.Get("type").String(),
-			SchemaPath:  value.Path(s.raw.Raw),
-			Path:        strings.ReplaceAll(value.Path(s.raw.Raw), "properties.", ""),
 			Unique:      value.Get(string(uniquePath)).Bool(),
-			Properties:  map[string]SchemaProperty{},
 		}
+
 		if properties := value.Get("properties"); properties.Exists() && schema.Type == "object" {
 			if err := s.loadProperties(properties); err != nil {
 				return err
@@ -117,7 +136,7 @@ func (s *collectionSchema) loadProperties(r gjson.Result) error {
 					return errors.Wrap(err, errors.Validation, "failed to decode index on property: %s", i.String())
 				}
 				for name, idx := range indexing {
-					fields := []string{schema.Path}
+					fields := []string{path}
 					fields = append(fields, idx.AdditionalFields...)
 					s.indexing[name] = Index{
 						Name:    name,
@@ -129,33 +148,33 @@ func (s *collectionSchema) loadProperties(r gjson.Result) error {
 			}
 		}
 		s.properties[key] = schema
-		s.propertyPaths[schema.Path] = schema
+		s.propertyPaths[path] = schema
 		switch {
 		case schema.Primary:
 			if s.primaryIndex.Name != "" {
 				return errors.New(errors.Validation, "multiple primary keys found")
 			}
-			idxName := fmt.Sprintf("%s.primaryidx", schema.Path)
+			idxName := fmt.Sprintf("%s.primaryidx", path)
 			s.indexing[idxName] = Index{
 				Name:    idxName,
-				Fields:  []string{schema.Path},
+				Fields:  []string{path},
 				Unique:  true,
 				Primary: true,
 			}
 			s.primaryIndex = s.indexing[idxName]
 		case schema.Unique:
-			idxName := fmt.Sprintf("%s.uniqueidx", schema.Path)
+			idxName := fmt.Sprintf("%s.uniqueidx", path)
 			s.indexing[idxName] = Index{
 				Name:    idxName,
-				Fields:  []string{schema.Path},
+				Fields:  []string{path},
 				Unique:  true,
 				Primary: false,
 			}
 		case schema.ForeignKey != nil:
-			idxName := fmt.Sprintf("%s.foreignidx", schema.Path)
+			idxName := fmt.Sprintf("%s.foreignidx", path)
 			s.indexing[idxName] = Index{
 				Name:       idxName,
-				Fields:     []string{schema.Path},
+				Fields:     []string{path},
 				Unique:     schema.Unique,
 				Primary:    false,
 				ForeignKey: schema.ForeignKey,
@@ -226,15 +245,23 @@ func (c *collectionSchema) Indexing() map[string]Index {
 }
 
 func (c *collectionSchema) ValidateDocument(ctx context.Context, doc *Document) error {
+	fmt.Println(string(doc.Bytes()))
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	kerrs, err := c.schema.ValidateBytes(ctx, doc.Bytes())
+	kerrs, err := c.schema.Validate(gojsonschema.NewBytesLoader(doc.Bytes()))
 	if err != nil {
 		return errors.Wrap(err, errors.Validation, "%v: failed to validate document", c.collection)
 	}
 
-	if kerrs != nil && len(kerrs) > 0 {
-		return errors.New(errors.Validation, "%v: invalid document- %s", c.collection, util.JSONString(kerrs))
+	if kerrs != nil && len(kerrs.Errors()) > 0 {
+		errmsg := ""
+		for _, kerr := range kerrs.Errors() {
+			errmsg += fmt.Sprintln(kerr)
+		}
+		return errors.New(errors.Validation, "%v: document validation error - %s", c.collection, errmsg)
+	}
+	if !kerrs.Valid() {
+		return errors.New(errors.Validation, "%v: invalid document: %s", c.collection, doc.String())
 	}
 	return nil
 }
