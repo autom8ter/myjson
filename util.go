@@ -6,6 +6,7 @@ import (
 	"reflect"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/autom8ter/gokvkit/errors"
 	"github.com/autom8ter/gokvkit/util"
@@ -59,6 +60,8 @@ func compareField(field string, i, j *Document) bool {
 	iFieldVal := i.Get(field)
 	jFieldVal := j.Get(field)
 	switch val := i.Get(field).(type) {
+	case time.Time:
+		return val.After(cast.ToTime(jFieldVal))
 	case bool:
 		return val && !cast.ToBool(jFieldVal)
 	case float64:
@@ -74,7 +77,6 @@ func orderByDocs(d Documents, orderBys []OrderBy) Documents {
 	if len(orderBys) == 0 {
 		return d
 	}
-	// TODO: support more than one order by
 	orderBy := orderBys[0]
 
 	if orderBy.Direction == OrderByDirectionDesc {

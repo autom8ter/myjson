@@ -94,8 +94,8 @@ func (t *transaction) persistCommand(ctx context.Context, md *Metadata, command 
 		return fmt.Errorf("tx: collection: %s does not exist", command.Collection)
 	}
 	docID := c.GetPrimaryKey(command.Document)
-	if command.Timestamp.IsZero() {
-		command.Timestamp = time.Now()
+	if command.Timestamp == 0 {
+		command.Timestamp = time.Now().UnixNano()
 	}
 	if command.Metadata == nil {
 		md, _ := GetMetadata(ctx)
@@ -331,8 +331,13 @@ func (t *transaction) queryScan(ctx context.Context, collection string, where []
 	pfx := seekPrefix(collection, optimization.Index, optimization.MatchedValues)
 	opts := kv.IterOpts{
 		Prefix:  pfx.Path(),
-		Seek:    pfx.Path(),
-		Reverse: false,
+		Reverse: optimization.Reverse,
+	}
+	if optimization.Seek != nil {
+		bytesSplit := [][]byte{opts.Seek, optimization.Seek}
+		opts.Seek = bytes.Join(bytesSplit, nullByte)
+	} else {
+		opts.Seek = opts.Prefix
 	}
 	it := t.tx.NewIterator(opts)
 	defer it.Close()

@@ -7,6 +7,8 @@ import (
 	"github.com/nqd/flat"
 )
 
+var nullByte = []byte("\x00")
+
 // indexFieldValue is a key value pair
 type indexFieldValue struct {
 	Field string `json:"field"`
@@ -67,7 +69,7 @@ func (p indexPathPrefix) Path() []byte {
 	if p.documentID != "" {
 		path = append(path, []byte(p.documentID))
 	}
-	return bytes.Join(path, []byte("\x00"))
+	return bytes.Join(path, nullByte)
 }
 
 func (i indexPathPrefix) DocumentID() string {
@@ -84,7 +86,7 @@ func indexPrefix(collection, index string) []byte {
 		[]byte(collection),
 		[]byte(index),
 	}
-	return bytes.Join(path, []byte("\x00"))
+	return bytes.Join(path, nullByte)
 }
 
 func collectionPrefix(collection string) []byte {
@@ -92,5 +94,5 @@ func collectionPrefix(collection string) []byte {
 		[]byte("index"),
 		[]byte(collection),
 	}
-	return bytes.Join(path, []byte("\x00"))
+	return bytes.Join(path, nullByte)
 }

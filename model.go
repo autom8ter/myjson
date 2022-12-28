@@ -244,6 +244,8 @@ type Optimization struct {
 	MatchedFields []string `json:"matched_fields"`
 	// MatchedValues are the values that were matched to the index
 	MatchedValues map[string]any `json:"matched_values"`
+	Seek          []byte
+	Reverse       bool
 }
 
 // Action is an action that causes a mutation to the database
@@ -265,7 +267,7 @@ type Command struct {
 	Collection string    `json:"collection" validate:"required"`
 	Action     Action    `json:"action" validate:"required,oneof='create' 'update' 'delete' 'set'"`
 	Document   *Document `json:"document" validate:"required"`
-	Timestamp  time.Time `json:"timestamp" validate:"required"`
+	Timestamp  int64     `json:"timestamp" validate:"required"`
 	Metadata   *Metadata `json:"metadata" validate:"required"`
 }
 
@@ -359,7 +361,7 @@ type CDC struct {
 	Action     Action        `json:"action" validate:"required,oneof='create' 'update' 'delete' 'set'"`
 	DocumentID string        `json:"documentID" validate:"required"`
 	Diff       []JSONFieldOp `json:"diff,omitempty"`
-	Timestamp  time.Time     `json:"timestamp" validate:"required"`
+	Timestamp  int64         `json:"timestamp" validate:"required"`
 	Metadata   *Metadata     `json:"metadata" validate:"required"`
 }
 

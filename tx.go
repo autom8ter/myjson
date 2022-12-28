@@ -81,7 +81,7 @@ func (t *transaction) Update(ctx context.Context, collection string, id string, 
 		Collection: collection,
 		Action:     Update,
 		Document:   doc,
-		Timestamp:  time.Now(),
+		Timestamp:  time.Now().UnixNano(),
 		Metadata:   md,
 	}); err != nil {
 		return errors.Wrap(err, 0, "tx: failed to commit update")
@@ -107,7 +107,7 @@ func (t *transaction) Create(ctx context.Context, collection string, document *D
 		Collection: collection,
 		Action:     Create,
 		Document:   document,
-		Timestamp:  time.Now(),
+		Timestamp:  time.Now().UnixNano(),
 		Metadata:   md,
 	}); err != nil {
 		return "", errors.Wrap(err, 0, "tx: failed to commit create")
@@ -124,7 +124,7 @@ func (t *transaction) Set(ctx context.Context, collection string, document *Docu
 		Collection: collection,
 		Action:     Set,
 		Document:   document,
-		Timestamp:  time.Now(),
+		Timestamp:  time.Now().UnixNano(),
 		Metadata:   md,
 	}); err != nil {
 		return errors.Wrap(err, 0, "tx: failed to commit set")
@@ -144,7 +144,7 @@ func (t *transaction) Delete(ctx context.Context, collection string, id string) 
 		Collection: collection,
 		Action:     Delete,
 		Document:   d,
-		Timestamp:  time.Now(),
+		Timestamp:  time.Now().UnixNano(),
 		Metadata:   md,
 	}); err != nil {
 		return errors.Wrap(err, 0, "tx: failed to commit delete")

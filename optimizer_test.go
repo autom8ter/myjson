@@ -2,6 +2,7 @@ package gokvkit
 
 import (
 	"testing"
+	"time"
 
 	"github.com/brianvoe/gofakeit/v6"
 	"github.com/stretchr/testify/assert"
@@ -96,5 +97,19 @@ func TestOptimizer(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, true, optimization.Index.Primary)
 		assert.Equal(t, 0, len(optimization.MatchedFields))
+	})
+	t.Run("select secondary index (>)", func(t *testing.T) {
+		cdc, err := newCollectionSchema([]byte(cdcSchema))
+		assert.NoError(t, err)
+		optimization, err := o.Optimize(cdc, []Where{
+			{
+				Field: "timestamp",
+				Op:    WhereOpGt,
+				Value: time.Now().String(),
+			},
+		})
+		assert.NoError(t, err)
+		assert.Equal(t, false, optimization.Index.Primary)
+		assert.Equal(t, "timestamp", optimization.MatchedFields[0])
 	})
 }
