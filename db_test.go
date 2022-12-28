@@ -2,7 +2,6 @@ package gokvkit_test
 
 import (
 	"context"
-	"fmt"
 	"runtime"
 	"sync"
 	"testing"
@@ -10,7 +9,6 @@ import (
 
 	"github.com/autom8ter/gokvkit"
 	"github.com/autom8ter/gokvkit/testutil"
-	"github.com/autom8ter/gokvkit/util"
 	"github.com/brianvoe/gofakeit/v6"
 	"github.com/stretchr/testify/assert"
 )
@@ -526,15 +524,15 @@ func TestIndexing1(t *testing.T) {
 						Value: now,
 					}},
 				}, func(d *gokvkit.Document) (bool, error) {
-					fmt.Println(d)
+					assert.Greater(t, d.GetFloat("timestamp"), float64(now))
 					count++
 					return true, nil
 				})
 				assert.NoError(t, err)
 				assert.Equal(t, false, o.Index.Primary)
-				assert.Equal(t, util.EncodeIndexValue(now), o.Seek)
+				assert.EqualValues(t, now, o.SeekValues["timestamp"])
 				assert.False(t, o.Reverse)
-				assert.Equal(t, "timestamp", o.MatchedFields[0])
+				assert.Equal(t, "timestamp", o.SeekFields[0])
 				assert.Equal(t, 0, count)
 			}))
 		})
@@ -560,15 +558,15 @@ func TestIndexing1(t *testing.T) {
 						Value: now,
 					}},
 				}, func(d *gokvkit.Document) (bool, error) {
-					fmt.Println(d)
+					assert.Greater(t, d.GetFloat("timestamp"), float64(now))
 					count++
 					return true, nil
 				})
 				assert.NoError(t, err)
 				assert.Equal(t, false, o.Index.Primary)
-				assert.Equal(t, util.EncodeIndexValue(now), o.Seek)
+				assert.EqualValues(t, now, o.SeekValues["timestamp"])
 				assert.False(t, o.Reverse)
-				assert.Equal(t, "timestamp", o.MatchedFields[0])
+				assert.Equal(t, "timestamp", o.SeekFields[0])
 				assert.NotEqual(t, 0, count)
 			}))
 		})
@@ -594,16 +592,118 @@ func TestIndexing1(t *testing.T) {
 						Value: now,
 					}},
 				}, func(d *gokvkit.Document) (bool, error) {
-					fmt.Println(d)
+					assert.Less(t, d.GetFloat("timestamp"), float64(now))
 					count++
 					return true, nil
 				})
 				assert.NoError(t, err)
 				assert.Equal(t, false, o.Index.Primary)
-				assert.Equal(t, util.EncodeIndexValue(now), o.Seek)
+				assert.EqualValues(t, now, o.SeekValues["timestamp"])
 				assert.True(t, o.Reverse)
-				assert.Equal(t, "timestamp", o.MatchedFields[0])
+				assert.Equal(t, "timestamp", o.SeekFields[0])
 				assert.NotEqual(t, 0, count)
+			}))
+		})
+		t.Run("some results (<=)", func(t *testing.T) {
+			assert.Nil(t, testutil.TestDB(func(ctx context.Context, db gokvkit.Database) {
+				var docs gokvkit.Documents
+				var ts time.Time
+				assert.Nil(t, db.Tx(ctx, true, func(ctx context.Context, tx gokvkit.Tx) error {
+					for i := 0; i < 5; i++ {
+						usr := testutil.NewUserDoc()
+						docs = append(docs, usr)
+						if err := tx.Set(ctx, "user", usr); err != nil {
+							return err
+						}
+					}
+					ts = time.Unix(0, tx.CDC()[0].Timestamp)
+					return nil
+				}))
+				count := 0
+				o, err := db.ForEach(ctx, "cdc", gokvkit.ForEachOpts{
+					Where: []gokvkit.Where{{
+						Field: "timestamp",
+						Op:    gokvkit.WhereOpLte,
+						Value: ts.UnixNano(),
+					}},
+				}, func(d *gokvkit.Document) (bool, error) {
+					assert.LessOrEqual(t, d.GetFloat("timestamp"), float64(ts.UnixNano()))
+					count++
+					return true, nil
+				})
+				assert.NoError(t, err)
+				assert.Equal(t, false, o.Index.Primary)
+				assert.True(t, o.Reverse)
+				assert.Equal(t, "timestamp", o.SeekFields[0])
+				assert.NotEqual(t, 0, count)
+			}))
+		})
+		t.Run("no results (>)", func(t *testing.T) {
+			assert.Nil(t, testutil.TestDB(func(ctx context.Context, db gokvkit.Database) {
+				var docs gokvkit.Documents
+				assert.Nil(t, db.Tx(ctx, true, func(ctx context.Context, tx gokvkit.Tx) error {
+					for i := 0; i < 5; i++ {
+						usr := testutil.NewUserDoc()
+						docs = append(docs, usr)
+						if err := tx.Set(ctx, "user", usr); err != nil {
+							return err
+						}
+					}
+					return nil
+				}))
+				count := 0
+				now := time.Now().UnixNano()
+				o, err := db.ForEach(ctx, "cdc", gokvkit.ForEachOpts{
+					Where: []gokvkit.Where{{
+						Field: "timestamp",
+						Op:    gokvkit.WhereOpGt,
+						Value: now,
+					}},
+				}, func(d *gokvkit.Document) (bool, error) {
+					assert.Greater(t, d.GetFloat("timestamp"), float64(now))
+					count++
+					return true, nil
+				})
+				assert.NoError(t, err)
+				assert.Equal(t, false, o.Index.Primary)
+				assert.EqualValues(t, now, o.SeekValues["timestamp"])
+				assert.False(t, o.Reverse)
+				assert.Equal(t, "timestamp", o.SeekFields[0])
+				assert.Equal(t, 0, count)
+			}))
+		})
+		t.Run("no results (<)", func(t *testing.T) {
+			assert.Nil(t, testutil.TestDB(func(ctx context.Context, db gokvkit.Database) {
+				var docs gokvkit.Documents
+				assert.Nil(t, db.Tx(ctx, true, func(ctx context.Context, tx gokvkit.Tx) error {
+					for i := 0; i < 5; i++ {
+						usr := testutil.NewUserDoc()
+						docs = append(docs, usr)
+						if err := tx.Set(ctx, "user", usr); err != nil {
+							return err
+						}
+					}
+					return nil
+				}))
+				count := 0
+				now := time.Now().Truncate(15 * time.Minute).UnixNano()
+				o, err := db.ForEach(ctx, "cdc", gokvkit.ForEachOpts{
+					Where: []gokvkit.Where{{
+						Field: "timestamp",
+						Op:    gokvkit.WhereOpLt,
+						Value: now,
+					}},
+				}, func(d *gokvkit.Document) (bool, error) {
+					assert.Less(t, d.GetFloat("timestamp"), float64(now))
+					count++
+					return true, nil
+				})
+				assert.NoError(t, err)
+				assert.Equal(t, false, o.Index.Primary)
+				assert.EqualValues(t, now, o.SeekValues["timestamp"])
+				assert.True(t, o.Reverse)
+				assert.Equal(t, "timestamp", o.SeekFields[0])
+				assert.Equal(t, 0, count)
 			}))
 		})
 	})

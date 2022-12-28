@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/autom8ter/gokvkit/kv"
-	"github.com/autom8ter/gokvkit/kv/kvutil"
 	"github.com/dgraph-io/badger/v3"
 )
 
@@ -20,11 +19,11 @@ func (b *badgerTx) NewIterator(kopts kv.IterOpts) kv.Iterator {
 	opts.PrefetchSize = 10
 	opts.Prefix = kopts.Prefix
 	opts.Reverse = kopts.Reverse
-	if opts.Reverse && opts.Prefix != nil {
-		opts.Prefix = kvutil.NextPrefix(kopts.Prefix)
-	}
 	iter := b.txn.NewIterator(opts)
-	iter.Rewind()
+	if kopts.Seek == nil {
+		iter.Rewind()
+	}
+	iter.Seek(kopts.Seek)
 	return &badgerIterator{iter: iter, opts: kopts}
 }
 

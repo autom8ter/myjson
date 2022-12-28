@@ -238,14 +238,17 @@ type PageStats struct {
 
 // Optimization
 type Optimization struct {
+	// Collection
+	Collection string `json:"collection"`
 	// Index is the index the query optimizer chose
 	Index Index `json:"index"`
 	// MatchedFields are the fields that matched the index
 	MatchedFields []string `json:"matched_fields"`
 	// MatchedValues are the values that were matched to the index
-	MatchedValues map[string]any `json:"matched_values"`
-	Seek          []byte
-	Reverse       bool
+	MatchedValues map[string]any `json:"matched_values,omitempty"`
+	SeekFields    []string       `json:"seek,omitempty"`
+	SeekValues    map[string]any `json:"seek_values,omitempty"`
+	Reverse       bool           `json:"reverse,omitempty"`
 }
 
 // Action is an action that causes a mutation to the database

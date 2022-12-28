@@ -2,7 +2,6 @@ package gokvkit
 
 import (
 	"github.com/autom8ter/gokvkit/errors"
-	"github.com/autom8ter/gokvkit/util"
 	"github.com/samber/lo"
 )
 
@@ -10,9 +9,13 @@ type defaultOptimizer struct{}
 
 func defaultOptimization(c CollectionSchema) Optimization {
 	return Optimization{
+		Collection:    c.Collection(),
 		Index:         c.PrimaryIndex(),
 		MatchedFields: []string{},
 		MatchedValues: map[string]any{},
+		SeekFields:    []string{},
+		SeekValues:    map[string]any{},
+		Reverse:       false,
 	}
 }
 
@@ -35,7 +38,9 @@ func (o defaultOptimizer) Optimize(c CollectionSchema, where []Where) (Optimizat
 		}, nil
 	}
 	var (
-		i = Optimization{}
+		opt = &Optimization{
+			Collection: c.Collection(),
+		}
 	)
 	for _, index := range indexes {
 		if len(index.Fields) == 0 {
@@ -43,7 +48,7 @@ func (o defaultOptimizer) Optimize(c CollectionSchema, where []Where) (Optimizat
 		}
 		var (
 			matchedFields []string
-			seek          []byte
+			seekFields    []string
 			reverse       bool
 		)
 		for i, field := range index.Fields {
@@ -53,45 +58,44 @@ func (o defaultOptimizer) Optimize(c CollectionSchema, where []Where) (Optimizat
 				} else if field == where[i].Field && len(index.Fields)-1 == i {
 					switch {
 					case where[i].Op == WhereOpGt:
-						matchedFields = append(matchedFields, field)
-						seek = util.EncodeIndexValue(where[i].Value)
+						seekFields = append(seekFields, field)
 					case where[i].Op == WhereOpGte:
-						matchedFields = append(matchedFields, field)
-						seek = util.EncodeIndexValue(where[i].Value)
+						seekFields = append(seekFields, field)
 					case where[i].Op == WhereOpLt:
-						matchedFields = append(matchedFields, field)
-						seek = util.EncodeIndexValue(where[i].Value)
+						seekFields = append(seekFields, field)
 						reverse = true
 					case where[i].Op == WhereOpLte:
-						matchedFields = append(matchedFields, field)
-						seek = util.EncodeIndexValue(where[i].Value)
+						seekFields = append(seekFields, field)
 						reverse = true
 					}
 				}
 			}
 		}
 		matchedFields = lo.Uniq(matchedFields)
-		if (len(matchedFields) > len(i.MatchedFields)) ||
-			(len(matchedFields) == len(i.MatchedFields)) {
-			i.Index = index
-			i.MatchedFields = matchedFields
-			i.Reverse = reverse
-			i.Seek = seek
+		if len(matchedFields)+len(seekFields) >= len(opt.MatchedFields)+len(opt.SeekFields) {
+			opt.Index = index
+			opt.MatchedFields = matchedFields
+			opt.Reverse = reverse
+			opt.SeekFields = seekFields
 		}
 	}
-	if len(i.MatchedFields) > 0 {
-		i.MatchedValues = getMatchedFieldValues(i.MatchedFields, where)
-		return i, nil
+	if len(opt.MatchedFields)+len(opt.SeekFields) > 0 {
+		opt.MatchedValues = getMatchedFieldValues(opt.MatchedFields, where)
+		opt.SeekValues = getMatchedFieldValues(opt.SeekFields, where)
+		return *opt, nil
 	}
 	return defaultOptimization(c), nil
 }
 
 func getMatchedFieldValues(fields []string, where []Where) map[string]any {
+	if len(fields) == 0 {
+		return map[string]any{}
+	}
 	var whereFields []string
 	var whereValues = map[string]any{}
 	for _, f := range fields {
 		for _, w := range where {
-			if w.Op != WhereOpEq || w.Field != f {
+			if w.Field != f {
 				continue
 			}
 			whereFields = append(whereFields, w.Field)

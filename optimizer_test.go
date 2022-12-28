@@ -110,6 +110,7 @@ func TestOptimizer(t *testing.T) {
 		})
 		assert.NoError(t, err)
 		assert.Equal(t, false, optimization.Index.Primary)
-		assert.Equal(t, "timestamp", optimization.MatchedFields[0])
+		assert.Equal(t, "timestamp", optimization.SeekFields[0])
+		assert.NotEmpty(t, optimization.SeekValues["timestamp"])
 	})
 }

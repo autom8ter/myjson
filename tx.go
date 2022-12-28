@@ -218,7 +218,7 @@ func (t *transaction) Get(ctx context.Context, collection string, id string) (*D
 	primaryIndex := c.PrimaryIndex()
 	val, err := t.tx.Get(seekPrefix(collection, primaryIndex, map[string]any{
 		c.PrimaryKey(): id,
-	}).SetDocumentID(id).Path())
+	}).Seek(id).Path())
 	if err != nil {
 		return nil, errors.Wrap(err, errors.NotFound, "%s not found", id)
 	}

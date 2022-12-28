@@ -36,10 +36,10 @@ func seekPrefix(collection string, i Index, fields map[string]any) indexPathPref
 }
 
 type indexPathPrefix struct {
-	prefix     [][]byte
-	documentID string
-	fields     [][]byte
-	fieldMap   []indexFieldValue
+	prefix    [][]byte
+	seekValue any
+	fields    [][]byte
+	fieldMap  []indexFieldValue
 }
 
 func (p indexPathPrefix) Append(field string, value any) indexPathPrefix {
@@ -55,25 +55,25 @@ func (p indexPathPrefix) Append(field string, value any) indexPathPrefix {
 	}
 }
 
-func (p indexPathPrefix) SetDocumentID(id string) indexPathPrefix {
+func (p indexPathPrefix) Seek(value any) indexPathPrefix {
 	return indexPathPrefix{
-		prefix:     p.prefix,
-		documentID: id,
-		fields:     p.fields,
-		fieldMap:   p.fieldMap,
+		prefix:    p.prefix,
+		seekValue: value,
+		fields:    p.fields,
+		fieldMap:  p.fieldMap,
 	}
 }
 
 func (p indexPathPrefix) Path() []byte {
 	var path = append(p.prefix, p.fields...)
-	if p.documentID != "" {
-		path = append(path, []byte(p.documentID))
+	if p.seekValue != nil {
+		path = append(path, util.EncodeIndexValue(p.seekValue))
 	}
 	return bytes.Join(path, nullByte)
 }
 
-func (i indexPathPrefix) DocumentID() string {
-	return i.documentID
+func (i indexPathPrefix) SeekValue() any {
+	return i.seekValue
 }
 
 func (i indexPathPrefix) Fields() []indexFieldValue {
