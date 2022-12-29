@@ -11,7 +11,6 @@ import (
 	"github.com/autom8ter/gokvkit/kv/registry"
 	"github.com/autom8ter/gokvkit/util"
 	"github.com/autom8ter/machine/v4"
-	"github.com/dop251/goja"
 )
 
 // defaultDB is an embedded, durable NoSQL database with support for schemas, indexing, and aggregation
@@ -248,9 +247,11 @@ func (d *defaultDB) RawKV() kv.DB {
 
 func (d *defaultDB) RunScript(ctx context.Context, name, script string, params map[string]any) (any, error) {
 	if _, ok := d.programs.Load(name); !ok {
-		vm := goja.New()
-		vm.SetFieldNameMapper(goja.TagFieldNameMapper("json", true))
-		_, err := vm.RunString(script)
+		vm, err := getJavascriptVM(ctx, d)
+		if err != nil {
+			return false, err
+		}
+		_, err = vm.RunString(script)
 		if err != nil {
 			return nil, err
 		}

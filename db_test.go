@@ -892,7 +892,6 @@ function getAccount(ctx, db, params) {
 				"id": "1",
 			})
 			assert.NoError(t, err)
-			fmt.Printf("%T %#v", results, results)
 			assert.Equal(t, "1", results)
 		}))
 	})
@@ -906,7 +905,6 @@ function getAccounts(ctx, db, params) {
  `
 			results, err := db.RunScript(ctx, "getAccounts", getAccountScript, map[string]any{})
 			assert.NoError(t, err)
-			fmt.Printf("%T %#v", results, results)
 			assert.Equal(t, 101, len(results.(gokvkit.Documents)))
 		}))
 	})
@@ -1102,8 +1100,11 @@ func TestMigrations(t *testing.T) {
 			assert.NoError(t, db.RunMigrations(ctx, migration))
 			assert.NoError(t, db.RunMigrations(ctx, migration))
 			assert.NoError(t, db.RunMigrations(ctx, migration))
+			val, err := db.Get(ctx, "migration", "seedAccounts")
+			assert.NoError(t, err)
+			assert.Equal(t, false, val.GetBool("dirty"))
 			count := 0
-			_, err := db.ForEach(ctx, "account", gokvkit.ForEachOpts{
+			_, err = db.ForEach(ctx, "account", gokvkit.ForEachOpts{
 				Where: []gokvkit.Where{{Field: "name", Op: gokvkit.WhereOpContains, Value: "autom8ter"}},
 				Join:  nil,
 			}, func(d *gokvkit.Document) (bool, error) {
@@ -1132,6 +1133,9 @@ func TestMigrations(t *testing.T) {
 				assert.Error(t, db.RunMigrations(ctx, migration))
 				assert.Error(t, db.RunMigrations(ctx, migration))
 				assert.Error(t, db.RunMigrations(ctx, migration))
+				val, err := db.Get(ctx, "migration", "seedAccounts")
+				assert.NoError(t, err)
+				assert.Equal(t, true, val.GetBool("dirty"))
 			}
 			{
 				script := `
@@ -1149,6 +1153,11 @@ func TestMigrations(t *testing.T) {
 				assert.NoError(t, db.RunMigrations(ctx, migration))
 				assert.NoError(t, db.RunMigrations(ctx, migration))
 				assert.NoError(t, db.RunMigrations(ctx, migration))
+				val, err := db.Get(ctx, "migration", "seedAccounts")
+				assert.NoError(t, err)
+				assert.Equal(t, false, val.GetBool("dirty"))
+				assert.Equal(t, script, val.GetString("script"))
+				assert.NotEmpty(t, val.GetString("timestamp"))
 			}
 			count := 0
 			_, err := db.ForEach(ctx, "account", gokvkit.ForEachOpts{
