@@ -414,4 +414,23 @@ func BenchmarkDocument(b *testing.B) {
 			_ = doc.Get("contact.email")
 		}
 	})
+	// BenchmarkDocument/where_(2)-12         	  521618	      2254 ns/op	      40 B/op	       3 allocs/op
+	b.Run("where (2)", func(b *testing.B) {
+		b.ReportAllocs()
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			doc.Where([]gokvkit.Where{
+				{
+					Field: "contact.email",
+					Op:    gokvkit.WhereOpEq,
+					Value: doc.Get("contact.email"),
+				},
+				{
+					Field: "age",
+					Op:    gokvkit.WhereOpGte,
+					Value: 10,
+				},
+			})
+		}
+	})
 }

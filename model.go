@@ -414,3 +414,5 @@ type ForEachOpts struct {
 	Where []Where `json:"where,omitempty"`
 	Join  []Join  `json:"join,omitempty"`
 }
+
+type JSFunction func(ctx context.Context, db Database, params map[string]any) (any, error)

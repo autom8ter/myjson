@@ -10,6 +10,7 @@ import (
 
 	"github.com/autom8ter/gokvkit/errors"
 	"github.com/autom8ter/gokvkit/util"
+	"github.com/dop251/goja"
 
 	"github.com/samber/lo"
 	"github.com/spf13/cast"
@@ -266,4 +267,16 @@ func schemaFromCtx(ctx context.Context, collection string) CollectionSchema {
 		return nil
 	}
 	return c
+}
+
+func gojaToCtx(ctx context.Context, goja *goja.Runtime) context.Context {
+	return context.WithValue(ctx, "goja", goja)
+}
+
+func gojaFromCtx(ctx context.Context) *goja.Runtime {
+	g, ok := ctx.Value("goja").(*goja.Runtime)
+	if !ok {
+		return nil
+	}
+	return g
 }

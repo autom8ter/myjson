@@ -245,7 +245,6 @@ func (c *collectionSchema) Indexing() map[string]Index {
 }
 
 func (c *collectionSchema) ValidateDocument(ctx context.Context, doc *Document) error {
-	fmt.Println(string(doc.Bytes()))
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	kerrs, err := c.schema.Validate(gojsonschema.NewBytesLoader(doc.Bytes()))

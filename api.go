@@ -63,6 +63,7 @@ type Database interface {
 	Query(ctx context.Context, collection string, query Query) (Page, error)
 	// Get gets 1-many document by id(s)
 	BatchGet(ctx context.Context, collection string, ids []string) (Documents, error)
+	RunScript(ctx context.Context, name, script string, params map[string]any) (any, error)
 	// RawKV returns the database key value provider - it should be used with caution and only when standard database functionality is insufficient.
 	RawKV() kv.DB
 	// Close closes the database

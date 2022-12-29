@@ -2,6 +2,7 @@ package gokvkit_test
 
 import (
 	"context"
+	"fmt"
 	"runtime"
 	"sync"
 	"testing"
@@ -757,6 +758,25 @@ func TestAggregate(t *testing.T) {
 				accounts = append(accounts, result.GetString("account_id"))
 				assert.Equal(t, ageSum[result.GetString("account_id")], result.GetFloat("age_sum"))
 			}
+		}))
+	})
+}
+
+func TestScript(t *testing.T) {
+	t.Run("getAccount", func(t *testing.T) {
+		assert.NoError(t, testutil.TestDB(func(ctx context.Context, db gokvkit.Database) {
+			getAccountScript := `
+function getAccount(ctx, db, params) {
+	let res = db.Get(ctx, 'account', params.id)
+	return res.Get('_id')
+}
+ `
+			results, err := db.RunScript(ctx, "getAccount", getAccountScript, map[string]any{
+				"id": "1",
+			})
+			assert.NoError(t, err)
+			fmt.Printf("%T %#v", results, results)
+			assert.Equal(t, "1", results)
 		}))
 	})
 }
