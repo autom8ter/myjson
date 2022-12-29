@@ -256,6 +256,9 @@ func collectionConfigPrefix(ctx context.Context) []byte {
 }
 
 func schemaToCtx(ctx context.Context, schema CollectionSchema) context.Context {
+	if schema == nil {
+		return ctx
+	}
 	return context.WithValue(ctx, fmt.Sprintf("%s.schema", schema.Collection()), schema)
 }
 

@@ -480,3 +480,22 @@ type ForEachOpts struct {
 
 // JSFunction is javascript function compiled to a go function
 type JSFunction func(ctx context.Context, db Database, params map[string]any) (any, error)
+
+//go:embed migration.yaml
+var migrationSchema string
+
+const migrationCollectionName = "migration"
+
+// Migration is an atomic database migration
+type Migration struct {
+	// ID is the unique id of the cdc
+	ID string `json:"_id" validate:"required"`
+	// Timestamp is the nanosecond timestamp the cdc was created at
+	Timestamp int64 `json:"timestamp"`
+	// Script is the script's content
+	Script string `json:"script" validate:"required"`
+	// Dirty indicates whether the migration failed or not
+	Dirty bool `json:"dirty"`
+	// An error message if one was encountered
+	Error string `json:"error"`
+}

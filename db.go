@@ -4,6 +4,7 @@ import (
 	"context"
 	_ "embed"
 	"sync"
+	"time"
 
 	"github.com/autom8ter/gokvkit/errors"
 	"github.com/autom8ter/gokvkit/kv"
@@ -47,8 +48,15 @@ func New(ctx context.Context, provider string, providerParams map[string]any, op
 			return nil, errors.Wrap(err, errors.Internal, "init hook failure")
 		}
 	}
-	if err := d.ConfigureCollection(ctx, []byte(cdcSchema)); err != nil {
-		return nil, errors.Wrap(err, errors.Internal, "failed to configure cdc collection")
+	if !d.HasCollection(ctx, "cdc") {
+		if err := d.ConfigureCollection(ctx, []byte(cdcSchema)); err != nil {
+			return nil, errors.Wrap(err, errors.Internal, "failed to configure cdc collection")
+		}
+	}
+	if !d.HasCollection(ctx, "migration") {
+		if err := d.ConfigureCollection(ctx, []byte(migrationSchema)); err != nil {
+			return nil, errors.Wrap(err, errors.Internal, "failed to configure migration collection")
+		}
 	}
 	return d, err
 }
@@ -238,10 +246,6 @@ func (d *defaultDB) RawKV() kv.DB {
 	return d.kv
 }
 
-func (d *defaultDB) Close(ctx context.Context) error {
-	return errors.Wrap(d.kv.Close(), 0, "")
-}
-
 func (d *defaultDB) RunScript(ctx context.Context, name, script string, params map[string]any) (any, error) {
 	if _, ok := d.programs.Load(name); !ok {
 		vm := goja.New()
@@ -258,4 +262,62 @@ func (d *defaultDB) RunScript(ctx context.Context, name, script string, params m
 	}
 	fn, _ := d.programs.Load(name)
 	return fn.(JSFunction)(ctx, d, params)
+}
+
+func (d *defaultDB) RunMigrations(ctx context.Context, migrations ...Migration) error {
+	var (
+		err     error
+		skipped bool
+	)
+	for _, m := range migrations {
+		m.Dirty = false
+		m.Timestamp = time.Now().Unix()
+		m.Error = ""
+		skipped, err = d.runMigration(ctx, m)
+		if skipped {
+			continue
+		}
+		if err != nil {
+			m.Error = err.Error()
+			m.Dirty = true
+		}
+		doc, err := NewDocumentFrom(m)
+		if err != nil {
+			return err
+		}
+		if err := d.Tx(ctx, true, func(ctx context.Context, tx Tx) error {
+			if err := tx.Set(ctx, migrationCollectionName, doc); err != nil {
+				return err
+			}
+			return nil
+		}); err != nil {
+			return err
+		}
+		if err != nil {
+			break
+		}
+	}
+	return err
+}
+
+func (d *defaultDB) runMigration(ctx context.Context, m Migration) (bool, error) {
+	if val, _ := d.Get(ctx, migrationCollectionName, m.ID); val != nil && !val.GetBool("dirty") {
+		return true, nil
+	}
+	if err := util.ValidateStruct(m); err != nil {
+		return false, errors.Wrap(err, 0, "migration is not valid")
+	}
+	vm, err := getJavascriptVM(ctx, d)
+	if err != nil {
+		return false, err
+	}
+	_, err = vm.RunString(m.Script)
+	if err != nil {
+		return false, err
+	}
+	return false, nil
+}
+
+func (d *defaultDB) Close(ctx context.Context) error {
+	return errors.Wrap(d.kv.Close(), 0, "")
 }

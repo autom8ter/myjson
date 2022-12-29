@@ -1083,3 +1083,83 @@ func TestJoin(t *testing.T) {
 		}))
 	})
 }
+
+func TestMigrations(t *testing.T) {
+	t.Run("basic", func(t *testing.T) {
+		assert.NoError(t, testutil.TestDB(func(ctx context.Context, db gokvkit.Database) {
+			script := `
+	db.tx(ctx, true, (ctx, tx) => {
+		for (let i = 100; i < 200; i++) {
+			tx.create(ctx, "account", newDocumentFrom({ name: "autom8ter"+String(i)}))
+		}
+	})
+`
+			migration := gokvkit.Migration{
+				ID:     "seedAccounts",
+				Script: script,
+			}
+
+			assert.NoError(t, db.RunMigrations(ctx, migration))
+			assert.NoError(t, db.RunMigrations(ctx, migration))
+			assert.NoError(t, db.RunMigrations(ctx, migration))
+			count := 0
+			_, err := db.ForEach(ctx, "account", gokvkit.ForEachOpts{
+				Where: []gokvkit.Where{{Field: "name", Op: gokvkit.WhereOpContains, Value: "autom8ter"}},
+				Join:  nil,
+			}, func(d *gokvkit.Document) (bool, error) {
+				count++
+				return true, nil
+			})
+			assert.NoError(t, err)
+			assert.Equal(t, count, 100)
+		}))
+	})
+	t.Run("dirty then fix", func(t *testing.T) {
+		assert.NoError(t, testutil.TestDB(func(ctx context.Context, db gokvkit.Database) {
+			{
+				script := `
+				db.tx(ctx, true, (ctx, tx) => {
+					for (let i = 100; i < 200; i++) {
+						tx.creat(ctx, "account", newDocumentFrom({ name: "autom8ter"+String(i)}))
+					}
+				})
+`
+				migration := gokvkit.Migration{
+					ID:     "seedAccounts",
+					Script: script,
+				}
+
+				assert.Error(t, db.RunMigrations(ctx, migration))
+				assert.Error(t, db.RunMigrations(ctx, migration))
+				assert.Error(t, db.RunMigrations(ctx, migration))
+			}
+			{
+				script := `
+				db.tx(ctx, true, (ctx, tx) => {
+					for (let i = 100; i < 200; i++) {
+						tx.create(ctx, "account", newDocumentFrom({ name: "autom8ter"+String(i)}))
+					}
+				})
+`
+				migration := gokvkit.Migration{
+					ID:     "seedAccounts",
+					Script: script,
+				}
+
+				assert.NoError(t, db.RunMigrations(ctx, migration))
+				assert.NoError(t, db.RunMigrations(ctx, migration))
+				assert.NoError(t, db.RunMigrations(ctx, migration))
+			}
+			count := 0
+			_, err := db.ForEach(ctx, "account", gokvkit.ForEachOpts{
+				Where: []gokvkit.Where{{Field: "name", Op: gokvkit.WhereOpContains, Value: "autom8ter"}},
+				Join:  nil,
+			}, func(d *gokvkit.Document) (bool, error) {
+				count++
+				return true, nil
+			})
+			assert.NoError(t, err)
+			assert.Equal(t, count, 100)
+		}))
+	})
+}

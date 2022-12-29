@@ -70,6 +70,10 @@ type Database interface {
 	// RunScript runs a javascript function by name within the given script.
 	// The javascript function must have the following signature: function ${name}(ctx, db, params)
 	RunScript(ctx context.Context, name, script string, params map[string]any) (any, error)
+	// RunMigrations runs migration scripts against the database. If a migration(id) has already successfully run, it will do nothing.
+	// Migrations are run sequentially in the order they are provided
+	// Migration executions will if an error is encountered
+	RunMigrations(ctx context.Context, migrations ...Migration) error
 	// RawKV returns the database key value provider - it should be used with caution and only when standard database functionality is insufficient.
 	RawKV() kv.DB
 	// Close closes the database
