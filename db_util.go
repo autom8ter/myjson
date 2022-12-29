@@ -10,8 +10,7 @@ import (
 )
 
 func (d *defaultDB) lockCollection(ctx context.Context, collection string) (func(), error) {
-	md, _ := GetMetadata(ctx)
-	lock := d.kv.NewLocker([]byte(fmt.Sprintf("%s.cache.internal.locks.%s", md.GetNamespace(), collection)), 1*time.Minute)
+	lock := d.kv.NewLocker([]byte(fmt.Sprintf("cache.internal.locks.%s", collection)), 1*time.Minute)
 	gotLock, err := lock.TryLock()
 	if err != nil {
 		return nil, errors.Wrap(err, errors.Internal, "failed to acquire lock on collection %s", collection)

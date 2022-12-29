@@ -27,7 +27,7 @@ func TestQuery(t *testing.T) {
 			Select: []Select{
 				{
 					Field:     "age",
-					Aggregate: SelectAggregateSum,
+					Aggregate: AggregateFunctionSum,
 					As:        "age_sum",
 				},
 			},
@@ -133,7 +133,7 @@ func TestQuery(t *testing.T) {
 			Select: []Select{
 				{
 					Field:     "test",
-					Aggregate: SelectAggregateMax,
+					Aggregate: AggregateFunctionMax,
 					As:        "max_test",
 				},
 			},

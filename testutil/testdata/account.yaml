@@ -6,8 +6,8 @@ required:
 properties:
   _id:
     type: string
-    description: The user's id.
+    description: The account's id.
     x-primary: true
   name:
     type: string
-    description: The user's name.
+    description: The accounts's name.

@@ -429,8 +429,13 @@ func (d *Document) Where(wheres []Where) (bool, error) {
 				}
 			}
 		case WhereOpHasPrefix:
-			fieldVal := d.Get(w.Field)
-			if !strings.HasPrefix(cast.ToString(fieldVal), cast.ToString(w.Value)) {
+			fieldVal := d.GetString(w.Field)
+			if !strings.HasPrefix(fieldVal, cast.ToString(w.Value)) {
+				return false, nil
+			}
+		case WhereOpHasSuffix:
+			fieldVal := d.GetString(w.Field)
+			if !strings.HasSuffix(fieldVal, cast.ToString(w.Value)) {
 				return false, nil
 			}
 		case WhereOpRegex:

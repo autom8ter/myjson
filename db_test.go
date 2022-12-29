@@ -738,7 +738,7 @@ func TestAggregate(t *testing.T) {
 					},
 					{
 						Field:     "age",
-						Aggregate: gokvkit.SelectAggregateSum,
+						Aggregate: gokvkit.AggregateFunctionSum,
 						As:        "age_sum",
 					},
 				},

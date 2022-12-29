@@ -163,7 +163,7 @@ func (t *transaction) Query(ctx context.Context, collection string, query Query)
 	if schema == nil {
 		return Page{}, errors.New(errors.Validation, "tx: unsupported collection: %s", collection)
 	}
-	if query.IsAggregate() {
+	if isAggregateQuery(query) {
 		return t.aggregate(ctx, collection, query)
 	}
 	ctx, cancel := context.WithCancel(ctx)

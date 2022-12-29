@@ -97,7 +97,7 @@ func TestUtil(t *testing.T) {
 		reduced, err := aggregateDocs(docs, []Select{
 			{
 				Field:     "age",
-				Aggregate: SelectAggregateSum,
+				Aggregate: AggregateFunctionSum,
 				As:        "age_sum",
 			},
 		})
@@ -139,6 +139,6 @@ func TestUtil(t *testing.T) {
 		assert.Equal(t, util.JSONString(s), util.JSONString(s2))
 	})
 	t.Run("defaultAs", func(t *testing.T) {
-		assert.Equal(t, "count_account_id", defaultAs(SelectAggregateCount, "account_id"))
+		assert.Equal(t, "count_account_id", defaultAs(AggregateFunctionCount, "account_id"))
 	})
 }

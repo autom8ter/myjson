@@ -50,7 +50,7 @@ func getIndexDiff(after, before map[string]Index) (indexDiff, error) {
 	}, nil
 }
 
-func defaultAs(function SelectAggregate, field string) string {
+func defaultAs(function AggregateFunction, field string) string {
 	if function != "" {
 		return fmt.Sprintf("%s_%s", function, field)
 	}
@@ -198,17 +198,17 @@ func applyNonAggregates(selct Select, aggregated, next *Document) error {
 func applyAggregates(agg Select, aggregated, next *Document) error {
 	current := aggregated.GetFloat(agg.As)
 	switch agg.Aggregate {
-	case SelectAggregateCount:
+	case AggregateFunctionCount:
 		current++
-	case SelectAggregateMax:
+	case AggregateFunctionMax:
 		if value := next.GetFloat(agg.Field); value > current {
 			current = value
 		}
-	case SelectAggregateMin:
+	case AggregateFunctionMin:
 		if value := next.GetFloat(agg.Field); value < current {
 			current = value
 		}
-	case SelectAggregateSum:
+	case AggregateFunctionSum:
 		current += next.GetFloat(agg.Field)
 	default:
 		return errors.New(errors.Validation, "unsupported aggregate function: %s/%s", agg.Field, agg.Aggregate)
@@ -248,13 +248,11 @@ func selectDocument(d *Document, fields []Select) error {
 }
 
 func collectionConfigKey(ctx context.Context, collection string) []byte {
-	md, _ := GetMetadata(ctx)
-	return []byte(fmt.Sprintf("%s.cache.internal.collections.%s", md.GetNamespace(), collection))
+	return []byte(fmt.Sprintf("cache.internal.collections.%s", collection))
 }
 
 func collectionConfigPrefix(ctx context.Context) []byte {
-	md, _ := GetMetadata(ctx)
-	return []byte(fmt.Sprintf("%s.cache.internal.collections.", md.GetNamespace()))
+	return []byte("cache.internal.collections.")
 }
 
 func schemaToCtx(ctx context.Context, schema CollectionSchema) context.Context {
@@ -279,4 +277,13 @@ func gojaFromCtx(ctx context.Context) *goja.Runtime {
 		return nil
 	}
 	return g
+}
+
+func isAggregateQuery(q Query) bool {
+	for _, a := range q.Select {
+		if a.Aggregate != "" {
+			return true
+		}
+	}
+	return false
 }

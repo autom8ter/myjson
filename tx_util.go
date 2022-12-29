@@ -9,6 +9,7 @@ import (
 
 	"github.com/autom8ter/gokvkit/errors"
 	"github.com/autom8ter/gokvkit/kv"
+	"github.com/autom8ter/gokvkit/util"
 	"github.com/nqd/flat"
 	"github.com/segmentio/ksuid"
 	"github.com/spf13/cast"
@@ -101,7 +102,7 @@ func (t *transaction) persistCommand(ctx context.Context, md *Metadata, command 
 		md, _ := GetMetadata(ctx)
 		command.Metadata = md
 	}
-	if err := command.Validate(); err != nil {
+	if err := util.ValidateStruct(c); err != nil {
 		return err
 	}
 	before, _ := t.Get(ctx, command.Collection, docID)
