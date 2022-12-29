@@ -11,6 +11,7 @@ import (
 	"github.com/autom8ter/gokvkit"
 	"github.com/autom8ter/gokvkit/testutil"
 	"github.com/brianvoe/gofakeit/v6"
+	"github.com/segmentio/ksuid"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -767,8 +768,8 @@ func TestScript(t *testing.T) {
 		assert.NoError(t, testutil.TestDB(func(ctx context.Context, db gokvkit.Database) {
 			getAccountScript := `
 function getAccount(ctx, db, params) {
-	let res = db.Get(ctx, 'account', params.id)
-	return res.Get('_id')
+	let res = db.get(ctx, 'account', params.id)
+	return res.get('_id')
 }
  `
 			results, err := db.RunScript(ctx, "getAccount", getAccountScript, map[string]any{
@@ -777,6 +778,61 @@ function getAccount(ctx, db, params) {
 			assert.NoError(t, err)
 			fmt.Printf("%T %#v", results, results)
 			assert.Equal(t, "1", results)
+		}))
+	})
+	t.Run("getAccounts", func(t *testing.T) {
+		assert.NoError(t, testutil.TestDB(func(ctx context.Context, db gokvkit.Database) {
+			getAccountScript := `
+function getAccounts(ctx, db, params) {
+	let res = db.query(ctx, 'account', {select: [{field: '*'}]})
+	return res.documents
+}
+ `
+			results, err := db.RunScript(ctx, "getAccounts", getAccountScript, map[string]any{})
+			assert.NoError(t, err)
+			fmt.Printf("%T %#v", results, results)
+			assert.Equal(t, 101, len(results.(gokvkit.Documents)))
+		}))
+	})
+	t.Run("setAccount", func(t *testing.T) {
+		assert.NoError(t, testutil.TestDB(func(ctx context.Context, db gokvkit.Database) {
+			getAccountScript := `
+function setAccount(ctx, db, params) {
+	db.tx(ctx, true, (ctx, tx) => {
+		tx.set(ctx, "account", params.doc)
+	})
+}
+ `
+			id := ksuid.New().String()
+			doc, err := gokvkit.NewDocumentFrom(map[string]any{
+				"_id":  id,
+				"name": gofakeit.Company(),
+			})
+			_, err = db.RunScript(ctx, "setAccount", getAccountScript, map[string]any{
+				"doc": doc,
+			})
+			assert.NoError(t, err)
+			val, err := db.Get(ctx, "account", id)
+			assert.NoError(t, err)
+			assert.NotEmpty(t, val)
+		}))
+	})
+	t.Run("forEachAccount", func(t *testing.T) {
+		assert.NoError(t, testutil.TestDB(func(ctx context.Context, db gokvkit.Database) {
+			getAccountScript := `
+function forEachAccount(ctx, db, params) {
+	db.forEach(ctx, 'account', undefined, params.fn)
+}
+ `
+			count := 0
+			_, err := db.RunScript(ctx, "forEachAccount", getAccountScript, map[string]any{
+				"fn": gokvkit.ForEachFunc(func(d *gokvkit.Document) (bool, error) {
+					count++
+					return true, nil
+				}),
+			})
+			assert.NoError(t, err)
+			assert.Equal(t, 101, count)
 		}))
 	})
 }

@@ -242,6 +242,7 @@ func (d *defaultDB) Close(ctx context.Context) error {
 func (d *defaultDB) RunScript(ctx context.Context, name, script string, params map[string]any) (any, error) {
 	if _, ok := d.programs.Load(name); !ok {
 		vm := goja.New()
+		vm.SetFieldNameMapper(goja.TagFieldNameMapper("json", true))
 		_, err := vm.RunString(script)
 		if err != nil {
 			return nil, err

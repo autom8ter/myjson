@@ -63,6 +63,8 @@ type Database interface {
 	Query(ctx context.Context, collection string, query Query) (Page, error)
 	// Get gets 1-many document by id(s)
 	BatchGet(ctx context.Context, collection string, ids []string) (Documents, error)
+	// RunScript runs a javascript function by name within the given script.
+	// The javascript function must have the following signature: function ${name}(ctx, db, params)
 	RunScript(ctx context.Context, name, script string, params map[string]any) (any, error)
 	// RawKV returns the database key value provider - it should be used with caution and only when standard database functionality is insufficient.
 	RawKV() kv.DB
