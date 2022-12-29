@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/autom8ter/gokvkit"
 	"github.com/autom8ter/gokvkit/testutil"
@@ -366,7 +367,42 @@ func TestDocument(t *testing.T) {
 		})
 		assert.Equal(t, "hello", d.Get(`message|@replaceAll:{"old": " world", "new": ""}`))
 	})
-
+	t.Run("@trim", func(t *testing.T) {
+		d, _ := gokvkit.NewDocumentFrom(map[string]any{
+			"message": "hello world",
+		})
+		assert.Equal(t, "helloworld", d.Get(`message|@trim`))
+	})
+	t.Run("@dateTrunc", func(t *testing.T) {
+		date := time.Date(1993, time.August, 17, 0, 0, 0, 0, time.Local)
+		d, _ := gokvkit.NewDocumentFrom(map[string]any{
+			"timestamp": date,
+		})
+		assert.Equal(t, "1993-08-01 00:00:00 -0600 MDT", d.GetString(`timestamp|@dateTrunc:month`))
+		assert.Equal(t, "1993-01-01 00:00:00 -0700 MST", d.GetString(`timestamp|@dateTrunc:year`))
+		assert.Equal(t, "1993-08-17 00:00:00 -0600 MDT", d.GetString(`timestamp|@dateTrunc:day`))
+	})
+	t.Run("@unix", func(t *testing.T) {
+		date := time.Date(1993, time.August, 17, 0, 0, 0, 0, time.Local)
+		d, _ := gokvkit.NewDocumentFrom(map[string]any{
+			"timestamp": date,
+		})
+		assert.Equal(t, float64(date.Unix()), d.GetFloat(`timestamp|@unix`))
+	})
+	t.Run("@unixMilli", func(t *testing.T) {
+		date := time.Date(1993, time.August, 17, 0, 0, 0, 0, time.Local)
+		d, _ := gokvkit.NewDocumentFrom(map[string]any{
+			"timestamp": date,
+		})
+		assert.Equal(t, float64(date.UnixMilli()), d.GetFloat(`timestamp|@unixMilli`))
+	})
+	t.Run("@unixNano", func(t *testing.T) {
+		date := time.Date(1993, time.August, 17, 0, 0, 0, 0, time.Local)
+		d, _ := gokvkit.NewDocumentFrom(map[string]any{
+			"timestamp": date,
+		})
+		assert.Equal(t, float64(date.UnixNano()), d.GetFloat(`timestamp|@unixNano`))
+	})
 	t.Run("results", func(t *testing.T) {
 		var docs = []*gokvkit.Document{
 			testutil.NewUserDoc(),

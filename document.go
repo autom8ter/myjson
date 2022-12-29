@@ -6,6 +6,7 @@ import (
 	"io"
 	"reflect"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -46,54 +47,46 @@ var modifiers = map[string]func(json, arg string) string{
 		return strings.ReplaceAll(json, args.Get("old").String(), args.Get("new").String())
 	},
 	"trim": func(json, arg string) string {
-		return strings.TrimSpace(json)
-	},
-	"trimPrefix": func(json, arg string) string {
-		return strings.TrimPrefix(json, arg)
-	},
-	"trimSuffix": func(json, arg string) string {
-		return strings.TrimSuffix(json, arg)
-	},
-	"addPrefix": func(json, arg string) string {
-		return fmt.Sprintf("%s%s", arg, json)
-	},
-	"addSuffix": func(json, arg string) string {
-		return fmt.Sprintf("%s%s", json, arg)
+		return strings.ReplaceAll(json, " ", "")
 	},
 	"dateTrunc": func(json, arg string) string {
+		json, _ = strconv.Unquote(json)
 		t := cast.ToTime(json)
-		day, month, yr := t.Date()
+		yr, month, day := t.Date()
 		switch arg {
 		case "month":
-			return time.Date(yr, month, 0, 0, 0, 0, 0, time.Local).String()
+			return strconv.Quote(time.Date(yr, month, 1, 0, 0, 0, 0, time.Local).String())
 		case "day":
-			return time.Date(yr, month, day, 0, 0, 0, 0, time.Local).String()
+			return strconv.Quote(time.Date(yr, month, day, 0, 0, 0, 0, time.Local).String())
 		case "year":
-			return time.Date(yr, 0, 0, 0, 0, 0, 0, time.Local).String()
+			return strconv.Quote(time.Date(yr, time.January, 1, 0, 0, 0, 0, time.Local).String())
 		default:
 			return json
 		}
 	},
-	"toUnix": func(json, arg string) string {
+	"unix": func(json, arg string) string {
+		json, _ = strconv.Unquote(json)
 		t := cast.ToTime(json)
 		if t.IsZero() {
 			return json
 		}
-		return fmt.Sprint(t.Unix())
+		return strconv.Quote(fmt.Sprint(t.Unix()))
 	},
-	"toUnixMs": func(json, arg string) string {
+	"unixMilli": func(json, arg string) string {
+		json, _ = strconv.Unquote(json)
 		t := cast.ToTime(json)
 		if t.IsZero() {
 			return json
 		}
-		return fmt.Sprint(t.UnixMilli())
+		return strconv.Quote(fmt.Sprint(t.UnixMilli()))
 	},
-	"toUnixNs": func(json, arg string) string {
+	"unixNano": func(json, arg string) string {
+		json, _ = strconv.Unquote(json)
 		t := cast.ToTime(json)
 		if t.IsZero() {
 			return json
 		}
-		return fmt.Sprint(t.UnixNano())
+		return strconv.Quote(fmt.Sprint(t.UnixNano()))
 	},
 }
 
