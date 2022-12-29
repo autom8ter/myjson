@@ -11,12 +11,91 @@ import (
 
 	"github.com/autom8ter/gokvkit/errors"
 	"github.com/autom8ter/gokvkit/util"
+	"github.com/huandu/xstrings"
 	flat2 "github.com/nqd/flat"
 	"github.com/samber/lo"
 	"github.com/spf13/cast"
 	"github.com/tidwall/gjson"
 	"github.com/tidwall/sjson"
 )
+
+func init() {
+	for k, v := range modifiers {
+		gjson.AddModifier(k, v)
+	}
+}
+
+var modifiers = map[string]func(json, arg string) string{
+	"snakeCase": func(json, arg string) string {
+		return xstrings.ToSnakeCase(json)
+	},
+	"camelCase": func(json, arg string) string {
+		return xstrings.ToCamelCase(json)
+	},
+	"kebabCase": func(json, arg string) string {
+		return xstrings.ToKebabCase(json)
+	},
+	"upper": func(json, arg string) string {
+		return strings.ToUpper(json)
+	},
+	"lower": func(json, arg string) string {
+		return strings.ToLower(json)
+	},
+	"replaceAll": func(json, arg string) string {
+		args := gjson.Parse(arg)
+		return strings.ReplaceAll(json, args.Get("old").String(), args.Get("new").String())
+	},
+	"trim": func(json, arg string) string {
+		return strings.TrimSpace(json)
+	},
+	"trimPrefix": func(json, arg string) string {
+		return strings.TrimPrefix(json, arg)
+	},
+	"trimSuffix": func(json, arg string) string {
+		return strings.TrimSuffix(json, arg)
+	},
+	"addPrefix": func(json, arg string) string {
+		return fmt.Sprintf("%s%s", arg, json)
+	},
+	"addSuffix": func(json, arg string) string {
+		return fmt.Sprintf("%s%s", json, arg)
+	},
+	"dateTrunc": func(json, arg string) string {
+		t := cast.ToTime(json)
+		day, month, yr := t.Date()
+		switch arg {
+		case "month":
+			return time.Date(yr, month, 0, 0, 0, 0, 0, time.Local).String()
+		case "day":
+			return time.Date(yr, month, day, 0, 0, 0, 0, time.Local).String()
+		case "year":
+			return time.Date(yr, 0, 0, 0, 0, 0, 0, time.Local).String()
+		default:
+			return json
+		}
+	},
+	"toUnix": func(json, arg string) string {
+		t := cast.ToTime(json)
+		if t.IsZero() {
+			return json
+		}
+		return fmt.Sprint(t.Unix())
+	},
+	"toUnixMs": func(json, arg string) string {
+		t := cast.ToTime(json)
+		if t.IsZero() {
+			return json
+		}
+		return fmt.Sprint(t.UnixMilli())
+	},
+	"toUnixNs": func(json, arg string) string {
+		t := cast.ToTime(json)
+		if t.IsZero() {
+			return json
+		}
+		return fmt.Sprint(t.UnixNano())
+	},
+}
 
 const selfRefPrefix = "$"
 

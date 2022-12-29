@@ -310,7 +310,7 @@ func TestDocument(t *testing.T) {
 		assert.True(t, usr.Exists("tsk.user"))
 		assert.True(t, usr.Exists("tsk._id"))
 	})
-	t.Run("hasPropertyPath", func(t *testing.T) {
+	t.Run("getArray", func(t *testing.T) {
 		usr := testutil.NewUserDoc()
 		assert.NoError(t, usr.Set("tags", []string{"#colorado"}))
 		assert.NotEmpty(t, usr.GetArray("tags"))
@@ -324,6 +324,49 @@ func TestDocument(t *testing.T) {
 		assert.NoError(t, usr2.UnmarshalJSON(bits))
 		assert.Equal(t, usr.String(), usr2.String())
 	})
+	t.Run("@reverse", func(t *testing.T) {
+		d, _ := gokvkit.NewDocumentFrom(map[string]any{
+			"messages": []string{"hello world", "hello world", "hello"},
+		})
+		assert.Equal(t, "hello", d.GetArray("messages|@reverse")[0])
+	})
+	t.Run("@snakeCase", func(t *testing.T) {
+		d, _ := gokvkit.NewDocumentFrom(map[string]any{
+			"message": "helloWorld",
+		})
+		assert.Equal(t, "hello_world", d.Get("message|@snakeCase"))
+	})
+	t.Run("@camelCase", func(t *testing.T) {
+		d, _ := gokvkit.NewDocumentFrom(map[string]any{
+			"message": "hello_world",
+		})
+		assert.Equal(t, "helloWorld", d.Get("message|@camelCase"))
+	})
+	t.Run("@kebabCase", func(t *testing.T) {
+		d, _ := gokvkit.NewDocumentFrom(map[string]any{
+			"message": "hello_world",
+		})
+		assert.Equal(t, "hello-world", d.Get("message|@kebabCase"))
+	})
+	t.Run("@lower", func(t *testing.T) {
+		d, _ := gokvkit.NewDocumentFrom(map[string]any{
+			"message": "HELLO WORLD",
+		})
+		assert.Equal(t, "hello world", d.Get("message|@lower"))
+	})
+	t.Run("@upper", func(t *testing.T) {
+		d, _ := gokvkit.NewDocumentFrom(map[string]any{
+			"message": "hello world",
+		})
+		assert.Equal(t, "HELLO WORLD", d.Get("message|@upper"))
+	})
+	t.Run("@replaceAll", func(t *testing.T) {
+		d, _ := gokvkit.NewDocumentFrom(map[string]any{
+			"message": "hello world",
+		})
+		assert.Equal(t, "hello", d.Get(`message|@replaceAll:{"old": " world", "new": ""}`))
+	})
+
 	t.Run("results", func(t *testing.T) {
 		var docs = []*gokvkit.Document{
 			testutil.NewUserDoc(),
