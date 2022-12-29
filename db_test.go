@@ -709,6 +709,122 @@ func TestIndexing1(t *testing.T) {
 			}))
 		})
 	})
+
+}
+
+func TestOrderBy(t *testing.T) {
+	t.Run("basic asc/desc", func(t *testing.T) {
+		assert.NoError(t, testutil.TestDB(func(ctx context.Context, db gokvkit.Database) {
+			var usrs []*gokvkit.Document
+			assert.NoError(t, db.Tx(ctx, true, func(ctx context.Context, tx gokvkit.Tx) error {
+				for i := 0; i < 10; i++ {
+					u := testutil.NewUserDoc()
+					assert.NoError(t, u.Set("age", i))
+					usrs = append(usrs, u)
+					assert.NoError(t, tx.Set(ctx, "user", u))
+				}
+				return nil
+			}))
+			{
+				results, err := db.Query(ctx, "user", gokvkit.Q().
+					Select(gokvkit.Select{Field: "*"}).
+					OrderBy(gokvkit.OrderBy{Field: "age", Direction: gokvkit.OrderByDirectionAsc}).
+					Query())
+				assert.NoError(t, err)
+				for i, d := range results.Documents {
+					assert.Equal(t, usrs[i].Get("age"), d.Get("age"))
+				}
+			}
+			{
+				results, err := db.Query(ctx, "user", gokvkit.Q().
+					Select(gokvkit.Select{Field: "*"}).
+					OrderBy(gokvkit.OrderBy{Field: "age", Direction: gokvkit.OrderByDirectionDesc}).
+					Query())
+				assert.NoError(t, err)
+				for i, d := range results.Documents {
+					assert.Equal(t, usrs[len(usrs)-i-1].Get("age"), d.Get("age"))
+				}
+			}
+		}))
+	})
+}
+
+func TestPagination(t *testing.T) {
+	t.Run("order by asc + pagination", func(t *testing.T) {
+		assert.NoError(t, testutil.TestDB(func(ctx context.Context, db gokvkit.Database) {
+			var usrs []*gokvkit.Document
+			assert.NoError(t, db.Tx(ctx, true, func(ctx context.Context, tx gokvkit.Tx) error {
+				for i := 0; i < 10; i++ {
+					u := testutil.NewUserDoc()
+					assert.NoError(t, u.Set("age", i))
+					usrs = append(usrs, u)
+					assert.NoError(t, tx.Set(ctx, "user", u))
+				}
+				return nil
+			}))
+			for i := 0; i < 10; i++ {
+				results, err := db.Query(ctx, "user", gokvkit.Q().
+					OrderBy(gokvkit.OrderBy{Field: "age", Direction: gokvkit.OrderByDirectionAsc}).
+					Page(i).
+					Limit(1).
+					Query())
+				assert.NoError(t, err)
+				assert.Equal(t, 1, results.Count)
+				assert.Equal(t, usrs[i].Get("age"), results.Documents[0].Get("age"))
+			}
+		}))
+	})
+	t.Run("order by desc + pagination", func(t *testing.T) {
+		assert.NoError(t, testutil.TestDB(func(ctx context.Context, db gokvkit.Database) {
+			var usrs []*gokvkit.Document
+			assert.NoError(t, db.Tx(ctx, true, func(ctx context.Context, tx gokvkit.Tx) error {
+				for i := 0; i < 10; i++ {
+					u := testutil.NewUserDoc()
+					assert.NoError(t, u.Set("age", i))
+					usrs = append(usrs, u)
+					assert.NoError(t, tx.Set(ctx, "user", u))
+				}
+				return nil
+			}))
+			for i := 0; i < 10; i++ {
+				results, err := db.Query(ctx, "user", gokvkit.Q().
+					OrderBy(gokvkit.OrderBy{Field: "age", Direction: gokvkit.OrderByDirectionDesc}).
+					Page(i).
+					Limit(1).
+					Query())
+				assert.NoError(t, err)
+				assert.Equal(t, 1, results.Count)
+				assert.Equal(t, usrs[len(usrs)-i-1].Get("age"), results.Documents[0].Get("age"))
+			}
+		}))
+	})
+	t.Run("order by desc + where + pagination", func(t *testing.T) {
+		assert.NoError(t, testutil.TestDB(func(ctx context.Context, db gokvkit.Database) {
+			var usrs []*gokvkit.Document
+			assert.NoError(t, db.Tx(ctx, true, func(ctx context.Context, tx gokvkit.Tx) error {
+				for i := 0; i < 10; i++ {
+					u := testutil.NewUserDoc()
+					assert.NoError(t, u.Set("age", i))
+					usrs = append(usrs, u)
+					assert.NoError(t, tx.Set(ctx, "user", u))
+				}
+				return nil
+			}))
+			for i := 0; i < 10; i++ {
+				results, err := db.Query(ctx, "user", gokvkit.Q().
+					Where(gokvkit.Where{Field: "age", Op: gokvkit.WhereOpGte, Value: 5}).
+					OrderBy(gokvkit.OrderBy{Field: "age", Direction: gokvkit.OrderByDirectionDesc}).
+					Page(i).
+					Limit(1).
+					Query())
+				assert.NoError(t, err)
+				if i < 5 {
+					assert.Equal(t, 1, results.Count)
+					assert.Equal(t, usrs[len(usrs)-i-1].Get("age"), results.Documents[0].Get("age"))
+				}
+			}
+		}))
+	})
 }
 
 func TestAggregate(t *testing.T) {
@@ -833,6 +949,137 @@ function forEachAccount(ctx, db, params) {
 			})
 			assert.NoError(t, err)
 			assert.Equal(t, 101, count)
+		}))
+	})
+}
+
+func TestJoin(t *testing.T) {
+	t.Run("join user to account", func(t *testing.T) {
+		assert.NoError(t, testutil.TestDB(func(ctx context.Context, db gokvkit.Database) {
+			var usrs = map[string]*gokvkit.Document{}
+			assert.NoError(t, db.Tx(ctx, true, func(ctx context.Context, tx gokvkit.Tx) error {
+				for i := 0; i < 100; i++ {
+					u := testutil.NewUserDoc()
+					usrs[u.GetString("_id")] = u
+					assert.NoError(t, tx.Set(ctx, "user", u))
+				}
+				return nil
+			}))
+			assert.NoError(t, db.Tx(ctx, true, func(ctx context.Context, tx gokvkit.Tx) error {
+				assert.NoError(t, tx.Set(ctx, "user", testutil.NewUserDoc()))
+				return nil
+			}))
+			results, err := db.Query(ctx, "user", gokvkit.Q().
+				Select(
+					gokvkit.Select{Field: "acc._id", As: "account_id"},
+					gokvkit.Select{Field: "acc.name", As: "account_name"},
+					gokvkit.Select{Field: "_id", As: "user_id"},
+				).
+				Join(gokvkit.Join{
+					Collection: "account",
+					On: []gokvkit.Where{
+						{
+							Field: "_id",
+							Op:    gokvkit.WhereOpEq,
+							Value: "$account_id",
+						},
+					},
+					As: "acc",
+				}).
+				Query())
+			assert.NoError(t, err)
+
+			for _, r := range results.Documents {
+				assert.True(t, r.Exists("account_name"))
+				assert.True(t, r.Exists("account_id"))
+				assert.True(t, r.Exists("user_id"))
+				if usrs[r.GetString("user_id")] != nil {
+					assert.NotEmpty(t, usrs[r.GetString("user_id")])
+					assert.Equal(t, usrs[r.GetString("user_id")].Get("account_id"), r.GetString("account_id"))
+				}
+			}
+		}))
+	})
+	t.Run("join account to user", func(t *testing.T) {
+		assert.NoError(t, testutil.TestDB(func(ctx context.Context, db gokvkit.Database) {
+			accID := ""
+			assert.NoError(t, db.Tx(ctx, true, func(ctx context.Context, tx gokvkit.Tx) error {
+				doc := testutil.NewUserDoc()
+				accID = doc.GetString("account_id")
+				doc2 := testutil.NewUserDoc()
+				assert.Nil(t, doc2.Set("account_id", accID))
+				assert.NoError(t, tx.Set(ctx, "user", doc))
+				assert.NoError(t, tx.Set(ctx, "user", doc2))
+				return nil
+			}))
+			results, err := db.Query(ctx, "account", gokvkit.Q().
+				Select(
+					gokvkit.Select{Field: "_id", As: "account_id"},
+					gokvkit.Select{Field: "name", As: "account_name"},
+					gokvkit.Select{Field: "usr.name"},
+				).
+				Where(
+					gokvkit.Where{
+						Field: "_id",
+						Op:    gokvkit.WhereOpEq,
+						Value: accID,
+					},
+				).
+				Join(gokvkit.Join{
+					Collection: "user",
+					On: []gokvkit.Where{
+						{
+							Field: "account_id",
+							Op:    gokvkit.WhereOpEq,
+							Value: "$_id",
+						},
+					},
+					As: "usr",
+				}).
+				OrderBy(gokvkit.OrderBy{Field: "account_name", Direction: gokvkit.OrderByDirectionAsc}).
+				Query())
+			assert.NoError(t, err)
+
+			for _, r := range results.Documents {
+				assert.True(t, r.Exists("account_name"))
+				assert.True(t, r.Exists("account_id"))
+				assert.True(t, r.Exists("usr"))
+			}
+			assert.Equal(t, 2, results.Count)
+		}))
+	})
+	t.Run("cascade delete", func(t *testing.T) {
+		assert.NoError(t, testutil.TestDB(func(ctx context.Context, db gokvkit.Database) {
+			assert.NoError(t, db.Tx(ctx, true, func(ctx context.Context, tx gokvkit.Tx) error {
+				for i := 0; i <= 100; i++ {
+					u := testutil.NewUserDoc()
+					if err := tx.Set(ctx, "user", u); err != nil {
+						return err
+					}
+					tsk := testutil.NewTaskDoc(u.GetString("_id"))
+					if err := tx.Set(ctx, "task", tsk); err != nil {
+						return err
+					}
+				}
+				return nil
+			}))
+			assert.NoError(t, db.Tx(ctx, true, func(ctx context.Context, tx gokvkit.Tx) error {
+				for i := 0; i <= 100; i++ {
+					if err := tx.Delete(ctx, "account", fmt.Sprint(i)); err != nil {
+						return err
+					}
+				}
+				return nil
+			}))
+			results, err := db.Query(ctx, "account", gokvkit.Query{Select: []gokvkit.Select{{Field: "*"}}})
+			assert.NoError(t, err)
+			assert.Equal(t, 0, results.Count, "failed to delete accounts")
+			results, err = db.Query(ctx, "user", gokvkit.Query{Select: []gokvkit.Select{{Field: "*"}}})
+			assert.NoError(t, err)
+			assert.Equal(t, 0, results.Count, "failed to cascade delete users")
+			results, err = db.Query(ctx, "task", gokvkit.Query{Select: []gokvkit.Select{{Field: "*"}}})
+			assert.NoError(t, err)
+			assert.Equal(t, 0, results.Count, "failed to cascade delete tasks")
 		}))
 	})
 }

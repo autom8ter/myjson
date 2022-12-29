@@ -112,6 +112,9 @@ func (d *defaultDB) Query(ctx context.Context, collection string, query Query) (
 		page Page
 		err  error
 	)
+	if len(query.Select) == 0 {
+		query.Select = []Select{{Field: "*"}}
+	}
 	if err := d.Tx(ctx, false, func(ctx context.Context, tx Tx) error {
 		page, err = tx.Query(ctx, collection, query)
 		return err

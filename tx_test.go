@@ -118,4 +118,12 @@ func TestTx(t *testing.T) {
 			}))
 		}))
 	})
+	t.Run("DB() not nil", func(t *testing.T) {
+		assert.Nil(t, testutil.TestDB(func(ctx context.Context, db gokvkit.Database) {
+			assert.Nil(t, db.Tx(ctx, true, func(ctx context.Context, tx gokvkit.Tx) error {
+				assert.NotNil(t, tx.DB())
+				return nil
+			}))
+		}))
+	})
 }

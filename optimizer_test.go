@@ -113,4 +113,70 @@ func TestOptimizer(t *testing.T) {
 		assert.Equal(t, "timestamp", optimization.SeekFields[0])
 		assert.NotEmpty(t, optimization.SeekValues["timestamp"])
 	})
+	t.Run("select primary index (neq)", func(t *testing.T) {
+		optimization, err := o.Optimize(indexes, []Where{
+			{
+				Field: "_id",
+				Op:    WhereOpNeq,
+				Value: gofakeit.Email(),
+			},
+		})
+		assert.NoError(t, err)
+		assert.Equal(t, true, optimization.Index.Primary)
+	})
+	t.Run("select primary index (hasPrefix)", func(t *testing.T) {
+		optimization, err := o.Optimize(indexes, []Where{
+			{
+				Field: "_id",
+				Op:    WhereOpHasPrefix,
+				Value: gofakeit.Email(),
+			},
+		})
+		assert.NoError(t, err)
+		assert.Equal(t, true, optimization.Index.Primary)
+	})
+	t.Run("select primary index (hasSuffix)", func(t *testing.T) {
+		optimization, err := o.Optimize(indexes, []Where{
+			{
+				Field: "_id",
+				Op:    WhereOpHasSuffix,
+				Value: gofakeit.Email(),
+			},
+		})
+		assert.NoError(t, err)
+		assert.Equal(t, true, optimization.Index.Primary)
+	})
+	t.Run("select primary index (contains)", func(t *testing.T) {
+		optimization, err := o.Optimize(indexes, []Where{
+			{
+				Field: "_id",
+				Op:    WhereOpContains,
+				Value: gofakeit.Email(),
+			},
+		})
+		assert.NoError(t, err)
+		assert.Equal(t, true, optimization.Index.Primary)
+	})
+	t.Run("select primary index (in)", func(t *testing.T) {
+		optimization, err := o.Optimize(indexes, []Where{
+			{
+				Field: "_id",
+				Op:    WhereOpIn,
+				Value: []string{gofakeit.Email()},
+			},
+		})
+		assert.NoError(t, err)
+		assert.Equal(t, true, optimization.Index.Primary)
+	})
+	t.Run("select primary index (containsAll)", func(t *testing.T) {
+		optimization, err := o.Optimize(indexes, []Where{
+			{
+				Field: "_id",
+				Op:    WhereOpContainsAll,
+				Value: []string{gofakeit.Email()},
+			},
+		})
+		assert.NoError(t, err)
+		assert.Equal(t, true, optimization.Index.Primary)
+	})
 }
