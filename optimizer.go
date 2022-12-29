@@ -84,6 +84,9 @@ func (o defaultOptimizer) Optimize(c CollectionSchema, where []Where) (Optimizat
 		opt.SeekValues = getMatchedFieldValues(opt.SeekFields, where)
 		return *opt, nil
 	}
+	if c.RequireQueryIndex() {
+		return Optimization{}, errors.New(errors.Forbidden, "index is required for query in collection: %s", c.Collection())
+	}
 	return defaultOptimization(c), nil
 }
 

@@ -177,4 +177,7 @@ func TestContext(t *testing.T) {
 
 	assert.Nil(t, json.Unmarshal(bits, c))
 	assert.True(t, c.Exists("testing"))
+
+	c.SetNamespace("acme.com")
+	assert.Equal(t, "acme.com", c.GetNamespace())
 }

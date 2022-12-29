@@ -23,8 +23,12 @@ type CollectionSchema interface {
 	GetPrimaryKey(doc *Document) string
 	// SetPrimaryKey sets the document's primary key
 	SetPrimaryKey(doc *Document, id string) error
-	// RequireQueryIndex returns whether the collection requires that querie's are appropriately indexed
+	// RequireQueryIndex returns whether the collection requires that queries are appropriately indexed
 	RequireQueryIndex() bool
+	// Properties returns a map of the schema's properties
+	Properties() map[string]SchemaProperty
+	// PropertyPaths returns a flattened map of the schema's properties - nested properties will be keyed in dot notation
+	PropertyPaths() map[string]SchemaProperty
 	// MarshalYAML returns the collection schema as yaml bytes
 	MarshalYAML() ([]byte, error)
 	// UnmarshalYAML refreshes the collection schema with the given json bytes

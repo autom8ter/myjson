@@ -455,12 +455,16 @@ type SchemaProperty struct {
 	Description string `json:"description,omitempty"`
 	// Type is the type of the property
 	Type string `json:"type" validate:"required"`
+	// Path is a dot notation path to the property
+	Path string `json:"path" validate:"required"`
 	// Unique indicates the field value is unique
 	Unique bool `json:"x-unique,omitempty"`
 	// ForeignKey is a relationship to another collection
 	ForeignKey *ForeignKey `json:"x-foreign,omitempty"`
 	// Index is a secondary index mapped by index name
 	Index map[string]PropertyIndex `json:"x-index,omitempty"`
+	// Properties are object properties
+	Properties map[string]SchemaProperty `json:"properties,omitempty"`
 }
 
 // PropertyIndex is an index attached to a json schema property

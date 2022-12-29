@@ -58,7 +58,7 @@ func newCollectionSchema(yamlContent []byte) (CollectionSchema, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := s.loadProperties(s.raw.Get("properties")); err != nil {
+	if err := s.loadProperties(s.properties, s.raw.Get("properties")); err != nil {
 		return nil, err
 	}
 	if err != nil {
@@ -92,7 +92,7 @@ func (c *collectionSchema) loadRef(fieldPath string, ref string) (gjson.Result, 
 	return c.raw.Get(path), nil
 }
 
-func (s *collectionSchema) loadProperties(r gjson.Result) error {
+func (s *collectionSchema) loadProperties(properties map[string]SchemaProperty, r gjson.Result) error {
 	if !r.Exists() {
 		return nil
 	}
@@ -115,10 +115,12 @@ func (s *collectionSchema) loadProperties(r gjson.Result) error {
 			Description: value.Get("description").String(),
 			Type:        value.Get("type").String(),
 			Unique:      value.Get(string(uniquePath)).Bool(),
+			Path:        path,
+			Properties:  map[string]SchemaProperty{},
 		}
 
-		if properties := value.Get("properties"); properties.Exists() && schema.Type == "object" {
-			if err := s.loadProperties(properties); err != nil {
+		if props := value.Get("properties"); props.Exists() && schema.Type == "object" {
+			if err := s.loadProperties(schema.Properties, props); err != nil {
 				return err
 			}
 		}
@@ -147,7 +149,7 @@ func (s *collectionSchema) loadProperties(r gjson.Result) error {
 				}
 			}
 		}
-		s.properties[key] = schema
+		properties[key] = schema
 		s.propertyPaths[path] = schema
 		switch {
 		case schema.Primary:
@@ -207,8 +209,6 @@ func (c *collectionSchema) MarshalYAML() ([]byte, error) {
 }
 
 func (c *collectionSchema) UnmarshalYAML(bytes []byte) error {
-	c.mu.Lock()
-	defer c.mu.Unlock()
 	bits, err := util.YAMLToJSON(bytes)
 	if err != nil {
 		return err
@@ -223,8 +223,6 @@ func (c *collectionSchema) MarshalJSON() ([]byte, error) {
 }
 
 func (c *collectionSchema) UnmarshalJSON(bytes []byte) error {
-	c.mu.Lock()
-	defer c.mu.Unlock()
 	return c.refreshSchema(bytes)
 }
 
@@ -297,6 +295,12 @@ func (c *collectionSchema) Properties() map[string]SchemaProperty {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	return c.properties
+}
+
+func (c *collectionSchema) PropertyPaths() map[string]SchemaProperty {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.propertyPaths
 }
 
 func (c *collectionSchema) HasPropertyPath(p string) bool {
