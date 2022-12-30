@@ -10,7 +10,6 @@ require (
 	github.com/go-playground/validator/v10 v10.11.1
 	github.com/mitchellh/mapstructure v1.5.0
 	github.com/nqd/flat v0.1.1
-	github.com/qri-io/jsonschema v0.2.1
 	github.com/samber/lo v1.28.2
 	github.com/segmentio/ksuid v1.0.4
 	github.com/spf13/cast v1.5.0
@@ -34,6 +33,7 @@ require (
 	github.com/dlclark/regexp2 v1.7.0 // indirect
 	github.com/dop251/goja v0.0.0-20221224150820-cc4634e76e9a // indirect
 	github.com/dustin/go-humanize v1.0.0 // indirect
+	github.com/go-chi/chi/v5 v5.0.8 // indirect
 	github.com/go-playground/locales v0.14.0 // indirect
 	github.com/go-playground/universal-translator v0.18.0 // indirect
 	github.com/go-sourcemap/sourcemap v2.1.3+incompatible // indirect
