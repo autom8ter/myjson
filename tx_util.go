@@ -422,39 +422,38 @@ func (t *transaction) queryScan(ctx context.Context, collection string, where []
 
 func (t *transaction) applyCommandTriggers(ctx context.Context, c CollectionSchema, command *Command) error {
 	runTrigger := func(trigger Trigger) error {
-		vm, err := getJavascriptVM(ctx, t.db)
-		if err != nil {
+		if err := t.vm.Set("tx", t); err != nil {
 			return err
 		}
-		if err := vm.Set("tx", t); err != nil {
+		if err := t.vm.Set("ctx", ctx); err != nil {
 			return err
 		}
-		if err := vm.Set("doc", command.Document); err != nil {
+		if err := t.vm.Set("doc", command.Document); err != nil {
 			return err
 		}
-		if err := vm.Set("metadata", command.Metadata); err != nil {
+		if err := t.vm.Set("metadata", command.Metadata); err != nil {
 			return err
 		}
-		if _, err := vm.RunString(trigger.Script); err != nil {
+		if _, err := t.vm.RunString(trigger.Script); err != nil {
 			return err
 		}
 		return nil
 	}
 	for _, trigger := range c.Triggers() {
 		switch {
-		case command.Action == Delete && lo.Contains(trigger.Timing, OnDelete):
+		case command.Action == Delete && lo.Contains(trigger.Events, OnDelete):
 			if err := runTrigger(trigger); err != nil {
 				return err
 			}
-		case command.Action == Set && lo.Contains(trigger.Timing, OnSet):
+		case command.Action == Set && lo.Contains(trigger.Events, OnSet):
 			if err := runTrigger(trigger); err != nil {
 				return err
 			}
-		case command.Action == Create && lo.Contains(trigger.Timing, OnCreate):
+		case command.Action == Create && lo.Contains(trigger.Events, OnCreate):
 			if err := runTrigger(trigger); err != nil {
 				return err
 			}
-		case command.Action == Update && lo.Contains(trigger.Timing, OnUpdate):
+		case command.Action == Update && lo.Contains(trigger.Events, OnUpdate):
 			if err := runTrigger(trigger); err != nil {
 				return err
 			}

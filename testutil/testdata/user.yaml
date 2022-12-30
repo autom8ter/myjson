@@ -49,7 +49,7 @@ properties:
 
 triggers:
   set_timestamp:
-    timing:
+    events:
       - on_create
       - on_update
       - on_set

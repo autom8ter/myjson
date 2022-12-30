@@ -20,7 +20,7 @@ type collectionSchema struct {
 	indexing      map[string]Index
 	properties    map[string]SchemaProperty
 	propertyPaths map[string]SchemaProperty
-	triggers      map[string]Trigger
+	triggers      []Trigger
 	mu            sync.RWMutex
 }
 
@@ -55,7 +55,6 @@ func newCollectionSchema(yamlContent []byte) (CollectionSchema, error) {
 		indexing:      map[string]Index{},
 		properties:    map[string]SchemaProperty{},
 		propertyPaths: map[string]SchemaProperty{},
-		triggers:      map[string]Trigger{},
 	}
 	if err != nil {
 		return nil, err
@@ -82,13 +81,14 @@ func newCollectionSchema(yamlContent []byte) (CollectionSchema, error) {
 	if triggers := s.raw.Get("triggers"); triggers.Exists() {
 		for name, t := range triggers.Map() {
 			var trig Trigger
+			trig.Name = name
 			if err := util.Decode(t.Value(), &trig); err != nil {
-				return nil, errors.Wrap(err, errors.Validation, "invalid trigger: %s", name)
+				return nil, errors.Wrap(err, errors.Validation, "invalid trigger")
 			}
 			if err := util.ValidateStruct(trig); err != nil {
-				return nil, errors.Wrap(err, errors.Validation, "invalid trigger: %s", name)
+				return nil, errors.Wrap(err, errors.Validation, "invalid trigger: %s", trig.Name)
 			}
-			s.triggers[name] = trig
+			s.triggers = append(s.triggers, trig)
 		}
 	}
 	return s, nil
@@ -323,7 +323,7 @@ func (c *collectionSchema) HasPropertyPath(p string) bool {
 	return c.propertyPaths[p].Name != ""
 }
 
-func (c *collectionSchema) Triggers() map[string]Trigger {
+func (c *collectionSchema) Triggers() []Trigger {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	return c.triggers

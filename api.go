@@ -30,7 +30,7 @@ type CollectionSchema interface {
 	// PropertyPaths returns a flattened map of the schema's properties - nested properties will be keyed in dot notation
 	PropertyPaths() map[string]SchemaProperty
 	// Triggers returns a map of triggers keyed by name that are assigned to the collection
-	Triggers() map[string]Trigger
+	Triggers() []Trigger
 	// MarshalYAML returns the collection schema as yaml bytes
 	MarshalYAML() ([]byte, error)
 	// UnmarshalYAML refreshes the collection schema with the given json bytes

@@ -52,10 +52,13 @@ func New(ctx context.Context, provider string, providerParams map[string]any, op
 }
 
 func (d *defaultDB) NewTx(isUpdate bool) Txn {
+	vm, _ := getJavascriptVM(context.Background(), d)
+	vm.Set("isUpdate", isUpdate)
 	return &transaction{
 		db:      d,
 		tx:      d.kv.NewTx(isUpdate),
 		isBatch: false,
+		vm:      vm,
 	}
 }
 

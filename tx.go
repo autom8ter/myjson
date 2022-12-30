@@ -7,6 +7,7 @@ import (
 	"github.com/autom8ter/gokvkit/errors"
 	"github.com/autom8ter/gokvkit/kv"
 	"github.com/autom8ter/gokvkit/util"
+	"github.com/dop251/goja"
 	"github.com/samber/lo"
 	"github.com/segmentio/ksuid"
 )
@@ -23,6 +24,7 @@ type transaction struct {
 	tx      kv.Tx
 	isBatch bool
 	cdc     []CDC
+	vm      *goja.Runtime
 }
 
 func (t *transaction) Commit(ctx context.Context) error {

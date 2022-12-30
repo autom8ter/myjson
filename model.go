@@ -352,18 +352,20 @@ type Index struct {
 	ForeignKey *ForeignKey `json:"foreignKey,omitempty"`
 }
 
-type Timing string
+type EventType string
 
 const (
-	OnSet    Timing = "on_set"
-	OnDelete Timing = "on_delete"
-	OnUpdate Timing = "on_update"
-	OnCreate Timing = "on_create"
+	OnSet    EventType = "on_set"
+	OnDelete EventType = "on_delete"
+	OnUpdate EventType = "on_update"
+	OnCreate EventType = "on_create"
 )
 
+// Trigger is a javasript function executed after a database event occurs
 type Trigger struct {
-	Timing []Timing `json:"timing" validate:"min=1,required"`
-	Script string   `json:"script" validate:"required"`
+	Name   string      `json:"name" validate:"required"`
+	Events []EventType `json:"events" validate:"min=1,required"`
+	Script string      `json:"script" validate:"required"`
 }
 
 // OnPersist is a hook function triggered whenever a command is persisted
