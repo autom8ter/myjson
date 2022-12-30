@@ -4,7 +4,6 @@ import (
 	"context"
 	_ "embed"
 	"encoding/json"
-	"flag"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -28,7 +27,6 @@ var (
 )
 
 func main() {
-	flag.Parse()
 	ctx := context.Background()
 	db, err := gokvkit.New(context.Background(), "badger", map[string]any{
 		"storage_path": "./tmp",

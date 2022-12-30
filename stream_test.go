@@ -13,16 +13,16 @@ func TestStream(t *testing.T) {
 	t.Run("broadcast", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		s := newStream[int](machine.New())
-		values := make(chan int, 5)
+		var values []int
 		go func() {
-			ch, err := s.Pull(ctx, "testing")
+			err := s.Pull(ctx, "testing", func(i int) (bool, error) {
+				values = append(values, i)
+				return true, nil
+			})
 			assert.NoError(t, err)
-			for i := range ch {
-				values <- i
-			}
-			close(values)
 		}()
 		time.Sleep(1 * time.Second)
+
 		for i := 0; i < 5; i++ {
 			s.Broadcast(ctx, "testing", i)
 		}

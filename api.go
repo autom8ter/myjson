@@ -58,7 +58,7 @@ type Database interface {
 	// NewTx returns a new transaction. a transaction must call Commit method in order to persist changes
 	NewTx(opts TxOpts) (Txn, error)
 	// ChangeStream streams changes to documents in the given collection.
-	ChangeStream(ctx context.Context, collection string) (<-chan CDC, error)
+	ChangeStream(ctx context.Context, collection string, fn func(cdc CDC) (bool, error)) error
 	// Get gets a single document by id
 	Get(ctx context.Context, collection, id string) (*Document, error)
 	// ForEach scans the optimal index for a collection's documents passing its filters.
@@ -95,7 +95,7 @@ type Stream[T any] interface {
 	// Broadcast broadcasts the entity to the channel
 	Broadcast(ctx context.Context, channel string, msg T)
 	// Pull pulls entities off of the given channel as they are broadcast
-	Pull(ctx context.Context, channel string) (<-chan T, error)
+	Pull(ctx context.Context, channel string, fn func(T) (bool, error)) error
 }
 
 // Txn is a database transaction interface - it holds the methods used while using a transaction + commit,rollback,and close functionality

@@ -52,16 +52,11 @@ func Test(t *testing.T) {
 				defer wg.Done()
 				ctx, cancel := context.WithCancel(context.Background())
 				defer cancel()
-				ch, err := db.ChangeStream(ctx, "user")
+				err := db.ChangeStream(ctx, "user", func(cdc gokvkit.CDC) (bool, error) {
+					received <- struct{}{}
+					return true, nil
+				})
 				assert.NoError(t, err)
-				for {
-					select {
-					case <-ctx.Done():
-						return
-					case <-ch:
-						received <- struct{}{}
-					}
-				}
 			}()
 			var (
 				id  string
@@ -841,12 +836,6 @@ func TestAggregate(t *testing.T) {
 				return nil
 			}))
 			query := gokvkit.Query{
-				GroupBy: []string{"account_id"},
-				//Where:      []schema.Where{
-				//	{
-				//
-				//	},
-				//},
 				Select: []gokvkit.Select{
 					{
 						Field: "account_id",
@@ -857,6 +846,7 @@ func TestAggregate(t *testing.T) {
 						As:        "age_sum",
 					},
 				},
+				GroupBy: []string{"account_id"},
 				OrderBy: []gokvkit.OrderBy{
 					{
 						Field:     "account_id",

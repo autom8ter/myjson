@@ -21,15 +21,12 @@ func (d defaultStream[T]) Broadcast(ctx context.Context, channel string, msg T) 
 	})
 }
 
-func (d defaultStream[T]) Pull(ctx context.Context, channel string) (<-chan T, error) {
-	ch := make(chan T)
+func (d defaultStream[T]) Pull(ctx context.Context, channel string, fn func(T) (bool, error)) error {
 	d.machine.Go(ctx, func(ctx context.Context) error {
 		err := d.machine.Subscribe(ctx, channel, func(ctx context.Context, msg machine.Message) (bool, error) {
-			ch <- msg.Body.(T)
-			return true, nil
+			return fn(msg.Body.(T))
 		})
-		close(ch)
 		return err
 	})
-	return ch, nil
+	return nil
 }

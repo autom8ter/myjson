@@ -238,11 +238,11 @@ func (d *defaultDB) GetSchema(ctx context.Context, collection string) Collection
 	return s
 }
 
-func (d *defaultDB) ChangeStream(ctx context.Context, collection string) (<-chan CDC, error) {
+func (d *defaultDB) ChangeStream(ctx context.Context, collection string, fn func(cdc CDC) (bool, error)) error {
 	if collection != "*" && !d.HasCollection(ctx, collection) {
-		return nil, errors.New(errors.Validation, "collection does not exist: %s", collection)
+		return errors.New(errors.Validation, "collection does not exist: %s", collection)
 	}
-	return d.cdcStream.Pull(ctx, collection)
+	return d.cdcStream.Pull(ctx, collection, fn)
 }
 
 func (d *defaultDB) RawKV() kv.DB {
