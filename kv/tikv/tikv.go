@@ -9,7 +9,6 @@ import (
 	"github.com/autom8ter/gokvkit/kv/registry"
 	"github.com/segmentio/ksuid"
 	"github.com/spf13/cast"
-	"github.com/tikv/client-go/v2/tikv"
 	"github.com/tikv/client-go/v2/txnkv"
 )
 
@@ -18,7 +17,7 @@ func init() {
 		if params["pd_addr"] == nil {
 			return nil, fmt.Errorf("'pd_addr' is a required paramater")
 		}
-		return open(cast.ToString(params["pd_addr"]))
+		return open(cast.ToStringSlice(params["pd_addr"]))
 	})
 }
 
@@ -26,11 +25,11 @@ type tikvKV struct {
 	db *txnkv.Client
 }
 
-func open(pdAddr string) (kv.DB, error) {
-	if pdAddr == "" {
+func open(pdAddr []string) (kv.DB, error) {
+	if len(pdAddr) == 0 {
 		return nil, fmt.Errorf("empty pd address")
 	}
-	client, err := txnkv.NewClient([]string{pdAddr})
+	client, err := txnkv.NewClient(pdAddr)
 	if err != nil {
 		return nil, err
 	}
@@ -44,20 +43,24 @@ func (b *tikvKV) Tx(readOnly bool, fn func(kv.Tx) error) error {
 	if err != nil {
 		return err
 	}
-	return fn(tx)
+	err = fn(tx)
+	if err != nil {
+		tx.Rollback(context.Background())
+		return err
+	}
+	if err := tx.Commit(context.Background()); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (b *tikvKV) NewTx(readOnly bool) (kv.Tx, error) {
-	if readOnly {
-		tx, err := b.db.Begin(tikv.WithStartTS(uint64(time.Now().Unix()) + 2))
-		if err != nil {
-			return nil, err
-		}
-		return &tikvTx{txn: tx, db: b, readOnly: readOnly}, nil
-	}
 	tx, err := b.db.Begin()
 	if err != nil {
 		return nil, err
+	}
+	if !tx.Valid() {
+		return nil, fmt.Errorf("invalid transaction")
 	}
 	return &tikvTx{txn: tx, db: b, readOnly: readOnly}, nil
 }

@@ -21,10 +21,11 @@ type DB interface {
 
 // IterOpts are options when creating an iterator
 type IterOpts struct {
-	// Prefix is the key prefix to return
-	Prefix     []byte `json:"prefix"`
+	// Prefix indicates that keys must match the given prefix
+	Prefix []byte `json:"prefix"`
+	// UpperBound indicates that keys must be <= the upper bound
 	UpperBound []byte `json:"upperBound"`
-	// Seek seeks to the given bytes
+	// Seek seeks to the given bytes before beginning to iterate
 	Seek []byte `json:"seek"`
 	// Reverse scans the index in reverse
 	Reverse bool `json:"reverse"`
@@ -59,8 +60,9 @@ type Iterator interface {
 	Close()
 	// Valid returns true if the iterator is still valid
 	Valid() bool
-	// Item returns the item at the current cursor position
+	// Key returns the key at the current cursor position
 	Key() []byte
+	// Value returns the value at the current cursor position
 	Value() ([]byte, error)
 	// Next iterates to the next item
 	Next() error

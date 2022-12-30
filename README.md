@@ -1,6 +1,6 @@
 # gokvkit
 
-A framework for building powerful, extensible, and feature-rich microservices on top of key/value storage
+A framework for building powerful, extensible, and feature-rich microservices on top of pluggable key/value storage
 
     go get -u github.com/autom8ter/gokvkit
 
@@ -67,23 +67,30 @@ WIP
 
 WIP
 
-#### Reading documents from a collection
+#### Reading documents in a collection
 
 WIP
 
-#### Querying documents from a collection
+#### Querying documents in a collection
 
 WIP
 
-#### Aggregating documents from a collection
+#### Iterating through documents in a collection
 
 WIP
 
-#### Adding business logic with hooks
+#### Streaming changes to documents
 
 WIP
 
-#### Starting an OpenAPI Server
+#### Aggregating documents in a collection
+
+WIP
+
+#### Adding business logic with triggers
+
+WIP
+
 
 ### Beta Roadmap
 
