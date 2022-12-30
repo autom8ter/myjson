@@ -20,6 +20,7 @@ type collectionSchema struct {
 	indexing      map[string]Index
 	properties    map[string]SchemaProperty
 	propertyPaths map[string]SchemaProperty
+	triggers      map[string]Trigger
 	mu            sync.RWMutex
 }
 
@@ -54,6 +55,7 @@ func newCollectionSchema(yamlContent []byte) (CollectionSchema, error) {
 		indexing:      map[string]Index{},
 		properties:    map[string]SchemaProperty{},
 		propertyPaths: map[string]SchemaProperty{},
+		triggers:      map[string]Trigger{},
 	}
 	if err != nil {
 		return nil, err
@@ -76,6 +78,18 @@ func newCollectionSchema(yamlContent []byte) (CollectionSchema, error) {
 	}
 	if len(s.primaryIndex.Fields) == 0 {
 		return nil, errors.New(errors.Validation, "primary index is required")
+	}
+	if triggers := s.raw.Get("triggers"); triggers.Exists() {
+		for name, t := range triggers.Map() {
+			var trig Trigger
+			if err := util.Decode(t.Value(), &trig); err != nil {
+				return nil, errors.Wrap(err, errors.Validation, "invalid trigger: %s", name)
+			}
+			if err := util.ValidateStruct(trig); err != nil {
+				return nil, errors.Wrap(err, errors.Validation, "invalid trigger: %s", name)
+			}
+			s.triggers[name] = trig
+		}
 	}
 	return s, nil
 }
@@ -307,4 +321,10 @@ func (c *collectionSchema) HasPropertyPath(p string) bool {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	return c.propertyPaths[p].Name != ""
+}
+
+func (c *collectionSchema) Triggers() map[string]Trigger {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.triggers
 }

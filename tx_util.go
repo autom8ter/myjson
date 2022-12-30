@@ -11,6 +11,7 @@ import (
 	"github.com/autom8ter/gokvkit/kv"
 	"github.com/autom8ter/gokvkit/util"
 	"github.com/nqd/flat"
+	"github.com/samber/lo"
 	"github.com/segmentio/ksuid"
 	"github.com/spf13/cast"
 	"golang.org/x/sync/errgroup"
@@ -88,12 +89,13 @@ func (t *transaction) setDocument(ctx context.Context, c CollectionSchema, docID
 	return nil
 }
 
-func (t *transaction) persistCommand(ctx context.Context, md *Metadata, command *Command) error {
+func (t *transaction) persistCommand(ctx context.Context, command *Command) error {
 
 	c := t.db.GetSchema(ctx, command.Collection)
 	if c == nil {
 		return fmt.Errorf("tx: collection: %s does not exist", command.Collection)
 	}
+	md, _ := GetMetadata(ctx)
 	docID := c.GetPrimaryKey(command.Document)
 	if command.Timestamp == 0 {
 		command.Timestamp = time.Now().UnixNano()
@@ -120,7 +122,7 @@ func (t *transaction) persistCommand(ctx context.Context, md *Metadata, command 
 	if t.db.collectionIsLocked(command.Collection) {
 		return errors.New(errors.Forbidden, "collection %s is locked", command.Collection)
 	}
-	if err := t.applyPersistHooks(ctx, t, command, true); err != nil {
+	if err := t.applyCommandTriggers(ctx, c, command); err != nil {
 		return err
 	}
 
@@ -150,9 +152,6 @@ func (t *transaction) persistCommand(ctx context.Context, md *Metadata, command 
 			return errors.Wrap(err, 0, "failed to update secondary index")
 		}
 	}
-	if err := t.applyPersistHooks(ctx, t, command, false); err != nil {
-		return err
-	}
 	if command.Collection != cdcCollectionName {
 		cdc := CDC{
 			ID:         ksuid.New().String(),
@@ -167,7 +166,7 @@ func (t *transaction) persistCommand(ctx context.Context, md *Metadata, command 
 		if err != nil {
 			return errors.Wrap(err, errors.Internal, "failed to persist cdc")
 		}
-		if err := t.persistCommand(ctx, cdc.Metadata, &Command{
+		if err := t.persistCommand(ctx, &Command{
 			Collection: "cdc",
 			Action:     Create,
 			Document:   cdcDoc,
@@ -303,17 +302,6 @@ func (t *transaction) updateSecondaryIndex(ctx context.Context, schema Collectio
 	return nil
 }
 
-func (t *transaction) applyPersistHooks(ctx context.Context, tx Tx, command *Command, before bool) error {
-	for _, sideEffect := range t.db.persistHooks {
-		if sideEffect.Before == before {
-			if err := sideEffect.Func(ctx, tx, command); err != nil {
-				return err
-			}
-		}
-	}
-	return nil
-}
-
 func (t *transaction) queryScan(ctx context.Context, collection string, where []Where, join []Join, fn ForEachFunc) (Optimization, error) {
 	if fn == nil {
 		return Optimization{}, errors.New(errors.Validation, "empty scan handler")
@@ -430,4 +418,47 @@ func (t *transaction) queryScan(ctx context.Context, collection string, where []
 		it.Next()
 	}
 	return optimization, nil
+}
+
+func (t *transaction) applyCommandTriggers(ctx context.Context, c CollectionSchema, command *Command) error {
+	runTrigger := func(trigger Trigger) error {
+		vm, err := getJavascriptVM(ctx, t.db)
+		if err != nil {
+			return err
+		}
+		if err := vm.Set("tx", t); err != nil {
+			return err
+		}
+		if err := vm.Set("doc", command.Document); err != nil {
+			return err
+		}
+		if err := vm.Set("metadata", command.Metadata); err != nil {
+			return err
+		}
+		if _, err := vm.RunString(trigger.Script); err != nil {
+			return err
+		}
+		return nil
+	}
+	for _, trigger := range c.Triggers() {
+		switch {
+		case command.Action == Delete && lo.Contains(trigger.Timing, OnDelete):
+			if err := runTrigger(trigger); err != nil {
+				return err
+			}
+		case command.Action == Set && lo.Contains(trigger.Timing, OnSet):
+			if err := runTrigger(trigger); err != nil {
+				return err
+			}
+		case command.Action == Create && lo.Contains(trigger.Timing, OnCreate):
+			if err := runTrigger(trigger); err != nil {
+				return err
+			}
+		case command.Action == Update && lo.Contains(trigger.Timing, OnUpdate):
+			if err := runTrigger(trigger); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }

@@ -46,6 +46,16 @@ properties:
     type: string
   annotations:
     type: object
+
+triggers:
+  set_timestamp:
+    timing:
+      - on_create
+      - on_update
+      - on_set
+    script: |
+      doc.set('timestamp', new Date().toISOString())
+
 common:
   contact:
     type: object
@@ -54,3 +64,6 @@ common:
         type: string
         description: The user's email.
         x-unique: true
+
+
+  

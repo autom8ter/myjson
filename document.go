@@ -200,7 +200,7 @@ func (d *Document) GetFloat(field string) float64 {
 
 // GetTime gets a time.Time field value on the document. GetTime has GJSON syntax support and supports dot notation
 func (d *Document) GetTime(field string) time.Time {
-	return cast.ToTime(d.Get(field))
+	return cast.ToTime(d.GetString(field))
 }
 
 // GetArray gets an array field on the document. Get has GJSON syntax support and supports dot notation

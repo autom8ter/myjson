@@ -15,15 +15,11 @@ import (
 
 // defaultDB is an embedded, durable NoSQL database with support for schemas, indexing, and aggregation
 type defaultDB struct {
-	kv           kv.DB
-	machine      machine.Machine
-	optimizer    Optimizer
-	initHooks    []OnInit
-	persistHooks []OnPersist
-	onCommit     []OnCommit
-	onRollback   []OnRollback
-	cdcStream    Stream[CDC]
-	programs     sync.Map
+	kv        kv.DB
+	machine   machine.Machine
+	optimizer Optimizer
+	cdcStream Stream[CDC]
+	programs  sync.Map
 }
 
 // New creates a new database instance from the given config
@@ -41,11 +37,6 @@ func New(ctx context.Context, provider string, providerParams map[string]any, op
 
 	for _, o := range opts {
 		o(d)
-	}
-	for _, h := range d.initHooks {
-		if err = h.Func(ctx, d); err != nil {
-			return nil, errors.Wrap(err, errors.Internal, "init hook failure")
-		}
 	}
 	if !d.HasCollection(ctx, "cdc") {
 		if err := d.ConfigureCollection(ctx, []byte(cdcSchema)); err != nil {
@@ -245,24 +236,20 @@ func (d *defaultDB) RawKV() kv.DB {
 	return d.kv
 }
 
-func (d *defaultDB) RunScript(ctx context.Context, name, script string, params map[string]any) (any, error) {
-	if _, ok := d.programs.Load(name); !ok {
-		vm, err := getJavascriptVM(ctx, d)
-		if err != nil {
-			return false, err
-		}
-		_, err = vm.RunString(script)
-		if err != nil {
-			return nil, err
-		}
-		var fn JSFunction
-		if err := vm.ExportTo(vm.Get(name), &fn); err != nil {
-			return nil, err
-		}
-		d.programs.Store(name, fn)
+func (d *defaultDB) RunScript(ctx context.Context, function string, script string, params map[string]any) (any, error) {
+	vm, err := getJavascriptVM(ctx, d)
+	if err != nil {
+		return false, err
 	}
-	fn, _ := d.programs.Load(name)
-	return fn.(JSFunction)(ctx, d, params)
+	_, err = vm.RunString(script)
+	if err != nil {
+		return nil, err
+	}
+	var fn func(ctx context.Context, db Database, params map[string]any) (any, error)
+	if err := vm.ExportTo(vm.Get(function), &fn); err != nil {
+		return nil, errors.Wrap(err, errors.Validation, "failed to export")
+	}
+	return fn(ctx, d, params)
 }
 
 func (d *defaultDB) RunMigrations(ctx context.Context, migrations ...Migration) error {

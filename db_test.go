@@ -3,7 +3,6 @@ package gokvkit_test
 import (
 	"context"
 	"fmt"
-	"runtime"
 	"sync"
 	"testing"
 	"time"
@@ -37,6 +36,7 @@ func Test(t *testing.T) {
 			}))
 			u, err := db.Get(ctx, "user", id)
 			assert.NoError(t, err)
+			fmt.Println(u.Get("timestamp"))
 			assert.NotNil(t, u)
 			assert.Equal(t, id, u.GetString("_id"))
 		}))
@@ -222,7 +222,6 @@ func Test(t *testing.T) {
 		})
 	}))
 	time.Sleep(1 * time.Second)
-	t.Log(runtime.NumGoroutine())
 }
 
 func Benchmark(b *testing.B) {
@@ -1169,6 +1168,30 @@ func TestMigrations(t *testing.T) {
 			})
 			assert.NoError(t, err)
 			assert.Equal(t, count, 100)
+		}))
+	})
+}
+
+func TestTriggers(t *testing.T) {
+	t.Run("test set_timestamp trigger", func(t *testing.T) {
+		assert.NoError(t, testutil.TestDB(func(ctx context.Context, db gokvkit.Database) {
+			assert.Nil(t, db.Tx(ctx, true, func(ctx context.Context, tx gokvkit.Tx) error {
+				id, err := tx.Create(ctx, "user", testutil.NewUserDoc())
+				assert.NoError(t, err)
+				u, err := tx.Get(ctx, "user", id)
+				assert.NoError(t, err)
+				assert.True(t, time.Now().Truncate(1*time.Minute).Before(u.GetTime("timestamp")))
+				return err
+			}))
+			assert.Nil(t, db.Tx(ctx, true, func(ctx context.Context, tx gokvkit.Tx) error {
+				u := testutil.NewUserDoc()
+				err := tx.Set(ctx, "user", u)
+				assert.NoError(t, err)
+				gu, err := tx.Get(ctx, "user", u.GetString("_id"))
+				assert.NoError(t, err)
+				assert.True(t, time.Now().Truncate(1*time.Minute).Before(gu.GetTime("timestamp")))
+				return err
+			}))
 		}))
 	})
 }

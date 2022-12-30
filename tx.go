@@ -26,42 +26,18 @@ type transaction struct {
 }
 
 func (t *transaction) Commit(ctx context.Context) error {
-	for _, h := range t.db.onCommit {
-		if h.Before {
-			if err := h.Func(ctx, t); err != nil {
-				return err
-			}
-		}
-	}
-	for _, cdc := range t.cdc {
-		t.db.cdcStream.Broadcast(ctx, cdc.Collection, cdc)
-	}
 	if err := t.tx.Commit(); err != nil {
 		return err
 	}
-	for _, h := range t.db.onCommit {
-		if !h.Before {
-			if err := h.Func(ctx, t); err != nil {
-				return err
-			}
-		}
+	for _, cdc := range t.cdc {
+		t.db.cdcStream.Broadcast(ctx, cdc.Collection, cdc)
 	}
 	t.cdc = []CDC{}
 	return nil
 }
 
 func (t *transaction) Rollback(ctx context.Context) {
-	for _, h := range t.db.onRollback {
-		if h.Before {
-			h.Func(ctx, t)
-		}
-	}
 	t.tx.Rollback()
-	for _, h := range t.db.onRollback {
-		if !h.Before {
-			h.Func(ctx, t)
-		}
-	}
 	t.cdc = []CDC{}
 }
 
@@ -78,7 +54,7 @@ func (t *transaction) Update(ctx context.Context, collection string, id string, 
 		return errors.Wrap(err, 0, "tx: failed to set primary key")
 	}
 	md, _ := GetMetadata(ctx)
-	if err := t.persistCommand(ctx, md, &Command{
+	if err := t.persistCommand(ctx, &Command{
 		Collection: collection,
 		Action:     Update,
 		Document:   doc,
@@ -104,7 +80,7 @@ func (t *transaction) Create(ctx context.Context, collection string, document *D
 		}
 	}
 	md, _ := GetMetadata(ctx)
-	if err := t.persistCommand(ctx, md, &Command{
+	if err := t.persistCommand(ctx, &Command{
 		Collection: collection,
 		Action:     Create,
 		Document:   document,
@@ -122,7 +98,7 @@ func (t *transaction) Set(ctx context.Context, collection string, document *Docu
 		return errors.New(errors.Validation, "tx: unsupported collection: %s", collection)
 	}
 	md, _ := GetMetadata(ctx)
-	if err := t.persistCommand(ctx, md, &Command{
+	if err := t.persistCommand(ctx, &Command{
 		Collection: collection,
 		Action:     Set,
 		Document:   document,
@@ -143,7 +119,7 @@ func (t *transaction) Delete(ctx context.Context, collection string, id string) 
 	d, _ := NewDocumentFrom(map[string]any{
 		t.db.GetSchema(ctx, collection).PrimaryKey(): id,
 	})
-	if err := t.persistCommand(ctx, md, &Command{
+	if err := t.persistCommand(ctx, &Command{
 		Collection: collection,
 		Action:     Delete,
 		Document:   d,

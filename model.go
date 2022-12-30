@@ -352,6 +352,20 @@ type Index struct {
 	ForeignKey *ForeignKey `json:"foreignKey,omitempty"`
 }
 
+type Timing string
+
+const (
+	OnSet    Timing = "on_set"
+	OnDelete Timing = "on_delete"
+	OnUpdate Timing = "on_update"
+	OnCreate Timing = "on_create"
+)
+
+type Trigger struct {
+	Timing []Timing `json:"timing" validate:"min=1,required"`
+	Script string   `json:"script" validate:"required"`
+}
+
 // OnPersist is a hook function triggered whenever a command is persisted
 type OnPersist struct {
 	// Name is the name of the hook
@@ -477,9 +491,6 @@ type ForEachOpts struct {
 	Where []Where `json:"where,omitempty"`
 	Join  []Join  `json:"join,omitempty"`
 }
-
-// JSFunction is javascript function compiled to a go function
-type JSFunction func(ctx context.Context, db Database, params map[string]any) (any, error)
 
 //go:embed migration.yaml
 var migrationSchema string

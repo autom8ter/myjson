@@ -29,6 +29,8 @@ type CollectionSchema interface {
 	Properties() map[string]SchemaProperty
 	// PropertyPaths returns a flattened map of the schema's properties - nested properties will be keyed in dot notation
 	PropertyPaths() map[string]SchemaProperty
+	// Triggers returns a map of triggers keyed by name that are assigned to the collection
+	Triggers() map[string]Trigger
 	// MarshalYAML returns the collection schema as yaml bytes
 	MarshalYAML() ([]byte, error)
 	// UnmarshalYAML refreshes the collection schema with the given json bytes
@@ -67,12 +69,13 @@ type Database interface {
 	Query(ctx context.Context, collection string, query Query) (Page, error)
 	// Get gets 1-many document by id(s)
 	BatchGet(ctx context.Context, collection string, ids []string) (Documents, error)
-	// RunScript runs a javascript function by name within the given script.
-	// The javascript function must have the following signature: function ${name}(ctx, db, params)
-	RunScript(ctx context.Context, name, script string, params map[string]any) (any, error)
+	// RunScript executes a javascript function within the script
+	// The following global variables will be injected: 'db' - a database instance, 'ctx' - the context passed to RunScript, and 'params' - the params passed to RunScript
+	RunScript(ctx context.Context, function string, script string, params map[string]any) (any, error)
 	// RunMigrations runs migration scripts against the database. If a migration(id) has already successfully run, it will do nothing.
 	// Migrations are run sequentially in the order they are provided
 	// Migration executions will if an error is encountered
+	// The following global variables will be injected into the script: 'db' - a Database instance, 'ctx' - the context passed to RunMigrations
 	RunMigrations(ctx context.Context, migrations ...Migration) error
 	// RawKV returns the database key value provider - it should be used with caution and only when standard database functionality is insufficient.
 	RawKV() kv.DB
