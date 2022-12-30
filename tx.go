@@ -28,7 +28,7 @@ type transaction struct {
 }
 
 func (t *transaction) Commit(ctx context.Context) error {
-	if err := t.tx.Commit(); err != nil {
+	if err := t.tx.Commit(ctx); err != nil {
 		return err
 	}
 	for _, cdc := range t.cdc {
@@ -39,7 +39,7 @@ func (t *transaction) Commit(ctx context.Context) error {
 }
 
 func (t *transaction) Rollback(ctx context.Context) {
-	t.tx.Rollback()
+	t.tx.Rollback(ctx)
 	t.cdc = []CDC{}
 }
 
@@ -198,7 +198,7 @@ func (t *transaction) Get(ctx context.Context, collection string, id string) (*D
 	md, _ := GetMetadata(ctx)
 	md.Set(string(txCtx), t.tx)
 	primaryIndex := c.PrimaryIndex()
-	val, err := t.tx.Get(seekPrefix(ctx, collection, primaryIndex, map[string]any{
+	val, err := t.tx.Get(ctx, seekPrefix(ctx, collection, primaryIndex, map[string]any{
 		c.PrimaryKey(): id,
 	}).Seek(id).Path())
 	if err != nil {
@@ -287,7 +287,7 @@ func (t *transaction) ForEach(ctx context.Context, collection string, opts ForEa
 }
 
 func (t *transaction) Close(ctx context.Context) {
-	t.tx.Close()
+	t.tx.Close(ctx)
 	t.cdc = []CDC{}
 }
 

@@ -56,7 +56,7 @@ type Database interface {
 	// otherwise, the changes will be commited to the database
 	Tx(ctx context.Context, opts TxOpts, fn TxFunc) error
 	// NewTx returns a new transaction. a transaction must call Commit method in order to persist changes
-	NewTx(opts TxOpts) Txn
+	NewTx(opts TxOpts) (Txn, error)
 	// ChangeStream streams changes to documents in the given collection.
 	ChangeStream(ctx context.Context, collection string) (<-chan CDC, error)
 	// Get gets a single document by id

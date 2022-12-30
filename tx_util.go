@@ -35,9 +35,9 @@ func (t *transaction) updateDocument(ctx context.Context, c CollectionSchema, do
 	if err := c.ValidateDocument(ctx, after); err != nil {
 		return err
 	}
-	if err := t.tx.Set(seekPrefix(ctx, c.Collection(), primaryIndex, map[string]any{
+	if err := t.tx.Set(ctx, seekPrefix(ctx, c.Collection(), primaryIndex, map[string]any{
 		c.PrimaryKey(): docID,
-	}).Seek(docID).Path(), after.Bytes(), 0); err != nil {
+	}).Seek(docID).Path(), after.Bytes()); err != nil {
 		return errors.Wrap(err, errors.Internal, "failed to batch set documents to primary index")
 	}
 	return nil
@@ -48,7 +48,7 @@ func (t *transaction) deleteDocument(ctx context.Context, c CollectionSchema, do
 		return errors.New(errors.Validation, "tx: delete command - empty document id")
 	}
 	primaryIndex := c.PrimaryIndex()
-	if err := t.tx.Delete(seekPrefix(ctx, c.Collection(), primaryIndex, map[string]any{
+	if err := t.tx.Delete(ctx, seekPrefix(ctx, c.Collection(), primaryIndex, map[string]any{
 		c.PrimaryKey(): docID,
 	}).Seek(docID).Path()); err != nil {
 		return errors.Wrap(err, 0, "failed to delete documents")
@@ -65,9 +65,9 @@ func (t *transaction) createDocument(ctx context.Context, c CollectionSchema, co
 	if err := c.ValidateDocument(ctx, command.Document); err != nil {
 		return err
 	}
-	if err := t.tx.Set(seekPrefix(ctx, c.Collection(), primaryIndex, map[string]any{
+	if err := t.tx.Set(ctx, seekPrefix(ctx, c.Collection(), primaryIndex, map[string]any{
 		c.PrimaryKey(): docID,
-	}).Seek(docID).Path(), command.Document.Bytes(), 0); err != nil {
+	}).Seek(docID).Path(), command.Document.Bytes()); err != nil {
 		return errors.Wrap(err, errors.Internal, "failed to batch set documents to primary index")
 	}
 	return nil
@@ -81,9 +81,9 @@ func (t *transaction) setDocument(ctx context.Context, c CollectionSchema, docID
 		return err
 	}
 	primaryIndex := c.PrimaryIndex()
-	if err := t.tx.Set(seekPrefix(ctx, c.Collection(), primaryIndex, map[string]any{
+	if err := t.tx.Set(ctx, seekPrefix(ctx, c.Collection(), primaryIndex, map[string]any{
 		c.PrimaryKey(): docID,
-	}).Seek(docID).Path(), command.Document.Bytes(), 0); err != nil {
+	}).Seek(docID).Path(), command.Document.Bytes()); err != nil {
 		return errors.Wrap(err, errors.Internal, "failed to set documents to primary index")
 	}
 	return nil
@@ -119,7 +119,7 @@ func (t *transaction) persistCommand(ctx context.Context, command *Command) erro
 		}
 		return nil
 	}
-	if t.db.collectionIsLocked(command.Collection) {
+	if t.db.collectionIsLocked(ctx, command.Collection) {
 		return errors.New(errors.Forbidden, "collection %s is locked", command.Collection)
 	}
 	if err := t.applyCommandTriggers(ctx, c, command); err != nil {
@@ -226,7 +226,7 @@ func (t *transaction) updateSecondaryIndex(ctx context.Context, schema Collectio
 	}
 	switch command.Action {
 	case Delete:
-		if err := t.tx.Delete(seekPrefix(ctx, command.Collection, idx, before.Value()).Seek(docID).Path()); err != nil {
+		if err := t.tx.Delete(ctx, seekPrefix(ctx, command.Collection, idx, before.Value()).Seek(docID).Path()); err != nil {
 			return errors.Wrap(
 				err,
 				errors.Internal,
@@ -237,7 +237,7 @@ func (t *transaction) updateSecondaryIndex(ctx context.Context, schema Collectio
 		}
 	case Set, Update, Create:
 		if before != nil {
-			if err := t.tx.Delete(seekPrefix(ctx, command.Collection, idx, before.Value()).Seek(docID).Path()); err != nil {
+			if err := t.tx.Delete(ctx, seekPrefix(ctx, command.Collection, idx, before.Value()).Seek(docID).Path()); err != nil {
 				return errors.Wrap(
 					err,
 					errors.Internal,
@@ -274,13 +274,15 @@ func (t *transaction) updateSecondaryIndex(ctx context.Context, schema Collectio
 			}
 		}
 		if idx.Unique && !idx.Primary && command.Document != nil {
-			it := t.tx.NewIterator(kv.IterOpts{
+			it, err := t.tx.NewIterator(kv.IterOpts{
 				Prefix: seekPrefix(ctx, command.Collection, idx, command.Document.Value()).Path(),
 			})
+			if err != nil {
+				return err
+			}
 			defer it.Close()
 			for it.Valid() {
-				item := it.Item()
-				split := bytes.Split(item.Key(), []byte("\x00"))
+				split := bytes.Split(it.Key(), []byte("\x00"))
 				id := split[len(split)-1]
 				if string(id) != docID {
 					return errors.New(errors.Validation, "duplicate value( %s ) found for unique index: %s", docID, idx.Name)
@@ -289,7 +291,7 @@ func (t *transaction) updateSecondaryIndex(ctx context.Context, schema Collectio
 			}
 		}
 		// only persist ids in secondary index - lookup full document in primary index
-		if err := t.tx.Set(seekPrefix(ctx, command.Collection, idx, command.Document.Value()).Seek(docID).Path(), []byte(docID), 0); err != nil {
+		if err := t.tx.Set(ctx, seekPrefix(ctx, command.Collection, idx, command.Document.Value()).Seek(docID).Path(), []byte(docID)); err != nil {
 			return errors.Wrap(
 				err,
 				errors.Internal,
@@ -313,7 +315,7 @@ func (t *transaction) queryScan(ctx context.Context, collection string, where []
 	var err error
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	if t.db.collectionIsLocked(collection) {
+	if t.db.collectionIsLocked(ctx, collection) {
 		return Optimization{}, errors.New(errors.Forbidden, "collection %s is locked", collection)
 	}
 	optimization, err := t.db.optimizer.Optimize(t.db.GetSchema(ctx, collection), where)
@@ -334,13 +336,15 @@ func (t *transaction) queryScan(ctx context.Context, collection string, where []
 	} else {
 		opts.Seek = opts.Prefix
 	}
-	it := t.tx.NewIterator(opts)
+	it, err := t.tx.NewIterator(opts)
+	if err != nil {
+		return Optimization{}, err
+	}
 	defer it.Close()
 	for it.Valid() {
-		item := it.Item()
 		var document *Document
 		if optimization.Index.Primary {
-			bits, err := item.Value()
+			bits, err := it.Value()
 			if err != nil {
 				return optimization, err
 			}
@@ -349,7 +353,7 @@ func (t *transaction) queryScan(ctx context.Context, collection string, where []
 				return optimization, err
 			}
 		} else {
-			split := bytes.Split(item.Key(), []byte("\x00"))
+			split := bytes.Split(it.Key(), []byte("\x00"))
 			id := split[len(split)-1]
 			document, err = t.Get(ctx, collection, string(id))
 			if err != nil {

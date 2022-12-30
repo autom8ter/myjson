@@ -10,8 +10,11 @@ import (
 )
 
 func (d *defaultDB) lockCollection(ctx context.Context, collection string) (func(), error) {
-	lock := d.kv.NewLocker([]byte(fmt.Sprintf("cache.internal.locks.%s", collection)), 1*time.Minute)
-	gotLock, err := lock.TryLock()
+	lock, err := d.kv.NewLocker([]byte(fmt.Sprintf("cache.internal.locks.%s", collection)), 1*time.Minute)
+	if err != nil {
+		return nil, errors.Wrap(err, errors.Internal, "failed to acquire lock on collection %s", collection)
+	}
+	gotLock, err := lock.TryLock(ctx)
 	if err != nil {
 		return nil, errors.Wrap(err, errors.Internal, "failed to acquire lock on collection %s", collection)
 	}
@@ -44,9 +47,12 @@ func (d *defaultDB) lockCollection(ctx context.Context, collection string) (func
 //	}
 //}
 
-func (d *defaultDB) collectionIsLocked(collection string) bool {
-	lock := d.kv.NewLocker([]byte(fmt.Sprintf("cache.internal.locks.%s", collection)), 1*time.Minute)
-	is, _ := lock.IsLocked()
+func (d *defaultDB) collectionIsLocked(ctx context.Context, collection string) bool {
+	lock, _ := d.kv.NewLocker([]byte(fmt.Sprintf("cache.internal.locks.%s", collection)), 1*time.Minute)
+	if lock == nil {
+		return true
+	}
+	is, _ := lock.IsLocked(ctx)
 	return is
 }
 
@@ -91,7 +97,7 @@ func (d *defaultDB) getSchema(ctx context.Context, collection string) (Collectio
 
 func (d *defaultDB) removeIndex(ctx context.Context, collection string, index Index) error {
 	schema, ctx := d.getSchema(ctx, collection)
-	if err := d.kv.DropPrefix(indexPrefix(ctx, schema.Collection(), index.Name)); err != nil {
+	if err := d.kv.DropPrefix(ctx, indexPrefix(ctx, schema.Collection(), index.Name)); err != nil {
 		return errors.Wrap(err, 0, "indexing: failed to remove index %s - %s", collection, index.Name)
 	}
 	return nil
@@ -103,7 +109,7 @@ func (d *defaultDB) persistCollectionConfig(ctx context.Context, val CollectionS
 		if err != nil {
 			return err
 		}
-		err = tx.Set(collectionConfigKey(ctx, val.Collection()), bits, 0)
+		err = tx.Set(ctx, collectionConfigKey(ctx, val.Collection()), bits)
 		if err != nil {
 			return err
 		}
@@ -116,7 +122,7 @@ func (d *defaultDB) persistCollectionConfig(ctx context.Context, val CollectionS
 
 func (d *defaultDB) deleteCollectionConfig(ctx context.Context, collection string) error {
 	if err := d.kv.Tx(false, func(tx kv.Tx) error {
-		err := tx.Delete(collectionConfigKey(ctx, collection))
+		err := tx.Delete(ctx, collectionConfigKey(ctx, collection))
 		if err != nil {
 			return err
 		}
@@ -130,14 +136,15 @@ func (d *defaultDB) deleteCollectionConfig(ctx context.Context, collection strin
 func (d *defaultDB) getCollectionConfigs(ctx context.Context) ([]CollectionSchema, error) {
 	var existing []CollectionSchema
 	if err := d.kv.Tx(true, func(tx kv.Tx) error {
-		i := tx.NewIterator(kv.IterOpts{
+		i, err := tx.NewIterator(kv.IterOpts{
 			Prefix: collectionConfigPrefix(ctx),
 		})
+		if err != nil {
+			return err
+		}
 		defer i.Close()
 		for i.Valid() {
-			item := i.Item()
-
-			bits, err := item.Value()
+			bits, err := i.Value()
 			if err != nil {
 				return err
 			}
@@ -160,7 +167,7 @@ func (d *defaultDB) getCollectionConfigs(ctx context.Context) ([]CollectionSchem
 func (d *defaultDB) getPersistedCollection(ctx context.Context, collection string) (CollectionSchema, error) {
 	var cfg CollectionSchema
 	if err := d.kv.Tx(true, func(tx kv.Tx) error {
-		bits, err := tx.Get(collectionConfigKey(ctx, collection))
+		bits, err := tx.Get(ctx, collectionConfigKey(ctx, collection))
 		if err != nil {
 			return err
 		}

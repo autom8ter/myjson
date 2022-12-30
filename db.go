@@ -51,22 +51,30 @@ func New(ctx context.Context, provider string, providerParams map[string]any, op
 	return d, err
 }
 
-func (d *defaultDB) NewTx(opts TxOpts) Txn {
+func (d *defaultDB) NewTx(opts TxOpts) (Txn, error) {
 	vm, _ := getJavascriptVM(context.Background(), d)
-	vm.Set("tx_opts", opts)
+	if err := vm.Set("tx_opts", opts); err != nil {
+		return nil, err
+	}
+	tx, err := d.kv.NewTx(opts.IsReadOnly)
+	if err != nil {
+		return nil, err
+	}
 	return &transaction{
 		db:      d,
-		tx:      d.kv.NewTx(opts.IsReadOnly),
+		tx:      tx,
 		isBatch: false,
 		vm:      vm,
-	}
+	}, nil
 }
 
 func (d *defaultDB) Tx(ctx context.Context, opts TxOpts, fn TxFunc) error {
-	tx := d.NewTx(opts)
-	defer tx.Close(ctx)
-	err := fn(ctx, tx)
+	tx, err := d.NewTx(opts)
 	if err != nil {
+		return err
+	}
+	defer tx.Close(ctx)
+	if err := fn(ctx, tx); err != nil {
 		tx.Rollback(ctx)
 		return errors.Wrap(err, 0, "tx: rolled back transaction")
 	}
@@ -142,7 +150,7 @@ func (d *defaultDB) ForEach(ctx context.Context, collection string, opts ForEach
 }
 
 func (d *defaultDB) DropCollection(ctx context.Context, collection string) error {
-	if err := d.kv.DropPrefix(collectionPrefix(ctx, collection)); err != nil {
+	if err := d.kv.DropPrefix(ctx, collectionPrefix(ctx, collection)); err != nil {
 		return errors.Wrap(err, errors.Internal, "failed to remove collection %s", collection)
 	}
 	if err := d.deleteCollectionConfig(ctx, collection); err != nil {
@@ -312,5 +320,5 @@ func (d *defaultDB) runMigration(ctx context.Context, m Migration) (bool, error)
 }
 
 func (d *defaultDB) Close(ctx context.Context) error {
-	return errors.Wrap(d.kv.Close(), 0, "")
+	return errors.Wrap(d.kv.Close(ctx), 0, "")
 }

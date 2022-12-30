@@ -2,6 +2,7 @@ package badger
 
 import (
 	"bytes"
+	"context"
 	"time"
 
 	"github.com/autom8ter/gokvkit/kv"
@@ -60,15 +61,11 @@ func (b *badgerKV) Tx(readOnly bool, fn func(kv.Tx) error) error {
 	})
 }
 
-func (b *badgerKV) NewTx(readOnly bool) kv.Tx {
-	return &badgerTx{txn: b.db.NewTransaction(!readOnly), db: b}
+func (b *badgerKV) NewTx(readOnly bool) (kv.Tx, error) {
+	return &badgerTx{txn: b.db.NewTransaction(!readOnly), db: b}, nil
 }
 
-func (b *badgerKV) NewBatch() kv.Batch {
-	return &badgerBatch{batch: b.db.NewWriteBatch()}
-}
-
-func (b *badgerKV) Close() error {
+func (b *badgerKV) Close(ctx context.Context) error {
 	if err := b.db.Sync(); err != nil {
 		return err
 	}
@@ -76,7 +73,7 @@ func (b *badgerKV) Close() error {
 	return b.db.Close()
 }
 
-func (b *badgerKV) DropPrefix(prefix ...[]byte) error {
+func (b *badgerKV) DropPrefix(ctx context.Context, prefix ...[]byte) error {
 	for _, p := range prefix {
 		if bytes.HasPrefix(p, []byte("cache.")) {
 			b.cache.Clear()
@@ -86,7 +83,7 @@ func (b *badgerKV) DropPrefix(prefix ...[]byte) error {
 	return b.db.DropPrefix(prefix...)
 }
 
-func (b *badgerKV) NewLocker(key []byte, leaseInterval time.Duration) kv.Locker {
+func (b *badgerKV) NewLocker(key []byte, leaseInterval time.Duration) (kv.Locker, error) {
 	return &badgerLock{
 		id:            ksuid.New().String(),
 		key:           key,
@@ -94,5 +91,5 @@ func (b *badgerKV) NewLocker(key []byte, leaseInterval time.Duration) kv.Locker 
 		leaseInterval: leaseInterval,
 		unlock:        make(chan struct{}),
 		hasUnlocked:   make(chan struct{}),
-	}
+	}, nil
 }

@@ -1,4 +1,4 @@
-package badger
+package tikv
 
 import (
 	"context"
@@ -6,13 +6,13 @@ import (
 	"time"
 
 	"github.com/autom8ter/gokvkit/kv"
-	"github.com/dgraph-io/badger/v3"
+	tikvErr "github.com/tikv/client-go/v2/error"
 )
 
-type badgerLock struct {
+type tikvLock struct {
 	id            string
 	key           []byte
-	db            *badgerKV
+	db            *tikvKV
 	leaseInterval time.Duration
 	start         time.Time
 	hasUnlocked   chan struct{}
@@ -26,12 +26,12 @@ type lockMeta struct {
 	Key        []byte    `json:"key"`
 }
 
-func (b *badgerLock) IsLocked(ctx context.Context) (bool, error) {
+func (b *tikvLock) IsLocked(ctx context.Context) (bool, error) {
 	isLocked := true
 	err := b.db.Tx(true, func(tx kv.Tx) error {
 		val, err := tx.Get(ctx, b.key)
 		if err != nil {
-			if err != badger.ErrKeyNotFound {
+			if !tikvErr.IsErrNotFound(err) {
 				return err
 			}
 			isLocked = false
@@ -48,13 +48,13 @@ func (b *badgerLock) IsLocked(ctx context.Context) (bool, error) {
 	return isLocked, err
 }
 
-func (b *badgerLock) TryLock(ctx context.Context) (bool, error) {
+func (b *tikvLock) TryLock(ctx context.Context) (bool, error) {
 	b.start = time.Now()
 	gotLock := false
 	err := b.db.Tx(false, func(tx kv.Tx) error {
 		val, err := tx.Get(ctx, b.key)
 		if err != nil {
-			if err != badger.ErrKeyNotFound {
+			if !tikvErr.IsErrNotFound(err) {
 				return err
 			}
 			if err := b.setLock(ctx, tx); err != nil {
@@ -80,12 +80,12 @@ func (b *badgerLock) TryLock(ctx context.Context) (bool, error) {
 	return gotLock, err
 }
 
-func (b *badgerLock) Unlock() {
+func (b *tikvLock) Unlock() {
 	b.unlock <- struct{}{}
 	<-b.hasUnlocked
 }
 
-func (b *badgerLock) setLock(ctx context.Context, tx kv.Tx) error {
+func (b *tikvLock) setLock(ctx context.Context, tx kv.Tx) error {
 	meta := &lockMeta{
 		ID:         b.id,
 		Start:      b.start,
@@ -103,11 +103,11 @@ func (b *badgerLock) setLock(ctx context.Context, tx kv.Tx) error {
 	return nil
 }
 
-func (b *badgerLock) delLock(ctx context.Context, tx kv.Tx) error {
+func (b *tikvLock) delLock(ctx context.Context, tx kv.Tx) error {
 	return tx.Delete(ctx, b.key)
 }
 
-func (b *badgerLock) getLock(ctx context.Context, tx kv.Tx) (*lockMeta, error) {
+func (b *tikvLock) getLock(ctx context.Context, tx kv.Tx) (*lockMeta, error) {
 	val, err := tx.Get(ctx, b.key)
 	if err != nil {
 		return nil, err
@@ -119,7 +119,7 @@ func (b *badgerLock) getLock(ctx context.Context, tx kv.Tx) (*lockMeta, error) {
 	return &m, nil
 }
 
-func (b *badgerLock) keepalive(ctx context.Context) error {
+func (b *tikvLock) keepalive(ctx context.Context) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	ticker := time.NewTicker(b.leaseInterval)
