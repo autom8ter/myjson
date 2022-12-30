@@ -11,6 +11,8 @@ import (
 
 	"github.com/autom8ter/gokvkit"
 	_ "github.com/autom8ter/gokvkit/kv/badger"
+	"github.com/autom8ter/gokvkit/testutil"
+	"github.com/brianvoe/gofakeit/v6"
 	"github.com/go-chi/chi/v5"
 	"github.com/samber/lo"
 	"gopkg.in/yaml.v2"
@@ -34,6 +36,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+
 	if err := db.ConfigureCollection(ctx, []byte(accountSchema)); err != nil {
 		panic(err)
 	}
@@ -43,7 +46,13 @@ func main() {
 	if err := db.ConfigureCollection(ctx, []byte(taskSchema)); err != nil {
 		panic(err)
 	}
+
 	fmt.Printf("registered collections: %v\n", db.Collections(ctx))
+
+	if err := seed(ctx, db); err != nil {
+		panic(err)
+	}
+
 	mux := chi.NewRouter()
 
 	mux.Get("/collections", func(w http.ResponseWriter, r *http.Request) {
@@ -183,4 +192,45 @@ func listRoutes(routes []chi.Route) {
 		}
 		fmt.Printf("registered endpoint: %v %v\n", lo.Keys(r.Handlers), r.Pattern)
 	}
+}
+
+func seed(ctx context.Context, db gokvkit.Database) error {
+	results, err := db.Query(ctx, "account", gokvkit.Q().Query())
+	if err != nil {
+		return err
+	}
+	if results.Count == 0 {
+		fmt.Println("seeding database...")
+		if err := db.Tx(ctx, gokvkit.TxOpts{}, func(ctx context.Context, tx gokvkit.Tx) error {
+			for i := 0; i < 100; i++ {
+				a, _ := gokvkit.NewDocumentFrom(map[string]any{
+					"name": gofakeit.Company(),
+				})
+				accountID, err := tx.Create(ctx, "account", a)
+				if err != nil {
+					return err
+				}
+				for i := 0; i < 10; i++ {
+					u := testutil.NewUserDoc()
+					u.Set("account_id", accountID)
+					usrID, err := tx.Create(ctx, "user", u)
+					if err != nil {
+						return err
+					}
+					for i := 0; i < 3; i++ {
+						t := testutil.NewTaskDoc(usrID)
+						_, err := tx.Create(ctx, "task", t)
+						if err != nil {
+							return err
+						}
+					}
+				}
+			}
+			return nil
+		}); err != nil {
+			return fmt.Errorf("failed to seed database: %s", err.Error())
+		}
+		fmt.Println("successfully seeded database")
+	}
+	return nil
 }

@@ -134,6 +134,9 @@ func (t *transaction) Delete(ctx context.Context, collection string, id string) 
 }
 
 func (t *transaction) Query(ctx context.Context, collection string, query Query) (Page, error) {
+	if len(query.Select) == 0 {
+		query.Select = append(query.Select, Select{Field: "*"})
+	}
 	if err := query.Validate(ctx); err != nil {
 		return Page{}, err
 	}
