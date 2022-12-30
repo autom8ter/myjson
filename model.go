@@ -363,47 +363,14 @@ const (
 
 // Trigger is a javasript function executed after a database event occurs
 type Trigger struct {
-	Name   string      `json:"name" validate:"required"`
+	// Name is the unique name of the trigger
+	Name string `json:"name" validate:"required"`
+	// Order is used to sort triggers into an array where the lower order #s are executed before larger order #s
+	Order int `json:"order"`
+	// Events is an array of events that the trigger executes on
 	Events []EventType `json:"events" validate:"min=1,required"`
-	Script string      `json:"script" validate:"required"`
-}
-
-// OnPersist is a hook function triggered whenever a command is persisted
-type OnPersist struct {
-	// Name is the name of the hook
-	Name string `validate:"required"`
-	// Before indicates whether the hook should execute before or after the command is persisted
-	Before bool
-	// Func is the function to execute
-	Func func(ctx context.Context, tx Tx, command *Command) error `validate:"required"`
-}
-
-// OnInit is a hook function triggered whenever the database starts
-type OnInit struct {
-	// Name is the name of the hook
-	Name string `validate:"required"`
-	// Func is the function to execute
-	Func func(ctx context.Context, db *defaultDB) error `validate:"required"`
-}
-
-// OnCommit is a hook function triggered before a transaction is commited
-type OnCommit struct {
-	// Name is the name of the hook
-	Name string `validate:"required"`
-	// Before indicates whether the hook should execute before or after the transaction is commited
-	Before bool
-	// Func is the function to execute
-	Func func(ctx context.Context, tx Tx) error `validate:"required"`
-}
-
-// OnRollback is a hook function triggered whenever a transaction is rolled back
-type OnRollback struct {
-	// Name is the name of the hook
-	Name string `validate:"required"`
-	// Before indicates whether the hook should execute before or after the transaction is rolled back
-	Before bool
-	// Func is the function to execute
-	Func func(ctx context.Context, tx Tx) `validate:"required"`
+	// Script is the javascript script to execute
+	Script string `json:"script" validate:"required"`
 }
 
 // JSONOp is an json field operation type
@@ -443,7 +410,7 @@ type CDC struct {
 	Collection string `json:"collection" validate:"required"`
 	// Action is the action applied to the document
 	Action Action `json:"action" validate:"required,oneof='create' 'update' 'delete' 'set'"`
-	// DocumentID is the document ID that was changed
+	// DocumentID is the ID of the document that was changed
 	DocumentID string `json:"documentID" validate:"required"`
 	// Diff is the difference between the previous and new version of the document
 	Diff []JSONFieldOp `json:"diff,omitempty"`

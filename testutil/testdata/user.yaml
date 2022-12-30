@@ -35,7 +35,7 @@ properties:
     type: string
     description: The user's first language.
     x-index:
-      language_idx: {}
+      language_idx: { }
   gender:
     type: string
     description: The user's gender.
@@ -49,6 +49,7 @@ properties:
 
 triggers:
   set_timestamp:
+    order: 1
     events:
       - on_create
       - on_update

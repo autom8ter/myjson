@@ -3,6 +3,7 @@ package gokvkit
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strings"
 	"sync"
 
@@ -91,6 +92,9 @@ func newCollectionSchema(yamlContent []byte) (CollectionSchema, error) {
 			s.triggers = append(s.triggers, trig)
 		}
 	}
+	sort.Slice(s.triggers, func(i, j int) bool {
+		return s.triggers[i].Order < s.triggers[j].Order
+	})
 	return s, nil
 }
 
