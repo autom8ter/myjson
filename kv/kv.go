@@ -5,9 +5,9 @@ import "time"
 // DB is a key value database implementation
 type DB interface {
 	// Tx executes the given function against a database transaction
-	Tx(isUpdate bool, fn func(Tx) error) error
+	Tx(readOnly bool, fn func(Tx) error) error
 	// NewTx creates a new database transaction.
-	NewTx(isUpdate bool) Tx
+	NewTx(readOnly bool) Tx
 	// NewBatch returns a batch kv writer
 	NewBatch() Batch
 	// NewLocker returns a mutex/locker with the given lease duration

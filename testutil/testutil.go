@@ -82,7 +82,7 @@ func TestDB(fn func(ctx context.Context, db gokvkit.Database), collections ...[]
 		}
 	}
 
-	if err := db.Tx(ctx, true, func(ctx context.Context, tx gokvkit.Tx) error {
+	if err := db.Tx(ctx, gokvkit.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx gokvkit.Tx) error {
 		for i := 0; i <= 100; i++ {
 			d, _ := gokvkit.NewDocumentFrom(map[string]any{
 				"_id":  fmt.Sprint(i),

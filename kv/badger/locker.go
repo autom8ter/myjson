@@ -50,7 +50,7 @@ func (b *badgerLock) IsLocked() (bool, error) {
 func (b *badgerLock) TryLock() (bool, error) {
 	b.start = time.Now()
 	gotLock := false
-	err := b.db.Tx(true, func(tx kv.Tx) error {
+	err := b.db.Tx(false, func(tx kv.Tx) error {
 		val, err := tx.Get(b.key)
 		if err != nil {
 			if err != badger.ErrKeyNotFound {
@@ -126,7 +126,7 @@ func (b *badgerLock) keepalive() error {
 		select {
 		case <-ticker.C:
 			// update lease
-			err := b.db.Tx(true, func(tx kv.Tx) error {
+			err := b.db.Tx(false, func(tx kv.Tx) error {
 				val, err := b.getLock(tx)
 				if err != nil {
 					return err
@@ -140,7 +140,7 @@ func (b *badgerLock) keepalive() error {
 				return err
 			}
 		case <-b.unlock:
-			err := b.db.Tx(true, func(tx kv.Tx) error {
+			err := b.db.Tx(false, func(tx kv.Tx) error {
 				val, err := b.getLock(tx)
 				if err != nil {
 					return err

@@ -49,8 +49,8 @@ func open(storagePath string) (kv.DB, error) {
 	}, nil
 }
 
-func (b *badgerKV) Tx(isUpdate bool, fn func(kv.Tx) error) error {
-	if isUpdate {
+func (b *badgerKV) Tx(readOnly bool, fn func(kv.Tx) error) error {
+	if !readOnly {
 		return b.db.Update(func(txn *badger.Txn) error {
 			return fn(&badgerTx{txn: txn, db: b})
 		})
@@ -60,8 +60,8 @@ func (b *badgerKV) Tx(isUpdate bool, fn func(kv.Tx) error) error {
 	})
 }
 
-func (b *badgerKV) NewTx(isUpdate bool) kv.Tx {
-	return &badgerTx{txn: b.db.NewTransaction(isUpdate), db: b}
+func (b *badgerKV) NewTx(readOnly bool) kv.Tx {
+	return &badgerTx{txn: b.db.NewTransaction(!readOnly), db: b}
 }
 
 func (b *badgerKV) NewBatch() kv.Batch {

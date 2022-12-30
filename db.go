@@ -51,19 +51,19 @@ func New(ctx context.Context, provider string, providerParams map[string]any, op
 	return d, err
 }
 
-func (d *defaultDB) NewTx(isUpdate bool) Txn {
+func (d *defaultDB) NewTx(opts TxOpts) Txn {
 	vm, _ := getJavascriptVM(context.Background(), d)
-	vm.Set("isUpdate", isUpdate)
+	vm.Set("tx_opts", opts)
 	return &transaction{
 		db:      d,
-		tx:      d.kv.NewTx(isUpdate),
+		tx:      d.kv.NewTx(opts.IsReadOnly),
 		isBatch: false,
 		vm:      vm,
 	}
 }
 
-func (d *defaultDB) Tx(ctx context.Context, isUpdate bool, fn TxFunc) error {
-	tx := d.NewTx(isUpdate)
+func (d *defaultDB) Tx(ctx context.Context, opts TxOpts, fn TxFunc) error {
+	tx := d.NewTx(opts)
 	defer tx.Close(ctx)
 	err := fn(ctx, tx)
 	if err != nil {
@@ -82,7 +82,9 @@ func (d *defaultDB) Get(ctx context.Context, collection, id string) (*Document, 
 		document *Document
 		err      error
 	)
-	if err := d.Tx(ctx, false, func(ctx context.Context, tx Tx) error {
+
+	// Tx(ctx, TxOpts{IsReadOnly: true},
+	if err := d.Tx(ctx, TxOpts{IsReadOnly: true}, func(ctx context.Context, tx Tx) error {
 		document, err = tx.Get(ctx, collection, id)
 		return err
 	}); err != nil {
@@ -93,7 +95,7 @@ func (d *defaultDB) Get(ctx context.Context, collection, id string) (*Document, 
 
 func (d *defaultDB) BatchGet(ctx context.Context, collection string, ids []string) (Documents, error) {
 	var documents []*Document
-	if err := d.Tx(ctx, false, func(ctx context.Context, tx Tx) error {
+	if err := d.Tx(ctx, TxOpts{IsReadOnly: true}, func(ctx context.Context, tx Tx) error {
 		for _, id := range ids {
 			document, err := tx.Get(ctx, collection, id)
 			if err != nil {
@@ -116,7 +118,7 @@ func (d *defaultDB) Query(ctx context.Context, collection string, query Query) (
 	if len(query.Select) == 0 {
 		query.Select = []Select{{Field: "*"}}
 	}
-	if err := d.Tx(ctx, false, func(ctx context.Context, tx Tx) error {
+	if err := d.Tx(ctx, TxOpts{IsReadOnly: true}, func(ctx context.Context, tx Tx) error {
 		page, err = tx.Query(ctx, collection, query)
 		return err
 	}); err != nil {
@@ -130,7 +132,7 @@ func (d *defaultDB) ForEach(ctx context.Context, collection string, opts ForEach
 		result Optimization
 		err    error
 	)
-	if err := d.Tx(ctx, false, func(ctx context.Context, tx Tx) error {
+	if err := d.Tx(ctx, TxOpts{IsReadOnly: true}, func(ctx context.Context, tx Tx) error {
 		result, err = tx.ForEach(ctx, collection, opts, fn)
 		return err
 	}); err != nil {
@@ -276,7 +278,7 @@ func (d *defaultDB) RunMigrations(ctx context.Context, migrations ...Migration) 
 		if err != nil {
 			return err
 		}
-		if err := d.Tx(ctx, true, func(ctx context.Context, tx Tx) error {
+		if err := d.Tx(ctx, TxOpts{IsReadOnly: false}, func(ctx context.Context, tx Tx) error {
 			if err := tx.Set(ctx, migrationCollectionName, doc); err != nil {
 				return err
 			}

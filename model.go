@@ -101,6 +101,11 @@ type Query struct {
 	Having []Where `json:"having,omitempty" validate:"dive"`
 }
 
+// String returns the query as a json string
+func (q Query) String() string {
+	return util.JSONString(q)
+}
+
 // OrderBy indicates how to order results returned from a query
 type OrderBy struct {
 	Direction OrderByDirection `json:"direction" validate:"oneof='desc' 'asc'"`
@@ -478,4 +483,9 @@ type Migration struct {
 	Dirty bool `json:"dirty"`
 	// An error message if one was encountered
 	Error string `json:"error"`
+}
+
+// TxOpts are options when creating a database transaction
+type TxOpts struct {
+	IsReadOnly bool `json:"isReadOnly,omitempty"`
 }

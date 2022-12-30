@@ -17,7 +17,7 @@ func Test(t *testing.T) {
 		data[fmt.Sprint(i)] = fmt.Sprint(i)
 	}
 	t.Run("set", func(t *testing.T) {
-		assert.Nil(t, db.Tx(true, func(tx kv.Tx) error {
+		assert.Nil(t, db.Tx(false, func(tx kv.Tx) error {
 			for k, v := range data {
 				assert.Nil(t, tx.Set([]byte(k), []byte(v), 0))
 			}
@@ -26,7 +26,7 @@ func Test(t *testing.T) {
 	})
 
 	t.Run("get", func(t *testing.T) {
-		assert.Nil(t, db.Tx(false, func(tx kv.Tx) error {
+		assert.Nil(t, db.Tx(true, func(tx kv.Tx) error {
 			for k, v := range data {
 				data, err := tx.Get([]byte(k))
 				assert.NoError(t, err)
@@ -41,7 +41,7 @@ func Test(t *testing.T) {
 			assert.Nil(t, batch.Set([]byte(k), []byte(v), 0))
 		}
 		assert.Nil(t, batch.Flush())
-		assert.Nil(t, db.Tx(false, func(tx kv.Tx) error {
+		assert.Nil(t, db.Tx(true, func(tx kv.Tx) error {
 			for k, v := range data {
 				data, err := tx.Get([]byte(k))
 				assert.NoError(t, err)
@@ -51,7 +51,7 @@ func Test(t *testing.T) {
 		}))
 	})
 	t.Run("iterate", func(t *testing.T) {
-		assert.Nil(t, db.Tx(false, func(tx kv.Tx) error {
+		assert.Nil(t, db.Tx(true, func(tx kv.Tx) error {
 			iter := tx.NewIterator(kv.IterOpts{
 				Prefix:  nil,
 				Seek:    nil,
@@ -71,7 +71,7 @@ func Test(t *testing.T) {
 		}))
 	})
 	t.Run("delete", func(t *testing.T) {
-		assert.Nil(t, db.Tx(true, func(tx kv.Tx) error {
+		assert.Nil(t, db.Tx(false, func(tx kv.Tx) error {
 			for k, _ := range data {
 				assert.Nil(t, tx.Delete([]byte(k)))
 			}
@@ -93,7 +93,7 @@ func Test(t *testing.T) {
 			assert.Nil(t, batch2.Delete([]byte(k)))
 		}
 		assert.Nil(t, batch2.Flush())
-		assert.Nil(t, db.Tx(false, func(tx kv.Tx) error {
+		assert.Nil(t, db.Tx(true, func(tx kv.Tx) error {
 			for k, _ := range data {
 				bytes, _ := tx.Get([]byte(k))
 				assert.Nil(t, bytes)
@@ -131,7 +131,7 @@ func Test(t *testing.T) {
 		assert.False(t, gotLock)
 	})
 	t.Run("set", func(t *testing.T) {
-		assert.Nil(t, db.Tx(true, func(tx kv.Tx) error {
+		assert.Nil(t, db.Tx(false, func(tx kv.Tx) error {
 			for k, v := range data {
 				assert.Nil(t, tx.Set([]byte(k), []byte(v), 3*time.Second))
 			}
@@ -148,7 +148,7 @@ func Test(t *testing.T) {
 		}))
 	})
 	t.Run("new tx", func(t *testing.T) {
-		tx := db.NewTx(true)
+		tx := db.NewTx(false)
 		defer func() {
 			assert.NoError(t, tx.Commit())
 		}()
@@ -166,7 +166,7 @@ func Test(t *testing.T) {
 		}
 	})
 	t.Run("new tx w/ rollback", func(t *testing.T) {
-		tx := db.NewTx(true)
+		tx := db.NewTx(false)
 
 		for k, v := range data {
 			assert.Nil(t, tx.Set([]byte(k), []byte(v), 0))
@@ -179,7 +179,7 @@ func Test(t *testing.T) {
 	})
 	t.Run("drop prefix", func(t *testing.T) {
 		{
-			tx := db.NewTx(true)
+			tx := db.NewTx(false)
 			for k, v := range data {
 				assert.Nil(t, tx.Set([]byte(fmt.Sprintf("testing.%s", k)), []byte(v), 0))
 			}
@@ -187,7 +187,7 @@ func Test(t *testing.T) {
 		}
 		assert.NoError(t, db.DropPrefix([]byte("testing.")))
 		count := 0
-		assert.NoError(t, db.Tx(false, func(tx kv.Tx) error {
+		assert.NoError(t, db.Tx(true, func(tx kv.Tx) error {
 			iter := tx.NewIterator(kv.IterOpts{Prefix: []byte("testing.")})
 			defer iter.Close()
 			for iter.Valid() {

@@ -54,9 +54,9 @@ type Database interface {
 	// Tx executes the given function against a new transaction.
 	// if the function returns an error, all changes will be rolled back.
 	// otherwise, the changes will be commited to the database
-	Tx(ctx context.Context, isUpdate bool, fn TxFunc) error
+	Tx(ctx context.Context, opts TxOpts, fn TxFunc) error
 	// NewTx returns a new transaction. a transaction must call Commit method in order to persist changes
-	NewTx(isUpdate bool) Txn
+	NewTx(opts TxOpts) Txn
 	// ChangeStream streams changes to documents in the given collection.
 	ChangeStream(ctx context.Context, collection string) (<-chan CDC, error)
 	// Get gets a single document by id

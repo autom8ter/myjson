@@ -151,7 +151,7 @@ func (d *Document) Valid() bool {
 
 // String returns the document as a json string
 func (d *Document) String() string {
-	return d.result.Get("@pretty:{\"sortKeys\":true}").Raw
+	return d.result.String()
 }
 
 // Bytes returns the document as json bytes

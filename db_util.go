@@ -62,7 +62,7 @@ func (d *defaultDB) addIndex(ctx context.Context, collection string, index Index
 	meta.Set(string(internalKey), true)
 	meta.Set(string(isIndexingKey), true)
 	if !index.Primary {
-		if err := d.Tx(ctx, true, func(ctx context.Context, tx Tx) error {
+		if err := d.Tx(ctx, TxOpts{IsReadOnly: false}, func(ctx context.Context, tx Tx) error {
 			_, err := d.ForEach(meta.ToContext(ctx), collection, ForEachOpts{}, func(doc *Document) (bool, error) {
 				if err := tx.Set(meta.ToContext(ctx), collection, doc); err != nil {
 					return false, err
@@ -98,7 +98,7 @@ func (d *defaultDB) removeIndex(ctx context.Context, collection string, index In
 }
 
 func (d *defaultDB) persistCollectionConfig(ctx context.Context, val CollectionSchema) error {
-	if err := d.kv.Tx(true, func(tx kv.Tx) error {
+	if err := d.kv.Tx(false, func(tx kv.Tx) error {
 		bits, err := val.MarshalJSON()
 		if err != nil {
 			return err
@@ -115,7 +115,7 @@ func (d *defaultDB) persistCollectionConfig(ctx context.Context, val CollectionS
 }
 
 func (d *defaultDB) deleteCollectionConfig(ctx context.Context, collection string) error {
-	if err := d.kv.Tx(true, func(tx kv.Tx) error {
+	if err := d.kv.Tx(false, func(tx kv.Tx) error {
 		err := tx.Delete(collectionConfigKey(ctx, collection))
 		if err != nil {
 			return err
@@ -129,7 +129,7 @@ func (d *defaultDB) deleteCollectionConfig(ctx context.Context, collection strin
 
 func (d *defaultDB) getCollectionConfigs(ctx context.Context) ([]CollectionSchema, error) {
 	var existing []CollectionSchema
-	if err := d.kv.Tx(false, func(tx kv.Tx) error {
+	if err := d.kv.Tx(true, func(tx kv.Tx) error {
 		i := tx.NewIterator(kv.IterOpts{
 			Prefix: collectionConfigPrefix(ctx),
 		})
@@ -159,7 +159,7 @@ func (d *defaultDB) getCollectionConfigs(ctx context.Context) ([]CollectionSchem
 
 func (d *defaultDB) getPersistedCollection(ctx context.Context, collection string) (CollectionSchema, error) {
 	var cfg CollectionSchema
-	if err := d.kv.Tx(false, func(tx kv.Tx) error {
+	if err := d.kv.Tx(true, func(tx kv.Tx) error {
 		bits, err := tx.Get(collectionConfigKey(ctx, collection))
 		if err != nil {
 			return err

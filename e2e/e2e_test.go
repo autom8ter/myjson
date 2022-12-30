@@ -11,7 +11,7 @@ func TestConcurrency(t *testing.T) {
 	//
 	//		for i := 0; i < 100; i++ {
 	//			var usrEmail string
-	//			err := db.Tx(ctx, true, func(ctx context.Context, tx gokvkit.Tx) error {
+	//			err := db.Tx(ctx, TxOpts{IsReadOnly: false}, func(ctx context.Context, tx gokvkit.Tx) error {
 	//				doc := testutil.NewUserDoc()
 	//				usrEmail = doc.GetString("contact.email")
 	//				tx.Set(ctx, "user", doc)
@@ -19,7 +19,7 @@ func TestConcurrency(t *testing.T) {
 	//			})
 	//			assert.NoError(t, err)
 	//			egp.Go(func() error {
-	//				db.Tx(ctx, true, func(ctx context.Context, tx gokvkit.Tx) error {
+	//				db.Tx(ctx, TxOpts{IsReadOnly: false}, func(ctx context.Context, tx gokvkit.Tx) error {
 	//					results, _ := tx.Query(ctx, "user", gokvkit.Q().
 	//						Select(gokvkit.Select{Field: "*"}).
 	//						Where(gokvkit.Where{
