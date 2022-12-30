@@ -1,6 +1,6 @@
 package kvutil
 
-// NextPrefix returns the next prefix
+// NextPrefix returns a prefix that is lexicographically larger than the input prefix
 func NextPrefix(prefix []byte) []byte {
 	buf := make([]byte, len(prefix))
 	copy(buf, prefix)

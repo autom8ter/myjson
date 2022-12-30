@@ -1,60 +1,182 @@
-package brutus
+package gokvkit
 
 import (
+	"testing"
+	"time"
+
 	"github.com/brianvoe/gofakeit/v6"
 	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 func TestOptimizer(t *testing.T) {
 	o := defaultOptimizer{}
-	indexes := map[string]Index{
-		"primary_idx": {
-			Collection: "testing",
-			Name:       "primary_idx",
-			Fields:     []string{"_id"},
-			Unique:     true,
-			Primary:    true,
-		},
-		"email_idx": {
-			Collection: "testing",
-			Name:       "email_idx",
-			Fields:     []string{"email"},
-			Unique:     true,
-			Primary:    false,
-		},
-	}
+	schema, err := newCollectionSchema([]byte(userSchema))
+	assert.NoError(t, err)
+	indexes := schema
 	t.Run("select secondary index", func(t *testing.T) {
-		i, err := o.BestIndex(indexes, []Where{
+		optimization, err := o.Optimize(indexes, []Where{
 			{
-				Field: "email",
-				Op:    "==",
+				Field: "contact.email",
+				Op:    WhereOpEq,
 				Value: gofakeit.Email(),
 			},
-		}, OrderBy{})
-		assert.Nil(t, err)
-		assert.Equal(t, false, i.IsPrimaryIndex)
-		assert.Equal(t, "email", i.MatchedFields[0])
+		})
+		assert.NoError(t, err)
+		assert.Equal(t, false, optimization.Index.Primary)
+		assert.Equal(t, "contact.email", optimization.MatchedFields[0])
 	})
+
 	t.Run("select primary index", func(t *testing.T) {
-		i, err := o.BestIndex(indexes, []Where{
+		optimization, err := o.Optimize(indexes, []Where{
 			{
 				Field: "_id",
-				Op:    "==",
+				Op:    WhereOpEq,
 				Value: gofakeit.Email(),
 			},
-		}, OrderBy{})
-		assert.Nil(t, err)
-		assert.Equal(t, "_id", i.MatchedFields[0])
-		assert.Equal(t, true, i.IsPrimaryIndex)
-	})
-	t.Run("select secondary index order by", func(t *testing.T) {
-		i, err := o.BestIndex(indexes, []Where{}, OrderBy{
-			Field:     "email",
-			Direction: DESC,
 		})
-		assert.Nil(t, err)
-		//assert.Equal(t, "email", i.MatchedFields[0])
-		assert.Equal(t, true, i.IsOrdered)
+		assert.NoError(t, err)
+		assert.Equal(t, true, optimization.Index.Primary, optimization.MatchedFields)
+		assert.Equal(t, "_id", optimization.MatchedFields[0], optimization.MatchedFields)
+	})
+
+	t.Run("select secondary index (multi-field)", func(t *testing.T) {
+		optimization, err := o.Optimize(indexes, []Where{
+			{
+				Field: "account_id",
+				Op:    WhereOpEq,
+				Value: "1",
+			},
+			{
+				Field: "contact.email",
+				Op:    WhereOpEq,
+				Value: gofakeit.Email(),
+			},
+		})
+		assert.NoError(t, err)
+		assert.Equal(t, false, optimization.Index.Primary)
+		assert.Equal(t, "account_id", optimization.MatchedFields[0])
+		assert.Equal(t, "contact.email", optimization.MatchedFields[1])
+	})
+	t.Run("select secondary index 2", func(t *testing.T) {
+		optimization, err := o.Optimize(indexes, []Where{
+			{
+				Field: "contact.email",
+				Op:    WhereOpEq,
+				Value: gofakeit.Email(),
+			},
+			{
+				Field: "account_id",
+				Op:    WhereOpEq,
+				Value: "1",
+			},
+		})
+		assert.NoError(t, err)
+		assert.EqualValues(t, false, optimization.Index.Primary)
+		assert.Equal(t, "contact.email", optimization.MatchedFields[0])
+	})
+	t.Run("select secondary index (multi-field partial match)", func(t *testing.T) {
+		optimization, err := o.Optimize(indexes, []Where{
+			{
+				Field: "account_id",
+				Op:    WhereOpEq,
+				Value: "1",
+			},
+		})
+		assert.NoError(t, err)
+		assert.Equal(t, false, optimization.Index.Primary)
+		assert.Equal(t, "account_id", optimization.MatchedFields[0])
+	})
+	t.Run("select secondary index (multi-field partial match (!=))", func(t *testing.T) {
+		optimization, err := o.Optimize(indexes, []Where{
+			{
+				Field: "account_id",
+				Op:    "!=",
+				Value: "1",
+			},
+		})
+		assert.NoError(t, err)
+		assert.Equal(t, true, optimization.Index.Primary)
+		assert.Equal(t, 0, len(optimization.MatchedFields))
+	})
+	t.Run("select secondary index (>)", func(t *testing.T) {
+		cdc, err := newCollectionSchema([]byte(cdcSchema))
+		assert.NoError(t, err)
+		optimization, err := o.Optimize(cdc, []Where{
+			{
+				Field: "timestamp",
+				Op:    WhereOpGt,
+				Value: time.Now().String(),
+			},
+		})
+		assert.NoError(t, err)
+		assert.Equal(t, false, optimization.Index.Primary)
+		assert.Equal(t, "timestamp", optimization.SeekFields[0])
+		assert.NotEmpty(t, optimization.SeekValues["timestamp"])
+	})
+	t.Run("select primary index (neq)", func(t *testing.T) {
+		optimization, err := o.Optimize(indexes, []Where{
+			{
+				Field: "_id",
+				Op:    WhereOpNeq,
+				Value: gofakeit.Email(),
+			},
+		})
+		assert.NoError(t, err)
+		assert.Equal(t, true, optimization.Index.Primary)
+	})
+	t.Run("select primary index (hasPrefix)", func(t *testing.T) {
+		optimization, err := o.Optimize(indexes, []Where{
+			{
+				Field: "_id",
+				Op:    WhereOpHasPrefix,
+				Value: gofakeit.Email(),
+			},
+		})
+		assert.NoError(t, err)
+		assert.Equal(t, true, optimization.Index.Primary)
+	})
+	t.Run("select primary index (hasSuffix)", func(t *testing.T) {
+		optimization, err := o.Optimize(indexes, []Where{
+			{
+				Field: "_id",
+				Op:    WhereOpHasSuffix,
+				Value: gofakeit.Email(),
+			},
+		})
+		assert.NoError(t, err)
+		assert.Equal(t, true, optimization.Index.Primary)
+	})
+	t.Run("select primary index (contains)", func(t *testing.T) {
+		optimization, err := o.Optimize(indexes, []Where{
+			{
+				Field: "_id",
+				Op:    WhereOpContains,
+				Value: gofakeit.Email(),
+			},
+		})
+		assert.NoError(t, err)
+		assert.Equal(t, true, optimization.Index.Primary)
+	})
+	t.Run("select primary index (in)", func(t *testing.T) {
+		optimization, err := o.Optimize(indexes, []Where{
+			{
+				Field: "_id",
+				Op:    WhereOpIn,
+				Value: []string{gofakeit.Email()},
+			},
+		})
+		assert.NoError(t, err)
+		assert.Equal(t, true, optimization.Index.Primary)
+	})
+	t.Run("select primary index (containsAll)", func(t *testing.T) {
+		optimization, err := o.Optimize(indexes, []Where{
+			{
+				Field: "_id",
+				Op:    WhereOpContainsAll,
+				Value: []string{gofakeit.Email()},
+			},
+		})
+		assert.NoError(t, err)
+		assert.Equal(t, true, optimization.Index.Primary)
 	})
 }

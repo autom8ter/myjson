@@ -1,0 +1,57 @@
+type: object
+x-collection: cdc
+required:
+  - collection
+  - action
+  - diff
+properties:
+  _id:
+    type: string
+    description: The cdc entry id.
+    x-primary: true
+  collection:
+    type: string
+    description: The collection the document belongs to
+    x-index:
+      collection_document_idx:
+        enabled: true
+        additional_fields:
+          - documentID
+  action:
+    type: string
+    description: The action taken upon the document
+    enum:
+      - create
+      - update
+      - delete
+      - set
+  documentID:
+    type: string
+    description: The id of the document being changed
+    x-index:
+      document_id_idx:
+        enabled: true
+  diff:
+    type: array
+    description: An array of changes made to a document
+    items:
+      type: object
+      properties:
+        op:
+          type: string
+          enum:
+            - replace
+            - add
+            - remove
+        path:
+          type: string
+        value: { }
+  timestamp:
+    type: integer
+    description: The unix nanosecond timestamp when the change was commited
+    x-index:
+      timestamp_idx:
+        enabled: true
+  metadata:
+    type: object
+    description: The context metadata when the change was commited

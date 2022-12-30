@@ -1,7 +1,9 @@
 package badger
 
 import (
-	"github.com/autom8ter/brutus/kv"
+	"bytes"
+
+	"github.com/autom8ter/gokvkit/kv"
 	"github.com/dgraph-io/badger/v3"
 )
 
@@ -19,16 +21,24 @@ func (b *badgerIterator) Close() {
 }
 
 func (b *badgerIterator) Valid() bool {
-	if b.opts.Prefix != nil {
-		return b.iter.ValidForPrefix(b.opts.Prefix)
+	if b.opts.Prefix != nil && !b.iter.ValidForPrefix(b.opts.Prefix) {
+		return false
+	}
+	if b.opts.UpperBound != nil && bytes.Compare(b.Key(), b.opts.UpperBound) == 1 {
+		return false
 	}
 	return b.iter.Valid()
 }
 
-func (b *badgerIterator) Item() kv.Item {
-	return &item{item: b.iter.Item()}
+func (b *badgerIterator) Key() []byte {
+	return b.iter.Item().Key()
 }
 
-func (b *badgerIterator) Next() {
+func (b *badgerIterator) Value() ([]byte, error) {
+	return b.iter.Item().ValueCopy(nil)
+}
+
+func (b *badgerIterator) Next() error {
 	b.iter.Next()
+	return nil
 }

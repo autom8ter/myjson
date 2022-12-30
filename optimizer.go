@@ -1,104 +1,109 @@
-package brutus
+package gokvkit
 
 import (
-	"github.com/palantir/stacktrace"
+	"github.com/autom8ter/gokvkit/errors"
+	"github.com/samber/lo"
 )
-
-// Optimizer selects the best index from a set of indexes based on a query
-type Optimizer interface {
-	// BestIndex selects the optimal index to use based on the given where clauses
-	BestIndex(indexes map[string]Index, where []Where, order OrderBy) (IndexMatch, error)
-}
-
-// IndexMatch is an index matched to a read request
-type IndexMatch struct {
-	// Ref is the matching index
-	Ref Index `json:"ref"`
-	// MatchedFields is the fields that match the index
-	MatchedFields []string `json:"matchedFields"`
-	// IsOrdered indicates whether the index delivers results in the order of the query.
-	// If the index order does not match the query order, a full table scan is necessary to retrieve the result set.
-	IsOrdered bool `json:"isOrdered"`
-	// IsPrimaryIndex indicates whether the primary index was selected
-	IsPrimaryIndex bool `json:"isPrimaryIndex"`
-	// Values are the original values used to target the index
-	Values map[string]any `json:"values"`
-}
 
 type defaultOptimizer struct{}
 
-// BestIndex selects the optimal index to use given the where/orderby clause
-func (o defaultOptimizer) BestIndex(indexes map[string]Index, where []Where, order OrderBy) (IndexMatch, error) {
-	if len(indexes) == 0 {
-		return IndexMatch{}, stacktrace.NewErrorWithCode(ErrTODO, "zero configured indexes")
+func defaultOptimization(c CollectionSchema) Optimization {
+	return Optimization{
+		Collection:    c.Collection(),
+		Index:         c.PrimaryIndex(),
+		MatchedFields: []string{},
+		MatchedValues: map[string]any{},
+		SeekFields:    []string{},
+		SeekValues:    map[string]any{},
+		Reverse:       false,
 	}
+}
 
-	values := indexableFields(where, order)
+func (o defaultOptimizer) Optimize(c CollectionSchema, where []Where) (Optimization, error) {
+	if len(c.PrimaryIndex().Fields) == 0 {
+		return Optimization{}, errors.New(errors.Internal, "zero configured indexes")
+	}
+	indexes := c.Indexing()
+	if len(indexes) == 0 {
+		return Optimization{}, errors.New(errors.Internal, "zero configured indexes")
+	}
+	if len(where) == 0 {
+		return defaultOptimization(c), nil
+	}
+	if c.PrimaryIndex().Fields[0] == where[0].Field && where[0].Op == WhereOpEq {
+		return Optimization{
+			Index:         c.PrimaryIndex(),
+			MatchedFields: []string{c.PrimaryKey()},
+			MatchedValues: getMatchedFieldValues([]string{c.PrimaryKey()}, where),
+		}, nil
+	}
 	var (
-		target  Index
-		primary Index
-		matched []string
-		ordered bool
+		opt = &Optimization{
+			Collection: c.Collection(),
+		}
 	)
 	for _, index := range indexes {
 		if len(index.Fields) == 0 {
 			continue
 		}
-		if index.Primary {
-			primary = index
-		}
-
-		isOrdered := index.Fields[0] == order.Field
-		var totalMatched []string
+		var (
+			matchedFields []string
+			seekFields    []string
+			reverse       bool
+		)
 		for i, field := range index.Fields {
 			if len(where) > i {
-				if field == where[i].Field {
-					totalMatched = append(totalMatched, field)
+				if field == where[i].Field && where[i].Op == WhereOpEq {
+					matchedFields = append(matchedFields, field)
+				} else if field == where[i].Field && len(index.Fields)-1 == i {
+					switch {
+					case where[i].Op == WhereOpGt:
+						seekFields = append(seekFields, field)
+					case where[i].Op == WhereOpGte:
+						seekFields = append(seekFields, field)
+					case where[i].Op == WhereOpLt:
+						seekFields = append(seekFields, field)
+						reverse = true
+					case where[i].Op == WhereOpLte:
+						seekFields = append(seekFields, field)
+						reverse = true
+					}
 				}
 			}
 		}
-		if len(totalMatched) > len(matched) || (!ordered && isOrdered) {
-			target = index
-			ordered = isOrdered
-			matched = totalMatched
+		matchedFields = lo.Uniq(matchedFields)
+		if len(matchedFields)+len(seekFields) >= len(opt.MatchedFields)+len(opt.SeekFields) {
+			opt.Index = index
+			opt.MatchedFields = matchedFields
+			opt.Reverse = reverse
+			opt.SeekFields = seekFields
 		}
 	}
-	if target.Primary {
-		ordered = true
+	if len(opt.MatchedFields)+len(opt.SeekFields) > 0 {
+		opt.MatchedValues = getMatchedFieldValues(opt.MatchedFields, where)
+		opt.SeekValues = getMatchedFieldValues(opt.SeekFields, where)
+		return *opt, nil
 	}
-	if len(target.Fields) > 0 {
-		return IndexMatch{
-			Ref:            target,
-			MatchedFields:  matched,
-			IsOrdered:      ordered,
-			Values:         values,
-			IsPrimaryIndex: target.Primary,
-		}, nil
+	if c.RequireQueryIndex() {
+		return Optimization{}, errors.New(errors.Forbidden, "index is required for query in collection: %s", c.Collection())
 	}
-	if len(primary.Fields) == 0 {
-		return IndexMatch{}, stacktrace.NewErrorWithCode(ErrTODO, "missing primary key index")
-	}
-	return IndexMatch{
-		Ref:            primary,
-		MatchedFields:  []string{primary.Fields[0]},
-		IsOrdered:      order.Field == primary.Fields[0] || order.Field == "",
-		Values:         values,
-		IsPrimaryIndex: true,
-	}, nil
+	return defaultOptimization(c), nil
 }
 
-func indexableFields(where []Where, by OrderBy) map[string]any {
+func getMatchedFieldValues(fields []string, where []Where) map[string]any {
+	if len(fields) == 0 {
+		return map[string]any{}
+	}
 	var whereFields []string
 	var whereValues = map[string]any{}
-	if by.Field != "" {
-		whereValues[by.Field] = nil
-	}
-	for _, w := range where {
-		if w.Op != "==" && w.Op != Eq {
-			continue
+	for _, f := range fields {
+		for _, w := range where {
+			if w.Field != f {
+				continue
+			}
+			whereFields = append(whereFields, w.Field)
+			whereValues[w.Field] = w.Value
 		}
-		whereFields = append(whereFields, w.Field)
-		whereValues[w.Field] = w.Value
 	}
 	return whereValues
 }

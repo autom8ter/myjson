@@ -2,66 +2,38 @@ package testutil
 
 import (
 	"context"
-	"github.com/autom8ter/brutus"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"time"
 
+	"github.com/autom8ter/gokvkit"
+
 	"github.com/brianvoe/gofakeit/v6"
 
 	_ "embed"
+
+	_ "github.com/autom8ter/gokvkit/kv/badger"
 )
 
 var (
-	//go:embed testdata/task.json
+	//go:embed testdata/task.yaml
 	TaskSchema string
-	//go:embed testdata/user.json
-	UserSchema     string
-	TaskCollection = brutus.NewCollection("task", "_id",
-		brutus.WithIndex(brutus.Index{
-			Collection: "task",
-			Name:       "task_user_idx",
-			Fields:     []string{"user"},
-			Unique:     false,
-			Primary:    false,
-		}),
-		brutus.WithValidatorHooks(brutus.MustJSONSchema([]byte(TaskSchema))),
-	)
-	UserCollection = brutus.NewCollection("user", "_id",
-		brutus.WithIndex(brutus.Index{
-			Collection: "user",
-			Name:       "user_lanaguage_idx",
-			Fields:     []string{"language"},
-			Unique:     false,
-			Primary:    false,
-		}),
-		brutus.WithIndex(brutus.Index{
-			Collection: "user",
-			Name:       "user_email_idx",
-			Fields:     []string{"contact.email"},
-			Unique:     true,
-			Primary:    false,
-		}),
-		brutus.WithIndex(brutus.Index{
-			Collection: "user",
-			Name:       "user_account_idx",
-			Fields:     []string{"account_id"},
-			Unique:     false,
-			Primary:    false,
-		}),
-		brutus.WithValidatorHooks(brutus.MustJSONSchema([]byte(UserSchema))),
-	)
-	AllCollections = []*brutus.Collection{UserCollection, TaskCollection}
+	//go:embed testdata/user.yaml
+	UserSchema string
+	//go:embed testdata/account.yaml
+	AccountSchema  string
+	AllCollections = [][]byte{[]byte(UserSchema), []byte(TaskSchema), []byte(AccountSchema)}
 )
 
-func NewUserDoc() *brutus.Document {
-	doc, err := brutus.NewDocumentFrom(map[string]interface{}{
+func NewUserDoc() *gokvkit.Document {
+	doc, err := gokvkit.NewDocumentFrom(map[string]interface{}{
 		"_id":  gofakeit.UUID(),
 		"name": gofakeit.Name(),
 		"contact": map[string]interface{}{
-			"email": gofakeit.Email(),
+			"email": fmt.Sprintf("%v.%s", gofakeit.IntRange(0, 100), gofakeit.Email()),
 		},
-		"account_id":      gofakeit.IntRange(0, 100),
+		"account_id":      fmt.Sprint(gofakeit.IntRange(0, 100)),
 		"language":        gofakeit.Language(),
 		"birthday_month":  gofakeit.Month(),
 		"favorite_number": gofakeit.Second(),
@@ -76,8 +48,8 @@ func NewUserDoc() *brutus.Document {
 	return doc
 }
 
-func NewTaskDoc(usrID string) *brutus.Document {
-	doc, err := brutus.NewDocumentFrom(map[string]interface{}{
+func NewTaskDoc(usrID string) *gokvkit.Document {
+	doc, err := gokvkit.NewDocumentFrom(map[string]interface{}{
 		"_id":     gofakeit.UUID(),
 		"user":    usrID,
 		"content": gofakeit.LoremIpsumSentence(5),
@@ -88,10 +60,8 @@ func NewTaskDoc(usrID string) *brutus.Document {
 	return doc
 }
 
-func TestDB(fn func(ctx context.Context, db *brutus.DB), collections ...*brutus.Collection) error {
-	if len(collections) == 0 {
-		collections = append(collections, AllCollections...)
-	}
+func TestDB(fn func(ctx context.Context, db gokvkit.Database), collections ...[]byte) error {
+	collections = append(collections, AllCollections...)
 	os.MkdirAll("tmp", 0700)
 	dir, err := ioutil.TempDir("./tmp", "")
 	if err != nil {
@@ -100,19 +70,33 @@ func TestDB(fn func(ctx context.Context, db *brutus.DB), collections ...*brutus.
 	defer os.RemoveAll(dir)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	db, err := brutus.New(ctx, brutus.KVConfig{
-		Provider: "badger",
-		Params: map[string]string{
-			"storage_path": dir,
-		},
+	db, err := gokvkit.New(ctx, "badger", map[string]any{
+		"storage_path": dir,
 	})
 	if err != nil {
 		return err
 	}
-	if err := db.Core().SetCollections(ctx, collections); err != nil {
+	for _, c := range collections {
+		if err := db.ConfigureCollection(ctx, c); err != nil {
+			return err
+		}
+	}
+
+	if err := db.Tx(ctx, gokvkit.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx gokvkit.Tx) error {
+		for i := 0; i <= 100; i++ {
+			d, _ := gokvkit.NewDocumentFrom(map[string]any{
+				"_id":  fmt.Sprint(i),
+				"name": gofakeit.Company(),
+			})
+			if err := tx.Set(ctx, "account", d); err != nil {
+				return err
+			}
+		}
+		return nil
+	}); err != nil {
 		return err
 	}
-	time.Sleep(1 * time.Second)
+
 	defer db.Close(ctx)
 	fn(ctx, db)
 	return nil

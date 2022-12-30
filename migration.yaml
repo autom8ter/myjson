@@ -1,0 +1,24 @@
+type: object
+x-collection: migration
+required:
+  - _id
+  - timestamp
+  - script
+  - dirty
+properties:
+  _id:
+    type: string
+    description: The migration's id
+    x-primary: true
+  script:
+    type: string
+    description: The migration script's content
+  dirty:
+    type: boolean
+    description: Whether the migration failed or not
+  timestamp:
+    type: integer
+    description: The unix timestamp when the migration executed
+  error:
+    type: string
+    description: An error message if one was encountered

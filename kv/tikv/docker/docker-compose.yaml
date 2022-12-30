@@ -1,0 +1,48 @@
+version: '3.7'
+
+services:
+  pd0:
+    hostname: pd0
+    container_name: pd0
+    image: pingcap/pd:latest
+    ports:
+      - "2379:2379"
+      - "2380:2380"
+    volumes:
+      - ./pd.toml:/pd.toml:ro
+      - ./data:/data
+      - ./logs:/logs
+    command:
+      - --name=pd0
+      - --client-urls=http://0.0.0.0:2379
+      - --peer-urls=http://0.0.0.0:2380
+      - --advertise-client-urls=http://pd0:2379
+      - --advertise-peer-urls=http://0.0.0.0:2380
+      #      - --initial-cluster=pd0=http://0.0.0.0:2380
+      - --data-dir=/data/pd0
+      - --config=/pd.toml
+      - --force-new-cluster
+    restart: on-failure
+  tikv0:
+    hostname: tikv0
+    container_name: tikv0
+    ports:
+      - "20160:20160"
+    image: pingcap/tikv:latest
+    volumes:
+      - ./tikv.toml:/tikv.toml:ro
+      - ./data:/data
+      - ./logs:/logs
+    command:
+      - --addr=0.0.0.0:20160
+      - --advertise-addr=tikv0:20160
+      - --data-dir=/data/tikv0
+      - --pd=pd0:2379
+      - --config=/tikv.toml
+    depends_on:
+      - "pd0"
+    restart: on-failure
+
+# $ docker run --rm -ti --network eventsourcing alpine sh -c "apk add curl; curl http://tikv0:20160/metrics"
+
+# docker exec -it tikv0 sh -c "apk add curl; curl http://pd0:2379/metrics"

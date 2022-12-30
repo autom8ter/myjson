@@ -1,28 +1,110 @@
-package brutus
+package gokvkit
 
 import (
-	"context"
 	"encoding/json"
+	"fmt"
+	"io"
+	"reflect"
+	"regexp"
+	"strconv"
+	"strings"
+	"time"
+
+	"github.com/autom8ter/gokvkit/errors"
+	"github.com/autom8ter/gokvkit/util"
+	"github.com/huandu/xstrings"
 	flat2 "github.com/nqd/flat"
-	"github.com/palantir/stacktrace"
 	"github.com/samber/lo"
 	"github.com/spf13/cast"
 	"github.com/tidwall/gjson"
 	"github.com/tidwall/sjson"
-	"io"
-	"sort"
-	"strings"
 )
 
-// Ref is a reference to a document
-type Ref struct {
-	Collection string `json:"collection"`
-	ID         string `json:"id"`
+func init() {
+	for k, v := range modifiers {
+		gjson.AddModifier(k, v)
+	}
 }
+
+var modifiers = map[string]func(json, arg string) string{
+	"snakeCase": func(json, arg string) string {
+		return xstrings.ToSnakeCase(json)
+	},
+	"camelCase": func(json, arg string) string {
+		return xstrings.ToCamelCase(json)
+	},
+	"kebabCase": func(json, arg string) string {
+		return xstrings.ToKebabCase(json)
+	},
+	"upper": func(json, arg string) string {
+		return strings.ToUpper(json)
+	},
+	"lower": func(json, arg string) string {
+		return strings.ToLower(json)
+	},
+	"replaceAll": func(json, arg string) string {
+		args := gjson.Parse(arg)
+		return strings.ReplaceAll(json, args.Get("old").String(), args.Get("new").String())
+	},
+	"trim": func(json, arg string) string {
+		return strings.ReplaceAll(json, " ", "")
+	},
+	"dateTrunc": func(json, arg string) string {
+		json, _ = strconv.Unquote(json)
+		t := cast.ToTime(json)
+		yr, month, day := t.Date()
+		switch arg {
+		case "month":
+			return strconv.Quote(time.Date(yr, month, 1, 0, 0, 0, 0, time.Local).String())
+		case "day":
+			return strconv.Quote(time.Date(yr, month, day, 0, 0, 0, 0, time.Local).String())
+		case "year":
+			return strconv.Quote(time.Date(yr, time.January, 1, 0, 0, 0, 0, time.Local).String())
+		default:
+			return json
+		}
+	},
+	"unix": func(json, arg string) string {
+		json, _ = strconv.Unquote(json)
+		t := cast.ToTime(json)
+		if t.IsZero() {
+			return json
+		}
+		return strconv.Quote(fmt.Sprint(t.Unix()))
+	},
+	"unixMilli": func(json, arg string) string {
+		json, _ = strconv.Unquote(json)
+		t := cast.ToTime(json)
+		if t.IsZero() {
+			return json
+		}
+		return strconv.Quote(fmt.Sprint(t.UnixMilli()))
+	},
+	"unixNano": func(json, arg string) string {
+		json, _ = strconv.Unquote(json)
+		t := cast.ToTime(json)
+		if t.IsZero() {
+			return json
+		}
+		return strconv.Quote(fmt.Sprint(t.UnixNano()))
+	},
+}
+
+const selfRefPrefix = "$"
 
 // Document is a concurrency safe JSON document
 type Document struct {
 	result gjson.Result
+}
+
+// UnmarshalJSON satisfies the json Unmarshaler interface
+func (d *Document) UnmarshalJSON(bytes []byte) error {
+	doc, err := NewDocumentFromBytes(bytes)
+	if err != nil {
+		return err
+	}
+	*d = *doc
+	return nil
 }
 
 // MarshalJSON satisfies the json Marshaler interface
@@ -41,13 +123,13 @@ func NewDocument() *Document {
 // NewDocumentFromBytes creates a new document from the given json bytes
 func NewDocumentFromBytes(json []byte) (*Document, error) {
 	if !gjson.ValidBytes(json) {
-		return nil, stacktrace.NewError("invalid json: %s", string(json))
+		return nil, errors.New(errors.Validation, "invalid json: %s", string(json))
 	}
 	d := &Document{
 		result: gjson.ParseBytes(json),
 	}
 	if !d.Valid() {
-		return nil, stacktrace.NewError("invalid document")
+		return nil, errors.New(errors.Validation, "invalid document")
 	}
 	return d, nil
 }
@@ -57,7 +139,7 @@ func NewDocumentFrom(value any) (*Document, error) {
 	var err error
 	bits, err := json.Marshal(value)
 	if err != nil {
-		return nil, stacktrace.NewError("failed to json encode value: %#v", value)
+		return nil, errors.New(errors.Validation, "failed to json encode value: %#v", value)
 	}
 	return NewDocumentFromBytes(bits)
 }
@@ -69,7 +151,7 @@ func (d *Document) Valid() bool {
 
 // String returns the document as a json string
 func (d *Document) String() string {
-	return d.result.Raw
+	return d.result.String()
 }
 
 // Bytes returns the document as json bytes
@@ -88,35 +170,22 @@ func (d *Document) Clone() *Document {
 	return &Document{result: gjson.Parse(raw)}
 }
 
-// Select returns the document with only the selected fields populated
-func (d *Document) Select(fields []string) error {
-	if len(fields) == 0 || fields[0] == "*" {
-		return nil
-	}
-	var (
-		selected = NewDocument()
-	)
-
-	patch := map[string]interface{}{}
-	for _, f := range fields {
-		patch[f] = d.Get(f)
-	}
-	err := selected.SetAll(patch)
-	if err != nil {
-		return stacktrace.Propagate(err, "")
-	}
-	d.result = selected.result
-	return nil
-}
-
 // Get gets a field on the document. Get has GJSON syntax support and supports dot notation
 func (d *Document) Get(field string) any {
-	return d.result.Get(field).Value()
+	if d.result.Get(field).Exists() {
+		return d.result.Get(field).Value()
+	}
+	return nil
 }
 
 // GetString gets a string field value on the document. Get has GJSON syntax support and supports dot notation
 func (d *Document) GetString(field string) string {
-	return cast.ToString(d.result.Get(field).Value())
+	return cast.ToString(d.Get(field))
+}
+
+// Exists returns true if the fieldPath has a value in the json document
+func (d *Document) Exists(field string) bool {
+	return d.result.Get(field).Exists()
 }
 
 // GetBool gets a bool field value on the document. GetBool has GJSON syntax support and supports dot notation
@@ -124,9 +193,14 @@ func (d *Document) GetBool(field string) bool {
 	return cast.ToBool(d.Get(field))
 }
 
-// GetFloat gets a bool field value on the document. GetFloat has GJSON syntax support and supports dot notation
+// GetFloat gets a float64 field value on the document. GetFloat has GJSON syntax support and supports dot notation
 func (d *Document) GetFloat(field string) float64 {
 	return cast.ToFloat64(d.Get(field))
+}
+
+// GetTime gets a time.Time field value on the document. GetTime has GJSON syntax support and supports dot notation
+func (d *Document) GetTime(field string) time.Time {
+	return cast.ToTime(d.GetString(field))
 }
 
 // GetArray gets an array field on the document. Get has GJSON syntax support and supports dot notation
@@ -141,26 +215,30 @@ func (d *Document) Set(field string, val any) error {
 	})
 }
 
+var setOpts = &sjson.Options{
+	Optimistic:     true,
+	ReplaceInPlace: true,
+}
+
 func (d *Document) set(field string, val any) error {
 	var (
-		result string
+		result []byte
 		err    error
 	)
 	switch val := val.(type) {
 	case gjson.Result:
-		result, err = sjson.Set(d.result.Raw, field, val.Value())
+		result, err = sjson.SetBytesOptions([]byte(d.result.Raw), field, val.Value(), setOpts)
 	case []byte:
-		result, err = sjson.SetRaw(d.result.Raw, field, string(val))
+		result, err = sjson.SetRawBytesOptions([]byte(d.result.Raw), field, val, setOpts)
 	default:
-		result, err = sjson.Set(d.result.Raw, field, val)
+		result, err = sjson.SetBytesOptions([]byte(d.result.Raw), field, val, setOpts)
 	}
 	if err != nil {
-		return stacktrace.Propagate(err, "")
+		return err
 	}
-	if !gjson.Valid(result) {
-		return stacktrace.NewError("invalid document")
+	if d.result.Raw != string(result) {
+		d.result = gjson.ParseBytes(result)
 	}
-	d.result = gjson.Parse(result)
 	return nil
 }
 
@@ -170,7 +248,7 @@ func (d *Document) SetAll(values map[string]any) error {
 	for k, v := range values {
 		err = d.set(k, v)
 		if err != nil {
-			return stacktrace.Propagate(err, "")
+			return err
 		}
 	}
 	return nil
@@ -179,14 +257,31 @@ func (d *Document) SetAll(values map[string]any) error {
 // Merge merges the doument with the provided document. This is not an overwrite.
 func (d *Document) Merge(with *Document) error {
 	if !with.Valid() {
-		return stacktrace.NewError("invalid document")
+		return errors.New(errors.Validation, "invalid document")
 	}
 	withMap := with.Value()
 	flattened, err := flat2.Flatten(withMap, nil)
 	if err != nil {
-		return stacktrace.Propagate(err, "")
+		return err
 	}
 	return d.SetAll(flattened)
+}
+
+func (d *Document) MergeJoin(with *Document, alias string) error {
+	if !with.Valid() {
+		return errors.New(errors.Validation, "invalid document")
+	}
+	withMap := with.Value()
+	flattened, err := flat2.Flatten(withMap, nil)
+	if err != nil {
+		return err
+	}
+	for k, v := range flattened {
+		if err := d.Set(fmt.Sprintf("%s.%s", alias, k), v); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // Del deletes a field from the document
@@ -199,42 +294,88 @@ func (d *Document) DelAll(fields ...string) error {
 	for _, field := range fields {
 		result, err := sjson.Delete(d.result.Raw, field)
 		if err != nil {
-			return stacktrace.Propagate(err, "")
+			return err
 		}
 		d.result = gjson.Parse(result)
 	}
 	return nil
 }
 
-// Where executes the where clauses against the document and returns true if it passes the clauses
+// Where executes the where clauses against the document and returns true if it passes the clauses.
+// If the value of a where clause is prefixed with $. it will compare where.field to the same document's $.{field}.
 func (d *Document) Where(wheres []Where) (bool, error) {
+
 	for _, w := range wheres {
+		var (
+			isSelf    = strings.HasPrefix(cast.ToString(w.Value), selfRefPrefix)
+			selfField = strings.TrimPrefix(cast.ToString(w.Value), selfRefPrefix)
+		)
+
 		switch w.Op {
-		case "==", Eq:
-			if w.Value != d.Get(w.Field) {
-				return false, nil
+		case WhereOpEq:
+			if w.Value == "null" && d.Get(selfField) != nil {
+
 			}
-		case "!=", Neq:
-			if w.Value == d.Get(w.Field) {
-				return false, nil
+			if isSelf {
+				if d.Get(w.Field) != d.Get(selfField) || w.Value == "null" && d.Get(selfField) != nil {
+					return false, nil
+				}
+			} else {
+				if w.Value != d.Get(w.Field) || w.Value == "null" && d.Get(w.Field) != nil {
+					return false, nil
+				}
 			}
-		case ">", Gt:
-			if d.GetFloat(w.Field) <= cast.ToFloat64(w.Value) {
-				return false, nil
+		case WhereOpNeq:
+			if isSelf {
+				if d.Get(w.Field) == d.Get(selfField) || w.Value == "null" && d.Get(selfField) == nil {
+					return false, nil
+				}
+			} else {
+				if w.Value == d.Get(w.Field) || w.Value == "null" && d.Get(w.Field) == nil {
+					return false, nil
+				}
 			}
-		case ">=", Gte:
-			if d.GetFloat(w.Field) < cast.ToFloat64(w.Value) {
-				return false, nil
+		case WhereOpLt:
+			if isSelf {
+				if d.GetFloat(w.Field) >= d.GetFloat(selfField) {
+					return false, nil
+				}
+			} else {
+				if d.GetFloat(w.Field) >= cast.ToFloat64(w.Value) {
+					return false, nil
+				}
 			}
-		case "<", Lt:
-			if d.GetFloat(w.Field) >= cast.ToFloat64(w.Value) {
-				return false, nil
+		case WhereOpLte:
+			if isSelf {
+				if d.GetFloat(w.Field) > d.GetFloat(selfField) {
+					return false, nil
+				}
+			} else {
+				if d.GetFloat(w.Field) > cast.ToFloat64(w.Value) {
+					return false, nil
+				}
 			}
-		case "<=", Lte:
-			if d.GetFloat(w.Field) > cast.ToFloat64(w.Value) {
-				return false, nil
+		case WhereOpGt:
+			if isSelf {
+				if d.GetFloat(w.Field) <= d.GetFloat(selfField) {
+					return false, nil
+				}
+			} else {
+				if d.GetFloat(w.Field) <= cast.ToFloat64(w.Value) {
+					return false, nil
+				}
 			}
-		case In:
+		case WhereOpGte:
+			if isSelf {
+				if d.GetFloat(w.Field) < d.GetFloat(selfField) {
+					return false, nil
+				}
+			} else {
+				if d.GetFloat(w.Field) < cast.ToFloat64(w.Value) {
+					return false, nil
+				}
+			}
+		case WhereOpIn:
 			bits, _ := json.Marshal(w.Value)
 			arr := gjson.ParseBytes(bits).Array()
 			value := d.Get(w.Field)
@@ -248,47 +389,147 @@ func (d *Document) Where(wheres []Where) (bool, error) {
 				return false, nil
 			}
 
-		case Contains:
-			if !strings.Contains(d.GetString(w.Field), cast.ToString(w.Value)) {
+		case WhereOpContains:
+			fieldVal := d.Get(w.Field)
+			switch fieldVal := fieldVal.(type) {
+			case []bool:
+				if !lo.Contains(fieldVal, cast.ToBool(w.Value)) {
+					return false, nil
+				}
+			case []float64:
+				if !lo.Contains(fieldVal, cast.ToFloat64(w.Value)) {
+					return false, nil
+				}
+			case []string:
+				if !lo.Contains(fieldVal, cast.ToString(w.Value)) {
+					return false, nil
+				}
+			case string:
+				if !strings.Contains(fieldVal, cast.ToString(w.Value)) {
+					return false, nil
+				}
+			default:
+				if !strings.Contains(util.JSONString(fieldVal), util.JSONString(w.Value)) {
+					return false, nil
+				}
+			}
+
+		case WhereOpContainsAll:
+			fieldVal := cast.ToStringSlice(d.Get(w.Field))
+			for _, v := range cast.ToStringSlice(w.Value) {
+				if !lo.Contains(fieldVal, v) {
+					return false, nil
+				}
+			}
+		case WhereOpContainsAny:
+			fieldVal := cast.ToStringSlice(d.Get(w.Field))
+			for _, v := range cast.ToStringSlice(w.Value) {
+				if lo.Contains(fieldVal, v) {
+					return true, nil
+				}
+			}
+		case WhereOpHasPrefix:
+			fieldVal := d.GetString(w.Field)
+			if !strings.HasPrefix(fieldVal, cast.ToString(w.Value)) {
+				return false, nil
+			}
+		case WhereOpHasSuffix:
+			fieldVal := d.GetString(w.Field)
+			if !strings.HasSuffix(fieldVal, cast.ToString(w.Value)) {
+				return false, nil
+			}
+		case WhereOpRegex:
+			fieldVal := d.Get(w.Field)
+			match, _ := regexp.Match(cast.ToString(w.Value), []byte(cast.ToString(fieldVal)))
+			if !match {
 				return false, nil
 			}
 		default:
-			return false, stacktrace.NewError("invalid operator: %s", w.Op)
+			return false, errors.New(errors.Validation, "unsupported operator: %s", w.Op)
 		}
 	}
 	return true, nil
 }
 
+// Diff calculates a json diff between the document and the input document
+func (d *Document) Diff(before *Document) []JSONFieldOp {
+	var ops []JSONFieldOp
+	if before == nil {
+		before = NewDocument()
+	}
+	var (
+		beforePaths = before.FieldPaths()
+		afterPaths  = d.FieldPaths()
+	)
+
+	for _, path := range beforePaths {
+		exists := d.result.Get(path).Exists()
+		switch {
+		case !exists:
+			ops = append(ops, JSONFieldOp{
+				Path:        path,
+				Op:          JSONOpRemove,
+				Value:       nil,
+				BeforeValue: before.Get(path),
+			})
+		case exists && !reflect.DeepEqual(d.Get(path), before.Get(path)):
+			ops = append(ops, JSONFieldOp{
+				Path:        path,
+				Op:          JSONOpReplace,
+				Value:       d.Get(path),
+				BeforeValue: before.Get(path),
+			})
+		}
+	}
+	for _, path := range afterPaths {
+		exists := before.result.Get(path).Exists()
+		switch {
+		case !exists:
+			ops = append(ops, JSONFieldOp{
+				Path:        path,
+				Op:          JSONOpAdd,
+				Value:       d.Get(path),
+				BeforeValue: nil,
+			})
+		}
+	}
+	return ops
+}
+
+// FieldPaths returns the paths to fields & nested fields in dot notation format
+func (d *Document) FieldPaths() []string {
+	paths := &[]string{}
+	d.paths(d.result, paths)
+	return *paths
+}
+
+func (d *Document) paths(result gjson.Result, pathValues *[]string) {
+	result.ForEach(func(key, value gjson.Result) bool {
+		if value.IsObject() {
+			d.paths(value, pathValues)
+		} else {
+			*pathValues = append(*pathValues, value.Path(d.result.Raw))
+		}
+		return true
+	})
+}
+
 // Scan scans the json document into the value
 func (d *Document) Scan(value any) error {
-	return Decode(d.Value(), &value)
+	return util.Decode(d.Value(), &value)
 }
 
 // Encode encodes the json document to the io writer
 func (d *Document) Encode(w io.Writer) error {
 	_, err := w.Write(d.Bytes())
 	if err != nil {
-		return stacktrace.Propagate(err, "failed to encode document")
+		return errors.Wrap(err, 0, "failed to encode document")
 	}
 	return nil
 }
 
 // Documents is an array of documents
 type Documents []*Document
-
-// GroupBy groups the documents by the given fields
-func (documents Documents) GroupBy(fields []string) map[string]Documents {
-	var grouped = map[string]Documents{}
-	for _, d := range documents {
-		var values []string
-		for _, g := range fields {
-			values = append(values, cast.ToString(d.Get(g)))
-		}
-		group := strings.Join(values, ".")
-		grouped[group] = append(grouped[group], d)
-	}
-	return grouped
-}
 
 // Slice slices the documents into a subarray of documents
 func (documents Documents) Slice(start, end int) Documents {
@@ -305,62 +546,7 @@ func (documents Documents) Map(mapper func(t *Document, i int) *Document) Docume
 	return lo.Map[*Document, *Document](documents, mapper)
 }
 
-// Reduce applies the reducer function to the documents and returns a single document
-func (documents Documents) Reduce(reducer func(accumulated, next *Document, i int) *Document) *Document {
-	return lo.Reduce[*Document](documents, reducer, NewDocument())
-}
-
-// OrderBy orders the documents by the OrderBy clause
-func (d Documents) OrderBy(orderBy OrderBy) Documents {
-	if orderBy.Field == "" {
-		return d
-	}
-	if orderBy.Direction == DESC {
-		sort.Slice(d, func(i, j int) bool {
-			return compareField(orderBy.Field, d[i], d[j])
-		})
-	} else {
-		sort.Slice(d, func(i, j int) bool {
-			return !compareField(orderBy.Field, d[i], d[j])
-		})
-	}
-	return d
-}
-
-// Aggregate reduces the documents with the input aggregates
-func (d Documents) Aggregate(ctx context.Context, aggregates []Aggregate) (*Document, error) {
-	var (
-		aggregated *Document
-	)
-	for _, next := range d {
-		if aggregated == nil || !aggregated.Valid() {
-			aggregated = next
-		}
-		for _, agg := range aggregates {
-			if agg.Alias == "" {
-				return nil, stacktrace.NewError("empty aggregate alias: %s/%s", agg.Field, agg.Function)
-			}
-			current := aggregated.GetFloat(agg.Alias)
-			switch agg.Function {
-			case COUNT:
-				current++
-			case MAX:
-				if value := next.GetFloat(agg.Field); value > current {
-					current = value
-				}
-			case MIN:
-				if value := next.GetFloat(agg.Field); value < current {
-					current = value
-				}
-			case SUM:
-				current += next.GetFloat(agg.Field)
-			default:
-				return nil, stacktrace.NewError("unsupported aggregate function: %s/%s", agg.Field, agg.Function)
-			}
-			if err := aggregated.Set(agg.Alias, current); err != nil {
-				return nil, stacktrace.Propagate(err, "")
-			}
-		}
-	}
-	return aggregated, nil
+// ForEach applies the function to each document in the documents
+func (documents Documents) ForEach(fn func(next *Document, i int)) {
+	lo.ForEach[*Document](documents, fn)
 }

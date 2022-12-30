@@ -1,58 +1,32 @@
-package brutus
+package gokvkit
 
 import (
 	"bytes"
-	"encoding/binary"
-	"encoding/json"
+	"context"
+
+	"github.com/autom8ter/gokvkit/util"
 	"github.com/nqd/flat"
-	"github.com/spf13/cast"
 )
 
-// Index is a database index used to optimize queries against a collection
-type Index struct {
-	// Collection is the collection the index belongs to
-	Collection string `json:"collection"`
-	// Name is the indexes unique name in the collection
-	Name string `json:"name"`
-	// Fields to index - order matters
-	Fields []string `json:"fields"`
-	// Unique indicates that it's a unique index which will enforce uniqueness
-	Unique bool `json:"unique"`
-	// Unique indicates that it's a primary index
-	Primary bool `json:"primary"`
-}
+var nullByte = []byte("\x00")
 
-// Prefix is a reference to a prefix within an index
-type Prefix interface {
-	// Append appends a field value to an index prefix
-	Append(field string, value any) Prefix
-	// Path returns the full path of the prefix
-	Path() []byte
-	// Fields returns the fields contained in the index prefix
-	Fields() []FieldValue
-	// DocumentID returns the document id set as the suffix of the prefix when Path() is called
-	// This allows the index to seek to the position of an individual document
-	DocumentID() string
-	// SetDocumentID sets the document id as the suffix of the prefix when Path() is called
-	// This allows the index to seek to the position of an individual document
-	SetDocumentID(id string) Prefix
-}
-
-// FieldValue is a key value pair
-type FieldValue struct {
+// indexFieldValue is a key value pair
+type indexFieldValue struct {
 	Field string `json:"field"`
 	Value any    `json:"value"`
 }
 
-func (i Index) Seek(fields map[string]any) Prefix {
+func seekPrefix(ctx context.Context, collection string, i Index, fields map[string]any) indexPathPrefix {
+	md, _ := GetMetadata(ctx)
 	fields, _ = flat.Flatten(fields, nil)
-	var prefix = Prefix(indexPathPrefix{
+	var prefix = indexPathPrefix{
 		prefix: [][]byte{
+			[]byte(md.GetNamespace()),
 			[]byte("index"),
-			[]byte(i.Collection),
+			[]byte(collection),
 			[]byte(i.Name),
 		},
-	})
+	}
 	if i.Fields == nil {
 		return prefix
 	}
@@ -65,15 +39,15 @@ func (i Index) Seek(fields map[string]any) Prefix {
 }
 
 type indexPathPrefix struct {
-	prefix     [][]byte
-	documentID string
-	fields     [][]byte
-	fieldMap   []FieldValue
+	prefix    [][]byte
+	seekValue any
+	fields    [][]byte
+	fieldMap  []indexFieldValue
 }
 
-func (p indexPathPrefix) Append(field string, value any) Prefix {
-	fields := append(p.fields, []byte(field), encodeIndexValue(value))
-	fieldMap := append(p.fieldMap, FieldValue{
+func (p indexPathPrefix) Append(field string, value any) indexPathPrefix {
+	fields := append(p.fields, []byte(field), util.EncodeIndexValue(value))
+	fieldMap := append(p.fieldMap, indexFieldValue{
 		Field: field,
 		Value: value,
 	})
@@ -84,49 +58,48 @@ func (p indexPathPrefix) Append(field string, value any) Prefix {
 	}
 }
 
-func (p indexPathPrefix) SetDocumentID(id string) Prefix {
+func (p indexPathPrefix) Seek(value any) indexPathPrefix {
 	return indexPathPrefix{
-		prefix:     p.prefix,
-		documentID: id,
-		fields:     p.fields,
-		fieldMap:   p.fieldMap,
+		prefix:    p.prefix,
+		seekValue: value,
+		fields:    p.fields,
+		fieldMap:  p.fieldMap,
 	}
 }
 
 func (p indexPathPrefix) Path() []byte {
 	var path = append(p.prefix, p.fields...)
-	if p.documentID != "" {
-		path = append(path, []byte(p.documentID))
+	if p.seekValue != nil {
+		path = append(path, util.EncodeIndexValue(p.seekValue))
 	}
-	return bytes.Join(path, []byte("\x00"))
+	return bytes.Join(path, nullByte)
 }
 
-func (i indexPathPrefix) DocumentID() string {
-	return i.documentID
+func (i indexPathPrefix) SeekValue() any {
+	return i.seekValue
 }
 
-func (i indexPathPrefix) Fields() []FieldValue {
+func (i indexPathPrefix) Fields() []indexFieldValue {
 	return i.fieldMap
 }
 
-func encodeIndexValue(value any) []byte {
-	if value == nil {
-		return []byte("")
+func indexPrefix(ctx context.Context, collection, index string) []byte {
+	md, _ := GetMetadata(ctx)
+	path := [][]byte{
+		[]byte(md.GetNamespace()),
+		[]byte("index"),
+		[]byte(collection),
+		[]byte(index),
 	}
-	switch value := value.(type) {
-	case bool:
-		return encodeIndexValue(cast.ToString(value))
-	case string:
-		return []byte(value)
-	case int, int64, int32, float64, float32, uint64, uint32, uint16:
-		buf := make([]byte, 8)
-		binary.BigEndian.PutUint64(buf, cast.ToUint64(value))
-		return buf
-	default:
-		bits, _ := json.Marshal(value)
-		if len(bits) == 0 {
-			bits = []byte(cast.ToString(value))
-		}
-		return bits
+	return bytes.Join(path, nullByte)
+}
+
+func collectionPrefix(ctx context.Context, collection string) []byte {
+	md, _ := GetMetadata(ctx)
+	path := [][]byte{
+		[]byte(md.GetNamespace()),
+		[]byte("index"),
+		[]byte(collection),
 	}
+	return bytes.Join(path, nullByte)
 }
