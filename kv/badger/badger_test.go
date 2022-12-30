@@ -1,6 +1,7 @@
 package badger
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"testing"
@@ -14,7 +15,7 @@ func Test(t *testing.T) {
 	db, err := open("")
 	assert.NoError(t, err)
 	data := map[string]string{}
-	for i := 0; i < 10; i++ {
+	for i := 0; i < 100; i++ {
 		data[fmt.Sprint(i)] = fmt.Sprint(i)
 	}
 	t.Run("set", func(t *testing.T) {
@@ -53,6 +54,69 @@ func Test(t *testing.T) {
 				iter.Next()
 			}
 			assert.Equal(t, len(data), i)
+			return nil
+		}))
+	})
+	t.Run("iterate w/ prefix", func(t *testing.T) {
+		assert.Nil(t, db.Tx(true, func(tx kv.Tx) error {
+			iter, err := tx.NewIterator(kv.IterOpts{
+				Prefix:  []byte("1"),
+				Seek:    nil,
+				Reverse: false,
+			})
+			assert.NoError(t, err)
+			defer iter.Close()
+			i := 0
+			for iter.Valid() {
+				i++
+				assert.True(t, bytes.HasPrefix(iter.Key(), []byte("1")))
+				val, _ := iter.Value()
+				assert.EqualValues(t, string(val), data[string(iter.Key())])
+				iter.Next()
+			}
+			assert.Equal(t, 11, i)
+			return nil
+		}))
+	})
+	t.Run("iterate w/ upper bound", func(t *testing.T) {
+		assert.Nil(t, db.Tx(true, func(tx kv.Tx) error {
+			iter, err := tx.NewIterator(kv.IterOpts{
+				Prefix:     []byte("1"),
+				Seek:       nil,
+				Reverse:    false,
+				UpperBound: []byte("10"),
+			})
+			assert.NoError(t, err)
+			defer iter.Close()
+			i := 0
+			for iter.Valid() {
+				i++
+				val, _ := iter.Value()
+				assert.EqualValues(t, string(val), data[string(iter.Key())])
+				iter.Next()
+			}
+			assert.Equal(t, 2, i)
+			return nil
+		}))
+	})
+	t.Run("iterate in reverse", func(t *testing.T) {
+		assert.Nil(t, db.Tx(true, func(tx kv.Tx) error {
+			iter, err := tx.NewIterator(kv.IterOpts{
+				Prefix:     []byte("1"),
+				Reverse:    true,
+				UpperBound: []byte("10"),
+			})
+			assert.NoError(t, err)
+			defer iter.Close()
+			var found [][]byte
+			for iter.Valid() {
+				val, _ := iter.Value()
+				assert.EqualValues(t, string(val), data[string(iter.Key())])
+				found = append(found, iter.Key())
+				iter.Next()
+			}
+			assert.Equal(t, 2, len(found))
+			assert.Equal(t, []byte("10"), found[0])
 			return nil
 		}))
 	})

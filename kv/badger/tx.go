@@ -19,6 +19,9 @@ func (b *badgerTx) NewIterator(kopts kv.IterOpts) (kv.Iterator, error) {
 	opts.PrefetchSize = 10
 	opts.Prefix = kopts.Prefix
 	opts.Reverse = kopts.Reverse
+	if kopts.Seek == nil && kopts.UpperBound != nil && kopts.Reverse {
+		kopts.Seek = kopts.UpperBound
+	}
 	iter := b.txn.NewIterator(opts)
 	if kopts.Seek == nil {
 		iter.Rewind()
