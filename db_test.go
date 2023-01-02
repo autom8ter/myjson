@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/autom8ter/gokvkit"
+	"github.com/autom8ter/gokvkit/kv"
 	"github.com/autom8ter/gokvkit/testutil"
 	"github.com/brianvoe/gofakeit/v6"
 	"github.com/segmentio/ksuid"
@@ -28,7 +29,7 @@ func Test(t *testing.T) {
 				id  string
 				err error
 			)
-			assert.Nil(t, db.Tx(ctx, gokvkit.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx gokvkit.Tx) error {
+			assert.Nil(t, db.Tx(ctx, kv.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx gokvkit.Tx) error {
 				id, err = tx.Create(ctx, "user", testutil.NewUserDoc())
 				assert.NoError(t, err)
 				_, err := tx.Get(ctx, "user", id)
@@ -62,7 +63,7 @@ func Test(t *testing.T) {
 				id  string
 				err error
 			)
-			assert.Nil(t, db.Tx(ctx, gokvkit.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx gokvkit.Tx) error {
+			assert.Nil(t, db.Tx(ctx, kv.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx gokvkit.Tx) error {
 				id, err = tx.Create(ctx, "user", testutil.NewUserDoc())
 				_, err := tx.Get(ctx, "user", id)
 				return err
@@ -78,7 +79,7 @@ func Test(t *testing.T) {
 		assert.Nil(t, testutil.TestDB(func(ctx context.Context, db gokvkit.Database) {
 			timer := timer()
 			defer timer(t)
-			assert.Nil(t, db.Tx(ctx, gokvkit.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx gokvkit.Tx) error {
+			assert.Nil(t, db.Tx(ctx, kv.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx gokvkit.Tx) error {
 				for i := 0; i < 10; i++ {
 					assert.Nil(t, tx.Set(ctx, "user", testutil.NewUserDoc()))
 				}
@@ -93,7 +94,7 @@ func Test(t *testing.T) {
 			timer := timer()
 			defer timer(t)
 
-			assert.Nil(t, db.Tx(ctx, gokvkit.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx gokvkit.Tx) error {
+			assert.Nil(t, db.Tx(ctx, kv.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx gokvkit.Tx) error {
 				for i := 0; i < 100; i++ {
 					usr := testutil.NewUserDoc()
 					ids = append(ids, usr.GetString("_id"))
@@ -169,7 +170,7 @@ func Test(t *testing.T) {
 			for _, u := range usrs {
 				id := u.GetString("_id")
 				email := gofakeit.Email()
-				assert.Nil(t, db.Tx(ctx, gokvkit.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx gokvkit.Tx) error {
+				assert.Nil(t, db.Tx(ctx, kv.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx gokvkit.Tx) error {
 					assert.Nil(t, tx.Update(ctx, "user", id, map[string]any{
 						"contact.email": email,
 					}))
@@ -183,7 +184,7 @@ func Test(t *testing.T) {
 		})
 		t.Run("delete first 50", func(t *testing.T) {
 			for _, id := range ids[:50] {
-				assert.Nil(t, db.Tx(ctx, gokvkit.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx gokvkit.Tx) error {
+				assert.Nil(t, db.Tx(ctx, kv.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx gokvkit.Tx) error {
 					assert.Nil(t, tx.Delete(ctx, "user", id))
 					return nil
 				}))
@@ -195,7 +196,7 @@ func Test(t *testing.T) {
 			}
 		})
 		t.Run("query delete all", func(t *testing.T) {
-			assert.Nil(t, db.Tx(ctx, gokvkit.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx gokvkit.Tx) error {
+			assert.Nil(t, db.Tx(ctx, kv.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx gokvkit.Tx) error {
 				res, err := db.Query(ctx, "user", gokvkit.Query{
 					Select: []gokvkit.Select{{Field: "*"}},
 				})
@@ -227,7 +228,7 @@ func Benchmark(b *testing.B) {
 		assert.Nil(b, testutil.TestDB(func(ctx context.Context, db gokvkit.Database) {
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				assert.Nil(b, db.Tx(ctx, gokvkit.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx gokvkit.Tx) error {
+				assert.Nil(b, db.Tx(ctx, kv.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx gokvkit.Tx) error {
 					return tx.Set(ctx, "user", doc)
 				}))
 			}
@@ -238,7 +239,7 @@ func Benchmark(b *testing.B) {
 		b.ReportAllocs()
 		doc := testutil.NewUserDoc()
 		assert.Nil(b, testutil.TestDB(func(ctx context.Context, db gokvkit.Database) {
-			assert.Nil(b, db.Tx(ctx, gokvkit.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx gokvkit.Tx) error {
+			assert.Nil(b, db.Tx(ctx, kv.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx gokvkit.Tx) error {
 				return tx.Set(ctx, "user", doc)
 			}))
 			b.ResetTimer()
@@ -253,11 +254,11 @@ func Benchmark(b *testing.B) {
 		b.ReportAllocs()
 		doc := testutil.NewUserDoc()
 		assert.Nil(b, testutil.TestDB(func(ctx context.Context, db gokvkit.Database) {
-			assert.Nil(b, db.Tx(ctx, gokvkit.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx gokvkit.Tx) error {
+			assert.Nil(b, db.Tx(ctx, kv.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx gokvkit.Tx) error {
 				return tx.Set(ctx, "user", doc)
 			}))
 			var docs []*gokvkit.Document
-			assert.Nil(b, db.Tx(ctx, gokvkit.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx gokvkit.Tx) error {
+			assert.Nil(b, db.Tx(ctx, kv.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx gokvkit.Tx) error {
 				for i := 0; i < 100000; i++ {
 					usr := testutil.NewUserDoc()
 					docs = append(docs, usr)
@@ -291,11 +292,11 @@ func Benchmark(b *testing.B) {
 		b.ReportAllocs()
 		doc := testutil.NewUserDoc()
 		assert.Nil(b, testutil.TestDB(func(ctx context.Context, db gokvkit.Database) {
-			assert.Nil(b, db.Tx(ctx, gokvkit.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx gokvkit.Tx) error {
+			assert.Nil(b, db.Tx(ctx, kv.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx gokvkit.Tx) error {
 				return tx.Set(ctx, "user", doc)
 			}))
 			var docs []*gokvkit.Document
-			assert.Nil(b, db.Tx(ctx, gokvkit.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx gokvkit.Tx) error {
+			assert.Nil(b, db.Tx(ctx, kv.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx gokvkit.Tx) error {
 				for i := 0; i < 100000; i++ {
 					usr := testutil.NewUserDoc()
 					docs = append(docs, usr)
@@ -328,7 +329,7 @@ func TestIndexing1(t *testing.T) {
 	t.Run("matching unique index (contact.email)", func(t *testing.T) {
 		assert.Nil(t, testutil.TestDB(func(ctx context.Context, db gokvkit.Database) {
 			var docs gokvkit.Documents
-			assert.Nil(t, db.Tx(ctx, gokvkit.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx gokvkit.Tx) error {
+			assert.Nil(t, db.Tx(ctx, kv.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx gokvkit.Tx) error {
 				for i := 0; i < 5; i++ {
 					usr := testutil.NewUserDoc()
 					docs = append(docs, usr)
@@ -360,7 +361,7 @@ func TestIndexing1(t *testing.T) {
 		}))
 		assert.Nil(t, testutil.TestDB(func(ctx context.Context, db gokvkit.Database) {
 			var docs gokvkit.Documents
-			assert.Nil(t, db.Tx(ctx, gokvkit.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx gokvkit.Tx) error {
+			assert.Nil(t, db.Tx(ctx, kv.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx gokvkit.Tx) error {
 				for i := 0; i < 5; i++ {
 					usr := testutil.NewUserDoc()
 					docs = append(docs, usr)
@@ -395,7 +396,7 @@ func TestIndexing1(t *testing.T) {
 	t.Run("non-matching (name)", func(t *testing.T) {
 		assert.Nil(t, testutil.TestDB(func(ctx context.Context, db gokvkit.Database) {
 			var docs gokvkit.Documents
-			assert.Nil(t, db.Tx(ctx, gokvkit.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx gokvkit.Tx) error {
+			assert.Nil(t, db.Tx(ctx, kv.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx gokvkit.Tx) error {
 				for i := 0; i < 5; i++ {
 					usr := testutil.NewUserDoc()
 					docs = append(docs, usr)
@@ -431,7 +432,7 @@ func TestIndexing1(t *testing.T) {
 	t.Run("matching primary (_id)", func(t *testing.T) {
 		assert.Nil(t, testutil.TestDB(func(ctx context.Context, db gokvkit.Database) {
 			var docs gokvkit.Documents
-			assert.Nil(t, db.Tx(ctx, gokvkit.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx gokvkit.Tx) error {
+			assert.Nil(t, db.Tx(ctx, kv.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx gokvkit.Tx) error {
 				for i := 0; i < 5; i++ {
 					usr := testutil.NewUserDoc()
 					docs = append(docs, usr)
@@ -465,7 +466,7 @@ func TestIndexing1(t *testing.T) {
 		}))
 		assert.Nil(t, testutil.TestDB(func(ctx context.Context, db gokvkit.Database) {
 			var docs gokvkit.Documents
-			assert.Nil(t, db.Tx(ctx, gokvkit.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx gokvkit.Tx) error {
+			assert.Nil(t, db.Tx(ctx, kv.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx gokvkit.Tx) error {
 				for i := 0; i < 5; i++ {
 					usr := testutil.NewUserDoc()
 					docs = append(docs, usr)
@@ -501,7 +502,7 @@ func TestIndexing1(t *testing.T) {
 		t.Run("no results (>)", func(t *testing.T) {
 			assert.Nil(t, testutil.TestDB(func(ctx context.Context, db gokvkit.Database) {
 				var docs gokvkit.Documents
-				assert.Nil(t, db.Tx(ctx, gokvkit.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx gokvkit.Tx) error {
+				assert.Nil(t, db.Tx(ctx, kv.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx gokvkit.Tx) error {
 					for i := 0; i < 5; i++ {
 						usr := testutil.NewUserDoc()
 						docs = append(docs, usr)
@@ -535,7 +536,7 @@ func TestIndexing1(t *testing.T) {
 		t.Run("all results (>)", func(t *testing.T) {
 			assert.Nil(t, testutil.TestDB(func(ctx context.Context, db gokvkit.Database) {
 				var docs gokvkit.Documents
-				assert.Nil(t, db.Tx(ctx, gokvkit.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx gokvkit.Tx) error {
+				assert.Nil(t, db.Tx(ctx, kv.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx gokvkit.Tx) error {
 					for i := 0; i < 5; i++ {
 						usr := testutil.NewUserDoc()
 						docs = append(docs, usr)
@@ -569,7 +570,7 @@ func TestIndexing1(t *testing.T) {
 		t.Run("all results (<)", func(t *testing.T) {
 			assert.Nil(t, testutil.TestDB(func(ctx context.Context, db gokvkit.Database) {
 				var docs gokvkit.Documents
-				assert.Nil(t, db.Tx(ctx, gokvkit.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx gokvkit.Tx) error {
+				assert.Nil(t, db.Tx(ctx, kv.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx gokvkit.Tx) error {
 					for i := 0; i < 5; i++ {
 						usr := testutil.NewUserDoc()
 						docs = append(docs, usr)
@@ -604,7 +605,7 @@ func TestIndexing1(t *testing.T) {
 			assert.Nil(t, testutil.TestDB(func(ctx context.Context, db gokvkit.Database) {
 				var docs gokvkit.Documents
 				var ts time.Time
-				assert.Nil(t, db.Tx(ctx, gokvkit.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx gokvkit.Tx) error {
+				assert.Nil(t, db.Tx(ctx, kv.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx gokvkit.Tx) error {
 					for i := 0; i < 5; i++ {
 						usr := testutil.NewUserDoc()
 						docs = append(docs, usr)
@@ -637,7 +638,7 @@ func TestIndexing1(t *testing.T) {
 		t.Run("no results (>)", func(t *testing.T) {
 			assert.Nil(t, testutil.TestDB(func(ctx context.Context, db gokvkit.Database) {
 				var docs gokvkit.Documents
-				assert.Nil(t, db.Tx(ctx, gokvkit.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx gokvkit.Tx) error {
+				assert.Nil(t, db.Tx(ctx, kv.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx gokvkit.Tx) error {
 					for i := 0; i < 5; i++ {
 						usr := testutil.NewUserDoc()
 						docs = append(docs, usr)
@@ -671,7 +672,7 @@ func TestIndexing1(t *testing.T) {
 		t.Run("no results (<)", func(t *testing.T) {
 			assert.Nil(t, testutil.TestDB(func(ctx context.Context, db gokvkit.Database) {
 				var docs gokvkit.Documents
-				assert.Nil(t, db.Tx(ctx, gokvkit.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx gokvkit.Tx) error {
+				assert.Nil(t, db.Tx(ctx, kv.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx gokvkit.Tx) error {
 					for i := 0; i < 5; i++ {
 						usr := testutil.NewUserDoc()
 						docs = append(docs, usr)
@@ -710,7 +711,7 @@ func TestOrderBy(t *testing.T) {
 	t.Run("basic asc/desc", func(t *testing.T) {
 		assert.NoError(t, testutil.TestDB(func(ctx context.Context, db gokvkit.Database) {
 			var usrs []*gokvkit.Document
-			assert.NoError(t, db.Tx(ctx, gokvkit.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx gokvkit.Tx) error {
+			assert.NoError(t, db.Tx(ctx, kv.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx gokvkit.Tx) error {
 				for i := 0; i < 10; i++ {
 					u := testutil.NewUserDoc()
 					assert.NoError(t, u.Set("age", i))
@@ -747,7 +748,7 @@ func TestPagination(t *testing.T) {
 	t.Run("order by asc + pagination", func(t *testing.T) {
 		assert.NoError(t, testutil.TestDB(func(ctx context.Context, db gokvkit.Database) {
 			var usrs []*gokvkit.Document
-			assert.NoError(t, db.Tx(ctx, gokvkit.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx gokvkit.Tx) error {
+			assert.NoError(t, db.Tx(ctx, kv.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx gokvkit.Tx) error {
 				for i := 0; i < 10; i++ {
 					u := testutil.NewUserDoc()
 					assert.NoError(t, u.Set("age", i))
@@ -771,7 +772,7 @@ func TestPagination(t *testing.T) {
 	t.Run("order by desc + pagination", func(t *testing.T) {
 		assert.NoError(t, testutil.TestDB(func(ctx context.Context, db gokvkit.Database) {
 			var usrs []*gokvkit.Document
-			assert.NoError(t, db.Tx(ctx, gokvkit.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx gokvkit.Tx) error {
+			assert.NoError(t, db.Tx(ctx, kv.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx gokvkit.Tx) error {
 				for i := 0; i < 10; i++ {
 					u := testutil.NewUserDoc()
 					assert.NoError(t, u.Set("age", i))
@@ -795,7 +796,7 @@ func TestPagination(t *testing.T) {
 	t.Run("order by desc + where + pagination", func(t *testing.T) {
 		assert.NoError(t, testutil.TestDB(func(ctx context.Context, db gokvkit.Database) {
 			var usrs []*gokvkit.Document
-			assert.NoError(t, db.Tx(ctx, gokvkit.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx gokvkit.Tx) error {
+			assert.NoError(t, db.Tx(ctx, kv.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx gokvkit.Tx) error {
 				for i := 0; i < 10; i++ {
 					u := testutil.NewUserDoc()
 					assert.NoError(t, u.Set("age", i))
@@ -826,7 +827,7 @@ func TestAggregate(t *testing.T) {
 		assert.Nil(t, testutil.TestDB(func(ctx context.Context, db gokvkit.Database) {
 			var usrs gokvkit.Documents
 			ageSum := map[string]float64{}
-			assert.Nil(t, db.Tx(ctx, gokvkit.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx gokvkit.Tx) error {
+			assert.Nil(t, db.Tx(ctx, kv.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx gokvkit.Tx) error {
 				for i := 0; i < 10; i++ {
 					u := testutil.NewUserDoc()
 					ageSum[u.GetString("account_id")] += u.GetFloat("age")
@@ -944,7 +945,7 @@ func TestJoin(t *testing.T) {
 	t.Run("join user to account", func(t *testing.T) {
 		assert.NoError(t, testutil.TestDB(func(ctx context.Context, db gokvkit.Database) {
 			var usrs = map[string]*gokvkit.Document{}
-			assert.NoError(t, db.Tx(ctx, gokvkit.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx gokvkit.Tx) error {
+			assert.NoError(t, db.Tx(ctx, kv.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx gokvkit.Tx) error {
 				for i := 0; i < 100; i++ {
 					u := testutil.NewUserDoc()
 					usrs[u.GetString("_id")] = u
@@ -952,7 +953,7 @@ func TestJoin(t *testing.T) {
 				}
 				return nil
 			}))
-			assert.NoError(t, db.Tx(ctx, gokvkit.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx gokvkit.Tx) error {
+			assert.NoError(t, db.Tx(ctx, kv.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx gokvkit.Tx) error {
 				assert.NoError(t, tx.Set(ctx, "user", testutil.NewUserDoc()))
 				return nil
 			}))
@@ -990,7 +991,7 @@ func TestJoin(t *testing.T) {
 	t.Run("join account to user", func(t *testing.T) {
 		assert.NoError(t, testutil.TestDB(func(ctx context.Context, db gokvkit.Database) {
 			accID := ""
-			assert.NoError(t, db.Tx(ctx, gokvkit.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx gokvkit.Tx) error {
+			assert.NoError(t, db.Tx(ctx, kv.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx gokvkit.Tx) error {
 				doc := testutil.NewUserDoc()
 				accID = doc.GetString("account_id")
 				doc2 := testutil.NewUserDoc()
@@ -1037,7 +1038,7 @@ func TestJoin(t *testing.T) {
 	})
 	t.Run("cascade delete", func(t *testing.T) {
 		assert.NoError(t, testutil.TestDB(func(ctx context.Context, db gokvkit.Database) {
-			assert.NoError(t, db.Tx(ctx, gokvkit.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx gokvkit.Tx) error {
+			assert.NoError(t, db.Tx(ctx, kv.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx gokvkit.Tx) error {
 				for i := 0; i <= 100; i++ {
 					u := testutil.NewUserDoc()
 					if err := tx.Set(ctx, "user", u); err != nil {
@@ -1050,7 +1051,7 @@ func TestJoin(t *testing.T) {
 				}
 				return nil
 			}))
-			assert.NoError(t, db.Tx(ctx, gokvkit.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx gokvkit.Tx) error {
+			assert.NoError(t, db.Tx(ctx, kv.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx gokvkit.Tx) error {
 				for i := 0; i <= 100; i++ {
 					if err := tx.Delete(ctx, "account", fmt.Sprint(i)); err != nil {
 						return err
@@ -1165,7 +1166,7 @@ func TestMigrations(t *testing.T) {
 func TestTriggers(t *testing.T) {
 	t.Run("test set_timestamp trigger", func(t *testing.T) {
 		assert.NoError(t, testutil.TestDB(func(ctx context.Context, db gokvkit.Database) {
-			assert.Nil(t, db.Tx(ctx, gokvkit.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx gokvkit.Tx) error {
+			assert.Nil(t, db.Tx(ctx, kv.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx gokvkit.Tx) error {
 				id, err := tx.Create(ctx, "user", testutil.NewUserDoc())
 				assert.NoError(t, err)
 				u, err := tx.Get(ctx, "user", id)
@@ -1173,7 +1174,7 @@ func TestTriggers(t *testing.T) {
 				assert.True(t, time.Now().Truncate(1*time.Minute).Before(u.GetTime("timestamp")))
 				return err
 			}))
-			assert.Nil(t, db.Tx(ctx, gokvkit.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx gokvkit.Tx) error {
+			assert.Nil(t, db.Tx(ctx, kv.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx gokvkit.Tx) error {
 				u := testutil.NewUserDoc()
 				err := tx.Set(ctx, "user", u)
 				assert.NoError(t, err)

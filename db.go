@@ -20,9 +20,9 @@ type defaultDB struct {
 	kv          kv.DB
 	machine     machine.Machine
 	optimizer   Optimizer
-	programs    sync.Map
 	jsOverrides map[string]any
 	vmPool      chan *goja.Runtime
+	collections sync.Map
 }
 
 // New creates a new database instance from the given config
@@ -51,11 +51,31 @@ func New(ctx context.Context, provider string, providerParams map[string]any, op
 			return nil, errors.Wrap(err, errors.Internal, "failed to configure migration collection")
 		}
 	}
+	for _, c := range d.Collections(ctx) {
+		coll, err := d.getPersistedCollection(ctx, c)
+		if err != nil {
+			return nil, err
+		}
+		if coll != nil {
+			d.collections.Store(c, coll)
+		}
+	}
 	go func() {
+		ctx, cancel := context.WithCancel(ctx)
+		defer cancel()
+		ticker := time.NewTicker(5 * time.Second)
+		defer ticker.Stop()
 		for {
 			select {
 			case <-ctx.Done():
 				return
+			case <-ticker.C:
+				for _, c := range d.Collections(ctx) {
+					coll, _ := d.getPersistedCollection(ctx, c)
+					if coll != nil {
+						d.collections.Store(c, coll)
+					}
+				}
 			default:
 				vm, _ := getJavascriptVM(ctx, d, d.jsOverrides)
 				if vm != nil {
@@ -67,9 +87,9 @@ func New(ctx context.Context, provider string, providerParams map[string]any, op
 	return d, err
 }
 
-func (d *defaultDB) NewTx(opts TxOpts) (Txn, error) {
+func (d *defaultDB) NewTx(opts kv.TxOpts) (Txn, error) {
 	vm := <-d.vmPool
-	tx, err := d.kv.NewTx(opts.IsReadOnly)
+	tx, err := d.kv.NewTx(opts)
 	if err != nil {
 		return nil, err
 	}
@@ -81,7 +101,7 @@ func (d *defaultDB) NewTx(opts TxOpts) (Txn, error) {
 	}, nil
 }
 
-func (d *defaultDB) Tx(ctx context.Context, opts TxOpts, fn TxFunc) error {
+func (d *defaultDB) Tx(ctx context.Context, opts kv.TxOpts, fn TxFunc) error {
 	tx, err := d.NewTx(opts)
 	if err != nil {
 		return err
@@ -104,8 +124,8 @@ func (d *defaultDB) Get(ctx context.Context, collection, id string) (*Document, 
 		err      error
 	)
 
-	// Tx(ctx, TxOpts{IsReadOnly: true},
-	if err := d.Tx(ctx, TxOpts{IsReadOnly: true}, func(ctx context.Context, tx Tx) error {
+	// Tx(ctx, kv.TxOpts{IsReadOnly: true},
+	if err := d.Tx(ctx, kv.TxOpts{IsReadOnly: true}, func(ctx context.Context, tx Tx) error {
 		document, err = tx.Get(ctx, collection, id)
 		return err
 	}); err != nil {
@@ -116,7 +136,7 @@ func (d *defaultDB) Get(ctx context.Context, collection, id string) (*Document, 
 
 func (d *defaultDB) BatchGet(ctx context.Context, collection string, ids []string) (Documents, error) {
 	var documents []*Document
-	if err := d.Tx(ctx, TxOpts{IsReadOnly: true}, func(ctx context.Context, tx Tx) error {
+	if err := d.Tx(ctx, kv.TxOpts{IsReadOnly: true}, func(ctx context.Context, tx Tx) error {
 		for _, id := range ids {
 			document, err := tx.Get(ctx, collection, id)
 			if err != nil {
@@ -139,7 +159,7 @@ func (d *defaultDB) Query(ctx context.Context, collection string, query Query) (
 	if len(query.Select) == 0 {
 		query.Select = []Select{{Field: "*"}}
 	}
-	if err := d.Tx(ctx, TxOpts{IsReadOnly: true}, func(ctx context.Context, tx Tx) error {
+	if err := d.Tx(ctx, kv.TxOpts{IsReadOnly: true}, func(ctx context.Context, tx Tx) error {
 		page, err = tx.Query(ctx, collection, query)
 		return err
 	}); err != nil {
@@ -153,7 +173,7 @@ func (d *defaultDB) ForEach(ctx context.Context, collection string, opts ForEach
 		result Optimization
 		err    error
 	)
-	if err := d.Tx(ctx, TxOpts{IsReadOnly: true}, func(ctx context.Context, tx Tx) error {
+	if err := d.Tx(ctx, kv.TxOpts{IsReadOnly: true}, func(ctx context.Context, tx Tx) error {
 		result, err = tx.ForEach(ctx, collection, opts, fn)
 		return err
 	}); err != nil {
@@ -309,7 +329,7 @@ func (d *defaultDB) RunMigrations(ctx context.Context, migrations ...Migration) 
 		if err != nil {
 			return err
 		}
-		if err := d.Tx(ctx, TxOpts{IsReadOnly: false}, func(ctx context.Context, tx Tx) error {
+		if err := d.Tx(ctx, kv.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx Tx) error {
 			if err := tx.Set(ctx, migrationCollectionName, doc); err != nil {
 				return err
 			}

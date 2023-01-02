@@ -57,8 +57,8 @@ func open(params map[string]interface{}) (kv.DB, error) {
 	}, nil
 }
 
-func (b *tikvKV) Tx(readOnly bool, fn func(kv.Tx) error) error {
-	tx, err := b.NewTx(readOnly)
+func (b *tikvKV) Tx(opts kv.TxOpts, fn func(kv.Tx) error) error {
+	tx, err := b.NewTx(opts)
 	if err != nil {
 		return err
 	}
@@ -73,7 +73,7 @@ func (b *tikvKV) Tx(readOnly bool, fn func(kv.Tx) error) error {
 	return nil
 }
 
-func (b *tikvKV) NewTx(readOnly bool) (kv.Tx, error) {
+func (b *tikvKV) NewTx(opts kv.TxOpts) (kv.Tx, error) {
 	tx, err := b.db.Begin()
 	if err != nil {
 		return nil, err
@@ -81,7 +81,7 @@ func (b *tikvKV) NewTx(readOnly bool) (kv.Tx, error) {
 	if !tx.Valid() {
 		return nil, fmt.Errorf("invalid transaction")
 	}
-	return &tikvTx{txn: tx, db: b, readOnly: readOnly}, nil
+	return &tikvTx{txn: tx, db: b, opts: opts}, nil
 }
 
 func (b *tikvKV) Close(ctx context.Context) error {

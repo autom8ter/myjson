@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/autom8ter/gokvkit"
+	"github.com/autom8ter/gokvkit/kv"
 	"github.com/autom8ter/gokvkit/testutil"
 	"github.com/stretchr/testify/assert"
 )
@@ -16,7 +17,7 @@ func BenchmarkCreate(b *testing.B) {
 	assert.Nil(b, testutil.TestDB(func(ctx context.Context, db gokvkit.Database) {
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
-			assert.Nil(b, db.Tx(ctx, gokvkit.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx gokvkit.Tx) error {
+			assert.Nil(b, db.Tx(ctx, kv.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx gokvkit.Tx) error {
 				_, err := tx.Create(ctx, "user", doc)
 				return err
 			}))
@@ -31,7 +32,7 @@ func BenchmarkCreate1000(b *testing.B) {
 	assert.Nil(b, testutil.TestDB(func(ctx context.Context, db gokvkit.Database) {
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
-			assert.Nil(b, db.Tx(ctx, gokvkit.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx gokvkit.Tx) error {
+			assert.Nil(b, db.Tx(ctx, kv.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx gokvkit.Tx) error {
 				for v := 0; v < 1000; v++ {
 					if _, err := tx.Create(ctx, "user", doc); err != nil {
 						return err

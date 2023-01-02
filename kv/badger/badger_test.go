@@ -22,7 +22,7 @@ func Test(t *testing.T) {
 		data[fmt.Sprint(i)] = fmt.Sprint(i)
 	}
 	t.Run("set", func(t *testing.T) {
-		assert.Nil(t, db.Tx(false, func(tx kv.Tx) error {
+		assert.Nil(t, db.Tx(kv.TxOpts{}, func(tx kv.Tx) error {
 			for k, v := range data {
 				assert.Nil(t, tx.Set(context.Background(), []byte(k), []byte(v)))
 			}
@@ -31,7 +31,7 @@ func Test(t *testing.T) {
 	})
 
 	t.Run("get", func(t *testing.T) {
-		assert.Nil(t, db.Tx(true, func(tx kv.Tx) error {
+		assert.Nil(t, db.Tx(kv.TxOpts{IsReadOnly: true}, func(tx kv.Tx) error {
 			for k, v := range data {
 				data, err := tx.Get(context.Background(), []byte(k))
 				assert.NoError(t, err)
@@ -41,7 +41,7 @@ func Test(t *testing.T) {
 		}))
 	})
 	t.Run("iterate", func(t *testing.T) {
-		assert.Nil(t, db.Tx(true, func(tx kv.Tx) error {
+		assert.Nil(t, db.Tx(kv.TxOpts{IsReadOnly: true}, func(tx kv.Tx) error {
 			iter, err := tx.NewIterator(kv.IterOpts{
 				Prefix:  nil,
 				Seek:    nil,
@@ -61,7 +61,7 @@ func Test(t *testing.T) {
 		}))
 	})
 	t.Run("iterate w/ prefix", func(t *testing.T) {
-		assert.Nil(t, db.Tx(true, func(tx kv.Tx) error {
+		assert.Nil(t, db.Tx(kv.TxOpts{IsReadOnly: true}, func(tx kv.Tx) error {
 			iter, err := tx.NewIterator(kv.IterOpts{
 				Prefix:  []byte("1"),
 				Seek:    nil,
@@ -82,7 +82,7 @@ func Test(t *testing.T) {
 		}))
 	})
 	t.Run("iterate w/ upper bound", func(t *testing.T) {
-		assert.Nil(t, db.Tx(true, func(tx kv.Tx) error {
+		assert.Nil(t, db.Tx(kv.TxOpts{IsReadOnly: true}, func(tx kv.Tx) error {
 			iter, err := tx.NewIterator(kv.IterOpts{
 				Prefix:     []byte("1"),
 				Seek:       nil,
@@ -103,7 +103,7 @@ func Test(t *testing.T) {
 		}))
 	})
 	t.Run("iterate in reverse", func(t *testing.T) {
-		assert.Nil(t, db.Tx(true, func(tx kv.Tx) error {
+		assert.Nil(t, db.Tx(kv.TxOpts{IsReadOnly: true}, func(tx kv.Tx) error {
 			iter, err := tx.NewIterator(kv.IterOpts{
 				Prefix:     []byte("1"),
 				Reverse:    true,
@@ -124,7 +124,7 @@ func Test(t *testing.T) {
 		}))
 	})
 	t.Run("delete", func(t *testing.T) {
-		assert.Nil(t, db.Tx(false, func(tx kv.Tx) error {
+		assert.Nil(t, db.Tx(kv.TxOpts{IsReadOnly: false}, func(tx kv.Tx) error {
 			for k, _ := range data {
 				assert.Nil(t, tx.Delete(context.Background(), []byte(k)))
 			}
@@ -167,7 +167,7 @@ func Test(t *testing.T) {
 		assert.False(t, gotLock)
 	})
 	t.Run("set", func(t *testing.T) {
-		assert.Nil(t, db.Tx(false, func(tx kv.Tx) error {
+		assert.Nil(t, db.Tx(kv.TxOpts{}, func(tx kv.Tx) error {
 			for k, v := range data {
 				assert.Nil(t, tx.Set(context.Background(), []byte(k), []byte(v)))
 			}
@@ -179,7 +179,7 @@ func Test(t *testing.T) {
 		}))
 	})
 	t.Run("new tx", func(t *testing.T) {
-		tx, err := db.NewTx(false)
+		tx, err := db.NewTx(kv.TxOpts{})
 		assert.NoError(t, err)
 		defer func() {
 			assert.NoError(t, tx.Commit(context.Background()))
@@ -193,7 +193,7 @@ func Test(t *testing.T) {
 		}
 	})
 	t.Run("new tx w/ rollback", func(t *testing.T) {
-		tx, err := db.NewTx(false)
+		tx, err := db.NewTx(kv.TxOpts{})
 		assert.NoError(t, err)
 		for k, v := range data {
 			assert.Nil(t, tx.Set(context.Background(), []byte(k), []byte(v)))
@@ -206,7 +206,7 @@ func Test(t *testing.T) {
 	})
 	t.Run("drop prefix", func(t *testing.T) {
 		{
-			tx, err := db.NewTx(false)
+			tx, err := db.NewTx(kv.TxOpts{})
 			assert.NoError(t, err)
 			for k, v := range data {
 				assert.Nil(t, tx.Set(context.Background(), []byte(fmt.Sprintf("testing.%s", k)), []byte(v)))
@@ -215,7 +215,7 @@ func Test(t *testing.T) {
 		}
 		assert.NoError(t, db.DropPrefix(context.Background(), []byte("testing.")))
 		count := 0
-		assert.NoError(t, db.Tx(true, func(tx kv.Tx) error {
+		assert.NoError(t, db.Tx(kv.TxOpts{IsReadOnly: true}, func(tx kv.Tx) error {
 			iter, err := tx.NewIterator(kv.IterOpts{Prefix: []byte("testing.")})
 			assert.NoError(t, err)
 			defer iter.Close()
@@ -252,7 +252,7 @@ func TestChangeStream(t *testing.T) {
 				return true, nil
 			}))
 		}()
-		assert.Nil(t, db.Tx(false, func(tx kv.Tx) error {
+		assert.Nil(t, db.Tx(kv.TxOpts{}, func(tx kv.Tx) error {
 			for k, v := range data {
 				assert.Nil(t, tx.Set(context.Background(), []byte(fmt.Sprintf("testing.%s", k)), []byte(v)))
 			}

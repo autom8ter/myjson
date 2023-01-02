@@ -96,7 +96,7 @@ doc.Set("name", "acme.com")
 #### Creating a transaction
 
 ```go
-if err := db.Tx(ctx, gokvkit.TxOpts{}, func(ctx context.Context, tx gokvkit.Tx) error {
+if err := db.Tx(ctx, kv.TxOpts{}, func(ctx context.Context, tx gokvkit.Tx) error {
 	// do stuff
 	// return error to rollback
 	// return no error to commit
@@ -106,7 +106,7 @@ if err := db.Tx(ctx, gokvkit.TxOpts{}, func(ctx context.Context, tx gokvkit.Tx) 
 #### Adding documents to a collection
 
 ```go
-if err := db.Tx(ctx, gokvkit.TxOpts{}, func(ctx context.Context, tx gokvkit.Tx) error {
+if err := db.Tx(ctx, kv.TxOpts{}, func(ctx context.Context, tx gokvkit.Tx) error {
     doc := gokvkit.NewDocument()
     doc.Set("name", "acme.com")
 	id, err := tx.Create(ctx, "account", document)
@@ -119,7 +119,7 @@ if err := db.Tx(ctx, gokvkit.TxOpts{}, func(ctx context.Context, tx gokvkit.Tx) 
 #### Querying documents in a collection
 
 ```go
-if err := db.Tx(ctx, gokvkit.TxOpts{}, func(ctx context.Context, tx gokvkit.Tx) error {
+if err := db.Tx(ctx, kv.TxOpts{IsReadOnly: true}, func(ctx context.Context, tx gokvkit.Tx) error {
     results, err := tx.Query(ctx, "user", gokvkit.Q().
     Select(gokvkit.Select{Field: "*"}).
     OrderBy(gokvkit.OrderBy{Field: "age", Direction: gokvkit.OrderByDirectionDesc}).

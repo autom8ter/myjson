@@ -484,8 +484,3 @@ type Migration struct {
 	// An error message if one was encountered
 	Error string `json:"error"`
 }
-
-// TxOpts are options when creating a database transaction
-type TxOpts struct {
-	IsReadOnly bool `json:"isReadOnly,omitempty"`
-}

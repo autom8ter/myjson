@@ -8,9 +8,9 @@ import (
 // DB is a key value database implementation
 type DB interface {
 	// Tx executes the given function against a database transaction
-	Tx(readOnly bool, fn func(Tx) error) error
+	Tx(opts TxOpts, fn func(Tx) error) error
 	// NewTx creates a new database transaction.
-	NewTx(readOnly bool) (Tx, error)
+	NewTx(opts TxOpts) (Tx, error)
 	// NewLocker returns a mutex/locker with the given lease duration
 	NewLocker(key []byte, leaseInterval time.Duration) (Locker, error)
 	// DropPrefix drops keys with the given prefix(s) from the database
@@ -30,6 +30,12 @@ type IterOpts struct {
 	Seek []byte `json:"seek"`
 	// Reverse scans the index in reverse
 	Reverse bool `json:"reverse"`
+}
+
+// TxOpts are options when creating a database transaction
+type TxOpts struct {
+	IsReadOnly bool `json:"isReadOnly,omitempty"`
+	IsBatch    bool `json:"isBatch,omitempty"`
 }
 
 // Tx is a database transaction interface

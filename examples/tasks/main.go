@@ -9,6 +9,7 @@ import (
 	"net/http"
 
 	"github.com/autom8ter/gokvkit"
+	"github.com/autom8ter/gokvkit/kv"
 	_ "github.com/autom8ter/gokvkit/kv/badger"
 	"github.com/autom8ter/gokvkit/testutil"
 	"github.com/brianvoe/gofakeit/v6"
@@ -64,7 +65,7 @@ func main() {
 	})
 	mux.Post("/collections/{collection}/documents", func(w http.ResponseWriter, r *http.Request) {
 		c := chi.URLParam(r, "collection")
-		if err := db.Tx(ctx, gokvkit.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx gokvkit.Tx) error {
+		if err := db.Tx(ctx, kv.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx gokvkit.Tx) error {
 			bits, err := ioutil.ReadAll(r.Body)
 			if err != nil {
 
@@ -87,7 +88,7 @@ func main() {
 	mux.Get("/collections/{collection}/documents/{id}", func(w http.ResponseWriter, r *http.Request) {
 		c := chi.URLParam(r, "collection")
 		id := chi.URLParam(r, "id")
-		if err := db.Tx(ctx, gokvkit.TxOpts{IsReadOnly: true}, func(ctx context.Context, tx gokvkit.Tx) error {
+		if err := db.Tx(ctx, kv.TxOpts{IsReadOnly: true}, func(ctx context.Context, tx gokvkit.Tx) error {
 			doc, err := tx.Get(r.Context(), c, id)
 			if err != nil {
 				return err
@@ -102,7 +103,7 @@ func main() {
 	mux.Put("/collections/{collection}/documents/{id}", func(w http.ResponseWriter, r *http.Request) {
 		c := chi.URLParam(r, "collection")
 		//id := chi.URLParam(r, "id")
-		if err := db.Tx(ctx, gokvkit.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx gokvkit.Tx) error {
+		if err := db.Tx(ctx, kv.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx gokvkit.Tx) error {
 			bits, err := ioutil.ReadAll(r.Body)
 			if err != nil {
 
@@ -124,7 +125,7 @@ func main() {
 	mux.Patch("/collections/{collection}/documents/{id}", func(w http.ResponseWriter, r *http.Request) {
 		c := chi.URLParam(r, "collection")
 		id := chi.URLParam(r, "id")
-		if err := db.Tx(ctx, gokvkit.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx gokvkit.Tx) error {
+		if err := db.Tx(ctx, kv.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx gokvkit.Tx) error {
 			bits, err := ioutil.ReadAll(r.Body)
 			if err != nil {
 
@@ -146,7 +147,7 @@ func main() {
 	mux.Delete("/collections/{collection}/documents/{id}", func(w http.ResponseWriter, r *http.Request) {
 		c := chi.URLParam(r, "collection")
 		id := chi.URLParam(r, "id")
-		if err := db.Tx(ctx, gokvkit.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx gokvkit.Tx) error {
+		if err := db.Tx(ctx, kv.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx gokvkit.Tx) error {
 			if err := tx.Delete(r.Context(), c, id); err != nil {
 				return err
 			}
@@ -159,7 +160,7 @@ func main() {
 	})
 	mux.Post("/collections/{collection}/query", func(w http.ResponseWriter, r *http.Request) {
 		c := chi.URLParam(r, "collection")
-		if err := db.Tx(ctx, gokvkit.TxOpts{IsReadOnly: true}, func(ctx context.Context, tx gokvkit.Tx) error {
+		if err := db.Tx(ctx, kv.TxOpts{IsReadOnly: true}, func(ctx context.Context, tx gokvkit.Tx) error {
 			var query gokvkit.Query
 			json.NewDecoder(r.Body).Decode(&query)
 			results, err := tx.Query(r.Context(), c, query)
@@ -199,7 +200,7 @@ func seed(ctx context.Context, db gokvkit.Database) error {
 	}
 	if results.Count == 0 {
 		fmt.Println("seeding database...")
-		if err := db.Tx(ctx, gokvkit.TxOpts{}, func(ctx context.Context, tx gokvkit.Tx) error {
+		if err := db.Tx(ctx, kv.TxOpts{}, func(ctx context.Context, tx gokvkit.Tx) error {
 			for i := 0; i < 100; i++ {
 				a, _ := gokvkit.NewDocumentFrom(map[string]any{
 					"name": gofakeit.Company(),

@@ -13,10 +13,10 @@ import (
 )
 
 type tikvTx struct {
-	txn      *transaction.KVTxn
-	readOnly bool
-	db       *tikvKV
-	entries  []kv.CDC
+	txn     *transaction.KVTxn
+	opts    kv.TxOpts
+	db      *tikvKV
+	entries []kv.CDC
 }
 
 func (t *tikvTx) NewIterator(kopts kv.IterOpts) (kv.Iterator, error) {
@@ -64,7 +64,7 @@ func (t *tikvTx) Get(ctx context.Context, key []byte) ([]byte, error) {
 }
 
 func (t *tikvTx) Set(ctx context.Context, key, value []byte) error {
-	if t.readOnly {
+	if t.opts.IsReadOnly {
 		return fmt.Errorf("writes forbidden in read-only transaction")
 	}
 	if err := t.txn.Set(key, value); err != nil {
@@ -79,7 +79,7 @@ func (t *tikvTx) Set(ctx context.Context, key, value []byte) error {
 }
 
 func (t *tikvTx) Delete(ctx context.Context, key []byte) error {
-	if t.readOnly {
+	if t.opts.IsReadOnly {
 		return fmt.Errorf("writes forbidden in read-only transaction")
 	}
 	if err := t.txn.Delete(key); err != nil {

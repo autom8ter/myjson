@@ -1,7 +1,6 @@
 package badger
 
 import (
-	"bytes"
 	"context"
 
 	"github.com/autom8ter/gokvkit/kv"
@@ -34,12 +33,6 @@ func (b *badgerTx) NewIterator(kopts kv.IterOpts) (kv.Iterator, error) {
 }
 
 func (b *badgerTx) Get(ctx context.Context, key []byte) ([]byte, error) {
-	if bytes.HasPrefix(key, []byte("cache.")) {
-		val, ok := b.db.cache.Get(key)
-		if ok {
-			return val.([]byte), nil
-		}
-	}
 	i, err := b.txn.Get(key)
 	if err != nil {
 		if err == badger.ErrKeyNotFound {
@@ -68,9 +61,6 @@ func (b *badgerTx) Set(ctx context.Context, key, value []byte) error {
 }
 
 func (b *badgerTx) Delete(ctx context.Context, key []byte) error {
-	if bytes.Contains(key, []byte("cache.")) {
-		b.db.cache.Del(key)
-	}
 	b.entries = append(b.entries, kv.CDC{
 		Operation: kv.DELOP,
 		Key:       key,
