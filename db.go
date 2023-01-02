@@ -12,6 +12,7 @@ import (
 	"github.com/autom8ter/gokvkit/kv/registry"
 	"github.com/autom8ter/gokvkit/util"
 	"github.com/autom8ter/machine/v4"
+	"github.com/dop251/goja"
 )
 
 // defaultDB is an embedded, durable NoSQL database with support for schemas, indexing, and aggregation
@@ -21,6 +22,7 @@ type defaultDB struct {
 	optimizer   Optimizer
 	programs    sync.Map
 	jsOverrides map[string]any
+	vmPool      chan *goja.Runtime
 }
 
 // New creates a new database instance from the given config
@@ -33,6 +35,7 @@ func New(ctx context.Context, provider string, providerParams map[string]any, op
 		kv:        db,
 		machine:   machine.New(),
 		optimizer: defaultOptimizer{},
+		vmPool:    make(chan *goja.Runtime, 20),
 	}
 
 	for _, o := range opts {
@@ -48,14 +51,24 @@ func New(ctx context.Context, provider string, providerParams map[string]any, op
 			return nil, errors.Wrap(err, errors.Internal, "failed to configure migration collection")
 		}
 	}
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			default:
+				vm, _ := getJavascriptVM(ctx, d, d.jsOverrides)
+				if vm != nil {
+					d.vmPool <- vm
+				}
+			}
+		}
+	}()
 	return d, err
 }
 
 func (d *defaultDB) NewTx(opts TxOpts) (Txn, error) {
-	vm, _ := getJavascriptVM(context.Background(), d, d.jsOverrides)
-	if err := vm.Set("tx_opts", opts); err != nil {
-		return nil, err
-	}
+	vm := <-d.vmPool
 	tx, err := d.kv.NewTx(opts.IsReadOnly)
 	if err != nil {
 		return nil, err
