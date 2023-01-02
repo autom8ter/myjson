@@ -3,6 +3,7 @@ package gokvkit
 import (
 	"context"
 	_ "embed"
+	"encoding/json"
 	"sync"
 	"time"
 
@@ -18,7 +19,6 @@ type defaultDB struct {
 	kv        kv.DB
 	machine   machine.Machine
 	optimizer Optimizer
-	cdcStream Stream[CDC]
 	programs  sync.Map
 }
 
@@ -32,7 +32,6 @@ func New(ctx context.Context, provider string, providerParams map[string]any, op
 		kv:        db,
 		machine:   machine.New(),
 		optimizer: defaultOptimizer{},
-		cdcStream: newStream[CDC](machine.New()),
 	}
 
 	for _, o := range opts {
@@ -242,7 +241,17 @@ func (d *defaultDB) ChangeStream(ctx context.Context, collection string, fn func
 	if collection != "*" && !d.HasCollection(ctx, collection) {
 		return errors.New(errors.Validation, "collection does not exist: %s", collection)
 	}
-	return d.cdcStream.Pull(ctx, collection, fn)
+	pfx := indexPrefix(ctx, "cdc", "_id.primaryidx")
+	return d.kv.ChangeStream(ctx, pfx, func(cdc kv.CDC) (bool, error) {
+		var c CDC
+		if err := json.Unmarshal(cdc.Value, &c); err != nil {
+			panic(err)
+		}
+		if c.Collection == collection || collection == "*" {
+			return fn(c)
+		}
+		return true, nil
+	})
 }
 
 func (d *defaultDB) RawKV() kv.DB {

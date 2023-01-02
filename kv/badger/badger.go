@@ -7,6 +7,7 @@ import (
 
 	"github.com/autom8ter/gokvkit/kv"
 	"github.com/autom8ter/gokvkit/kv/registry"
+	"github.com/autom8ter/machine/v4"
 	"github.com/dgraph-io/badger/v3"
 	"github.com/dgraph-io/ristretto"
 	"github.com/segmentio/ksuid"
@@ -20,8 +21,9 @@ func init() {
 }
 
 type badgerKV struct {
-	db    *badger.DB
-	cache *ristretto.Cache
+	db      *badger.DB
+	cache   *ristretto.Cache
+	machine machine.Machine
 }
 
 func open(storagePath string) (kv.DB, error) {
@@ -45,24 +47,30 @@ func open(storagePath string) (kv.DB, error) {
 		return nil, err
 	}
 	return &badgerKV{
-		db:    db,
-		cache: cache,
+		db:      db,
+		cache:   cache,
+		machine: machine.New(),
 	}, nil
 }
 
 func (b *badgerKV) Tx(readOnly bool, fn func(kv.Tx) error) error {
-	if !readOnly {
-		return b.db.Update(func(txn *badger.Txn) error {
-			return fn(&badgerTx{txn: txn, db: b})
-		})
+	tx, err := b.NewTx(readOnly)
+	if err != nil {
+		return err
 	}
-	return b.db.View(func(txn *badger.Txn) error {
-		return fn(&badgerTx{txn: txn, db: b})
-	})
+	err = fn(tx)
+	if err != nil {
+		tx.Rollback(context.Background())
+		return err
+	}
+	if err := tx.Commit(context.Background()); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (b *badgerKV) NewTx(readOnly bool) (kv.Tx, error) {
-	return &badgerTx{txn: b.db.NewTransaction(!readOnly), db: b}, nil
+	return &badgerTx{txn: b.db.NewTransaction(!readOnly), db: b, machine: b.machine}, nil
 }
 
 func (b *badgerKV) Close(ctx context.Context) error {
@@ -92,4 +100,14 @@ func (b *badgerKV) NewLocker(key []byte, leaseInterval time.Duration) (kv.Locker
 		unlock:        make(chan struct{}),
 		hasUnlocked:   make(chan struct{}),
 	}, nil
+}
+
+func (b *badgerKV) ChangeStream(ctx context.Context, prefix []byte, fn kv.ChangeStreamHandler) error {
+	return b.machine.Subscribe(ctx, "*", func(ctx context.Context, msg machine.Message) (bool, error) {
+		cdc := msg.Body.(kv.CDC)
+		if bytes.HasPrefix(cdc.Key, prefix) {
+			return fn(msg.Body.(kv.CDC))
+		}
+		return true, nil
+	})
 }

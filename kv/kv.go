@@ -15,6 +15,7 @@ type DB interface {
 	NewLocker(key []byte, leaseInterval time.Duration) (Locker, error)
 	// DropPrefix drops keys with the given prefix(s) from the database
 	DropPrefix(ctx context.Context, prefix ...[]byte) error
+	ChangeStreamer
 	// Close closes the key value database
 	Close(ctx context.Context) error
 }
@@ -106,4 +107,28 @@ type KVConfig struct {
 	Provider string `json:"provider"`
 	// Params are the kv providers params
 	Params map[string]any `json:"params"`
+}
+
+// TxOp is an transaction operation type
+type TxOp string
+
+const (
+	// SETOP sets a key value pair
+	SETOP TxOp = "SET"
+	// DELOP deletes a key value pair
+	DELOP TxOp = "DEL"
+)
+
+// CDC or change data capture holds an transaction operation type and a key value pair.
+// It is used as a container for streaming changes to key value pairs
+type CDC struct {
+	Operation TxOp   `json:"operation"`
+	Key       []byte `json:"key"`
+	Value     []byte `json:"value,omitempty"`
+}
+
+type ChangeStreamHandler func(cdc CDC) (bool, error)
+
+type ChangeStreamer interface {
+	ChangeStream(ctx context.Context, prefix []byte, fn ChangeStreamHandler) error
 }

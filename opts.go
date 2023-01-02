@@ -9,10 +9,3 @@ func WithOptimizer(o Optimizer) DBOpt {
 		d.optimizer = o
 	}
 }
-
-// WithChangeStream overrides the default change stream provider so a distributed provider can be configured ex: nats, rabbitmq, kafka
-func WithChangeStream(c Stream[CDC]) DBOpt {
-	return func(d *defaultDB) {
-		d.cdcStream = c
-	}
-}

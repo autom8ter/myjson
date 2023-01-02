@@ -38,12 +38,12 @@ Build stateful, extensible, and feature-rich programs on top of pluggable key/va
 
 ### Storage Providers
 
-| Feature | Description                                           | Implemented |
-|---------|-------------------------------------------------------|-------------|
-| Badger  | persistant, embedded LSM database written in Go       | [x]         |
-| Tikv    | persistant, distributed LSM database  written in Rust | [x]         |
-| BoltDB  | persistant, embedded B+tree database  written in Go   |             |
-| RocksDB | persistant, embedded LSM database written in C++      |             |
+| Provider | Description                                           | Implemented |
+|----------|-------------------------------------------------------|-------------|
+| Badger   | persistant, embedded LSM database written in Go       | [x]         |
+| Tikv     | persistant, distributed LSM database  written in Rust | [x]         |
+| RocksDB  | persistant, embedded LSM database written in C++      |             |
+
 
 
 ## Getting Started
