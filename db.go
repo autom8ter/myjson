@@ -16,10 +16,11 @@ import (
 
 // defaultDB is an embedded, durable NoSQL database with support for schemas, indexing, and aggregation
 type defaultDB struct {
-	kv        kv.DB
-	machine   machine.Machine
-	optimizer Optimizer
-	programs  sync.Map
+	kv          kv.DB
+	machine     machine.Machine
+	optimizer   Optimizer
+	programs    sync.Map
+	jsOverrides map[string]any
 }
 
 // New creates a new database instance from the given config
@@ -51,7 +52,7 @@ func New(ctx context.Context, provider string, providerParams map[string]any, op
 }
 
 func (d *defaultDB) NewTx(opts TxOpts) (Txn, error) {
-	vm, _ := getJavascriptVM(context.Background(), d)
+	vm, _ := getJavascriptVM(context.Background(), d, d.jsOverrides)
 	if err := vm.Set("tx_opts", opts); err != nil {
 		return nil, err
 	}
@@ -259,7 +260,7 @@ func (d *defaultDB) RawKV() kv.DB {
 }
 
 func (d *defaultDB) RunScript(ctx context.Context, function string, script string, params map[string]any) (any, error) {
-	vm, err := getJavascriptVM(ctx, d)
+	vm, err := getJavascriptVM(ctx, d, d.jsOverrides)
 	if err != nil {
 		return false, err
 	}
@@ -317,7 +318,7 @@ func (d *defaultDB) runMigration(ctx context.Context, m Migration) (bool, error)
 	if err := util.ValidateStruct(m); err != nil {
 		return false, errors.Wrap(err, 0, "migration is not valid")
 	}
-	vm, err := getJavascriptVM(ctx, d)
+	vm, err := getJavascriptVM(ctx, d, d.jsOverrides)
 	if err != nil {
 		return false, err
 	}

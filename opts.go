@@ -9,3 +9,9 @@ func WithOptimizer(o Optimizer) DBOpt {
 		d.optimizer = o
 	}
 }
+
+func WithJavascriptOverrides(overrides map[string]any) DBOpt {
+	return func(d *defaultDB) {
+		d.jsOverrides = overrides
+	}
+}
