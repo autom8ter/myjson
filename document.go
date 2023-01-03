@@ -56,11 +56,11 @@ var modifiers = map[string]func(json, arg string) string{
 		yr, month, day := t.Date()
 		switch arg {
 		case "month":
-			return strconv.Quote(time.Date(yr, month, 1, 0, 0, 0, 0, time.Local).String())
+			return strconv.Quote(time.Date(yr, month, 1, 0, 0, 0, 0, time.UTC).String())
 		case "day":
-			return strconv.Quote(time.Date(yr, month, day, 0, 0, 0, 0, time.Local).String())
+			return strconv.Quote(time.Date(yr, month, day, 0, 0, 0, 0, time.UTC).String())
 		case "year":
-			return strconv.Quote(time.Date(yr, time.January, 1, 0, 0, 0, 0, time.Local).String())
+			return strconv.Quote(time.Date(yr, time.January, 1, 0, 0, 0, 0, time.UTC).String())
 		default:
 			return json
 		}

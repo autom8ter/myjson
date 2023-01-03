@@ -385,9 +385,9 @@ func TestDocument(t *testing.T) {
 		d, _ := gokvkit.NewDocumentFrom(map[string]any{
 			"timestamp": date,
 		})
-		assert.Equal(t, "1993-08-01 00:00:00 -0600 MDT", d.GetString(`timestamp|@dateTrunc:month`))
-		assert.Equal(t, "1993-01-01 00:00:00 -0700 MST", d.GetString(`timestamp|@dateTrunc:year`))
-		assert.Equal(t, "1993-08-17 00:00:00 -0600 MDT", d.GetString(`timestamp|@dateTrunc:day`))
+		assert.Equal(t, "1993-08-01 00:00:00 +0000 UTC", d.GetString(`timestamp|@dateTrunc:month`))
+		assert.Equal(t, "1993-01-01 00:00:00 +0000 UTC", d.GetString(`timestamp|@dateTrunc:year`))
+		assert.Equal(t, "1993-08-17 00:00:00 +0000 UTC", d.GetString(`timestamp|@dateTrunc:day`))
 	})
 	t.Run("@unix", func(t *testing.T) {
 		date := time.Date(1993, time.August, 17, 0, 0, 0, 0, time.Local)
