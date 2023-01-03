@@ -11,7 +11,7 @@ import (
 func ExampleNew() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	db, err := myjson.New(ctx, "badger", map[string]any{
+	db, err := myjson.Open(ctx, "badger", map[string]any{
 		// leave empty for in-memory
 		"storage_path": "",
 	})

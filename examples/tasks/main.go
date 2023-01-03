@@ -29,7 +29,7 @@ var (
 
 func main() {
 	ctx := context.Background()
-	db, err := myjson.New(context.Background(), "badger", map[string]any{
+	db, err := myjson.Open(context.Background(), "badger", map[string]any{
 		"storage_path": "./tmp",
 	})
 	if err != nil {
