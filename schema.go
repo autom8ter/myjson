@@ -34,6 +34,7 @@ const (
 	indexPath        schemaPath = "x-index"
 	primaryPath      schemaPath = "x-primary"
 	uniquePath       schemaPath = "x-unique"
+	triggersPath     schemaPath = "x-triggers"
 	refPrefix                   = "common."
 )
 
@@ -80,7 +81,7 @@ func newCollectionSchema(yamlContent []byte) (CollectionSchema, error) {
 	if len(s.primaryIndex.Fields) == 0 {
 		return nil, errors.New(errors.Validation, "primary index is required")
 	}
-	if triggers := s.raw.Get("triggers"); triggers.Exists() {
+	if triggers := s.raw.Get(string(triggersPath)); triggers.Exists() {
 		for name, t := range triggers.Map() {
 			var trig Trigger
 			trig.Name = name

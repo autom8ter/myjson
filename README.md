@@ -5,6 +5,40 @@ MyJSON is an embedded relational document store built on top of pluggable key va
 
     go get -u github.com/autom8ter/myjson
 
+- [myjson [![GoDoc](https://godoc.org/github.com/autom8ter/myjson?status.svg)](https://godoc.org/github.com/autom8ter/myjson)](#myjson----godoc--https---godocorg-githubcom-autom8ter-myjson-statussvg---https---godocorg-githubcom-autom8ter-myjson-)
+    * [Use Case](#use-case)
+    * [Features:](#features-)
+        + [Architecture](#architecture)
+        + [Database](#database)
+        + [Storage Providers](#storage-providers)
+    * [Getting Started](#getting-started)
+        + [Opening a database instance](#opening-a-database-instance)
+            - [Single Node in Memory (badger)](#single-node-in-memory--badger-)
+            - [Single Node w/ Persistance (badger)](#single-node-w--persistance--badger-)
+            - [Multi Node w/ Persistance (tikv)](#multi-node-w--persistance--tikv-)
+        + [Configuring a database instance](#configuring-a-database-instance)
+        + [Working with JSON documents](#working-with-json-documents)
+            - [Creating a JSON document](#creating-a-json-document)
+            - [Setting JSON values](#setting-json-values)
+            - [Getting JSON values](#getting-json-values)
+        + [Transactions](#transactions)
+            - [Writable](#writable)
+            - [Read Only](#read-only)
+            - [Adding documents to a collection](#adding-documents-to-a-collection)
+        + [Queries](#queries)
+            - [Joins](#joins)
+            - [Iterating through documents in a collection](#iterating-through-documents-in-a-collection)
+            - [Reading documents in a collection](#reading-documents-in-a-collection)
+        + [Change Streams](#change-streams)
+            - [Stream Changes in a given collection](#stream-changes-in-a-given-collection)
+        + [Aggregation](#aggregation)
+        + [Triggers](#triggers)
+        + [Scripts](#scripts)
+        + [Example JSON Schema](#example-json-schema)
+    * [Tikv Setup Guide (full scale)](#tikv-setup-guide--full-scale-)
+    * [Contributing](#contributing)
+
+
 ## Use Case
 
 Build powerful applications on top of simple key value storage. 
@@ -300,6 +334,7 @@ javascript variables are injected at runtime:
 - `db` - the global database instance(all methods are available lowercased)
 - `ctx` - the context when the trigger was called
 - `metadata` - the context metadata when the script is called
+- `tx` - the current transaction instance
 
 ### Scripts
 
@@ -334,6 +369,17 @@ javascript variables are injected at runtime:
 - `newDocumentFrom` - function to initialize a new JSON document from a javascript object
 
 ### Example JSON Schema
+
+MyJSON JSON schemas are a modification of the [JSON Schema](https://json-schema.org/) specification
+
+custom attributes include:
+- x-collection: a root level field for specifying the name of the collection(required)
+- x-foreign: a property level block for specifying a relationship to another collection
+  - foreign keys are automatically indexed
+- x-primary: a property level field for specifying the primary key(required)
+  - primary key is automatically indexed
+- x-index: a property level block for specifying multi-field secondary indexes
+- x-triggers: a root level block for specifying triggers on document changes
 
 ```yaml
 type: object
@@ -394,7 +440,7 @@ properties:
     type: object
 
 # triggers are javascript functions that execute based on certain events
-triggers:
+x-triggers:
   # name of the trigger
   set_timestamp:
     # order determines the order in which the functions are executed - lower ordered triggers are executed first
