@@ -3,17 +3,17 @@ package benchmarks
 import (
 	"context"
 
-	"github.com/autom8ter/gokvkit"
-	"github.com/autom8ter/gokvkit/kv"
-	"github.com/autom8ter/gokvkit/testutil"
+	"github.com/autom8ter/myjson"
+	"github.com/autom8ter/myjson/kv"
+	"github.com/autom8ter/myjson/testutil"
 )
 
-func seedDatabase(ctx context.Context, db gokvkit.Database) error {
-	results, err := db.Query(ctx, "account", gokvkit.Q().Query())
+func seedDatabase(ctx context.Context, db myjson.Database) error {
+	results, err := db.Query(ctx, "account", myjson.Q().Query())
 	if err != nil {
 		return err
 	}
-	if err := db.Tx(ctx, kv.TxOpts{}, func(ctx context.Context, tx gokvkit.Tx) error {
+	if err := db.Tx(ctx, kv.TxOpts{}, func(ctx context.Context, tx myjson.Tx) error {
 		for _, a := range results.Documents {
 			for i := 0; i < 10; i++ {
 				u := testutil.NewUserDoc()

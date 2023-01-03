@@ -52,8 +52,8 @@ properties:
   annotations:
     type: object
 
-# triggers are javascript functions that execute based on certain events
-triggers:
+# x-triggers are javascript functions that execute based on certain events
+x-triggers:
   # name of the trigger
   set_timestamp:
     # order determines the order in which the functions are executed - lower ordered triggers are executed first

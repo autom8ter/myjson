@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/autom8ter/gokvkit/errors"
+	"github.com/autom8ter/myjson/errors"
 	"github.com/go-playground/validator/v10"
 	"github.com/mitchellh/mapstructure"
 	"github.com/spf13/cast"

@@ -1,4 +1,4 @@
-package gokvkit
+package myjson
 
 import (
 	"context"
@@ -7,11 +7,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/autom8ter/gokvkit/errors"
-	"github.com/autom8ter/gokvkit/kv"
-	"github.com/autom8ter/gokvkit/kv/registry"
-	"github.com/autom8ter/gokvkit/util"
 	"github.com/autom8ter/machine/v4"
+	"github.com/autom8ter/myjson/errors"
+	"github.com/autom8ter/myjson/kv"
+	"github.com/autom8ter/myjson/kv/registry"
+	"github.com/autom8ter/myjson/util"
 	"github.com/dop251/goja"
 )
 
@@ -26,8 +26,8 @@ type defaultDB struct {
 	collections sync.Map
 }
 
-// New creates a new database instance from the given config
-func New(ctx context.Context, provider string, providerParams map[string]any, opts ...DBOpt) (Database, error) {
+// Open opens a new database instance from the given config
+func Open(ctx context.Context, provider string, providerParams map[string]any, opts ...DBOpt) (Database, error) {
 	db, err := registry.Open(provider, providerParams)
 	if err != nil {
 		return nil, errors.Wrap(err, errors.Internal, "failed to open kv database")

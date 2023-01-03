@@ -1,4 +1,4 @@
-package gokvkit
+package myjson
 
 // DBOpt is an option for configuring a collection
 type DBOpt func(d *defaultDB)

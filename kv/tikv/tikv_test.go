@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/autom8ter/gokvkit/kv"
+	"github.com/autom8ter/myjson/kv"
 	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 )
@@ -21,7 +21,7 @@ func Test(t *testing.T) {
 	ctx := context.Background()
 	db, err := open(map[string]interface{}{
 		"pd_addr":    []string{"http://pd0:2379"},
-		"redis_addr": []string{"http://localhost:6379"},
+		"redis_addr": "localhost:6379",
 	})
 	assert.NoError(t, err)
 	data := map[string]string{}
@@ -254,7 +254,7 @@ func TestChangeStream(t *testing.T) {
 	t.Run("change stream set", func(t *testing.T) {
 		db, err := open(map[string]interface{}{
 			"pd_addr":    []string{"http://pd0:2379"},
-			"redis_addr": []string{"http://localhost:6379"},
+			"redis_addr": "localhost:6379",
 		})
 		assert.NoError(t, err)
 		data := map[string]string{}

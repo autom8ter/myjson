@@ -1,10 +1,10 @@
-package gokvkit
+package myjson
 
 import (
 	"bytes"
 	"context"
 
-	"github.com/autom8ter/gokvkit/util"
+	"github.com/autom8ter/myjson/util"
 	"github.com/nqd/flat"
 )
 

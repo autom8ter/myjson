@@ -1,4 +1,4 @@
-package gokvkit
+package myjson
 
 // QueryBuilder is a utility for creating queries via chainable methods
 type QueryBuilder struct {
