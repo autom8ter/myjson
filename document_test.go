@@ -134,6 +134,13 @@ func TestDocument(t *testing.T) {
 		assert.Equal(t, gokvkit.JSONOpRemove, diff[0].Op)
 		assert.Equal(t, before.Get("contact.email"), diff[0].BeforeValue)
 	})
+	t.Run("overwrite", func(t *testing.T) {
+		before := testutil.NewUserDoc()
+		after := before.Clone()
+		assert.Nil(t, after.Del("contact.email"))
+		assert.NoError(t, before.Overwrite(after.Value()))
+		assert.JSONEq(t, after.String(), before.String())
+	})
 
 	t.Run("where", func(t *testing.T) {
 		r, err = gokvkit.NewDocumentFrom(&usr)

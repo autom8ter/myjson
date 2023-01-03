@@ -93,13 +93,26 @@ doc.Set("name", "acme.com")
 ```
 
 
-#### Creating a transaction
+### Transactions
 
+
+Most database functionality is made available via the Tx interface which has read/write methods
+across 1-many collections.
+
+#### Writable
 ```go
-if err := db.Tx(ctx, kv.TxOpts{}, func(ctx context.Context, tx gokvkit.Tx) error {
-	// do stuff
+if err := db.Tx(ctx, kv.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx gokvkit.Tx) error {
+	// do stuff ...tx.Set(...)
 	// return error to rollback
 	// return no error to commit
+}
+```
+
+#### Read Only
+
+```go
+if err := db.Tx(ctx, kv.TxOpts{IsReadOnly: true}, func(ctx context.Context, tx gokvkit.Tx) error {
+	// ...tx.Get(...)
 }
 ```
 
@@ -116,22 +129,38 @@ if err := db.Tx(ctx, kv.TxOpts{}, func(ctx context.Context, tx gokvkit.Tx) error
 }
 ```
 
-#### Querying documents in a collection
+### Queries
 
 ```go
-if err := db.Tx(ctx, kv.TxOpts{IsReadOnly: true}, func(ctx context.Context, tx gokvkit.Tx) error {
-    results, err := tx.Query(ctx, "user", gokvkit.Q().
+results, err := tx.Query(ctx, "user", gokvkit.Q().
     Select(gokvkit.Select{Field: "*"}).
-    OrderBy(gokvkit.OrderBy{Field: "age", Direction: gokvkit.OrderByDirectionDesc}).
+	OrderBy(gokvkit.OrderBy{Field: "age", Direction: gokvkit.OrderByDirectionDesc}).
     Query())
-}
 ```
 
-#### Reading documents in a collection
+#### Joins
 
 ```go
-doc, err := db.Get(ctx, "user", "$id")
+results, err := db.Query(ctx, "user", gokvkit.Q().
+    Select(
+        gokvkit.Select{Field: "acc._id", As: "account_id"},
+        gokvkit.Select{Field: "acc.name", As: "account_name"},
+		gokvkit.Select{Field: "_id", As: "user_id"},
+    ).
+    Join(gokvkit.Join{
+        Collection: "account",
+        On: []gokvkit.Where{
+            {
+				Field: "_id",
+				Op:    gokvkit.WhereOpEq,
+                Value: "$account_id",
+            },
+    },
+        As: "acc",
+    }).
+Query())
 ```
+
 
 #### Iterating through documents in a collection
 
@@ -142,13 +171,27 @@ _, err := tx.ForEach(ctx, "user", gokvkit.ForEachOpts{}, func(d *gokvkit.Documen
 })
 ```
 
-#### Streaming changes to documents
+
+#### Reading documents in a collection
 
 ```go
-TODO
+doc, err := tx.Get(ctx, "user", "$id")
 ```
 
-#### Aggregating documents in a collection
+### Change Streams
+
+#### Stream Changes in a given collection
+
+```go
+ctx, cancel := context.WithCancel(context.Background())
+defer cancel()
+err := db.ChangeStream(ctx, "user", func(cdc gokvkit.CDC) (bool, error) {
+    fmt.Println(cdc)
+    return true, nil
+})
+```
+
+### Aggregation
 
 ```go
 query := gokvkit.Query{
@@ -163,17 +206,11 @@ query := gokvkit.Query{
 		},
 	},
 	GroupBy: []string{"account_id"},
-	OrderBy: []gokvkit.OrderBy{
-		{
-            Field:     "account_id",
-            Direction: gokvkit.OrderByDirectionAsc,
-		},
-	},
 }
 results, err := db.Query(ctx, "user", query)
 ```
 
-#### Adding business logic with triggers
+### Triggers
 
 add a triggers block to your JSON schema
 ex: update timestamp on set/update/create

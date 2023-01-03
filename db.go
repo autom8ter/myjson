@@ -17,6 +17,7 @@ import (
 
 // defaultDB is an embedded, durable NoSQL database with support for schemas, indexing, and aggregation
 type defaultDB struct {
+	persistCDC  bool
 	kv          kv.DB
 	machine     machine.Machine
 	optimizer   Optimizer
@@ -32,10 +33,11 @@ func New(ctx context.Context, provider string, providerParams map[string]any, op
 		return nil, errors.Wrap(err, errors.Internal, "failed to open kv database")
 	}
 	d := &defaultDB{
-		kv:        db,
-		machine:   machine.New(),
-		optimizer: defaultOptimizer{},
-		vmPool:    make(chan *goja.Runtime, 20),
+		kv:         db,
+		machine:    machine.New(),
+		optimizer:  defaultOptimizer{},
+		vmPool:     make(chan *goja.Runtime, 20),
+		persistCDC: false,
 	}
 
 	for _, o := range opts {
@@ -272,15 +274,16 @@ func (d *defaultDB) GetSchema(ctx context.Context, collection string) Collection
 }
 
 func (d *defaultDB) ChangeStream(ctx context.Context, collection string, fn func(cdc CDC) (bool, error)) error {
+	if !d.persistCDC {
+		return errors.New(errors.Forbidden, "cdc persistance is disabled")
+	}
 	if collection != "*" && !d.HasCollection(ctx, collection) {
 		return errors.New(errors.Validation, "collection does not exist: %s", collection)
 	}
 	pfx := indexPrefix(ctx, "cdc", "_id.primaryidx")
 	return d.kv.ChangeStream(ctx, pfx, func(cdc kv.CDC) (bool, error) {
 		var c CDC
-		if err := json.Unmarshal(cdc.Value, &c); err != nil {
-			panic(err)
-		}
+		json.Unmarshal(cdc.Value, &c)
 		if c.Collection == collection || collection == "*" {
 			return fn(c)
 		}

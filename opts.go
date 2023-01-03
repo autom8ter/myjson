@@ -10,8 +10,16 @@ func WithOptimizer(o Optimizer) DBOpt {
 	}
 }
 
+// WithJavascriptOverrides adds global variables or methods to the embedded javascript vm(s)
 func WithJavascriptOverrides(overrides map[string]any) DBOpt {
 	return func(d *defaultDB) {
 		d.jsOverrides = overrides
+	}
+}
+
+// WithPersistCDC configures the database to persist all change-data-capture entries so that features like time-travel are possible
+func WithPersistCDC(persist bool) DBOpt {
+	return func(d *defaultDB) {
+		d.persistCDC = persist
 	}
 }

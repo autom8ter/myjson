@@ -44,7 +44,7 @@ func Test(t *testing.T) {
 	})
 	t.Run("create & stream", func(t *testing.T) {
 		assert.Nil(t, testutil.TestDB(func(ctx context.Context, db gokvkit.Database) {
-			ctx, cancel := context.WithCancel(context.Background())
+			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 			defer cancel()
 			wg := sync.WaitGroup{}
 			wg.Add(1)
@@ -73,7 +73,7 @@ func Test(t *testing.T) {
 			assert.NotNil(t, u)
 			assert.Equal(t, id, u.GetString("_id"))
 			<-received
-		}))
+		}, gokvkit.WithPersistCDC(true)))
 	})
 	t.Run("set", func(t *testing.T) {
 		assert.Nil(t, testutil.TestDB(func(ctx context.Context, db gokvkit.Database) {
@@ -565,7 +565,7 @@ func TestIndexing1(t *testing.T) {
 				assert.False(t, o.Reverse)
 				assert.Equal(t, "timestamp", o.SeekFields[0])
 				assert.NotEqual(t, 0, count)
-			}))
+			}, gokvkit.WithPersistCDC(true)))
 		})
 		t.Run("all results (<)", func(t *testing.T) {
 			assert.Nil(t, testutil.TestDB(func(ctx context.Context, db gokvkit.Database) {
@@ -599,7 +599,7 @@ func TestIndexing1(t *testing.T) {
 				assert.True(t, o.Reverse)
 				assert.Equal(t, "timestamp", o.SeekFields[0])
 				assert.NotEqual(t, 0, count)
-			}))
+			}, gokvkit.WithPersistCDC(true)))
 		})
 		t.Run("some results (<=)", func(t *testing.T) {
 			assert.Nil(t, testutil.TestDB(func(ctx context.Context, db gokvkit.Database) {
@@ -633,7 +633,7 @@ func TestIndexing1(t *testing.T) {
 				assert.True(t, o.Reverse)
 				assert.Equal(t, "timestamp", o.SeekFields[0])
 				assert.NotEqual(t, 0, count)
-			}))
+			}, gokvkit.WithPersistCDC(true)))
 		})
 		t.Run("no results (>)", func(t *testing.T) {
 			assert.Nil(t, testutil.TestDB(func(ctx context.Context, db gokvkit.Database) {
@@ -667,7 +667,7 @@ func TestIndexing1(t *testing.T) {
 				assert.False(t, o.Reverse)
 				assert.Equal(t, "timestamp", o.SeekFields[0])
 				assert.Equal(t, 0, count)
-			}))
+			}, gokvkit.WithPersistCDC(true)))
 		})
 		t.Run("no results (<)", func(t *testing.T) {
 			assert.Nil(t, testutil.TestDB(func(ctx context.Context, db gokvkit.Database) {
@@ -701,7 +701,7 @@ func TestIndexing1(t *testing.T) {
 				assert.True(t, o.Reverse)
 				assert.Equal(t, "timestamp", o.SeekFields[0])
 				assert.Equal(t, 0, count)
-			}))
+			}, gokvkit.WithPersistCDC(true)))
 		})
 	})
 
@@ -957,33 +957,66 @@ func TestJoin(t *testing.T) {
 				assert.NoError(t, tx.Set(ctx, "user", testutil.NewUserDoc()))
 				return nil
 			}))
-			results, err := db.Query(ctx, "user", gokvkit.Q().
-				Select(
-					gokvkit.Select{Field: "acc._id", As: "account_id"},
-					gokvkit.Select{Field: "acc.name", As: "account_name"},
-					gokvkit.Select{Field: "_id", As: "user_id"},
-				).
-				Join(gokvkit.Join{
-					Collection: "account",
-					On: []gokvkit.Where{
-						{
-							Field: "_id",
-							Op:    gokvkit.WhereOpEq,
-							Value: "$account_id",
+			{
+				results, err := db.Query(ctx, "user", gokvkit.Q().
+					Select(
+						gokvkit.Select{Field: "acc._id", As: "account_id"},
+						gokvkit.Select{Field: "acc.name", As: "account_name"},
+						gokvkit.Select{Field: "_id", As: "user_id"},
+					).
+					Join(gokvkit.Join{
+						Collection: "account",
+						On: []gokvkit.Where{
+							{
+								Field: "_id",
+								Op:    gokvkit.WhereOpEq,
+								Value: "$account_id",
+							},
 						},
-					},
-					As: "acc",
-				}).
-				Query())
-			assert.NoError(t, err)
+						As: "acc",
+					}).
+					Query())
+				assert.NoError(t, err)
 
-			for _, r := range results.Documents {
-				assert.True(t, r.Exists("account_name"))
-				assert.True(t, r.Exists("account_id"))
-				assert.True(t, r.Exists("user_id"))
-				if usrs[r.GetString("user_id")] != nil {
-					assert.NotEmpty(t, usrs[r.GetString("user_id")])
-					assert.Equal(t, usrs[r.GetString("user_id")].Get("account_id"), r.GetString("account_id"))
+				for _, r := range results.Documents {
+					assert.True(t, r.Exists("account_name"))
+					assert.True(t, r.Exists("account_id"))
+					assert.True(t, r.Exists("user_id"))
+					if usrs[r.GetString("user_id")] != nil {
+						assert.NotEmpty(t, usrs[r.GetString("user_id")])
+						assert.Equal(t, usrs[r.GetString("user_id")].Get("account_id"), r.GetString("account_id"))
+					}
+				}
+			}
+			{
+				results, err := db.Query(ctx, "user", gokvkit.Q().
+					Select(
+						gokvkit.Select{Field: "acc._id", As: "account_id"},
+						gokvkit.Select{Field: "acc.name", As: "account_name"},
+						gokvkit.Select{Field: "_id", As: "user_id"},
+					).
+					Join(gokvkit.Join{
+						Collection: "account",
+						On: []gokvkit.Where{
+							{
+								Field: "_id",
+								Op:    gokvkit.WhereOpNeq,
+								Value: "$account_id",
+							},
+						},
+						As: "acc",
+					}).
+					Query())
+				assert.NoError(t, err)
+
+				for _, r := range results.Documents {
+					assert.True(t, r.Exists("account_name"))
+					assert.True(t, r.Exists("account_id"))
+					assert.True(t, r.Exists("user_id"))
+					if usrs[r.GetString("user_id")] != nil {
+						assert.NotEmpty(t, usrs[r.GetString("user_id")])
+						assert.NotEqual(t, usrs[r.GetString("user_id")].Get("account_id"), r.GetString("account_id"))
+					}
 				}
 			}
 		}))
