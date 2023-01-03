@@ -1,7 +1,7 @@
-package gokvkit
+package myjson
 
 import (
-	"github.com/autom8ter/gokvkit/errors"
+	"github.com/autom8ter/myjson/errors"
 	"github.com/samber/lo"
 )
 

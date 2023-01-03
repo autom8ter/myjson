@@ -1,6 +1,6 @@
 # Tasks
 
-an example http task microservice built with gokvkit
+an example http task microservice built with myjson
 
 ### Details
 - 3 collections: account, user, task

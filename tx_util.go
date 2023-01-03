@@ -1,4 +1,4 @@
-package gokvkit
+package myjson
 
 import (
 	"bytes"
@@ -7,9 +7,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/autom8ter/gokvkit/errors"
-	"github.com/autom8ter/gokvkit/kv"
-	"github.com/autom8ter/gokvkit/util"
+	"github.com/autom8ter/myjson/errors"
+	"github.com/autom8ter/myjson/kv"
+	"github.com/autom8ter/myjson/util"
 	"github.com/nqd/flat"
 	"github.com/samber/lo"
 	"github.com/segmentio/ksuid"
@@ -177,7 +177,6 @@ func (t *transaction) persistCommand(ctx context.Context, command *Command) erro
 				return errors.Wrap(err, errors.Internal, "failed to persist cdc")
 			}
 		}
-
 		t.cdc = append(t.cdc, cdc)
 	}
 	return nil
@@ -363,7 +362,7 @@ func (t *transaction) queryScan(ctx context.Context, collection string, where []
 				return optimization, err
 			}
 		}
-		var documents []*Document
+		var documents = []*Document{document}
 		if len(join) > 0 {
 
 			for _, j := range join {
@@ -381,7 +380,7 @@ func (t *transaction) queryScan(ctx context.Context, collection string, where []
 						newJoin.On = append(newJoin.On, Where{
 							Field: j.On[i].Field,
 							Op:    j.On[i].Op,
-							Value: document.Get(strings.TrimPrefix(cast.ToString(o.Value), selfRefPrefix)),
+							Value: documents[0].Get(strings.TrimPrefix(cast.ToString(o.Value), selfRefPrefix)),
 						})
 					} else {
 						newJoin.On = append(newJoin.On, o)
@@ -395,17 +394,21 @@ func (t *transaction) queryScan(ctx context.Context, collection string, where []
 				if err != nil {
 					return Optimization{}, err
 				}
-				for _, d := range results.Documents {
-					cloned := document.Clone()
-					if err := cloned.MergeJoin(d, j.As); err != nil {
-						return Optimization{}, err
+				for i, d := range results.Documents {
+					if len(documents) > i {
+						if err := documents[i].MergeJoin(d, j.As); err != nil {
+							return Optimization{}, err
+						}
+					} else {
+						cloned := documents[0].Clone()
+						if err := cloned.MergeJoin(d, j.As); err != nil {
+							return Optimization{}, err
+						}
+						documents = append(documents, cloned)
 					}
-					documents = append(documents, cloned)
+
 				}
 			}
-		}
-		if len(documents) == 0 {
-			documents = []*Document{document}
 		}
 		for _, d := range documents {
 			pass, err := d.Where(where)

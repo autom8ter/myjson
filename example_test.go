@@ -1,17 +1,17 @@
-package gokvkit_test
+package myjson_test
 
 import (
 	"context"
 	"fmt"
 
-	"github.com/autom8ter/gokvkit"
-	"github.com/autom8ter/gokvkit/kv"
+	"github.com/autom8ter/myjson"
+	"github.com/autom8ter/myjson/kv"
 )
 
 func ExampleNew() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	db, err := gokvkit.New(ctx, "badger", map[string]any{
+	db, err := myjson.Open(ctx, "badger", map[string]any{
 		// leave empty for in-memory
 		"storage_path": "",
 	})
@@ -37,9 +37,9 @@ properties:
 	if err := db.ConfigureCollection(ctx, []byte(accountSchema)); err != nil {
 		panic(err)
 	}
-	if err := db.Tx(ctx, kv.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx gokvkit.Tx) error {
+	if err := db.Tx(ctx, kv.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx myjson.Tx) error {
 		// create a new account document
-		account, err := gokvkit.NewDocumentFrom(map[string]any{
+		account, err := myjson.NewDocumentFrom(map[string]any{
 			"name": "acme.com",
 		})
 		if err != nil {
@@ -57,13 +57,13 @@ properties:
 }
 
 func ExampleQ() {
-	query := gokvkit.Q().
-		Select(gokvkit.Select{
+	query := myjson.Q().
+		Select(myjson.Select{
 			Field: "*",
 		}).
-		Where(gokvkit.Where{
+		Where(myjson.Where{
 			Field: "description",
-			Op:    gokvkit.WhereOpContains,
+			Op:    myjson.WhereOpContains,
 			Value: "testing",
 		}).Query()
 	fmt.Println(query.String())
@@ -73,7 +73,7 @@ func ExampleQ() {
 
 func ExampleNewMetadata() {
 	var orgID = "123"
-	md := gokvkit.NewMetadata(map[string]any{})
+	md := myjson.NewMetadata(map[string]any{})
 	md.SetNamespace(orgID)
 	bytes, _ := md.MarshalJSON()
 	fmt.Println(string(bytes))
@@ -82,7 +82,7 @@ func ExampleNewMetadata() {
 }
 
 func ExampleNewDocumentFrom() {
-	doc, _ := gokvkit.NewDocumentFrom(map[string]any{
+	doc, _ := myjson.NewDocumentFrom(map[string]any{
 		"name": "autom8ter",
 	})
 	fmt.Println(doc.String())

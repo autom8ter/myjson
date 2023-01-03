@@ -1,4 +1,4 @@
-package gokvkit
+package myjson
 
 import (
 	"context"
@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/autom8ter/gokvkit/util"
+	"github.com/autom8ter/myjson/util"
 	"github.com/stretchr/testify/assert"
 )
 

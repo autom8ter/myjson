@@ -1,8 +1,8 @@
 package registry
 
 import (
-	"github.com/autom8ter/gokvkit/errors"
-	"github.com/autom8ter/gokvkit/kv"
+	"github.com/autom8ter/myjson/errors"
+	"github.com/autom8ter/myjson/kv"
 )
 
 // KVDBOpener opens a key value database
