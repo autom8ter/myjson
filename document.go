@@ -1,4 +1,4 @@
-package gokvkit
+package myjson
 
 import (
 	"encoding/json"
@@ -11,8 +11,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/autom8ter/gokvkit/errors"
-	"github.com/autom8ter/gokvkit/util"
+	"github.com/autom8ter/myjson/errors"
+	"github.com/autom8ter/myjson/util"
 	"github.com/huandu/xstrings"
 	flat2 "github.com/nqd/flat"
 	"github.com/samber/lo"

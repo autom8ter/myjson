@@ -1,12 +1,12 @@
-package gokvkit
+package myjson
 
 import (
 	"context"
 	"fmt"
 	"time"
 
-	"github.com/autom8ter/gokvkit/errors"
-	"github.com/autom8ter/gokvkit/kv"
+	"github.com/autom8ter/myjson/errors"
+	"github.com/autom8ter/myjson/kv"
 )
 
 func (d *defaultDB) lockCollection(ctx context.Context, collection string) (func(), error) {

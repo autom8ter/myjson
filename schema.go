@@ -1,4 +1,4 @@
-package gokvkit
+package myjson
 
 import (
 	"context"
@@ -7,8 +7,8 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/autom8ter/gokvkit/errors"
-	"github.com/autom8ter/gokvkit/util"
+	"github.com/autom8ter/myjson/errors"
+	"github.com/autom8ter/myjson/util"
 	"github.com/tidwall/gjson"
 	"github.com/xeipuuv/gojsonschema"
 )

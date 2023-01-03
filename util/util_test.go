@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/autom8ter/gokvkit"
-	"github.com/autom8ter/gokvkit/testutil"
-	"github.com/autom8ter/gokvkit/util"
+	"github.com/autom8ter/myjson"
+	"github.com/autom8ter/myjson/testutil"
+	"github.com/autom8ter/myjson/util"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -19,7 +19,7 @@ func TestUtil(t *testing.T) {
 		assert.NoError(t, err)
 		jsonData, err := util.YAMLToJSON(yml)
 		assert.NoError(t, err)
-		doc2, err := gokvkit.NewDocumentFromBytes(jsonData)
+		doc2, err := myjson.NewDocumentFromBytes(jsonData)
 		assert.NoError(t, err)
 		assert.Equal(t, doc.String(), doc2.String())
 	})
@@ -32,7 +32,7 @@ func TestUtil(t *testing.T) {
 		doc := testutil.NewUserDoc()
 		data := map[string]any{}
 		assert.Nil(t, util.Decode(doc.Value(), &data))
-		doc2, err := gokvkit.NewDocumentFrom(data)
+		doc2, err := myjson.NewDocumentFrom(data)
 		assert.NoError(t, err)
 		assert.Equal(t, doc.String(), doc2.String())
 	})

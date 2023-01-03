@@ -1,4 +1,4 @@
-module github.com/autom8ter/gokvkit
+module github.com/autom8ter/myjson
 
 go 1.18
 

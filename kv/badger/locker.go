@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/autom8ter/gokvkit/kv"
+	"github.com/autom8ter/myjson/kv"
 	"github.com/dgraph-io/badger/v3"
 )
 

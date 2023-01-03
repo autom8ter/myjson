@@ -3,7 +3,7 @@ package tikv
 import (
 	"bytes"
 
-	"github.com/autom8ter/gokvkit/kv"
+	"github.com/autom8ter/myjson/kv"
 )
 
 type unionStoreIterator interface {

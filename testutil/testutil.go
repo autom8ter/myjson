@@ -7,14 +7,14 @@ import (
 	"os"
 	"time"
 
-	"github.com/autom8ter/gokvkit"
-	"github.com/autom8ter/gokvkit/kv"
+	"github.com/autom8ter/myjson"
+	"github.com/autom8ter/myjson/kv"
 
 	"github.com/brianvoe/gofakeit/v6"
 
 	_ "embed"
 
-	_ "github.com/autom8ter/gokvkit/kv/badger"
+	_ "github.com/autom8ter/myjson/kv/badger"
 )
 
 var (
@@ -27,8 +27,8 @@ var (
 	AllCollections = [][]byte{[]byte(UserSchema), []byte(TaskSchema), []byte(AccountSchema)}
 )
 
-func NewUserDoc() *gokvkit.Document {
-	doc, err := gokvkit.NewDocumentFrom(map[string]interface{}{
+func NewUserDoc() *myjson.Document {
+	doc, err := myjson.NewDocumentFrom(map[string]interface{}{
 		"_id":  gofakeit.UUID(),
 		"name": gofakeit.Name(),
 		"contact": map[string]interface{}{
@@ -49,8 +49,8 @@ func NewUserDoc() *gokvkit.Document {
 	return doc
 }
 
-func NewTaskDoc(usrID string) *gokvkit.Document {
-	doc, err := gokvkit.NewDocumentFrom(map[string]interface{}{
+func NewTaskDoc(usrID string) *myjson.Document {
+	doc, err := myjson.NewDocumentFrom(map[string]interface{}{
 		"_id":     gofakeit.UUID(),
 		"user":    usrID,
 		"content": gofakeit.LoremIpsumSentence(5),
@@ -61,7 +61,7 @@ func NewTaskDoc(usrID string) *gokvkit.Document {
 	return doc
 }
 
-func TestDB(fn func(ctx context.Context, db gokvkit.Database), opts ...gokvkit.DBOpt) error {
+func TestDB(fn func(ctx context.Context, db myjson.Database), opts ...myjson.DBOpt) error {
 	os.MkdirAll("tmp", 0700)
 	dir, err := ioutil.TempDir("./tmp", "")
 	if err != nil {
@@ -70,7 +70,7 @@ func TestDB(fn func(ctx context.Context, db gokvkit.Database), opts ...gokvkit.D
 	defer os.RemoveAll(dir)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	db, err := gokvkit.New(ctx, "badger", map[string]any{
+	db, err := myjson.New(ctx, "badger", map[string]any{
 		"storage_path": dir,
 	}, opts...)
 	if err != nil {
@@ -82,9 +82,9 @@ func TestDB(fn func(ctx context.Context, db gokvkit.Database), opts ...gokvkit.D
 		}
 	}
 
-	if err := db.Tx(ctx, kv.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx gokvkit.Tx) error {
+	if err := db.Tx(ctx, kv.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx myjson.Tx) error {
 		for i := 0; i <= 100; i++ {
-			d, _ := gokvkit.NewDocumentFrom(map[string]any{
+			d, _ := myjson.NewDocumentFrom(map[string]any{
 				"_id":  fmt.Sprint(i),
 				"name": gofakeit.Company(),
 			})

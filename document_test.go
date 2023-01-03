@@ -1,4 +1,4 @@
-package gokvkit_test
+package myjson_test
 
 import (
 	"encoding/json"
@@ -6,9 +6,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/autom8ter/gokvkit"
-	"github.com/autom8ter/gokvkit/testutil"
-	"github.com/autom8ter/gokvkit/util"
+	"github.com/autom8ter/myjson"
+	"github.com/autom8ter/myjson/testutil"
+	"github.com/autom8ter/myjson/util"
 	"github.com/brianvoe/gofakeit/v6"
 	"github.com/stretchr/testify/assert"
 )
@@ -35,7 +35,7 @@ func TestDocument(t *testing.T) {
 		Name: "john smith",
 		Age:  50,
 	}
-	r, err := gokvkit.NewDocumentFrom(&usr)
+	r, err := myjson.NewDocumentFrom(&usr)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -58,7 +58,7 @@ func TestDocument(t *testing.T) {
 	})
 	t.Run("merge", func(t *testing.T) {
 		usr2 := user{ID: usr.ID, Contact: contact{Email: gofakeit.Email()}, Name: "john smith"}
-		r2, err := gokvkit.NewDocumentFrom(&usr2)
+		r2, err := myjson.NewDocumentFrom(&usr2)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -68,9 +68,9 @@ func TestDocument(t *testing.T) {
 		assert.Equal(t, usr.Contact.Phone, r.GetString("contact.phone"))
 	})
 	t.Run("valid", func(t *testing.T) {
-		r := gokvkit.NewDocument()
+		r := myjson.NewDocument()
 		assert.Equal(t, true, r.Valid())
-		r, err := gokvkit.NewDocumentFrom([]any{1})
+		r, err := myjson.NewDocumentFrom([]any{1})
 		assert.NotNil(t, err)
 	})
 	t.Run("clone", func(t *testing.T) {
@@ -87,7 +87,7 @@ func TestDocument(t *testing.T) {
 		assert.NotEmpty(t, string(r.Bytes()))
 	})
 	t.Run("new from bytes", func(t *testing.T) {
-		n, err := gokvkit.NewDocumentFromBytes(r.Bytes())
+		n, err := myjson.NewDocumentFromBytes(r.Bytes())
 		assert.NoError(t, err)
 		assert.Equal(t, true, n.Valid())
 	})
@@ -111,7 +111,7 @@ func TestDocument(t *testing.T) {
 		diff := after.Diff(before)
 		assert.Len(t, diff, 1)
 		assert.Equal(t, "contact.email", diff[0].Path)
-		assert.Equal(t, gokvkit.JSONOpReplace, diff[0].Op)
+		assert.Equal(t, myjson.JSONOpReplace, diff[0].Op)
 	})
 	t.Run("diff - add contact.email", func(t *testing.T) {
 		before := testutil.NewUserDoc()
@@ -121,7 +121,7 @@ func TestDocument(t *testing.T) {
 		diff := after.Diff(before)
 		assert.Len(t, diff, 1)
 		assert.Equal(t, "contact.email", diff[0].Path)
-		assert.Equal(t, gokvkit.JSONOpAdd, diff[0].Op)
+		assert.Equal(t, myjson.JSONOpAdd, diff[0].Op)
 		assert.Equal(t, after.Get("contact.email"), diff[0].Value)
 	})
 	t.Run("diff - remove contact.email", func(t *testing.T) {
@@ -131,7 +131,7 @@ func TestDocument(t *testing.T) {
 		diff := after.Diff(before)
 		assert.Len(t, diff, 1)
 		assert.Equal(t, "contact.email", diff[0].Path)
-		assert.Equal(t, gokvkit.JSONOpRemove, diff[0].Op)
+		assert.Equal(t, myjson.JSONOpRemove, diff[0].Op)
 		assert.Equal(t, before.Get("contact.email"), diff[0].BeforeValue)
 	})
 	t.Run("overwrite", func(t *testing.T) {
@@ -143,141 +143,141 @@ func TestDocument(t *testing.T) {
 	})
 
 	t.Run("where", func(t *testing.T) {
-		r, err = gokvkit.NewDocumentFrom(&usr)
+		r, err = myjson.NewDocumentFrom(&usr)
 		if err != nil {
 			t.Fatal(err)
 		}
-		pass, err := r.Where([]gokvkit.Where{
+		pass, err := r.Where([]myjson.Where{
 			{
 				Field: "contact.email",
-				Op:    gokvkit.WhereOpEq,
+				Op:    myjson.WhereOpEq,
 				Value: email,
 			},
 		})
 		assert.NoError(t, err)
 		assert.True(t, pass)
 
-		pass, err = r.Where([]gokvkit.Where{
+		pass, err = r.Where([]myjson.Where{
 			{
 				Field: "contact.email",
-				Op:    gokvkit.WhereOpContains,
+				Op:    myjson.WhereOpContains,
 				Value: email,
 			},
 		})
 		assert.NoError(t, err)
 		assert.True(t, pass)
 
-		pass, err = r.Where([]gokvkit.Where{
+		pass, err = r.Where([]myjson.Where{
 			{
 				Field: "contact.email",
-				Op:    gokvkit.WhereOpEq,
+				Op:    myjson.WhereOpEq,
 				Value: gofakeit.Email(),
 			},
 		})
 		assert.NoError(t, err)
 		assert.False(t, pass)
 
-		pass, err = r.Where([]gokvkit.Where{
+		pass, err = r.Where([]myjson.Where{
 			{
 				Field: "contact.email",
-				Op:    gokvkit.WhereOpNeq,
+				Op:    myjson.WhereOpNeq,
 				Value: gofakeit.Email(),
 			},
 		})
 		assert.NoError(t, err)
 		assert.True(t, pass)
 
-		pass, err = r.Where([]gokvkit.Where{
+		pass, err = r.Where([]myjson.Where{
 			{
 				Field: "age",
-				Op:    gokvkit.WhereOpGt,
+				Op:    myjson.WhereOpGt,
 				Value: 10,
 			},
 		})
 		assert.NoError(t, err)
 		assert.True(t, pass)
 
-		pass, err = r.Where([]gokvkit.Where{
+		pass, err = r.Where([]myjson.Where{
 			{
 				Field: "age",
-				Op:    gokvkit.WhereOpGte,
+				Op:    myjson.WhereOpGte,
 				Value: 50,
 			},
 		})
 		assert.NoError(t, err)
 		assert.True(t, pass)
 
-		pass, err = r.Where([]gokvkit.Where{
+		pass, err = r.Where([]myjson.Where{
 			{
 				Field: "age",
-				Op:    gokvkit.WhereOpGte,
+				Op:    myjson.WhereOpGte,
 				Value: 51,
 			},
 		})
 		assert.NoError(t, err)
 		assert.False(t, pass)
 
-		pass, err = r.Where([]gokvkit.Where{
+		pass, err = r.Where([]myjson.Where{
 			{
 				Field: "age",
-				Op:    gokvkit.WhereOpLt,
+				Op:    myjson.WhereOpLt,
 				Value: 51,
 			},
 		})
 		assert.NoError(t, err)
 		assert.True(t, pass)
 
-		pass, err = r.Where([]gokvkit.Where{
+		pass, err = r.Where([]myjson.Where{
 			{
 				Field: "age",
-				Op:    gokvkit.WhereOpLte,
+				Op:    myjson.WhereOpLte,
 				Value: 50,
 			},
 		})
 		assert.NoError(t, err)
 		assert.True(t, pass)
 
-		pass, err = r.Where([]gokvkit.Where{
+		pass, err = r.Where([]myjson.Where{
 			{
 				Field: "age",
-				Op:    gokvkit.WhereOpLte,
+				Op:    myjson.WhereOpLte,
 				Value: 50,
 			},
 		})
 		assert.NoError(t, err)
 		assert.True(t, pass)
 
-		pass, err = r.Where([]gokvkit.Where{
+		pass, err = r.Where([]myjson.Where{
 			{
 				Field: "age",
-				Op:    gokvkit.WhereOpGte,
+				Op:    myjson.WhereOpGte,
 				Value: 50,
 			},
 		})
 		assert.NoError(t, err)
 		assert.True(t, pass)
 
-		pass, err = r.Where([]gokvkit.Where{
+		pass, err = r.Where([]myjson.Where{
 			{
 				Field: "age",
-				Op:    gokvkit.WhereOpIn,
+				Op:    myjson.WhereOpIn,
 				Value: []float64{50},
 			},
 		})
 		assert.NoError(t, err)
 		assert.True(t, pass)
 
-		pass, err = r.Where([]gokvkit.Where{
+		pass, err = r.Where([]myjson.Where{
 			{
 				Field: "age",
-				Op:    gokvkit.WhereOpLt,
+				Op:    myjson.WhereOpLt,
 				Value: 49,
 			},
 		})
 		assert.NoError(t, err)
 		assert.False(t, pass)
 
-		pass, err = r.Where([]gokvkit.Where{
+		pass, err = r.Where([]myjson.Where{
 			{
 				Field: "age",
 				Op:    "8",
@@ -290,20 +290,20 @@ func TestDocument(t *testing.T) {
 	t.Run("self ref", func(t *testing.T) {
 		usr := testutil.NewUserDoc()
 		assert.NoError(t, usr.Set("contact.email", usr.Get("name")))
-		pass, err := usr.Where([]gokvkit.Where{
+		pass, err := usr.Where([]myjson.Where{
 			{
 				Field: "name",
-				Op:    gokvkit.WhereOpEq,
+				Op:    myjson.WhereOpEq,
 				Value: "$contact.email",
 			},
 		})
 		assert.NoError(t, err)
 		assert.True(t, pass)
 
-		pass, err = usr.Where([]gokvkit.Where{
+		pass, err = usr.Where([]myjson.Where{
 			{
 				Field: "name",
-				Op:    gokvkit.WhereOpNeq,
+				Op:    myjson.WhereOpNeq,
 				Value: "$contact.email",
 			},
 		})
@@ -328,61 +328,61 @@ func TestDocument(t *testing.T) {
 		usr := testutil.NewUserDoc()
 		bits, err := usr.MarshalJSON()
 		assert.NoError(t, err)
-		usr2 := gokvkit.NewDocument()
+		usr2 := myjson.NewDocument()
 		assert.NoError(t, usr2.UnmarshalJSON(bits))
 		assert.Equal(t, usr.String(), usr2.String())
 	})
 	t.Run("@reverse", func(t *testing.T) {
-		d, _ := gokvkit.NewDocumentFrom(map[string]any{
+		d, _ := myjson.NewDocumentFrom(map[string]any{
 			"messages": []string{"hello world", "hello world", "hello"},
 		})
 		assert.Equal(t, "hello", d.GetArray("messages|@reverse")[0])
 	})
 	t.Run("@snakeCase", func(t *testing.T) {
-		d, _ := gokvkit.NewDocumentFrom(map[string]any{
+		d, _ := myjson.NewDocumentFrom(map[string]any{
 			"message": "helloWorld",
 		})
 		assert.Equal(t, "hello_world", d.Get("message|@snakeCase"))
 	})
 	t.Run("@camelCase", func(t *testing.T) {
-		d, _ := gokvkit.NewDocumentFrom(map[string]any{
+		d, _ := myjson.NewDocumentFrom(map[string]any{
 			"message": "hello_world",
 		})
 		assert.Equal(t, "helloWorld", d.Get("message|@camelCase"))
 	})
 	t.Run("@kebabCase", func(t *testing.T) {
-		d, _ := gokvkit.NewDocumentFrom(map[string]any{
+		d, _ := myjson.NewDocumentFrom(map[string]any{
 			"message": "hello_world",
 		})
 		assert.Equal(t, "hello-world", d.Get("message|@kebabCase"))
 	})
 	t.Run("@lower", func(t *testing.T) {
-		d, _ := gokvkit.NewDocumentFrom(map[string]any{
+		d, _ := myjson.NewDocumentFrom(map[string]any{
 			"message": "HELLO WORLD",
 		})
 		assert.Equal(t, "hello world", d.Get("message|@lower"))
 	})
 	t.Run("@upper", func(t *testing.T) {
-		d, _ := gokvkit.NewDocumentFrom(map[string]any{
+		d, _ := myjson.NewDocumentFrom(map[string]any{
 			"message": "hello world",
 		})
 		assert.Equal(t, "HELLO WORLD", d.Get("message|@upper"))
 	})
 	t.Run("@replaceAll", func(t *testing.T) {
-		d, _ := gokvkit.NewDocumentFrom(map[string]any{
+		d, _ := myjson.NewDocumentFrom(map[string]any{
 			"message": "hello world",
 		})
 		assert.Equal(t, "hello", d.Get(`message|@replaceAll:{"old": " world", "new": ""}`))
 	})
 	t.Run("@trim", func(t *testing.T) {
-		d, _ := gokvkit.NewDocumentFrom(map[string]any{
+		d, _ := myjson.NewDocumentFrom(map[string]any{
 			"message": "hello world",
 		})
 		assert.Equal(t, "helloworld", d.Get(`message|@trim`))
 	})
 	t.Run("@dateTrunc", func(t *testing.T) {
 		date := time.Date(1993, time.August, 17, 0, 0, 0, 0, time.Local)
-		d, _ := gokvkit.NewDocumentFrom(map[string]any{
+		d, _ := myjson.NewDocumentFrom(map[string]any{
 			"timestamp": date,
 		})
 		assert.Equal(t, "1993-08-01 00:00:00 +0000 UTC", d.GetString(`timestamp|@dateTrunc:month`))
@@ -391,32 +391,32 @@ func TestDocument(t *testing.T) {
 	})
 	t.Run("@unix", func(t *testing.T) {
 		date := time.Date(1993, time.August, 17, 0, 0, 0, 0, time.Local)
-		d, _ := gokvkit.NewDocumentFrom(map[string]any{
+		d, _ := myjson.NewDocumentFrom(map[string]any{
 			"timestamp": date,
 		})
 		assert.Equal(t, float64(date.Unix()), d.GetFloat(`timestamp|@unix`))
 	})
 	t.Run("@unixMilli", func(t *testing.T) {
 		date := time.Date(1993, time.August, 17, 0, 0, 0, 0, time.Local)
-		d, _ := gokvkit.NewDocumentFrom(map[string]any{
+		d, _ := myjson.NewDocumentFrom(map[string]any{
 			"timestamp": date,
 		})
 		assert.Equal(t, float64(date.UnixMilli()), d.GetFloat(`timestamp|@unixMilli`))
 	})
 	t.Run("@unixNano", func(t *testing.T) {
 		date := time.Date(1993, time.August, 17, 0, 0, 0, 0, time.Local)
-		d, _ := gokvkit.NewDocumentFrom(map[string]any{
+		d, _ := myjson.NewDocumentFrom(map[string]any{
 			"timestamp": date,
 		})
 		assert.Equal(t, float64(date.UnixNano()), d.GetFloat(`timestamp|@unixNano`))
 	})
 	t.Run("results", func(t *testing.T) {
-		var docs = []*gokvkit.Document{
+		var docs = []*myjson.Document{
 			testutil.NewUserDoc(),
 			testutil.NewUserDoc(),
 			testutil.NewUserDoc(),
 		}
-		result := gokvkit.Page{
+		result := myjson.Page{
 			Documents: docs,
 			NextPage:  0,
 		}
@@ -425,30 +425,30 @@ func TestDocument(t *testing.T) {
 		t.Log(string(bits))
 	})
 	t.Run("documents - for each", func(t *testing.T) {
-		var docs = gokvkit.Documents{
+		var docs = myjson.Documents{
 			testutil.NewUserDoc(),
 			testutil.NewUserDoc(),
 			testutil.NewUserDoc(),
 		}
 		count := 0
-		docs.ForEach(func(next *gokvkit.Document, i int) {
+		docs.ForEach(func(next *myjson.Document, i int) {
 			count++
 		})
 		assert.Equal(t, 3, count)
 	})
 	t.Run("documents - filter", func(t *testing.T) {
-		var docs = gokvkit.Documents{
+		var docs = myjson.Documents{
 			testutil.NewUserDoc(),
 			testutil.NewUserDoc(),
 			testutil.NewUserDoc(),
 		}
-		docs = docs.Filter(func(document *gokvkit.Document, i int) bool {
+		docs = docs.Filter(func(document *myjson.Document, i int) bool {
 			return document.String() != docs[0].String()
 		})
 		assert.Equal(t, 2, len(docs))
 	})
 	t.Run("documents - slice", func(t *testing.T) {
-		var docs = gokvkit.Documents{
+		var docs = myjson.Documents{
 			testutil.NewUserDoc(),
 			testutil.NewUserDoc(),
 			testutil.NewUserDoc(),
@@ -457,16 +457,16 @@ func TestDocument(t *testing.T) {
 		assert.Equal(t, 2, len(docs))
 	})
 	t.Run("documents - map", func(t *testing.T) {
-		var docs = gokvkit.Documents{
+		var docs = myjson.Documents{
 			testutil.NewUserDoc(),
 			testutil.NewUserDoc(),
 			testutil.NewUserDoc(),
 		}
-		docs.Map(func(t *gokvkit.Document, i int) *gokvkit.Document {
+		docs.Map(func(t *myjson.Document, i int) *myjson.Document {
 			t.Set("age", 1)
 			return t
 		})
-		docs.ForEach(func(next *gokvkit.Document, i int) {
+		docs.ForEach(func(next *myjson.Document, i int) {
 			assert.Equal(t, float64(1), next.Get("age"))
 		})
 	})
@@ -505,15 +505,15 @@ func BenchmarkDocument(b *testing.B) {
 		b.ReportAllocs()
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
-			doc.Where([]gokvkit.Where{
+			doc.Where([]myjson.Where{
 				{
 					Field: "contact.email",
-					Op:    gokvkit.WhereOpEq,
+					Op:    myjson.WhereOpEq,
 					Value: doc.Get("contact.email"),
 				},
 				{
 					Field: "age",
-					Op:    gokvkit.WhereOpGte,
+					Op:    myjson.WhereOpGte,
 					Value: 10,
 				},
 			})

@@ -1,4 +1,4 @@
-package gokvkit
+package myjson
 
 import (
 	"context"
@@ -8,8 +8,8 @@ import (
 
 	_ "embed"
 
-	"github.com/autom8ter/gokvkit/errors"
-	"github.com/autom8ter/gokvkit/util"
+	"github.com/autom8ter/myjson/errors"
+	"github.com/autom8ter/myjson/util"
 	"github.com/samber/lo"
 	"github.com/spf13/cast"
 )

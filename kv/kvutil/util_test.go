@@ -2,7 +2,7 @@ package kvutil_test
 
 import (
 	"bytes"
-	"github.com/autom8ter/gokvkit/kv/kvutil"
+	"github.com/autom8ter/myjson/kv/kvutil"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )

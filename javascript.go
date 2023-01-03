@@ -1,4 +1,4 @@
-package gokvkit
+package myjson
 
 import (
 	"context"

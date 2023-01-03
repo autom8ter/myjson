@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/autom8ter/gokvkit/kv"
+	"github.com/autom8ter/myjson/kv"
 	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 )
