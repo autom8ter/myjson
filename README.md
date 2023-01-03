@@ -1,13 +1,13 @@
 # myjson [![GoDoc](https://godoc.org/github.com/autom8ter/myjson?status.svg)](https://godoc.org/github.com/autom8ter/myjson)
 ![Coverage](https://img.shields.io/badge/Coverage-72.7%25-brightgreen)
 
-myjson is an embedded database built on top of pluggable key value storage
+MyJSON is an embedded relational document store built on top of pluggable key value storage
 
     go get -u github.com/autom8ter/myjson
 
 ## Use Case
 
-Build stateful, extensible, and feature-rich programs on top of pluggable key/value storage providers
+Build powerful applications on top of simple key value storage. 
 
 ## Features:
 
@@ -53,7 +53,35 @@ Build stateful, extensible, and feature-rich programs on top of pluggable key/va
 
 Before getting started, take a look at the [examples](./examples) and [Godoc](https://godoc.org/github.com/autom8ter/myjson)
 
-#### Configuring a database instance
+### Opening a database instance
+
+
+#### Single Node in Memory (badger)
+```go
+db, err := myjson.Open(context.Background(), "badger", map[string]any{
+	"storage_path": "",
+})
+```
+
+#### Single Node w/ Persistance (badger)
+```go
+db, err := myjson.Open(context.Background(), "badger", map[string]any{
+	"storage_path": "./tmp",
+})
+```
+
+
+#### Multi Node w/ Persistance (tikv)
+```go
+db, err := myjson.Open(context.Background(), "tikv", map[string]any{
+    "pd_addr":    []string{"http://pd0:2379"},
+    "redis_addr": "localhost:6379",
+    "redis_user": "admin", //change me
+    "redis_password": "123232", //change me
+})
+```
+
+### Configuring a database instance
 
 Collection schemas can be configured at runtime or at startup. Collection schemas are declarative - 
 any changes to indexing or validation happen within the database when ConfigureCollection is called
@@ -80,7 +108,9 @@ if err := db.ConfigureCollection(ctx, []byte(taskSchema)); err != nil {
 }
 ```
 
-### Creating a JSON document
+### Working with JSON documents
+
+#### Creating a JSON document
 
 ```go
 document, err := myjson.NewDocumentFrom(map[string]any{
@@ -93,6 +123,41 @@ doc := myjson.NewDocument()
 doc.Set("name", "acme.com")
 ```
 
+#### Setting JSON values
+
+```go
+doc := myjson.NewDocument()
+doc.Set("name", "acme.com")
+```
+
+SJSON syntax is supported: https://github.com/tidwall/sjson#path-syntax
+```go
+doc := myjson.NewDocument()
+doc.Set("contact.email", "info@acme.com")
+```
+
+
+#### Getting JSON values
+
+```go
+doc := myjson.NewDocument()
+doc.Set("name", "acme.com")
+```
+
+GJSON syntax is supported: https://github.com/tidwall/sjson#path-syntax
+```go
+value := doc.Get("contact.email")
+```
+
+additional GJSON modifiers are available:
+- @camelCase - convert a json string field to camel case `doc.Get("project|@camelCase")`
+- @snakeCase - convert a json string field to snake case `doc.Get("project|@snakeCase")`
+- @kebabCase - convert a json string field to kebab case `doc.Get("project|@kebabCase")`
+- @replaceAll - replace a substring within a json string field with another string 
+- @unix - get the unix timestamp of the json time field `doc.Get("timestamp|@unix")`
+- @unixMilli - get the unix millisecond timestamp of the json time field `doc.Get("timestamp|@unixMilli")`
+- @unixNano - get the unix nanosecond timestamp of the json time field `doc.Get("timestamp|@unixNano")`
+- @dateTrunc - truncate a date to day, month, or year ex: `doc.GetString("timestamp|@dateTrunc:month")`,  `doc.GetString("timestamp|@dateTrunc:year")`,  `doc.GetString("timestamp|@dateTrunc:day")`
 
 ### Transactions
 
@@ -141,6 +206,7 @@ results, err := tx.Query(ctx, "user", myjson.Q().
 
 #### Joins
 
+1-many joins are 
 ```go
 results, err := db.Query(ctx, "user", myjson.Q().
     Select(
@@ -154,7 +220,7 @@ results, err := db.Query(ctx, "user", myjson.Q().
             {
 				Field: "_id",
 				Op:    myjson.WhereOpEq,
-                Value: "$account_id",
+                Value: "$account_id", //self reference the account_id on the user document
             },
     },
         As: "acc",
@@ -182,6 +248,8 @@ doc, err := tx.Get(ctx, "user", "$id")
 ### Change Streams
 
 #### Stream Changes in a given collection
+
+CDC persistance must be enabled for change streams to work. See the database Options for more info.
 
 ```go
 ctx, cancel := context.WithCancel(context.Background())
@@ -227,6 +295,11 @@ triggers:
       doc.set('timestamp', new Date().toISOString())
 ```
 
+javascript variables are injected at runtime:
+- `doc` - the JSON document that is being changed
+- `db` - the global database instance(all methods are available lowercased)
+- `ctx` - the context when the trigger was called
+- `metadata` - the context metadata when the script is called
 
 ### Scripts
 
@@ -253,6 +326,12 @@ _, err = db.RunScript(ctx, "setAccount", getAccountScript, map[string]any{
     "doc": doc,
 })
 ```
+javascript variables are injected at runtime:
+- `db` - the global database instance(all methods are available lowercased)
+- `ctx` - the context when the script is called
+- `metadata` - the context metadata when the script is called
+- `newDocument` - function to intialize a new JSON document
+- `newDocumentFrom` - function to initialize a new JSON document from a javascript object
 
 ### Example JSON Schema
 

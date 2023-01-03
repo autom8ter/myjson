@@ -188,7 +188,8 @@ func (d *Document) Clone() *Document {
 	return &Document{result: gjson.Parse(raw)}
 }
 
-// Get gets a field on the document. Get has GJSON syntax support and supports dot notation
+// Get gets a field on the document. Get has GJSON syntax support
+// For information on gjson syntax, check out https://github.com/tidwall/gjson/blob/master/SYNTAX.md
 func (d *Document) Get(field string) any {
 	d.mu.RLock()
 	defer d.mu.RUnlock()
@@ -198,39 +199,46 @@ func (d *Document) Get(field string) any {
 	return nil
 }
 
-// GetString gets a string field value on the document. Get has GJSON syntax support and supports dot notation
+// GetString gets a string field value on the document. GetString has GJSON syntax support
+// For information on gjson syntax, check out https://github.com/tidwall/gjson/blob/master/SYNTAX.md
 func (d *Document) GetString(field string) string {
 	return cast.ToString(d.Get(field))
 }
 
-// Exists returns true if the fieldPath has a value in the json document
+// Exists returns true if the fieldPath has a value in the json document. Exists has GJSON syntax support
+// // For information on gjson syntax, check out https://github.com/tidwall/gjson/blob/master/SYNTAX.md
 func (d *Document) Exists(field string) bool {
 	d.mu.RLock()
 	defer d.mu.RUnlock()
 	return d.result.Get(field).Exists()
 }
 
-// GetBool gets a bool field value on the document. GetBool has GJSON syntax support and supports dot notation
+// GetBool gets a bool field value on the document. GetBool has GJSON syntax support
+// For information on gjson syntax, check out https://github.com/tidwall/gjson/blob/master/SYNTAX.md
 func (d *Document) GetBool(field string) bool {
 	return cast.ToBool(d.Get(field))
 }
 
-// GetFloat gets a float64 field value on the document. GetFloat has GJSON syntax support and supports dot notation
+// GetFloat gets a float64 field value on the document. GetFloat has GJSON syntax support
+// For information on gjson syntax, check out https://github.com/tidwall/gjson/blob/master/SYNTAX.md
 func (d *Document) GetFloat(field string) float64 {
 	return cast.ToFloat64(d.Get(field))
 }
 
-// GetTime gets a time.Time field value on the document. GetTime has GJSON syntax support and supports dot notation
+// GetTime gets a time.Time field value on the document. GetTime has GJSON syntax support
+// For information on gjson syntax, check out https://github.com/tidwall/gjson/blob/master/SYNTAX.md
 func (d *Document) GetTime(field string) time.Time {
 	return cast.ToTime(d.GetString(field))
 }
 
-// GetArray gets an array field on the document. Get has GJSON syntax support and supports dot notation
+// GetArray gets an array field on the document. Get has GJSON syntax support
+// For information on gjson syntax, check out https://github.com/tidwall/gjson/blob/master/SYNTAX.md
 func (d *Document) GetArray(field string) []any {
 	return cast.ToSlice(d.Get(field))
 }
 
-// Set sets a field on the document. Dot notation is supported.
+// Set sets a field on the document. Set has SJSON syntax support (dot notation)
+// For information on sjson syntax, check out https://github.com/tidwall/sjson#path-syntax
 func (d *Document) Set(field string, val any) error {
 	return d.SetAll(map[string]any{
 		field: val,
@@ -264,7 +272,8 @@ func (d *Document) set(field string, val any) error {
 	return nil
 }
 
-// SetAll sets all fields on the document. Dot notation is supported.
+// SetAll sets all fields on the document. SJSON systax is supported
+// For information on sjson syntax, check out https://github.com/tidwall/sjson#path-syntax
 func (d *Document) SetAll(values map[string]any) error {
 	d.mu.Lock()
 	defer d.mu.Unlock()
@@ -278,7 +287,8 @@ func (d *Document) SetAll(values map[string]any) error {
 	return nil
 }
 
-// Overwrite resets the document with the given values. Dot notation is supported.
+// Overwrite resets the document with the given values. SJSON systax is supported
+// For information on sjson syntax, check out https://github.com/tidwall/sjson#path-syntax
 func (d *Document) Overwrite(values map[string]any) error {
 	d.mu.Lock()
 	defer d.mu.Unlock()
@@ -292,7 +302,7 @@ func (d *Document) Overwrite(values map[string]any) error {
 	return nil
 }
 
-// Merge merges the doument with the provided document. This is not an overwrite.
+// Merge merges the document with the provided document.
 func (d *Document) Merge(with *Document) error {
 	if !with.Valid() {
 		return errors.New(errors.Validation, "invalid document")
@@ -305,6 +315,7 @@ func (d *Document) Merge(with *Document) error {
 	return d.SetAll(flattened)
 }
 
+// MergeJoin merges the document with the input document with each key from the input document prefixed with the given alias
 func (d *Document) MergeJoin(with *Document, alias string) error {
 	if !with.Valid() {
 		return errors.New(errors.Validation, "invalid document")
@@ -322,12 +333,14 @@ func (d *Document) MergeJoin(with *Document, alias string) error {
 	return nil
 }
 
-// Del deletes a field from the document
+// Del deletes a field from the document. SJSON systax is supported
+// For information on sjson syntax, check out https://github.com/tidwall/sjson#path-syntax
 func (d *Document) Del(field string) error {
 	return d.DelAll(field)
 }
 
-// Del deletes a field from the document
+// DelAll deletes a field from the document. SJSON systax is supported
+// For information on sjson syntax, check out https://github.com/tidwall/sjson#path-syntax
 func (d *Document) DelAll(fields ...string) error {
 	d.mu.Lock()
 	defer d.mu.Unlock()

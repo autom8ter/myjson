@@ -1121,12 +1121,12 @@ func TestJoin(t *testing.T) {
 					}).
 					Query())
 				assert.NoError(t, err)
-
+				assert.NotEqual(t, 0, results.Count)
 				for _, r := range results.Documents {
 					assert.True(t, r.Exists("account_name"))
 					assert.True(t, r.Exists("account_id"))
 					assert.True(t, r.Exists("user_id"))
-					assert.NotEmpty(t, usrs[r.GetString("user_id")])
+					assert.NotEmpty(t, usrs[r.GetString("user_id")], r.String())
 					assert.Equal(t, usrs[r.GetString("user_id")].Get("account_id"), r.GetString("account_id"))
 				}
 			}
