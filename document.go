@@ -8,6 +8,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/autom8ter/gokvkit/errors"
@@ -55,11 +56,11 @@ var modifiers = map[string]func(json, arg string) string{
 		yr, month, day := t.Date()
 		switch arg {
 		case "month":
-			return strconv.Quote(time.Date(yr, month, 1, 0, 0, 0, 0, time.Local).String())
+			return strconv.Quote(time.Date(yr, month, 1, 0, 0, 0, 0, time.UTC).String())
 		case "day":
-			return strconv.Quote(time.Date(yr, month, day, 0, 0, 0, 0, time.Local).String())
+			return strconv.Quote(time.Date(yr, month, day, 0, 0, 0, 0, time.UTC).String())
 		case "year":
-			return strconv.Quote(time.Date(yr, time.January, 1, 0, 0, 0, 0, time.Local).String())
+			return strconv.Quote(time.Date(yr, time.January, 1, 0, 0, 0, 0, time.UTC).String())
 		default:
 			return json
 		}
@@ -95,20 +96,25 @@ const selfRefPrefix = "$"
 // Document is a concurrency safe JSON document
 type Document struct {
 	result gjson.Result
+	mu     sync.RWMutex
 }
 
 // UnmarshalJSON satisfies the json Unmarshaler interface
 func (d *Document) UnmarshalJSON(bytes []byte) error {
+	d.mu.Lock()
+	defer d.mu.Unlock()
 	doc, err := NewDocumentFromBytes(bytes)
 	if err != nil {
 		return err
 	}
-	*d = *doc
+	d.result = doc.result
 	return nil
 }
 
 // MarshalJSON satisfies the json Marshaler interface
 func (d *Document) MarshalJSON() ([]byte, error) {
+	d.mu.RLock()
+	defer d.mu.RUnlock()
 	return d.Bytes(), nil
 }
 
@@ -117,6 +123,7 @@ func NewDocument() *Document {
 	parsed := gjson.Parse("{}")
 	return &Document{
 		result: parsed,
+		mu:     sync.RWMutex{},
 	}
 }
 
@@ -127,6 +134,7 @@ func NewDocumentFromBytes(json []byte) (*Document, error) {
 	}
 	d := &Document{
 		result: gjson.ParseBytes(json),
+		mu:     sync.RWMutex{},
 	}
 	if !d.Valid() {
 		return nil, errors.New(errors.Validation, "invalid document")
@@ -146,32 +154,44 @@ func NewDocumentFrom(value any) (*Document, error) {
 
 // Valid returns whether the document is valid
 func (d *Document) Valid() bool {
+	d.mu.RLock()
+	defer d.mu.RUnlock()
 	return gjson.ValidBytes(d.Bytes()) && !d.result.IsArray()
 }
 
 // String returns the document as a json string
 func (d *Document) String() string {
+	d.mu.RLock()
+	defer d.mu.RUnlock()
 	return d.result.String()
 }
 
 // Bytes returns the document as json bytes
 func (d *Document) Bytes() []byte {
+	d.mu.RLock()
+	defer d.mu.RUnlock()
 	return []byte(d.result.Raw)
 }
 
 // Value returns the document as a map
 func (d *Document) Value() map[string]any {
+	d.mu.RLock()
+	defer d.mu.RUnlock()
 	return cast.ToStringMap(d.result.Value())
 }
 
 // Clone allocates a new document with identical values
 func (d *Document) Clone() *Document {
+	d.mu.RLock()
+	defer d.mu.RUnlock()
 	raw := d.result.Raw
 	return &Document{result: gjson.Parse(raw)}
 }
 
 // Get gets a field on the document. Get has GJSON syntax support and supports dot notation
 func (d *Document) Get(field string) any {
+	d.mu.RLock()
+	defer d.mu.RUnlock()
 	if d.result.Get(field).Exists() {
 		return d.result.Get(field).Value()
 	}
@@ -185,6 +205,8 @@ func (d *Document) GetString(field string) string {
 
 // Exists returns true if the fieldPath has a value in the json document
 func (d *Document) Exists(field string) bool {
+	d.mu.RLock()
+	defer d.mu.RUnlock()
 	return d.result.Get(field).Exists()
 }
 
@@ -244,6 +266,8 @@ func (d *Document) set(field string, val any) error {
 
 // SetAll sets all fields on the document. Dot notation is supported.
 func (d *Document) SetAll(values map[string]any) error {
+	d.mu.Lock()
+	defer d.mu.Unlock()
 	var err error
 	for k, v := range values {
 		err = d.set(k, v)
@@ -251,6 +275,20 @@ func (d *Document) SetAll(values map[string]any) error {
 			return err
 		}
 	}
+	return nil
+}
+
+// Overwrite resets the document with the given values. Dot notation is supported.
+func (d *Document) Overwrite(values map[string]any) error {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	nd := NewDocument()
+	for k, v := range values {
+		if err := nd.Set(k, v); err != nil {
+			return err
+		}
+	}
+	d.result = nd.result
 	return nil
 }
 
@@ -291,6 +329,8 @@ func (d *Document) Del(field string) error {
 
 // Del deletes a field from the document
 func (d *Document) DelAll(fields ...string) error {
+	d.mu.Lock()
+	defer d.mu.Unlock()
 	for _, field := range fields {
 		result, err := sjson.Delete(d.result.Raw, field)
 		if err != nil {
@@ -304,7 +344,8 @@ func (d *Document) DelAll(fields ...string) error {
 // Where executes the where clauses against the document and returns true if it passes the clauses.
 // If the value of a where clause is prefixed with $. it will compare where.field to the same document's $.{field}.
 func (d *Document) Where(wheres []Where) (bool, error) {
-
+	d.mu.RLock()
+	defer d.mu.RUnlock()
 	for _, w := range wheres {
 		var (
 			isSelf    = strings.HasPrefix(cast.ToString(w.Value), selfRefPrefix)
@@ -313,9 +354,6 @@ func (d *Document) Where(wheres []Where) (bool, error) {
 
 		switch w.Op {
 		case WhereOpEq:
-			if w.Value == "null" && d.Get(selfField) != nil {
-
-			}
 			if isSelf {
 				if d.Get(w.Field) != d.Get(selfField) || w.Value == "null" && d.Get(selfField) != nil {
 					return false, nil
@@ -498,6 +536,8 @@ func (d *Document) Diff(before *Document) []JSONFieldOp {
 
 // FieldPaths returns the paths to fields & nested fields in dot notation format
 func (d *Document) FieldPaths() []string {
+	d.mu.RLock()
+	defer d.mu.RUnlock()
 	paths := &[]string{}
 	d.paths(d.result, paths)
 	return *paths

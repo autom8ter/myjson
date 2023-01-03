@@ -1,5 +1,7 @@
 type: object
+# x-collection specifies the name of the collection the object will be stored in
 x-collection: user
+# required specifies the required attributes
 required:
   - _id
   - name
@@ -11,6 +13,7 @@ properties:
   _id:
     type: string
     description: The user's id.
+    # x-primary indicates that the property is the primary key for the object - only one primary key may be specified
     x-primary: true
   name:
     type: string
@@ -23,10 +26,12 @@ properties:
     minimum: 0
   account_id:
     type: string
+    # x-foreign indicates that the property is a foreign key - foreign keys are automatically indexed
     x-foreign:
       collection: account
       field: _id
       cascade: true
+    # x-index specifies a secondary index which can have 1-many fields
     x-index:
       account_email_idx:
         additional_fields:
@@ -47,16 +52,22 @@ properties:
   annotations:
     type: object
 
+# triggers are javascript functions that execute based on certain events
 triggers:
+  # name of the trigger
   set_timestamp:
+    # order determines the order in which the functions are executed - lower ordered triggers are executed first
     order: 1
+    # events configures the trigger to execute on certain events
     events:
       - on_create
       - on_update
       - on_set
+    # script is the javascript to execute
     script: |
       doc.set('timestamp', new Date().toISOString())
 
+# common holds reusable objects that are referenced in the JSON schema
 common:
   contact:
     type: object

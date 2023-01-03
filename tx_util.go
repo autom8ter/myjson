@@ -166,15 +166,18 @@ func (t *transaction) persistCommand(ctx context.Context, command *Command) erro
 		if err != nil {
 			return errors.Wrap(err, errors.Internal, "failed to persist cdc")
 		}
-		if err := t.persistCommand(ctx, &Command{
-			Collection: "cdc",
-			Action:     Create,
-			Document:   cdcDoc,
-			Timestamp:  cdc.Timestamp,
-			Metadata:   cdc.Metadata,
-		}); err != nil {
-			return errors.Wrap(err, errors.Internal, "failed to persist cdc")
+		if t.db.persistCDC {
+			if err := t.persistCommand(ctx, &Command{
+				Collection: "cdc",
+				Action:     Create,
+				Document:   cdcDoc,
+				Timestamp:  cdc.Timestamp,
+				Metadata:   cdc.Metadata,
+			}); err != nil {
+				return errors.Wrap(err, errors.Internal, "failed to persist cdc")
+			}
 		}
+
 		t.cdc = append(t.cdc, cdc)
 	}
 	return nil

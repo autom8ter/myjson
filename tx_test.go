@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/autom8ter/gokvkit"
+	"github.com/autom8ter/gokvkit/kv"
 	"github.com/autom8ter/gokvkit/testutil"
 	"github.com/stretchr/testify/assert"
 )
@@ -12,7 +13,7 @@ import (
 func TestTx(t *testing.T) {
 	t.Run("set then get", func(t *testing.T) {
 		assert.Nil(t, testutil.TestDB(func(ctx context.Context, db gokvkit.Database) {
-			assert.Nil(t, db.Tx(ctx, gokvkit.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx gokvkit.Tx) error {
+			assert.Nil(t, db.Tx(ctx, kv.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx gokvkit.Tx) error {
 				doc := testutil.NewUserDoc()
 				err := tx.Set(ctx, "user", doc)
 				assert.NoError(t, err)
@@ -26,7 +27,7 @@ func TestTx(t *testing.T) {
 	})
 	t.Run("create then get", func(t *testing.T) {
 		assert.Nil(t, testutil.TestDB(func(ctx context.Context, db gokvkit.Database) {
-			assert.Nil(t, db.Tx(ctx, gokvkit.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx gokvkit.Tx) error {
+			assert.Nil(t, db.Tx(ctx, kv.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx gokvkit.Tx) error {
 				doc := testutil.NewUserDoc()
 				id, err := tx.Create(ctx, "user", doc)
 				assert.NoError(t, err)
@@ -40,7 +41,7 @@ func TestTx(t *testing.T) {
 	})
 	t.Run("create then update then get", func(t *testing.T) {
 		assert.Nil(t, testutil.TestDB(func(ctx context.Context, db gokvkit.Database) {
-			assert.Nil(t, db.Tx(ctx, gokvkit.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx gokvkit.Tx) error {
+			assert.Nil(t, db.Tx(ctx, kv.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx gokvkit.Tx) error {
 				doc := testutil.NewUserDoc()
 				id, err := tx.Create(ctx, "user", doc)
 				assert.NoError(t, err)
@@ -58,7 +59,7 @@ func TestTx(t *testing.T) {
 	})
 	t.Run("create then delete then get", func(t *testing.T) {
 		assert.Nil(t, testutil.TestDB(func(ctx context.Context, db gokvkit.Database) {
-			assert.Nil(t, db.Tx(ctx, gokvkit.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx gokvkit.Tx) error {
+			assert.Nil(t, db.Tx(ctx, kv.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx gokvkit.Tx) error {
 				doc := testutil.NewUserDoc()
 				id, err := tx.Create(ctx, "user", doc)
 				assert.NoError(t, err)
@@ -73,7 +74,7 @@ func TestTx(t *testing.T) {
 	})
 	t.Run("set 10 then forEach", func(t *testing.T) {
 		assert.Nil(t, testutil.TestDB(func(ctx context.Context, db gokvkit.Database) {
-			assert.Nil(t, db.Tx(ctx, gokvkit.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx gokvkit.Tx) error {
+			assert.Nil(t, db.Tx(ctx, kv.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx gokvkit.Tx) error {
 				var usrs = map[string]*gokvkit.Document{}
 				for i := 0; i < 10; i++ {
 					doc := testutil.NewUserDoc()
@@ -95,7 +96,7 @@ func TestTx(t *testing.T) {
 	})
 	t.Run("set 10 then check cdc", func(t *testing.T) {
 		assert.Nil(t, testutil.TestDB(func(ctx context.Context, db gokvkit.Database) {
-			assert.Nil(t, db.Tx(ctx, gokvkit.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx gokvkit.Tx) error {
+			assert.Nil(t, db.Tx(ctx, kv.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx gokvkit.Tx) error {
 				md := gokvkit.NewMetadata(map[string]any{
 					"testing": true,
 				})
@@ -120,7 +121,7 @@ func TestTx(t *testing.T) {
 	})
 	t.Run("DB() not nil", func(t *testing.T) {
 		assert.Nil(t, testutil.TestDB(func(ctx context.Context, db gokvkit.Database) {
-			assert.Nil(t, db.Tx(ctx, gokvkit.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx gokvkit.Tx) error {
+			assert.Nil(t, db.Tx(ctx, kv.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx gokvkit.Tx) error {
 				assert.NotNil(t, tx.DB())
 				return nil
 			}))

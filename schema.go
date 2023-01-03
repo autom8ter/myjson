@@ -34,6 +34,7 @@ const (
 	indexPath        schemaPath = "x-index"
 	primaryPath      schemaPath = "x-primary"
 	uniquePath       schemaPath = "x-unique"
+	refPrefix                   = "common."
 )
 
 func newCollectionSchema(yamlContent []byte) (CollectionSchema, error) {
@@ -97,8 +98,6 @@ func newCollectionSchema(yamlContent []byte) (CollectionSchema, error) {
 	})
 	return s, nil
 }
-
-var refPrefix = "common."
 
 func (c *collectionSchema) loadRef(fieldPath string, ref string) (gjson.Result, error) {
 	fieldPath = strings.ReplaceAll(fieldPath, "properties.", "")

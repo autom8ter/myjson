@@ -223,9 +223,6 @@ func selectDocument(d *Document, fields []Select) error {
 	if len(fields) == 0 || fields[0].Field == "*" {
 		return nil
 	}
-	var (
-		selected = NewDocument()
-	)
 	patch := map[string]interface{}{}
 	for _, f := range fields {
 		if f.As == "" {
@@ -239,11 +236,10 @@ func selectDocument(d *Document, fields []Select) error {
 			patch[f.As] = d.Get(f.Field)
 		}
 	}
-	err := selected.SetAll(patch)
+	err := d.Overwrite(patch)
 	if err != nil {
 		return err
 	}
-	*d = *selected
 	return nil
 }
 

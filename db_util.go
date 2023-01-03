@@ -68,7 +68,7 @@ func (d *defaultDB) addIndex(ctx context.Context, collection string, index Index
 	meta.Set(string(internalKey), true)
 	meta.Set(string(isIndexingKey), true)
 	if !index.Primary {
-		if err := d.Tx(ctx, TxOpts{IsReadOnly: false}, func(ctx context.Context, tx Tx) error {
+		if err := d.Tx(ctx, kv.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx Tx) error {
 			_, err := d.ForEach(meta.ToContext(ctx), collection, ForEachOpts{}, func(doc *Document) (bool, error) {
 				if err := tx.Set(meta.ToContext(ctx), collection, doc); err != nil {
 					return false, err
@@ -89,8 +89,11 @@ func (d *defaultDB) addIndex(ctx context.Context, collection string, index Index
 func (d *defaultDB) getSchema(ctx context.Context, collection string) (CollectionSchema, context.Context) {
 	schema := schemaFromCtx(ctx, collection)
 	if schema == nil {
-		c, _ := d.getPersistedCollection(ctx, collection)
-		return c, schemaToCtx(ctx, c)
+		c, _ := d.collections.Load(collection)
+		if c == nil {
+			return nil, ctx
+		}
+		return c.(CollectionSchema), schemaToCtx(ctx, c.(CollectionSchema))
 	}
 	return schema, ctx
 }
@@ -104,7 +107,7 @@ func (d *defaultDB) removeIndex(ctx context.Context, collection string, index In
 }
 
 func (d *defaultDB) persistCollectionConfig(ctx context.Context, val CollectionSchema) error {
-	if err := d.kv.Tx(false, func(tx kv.Tx) error {
+	if err := d.kv.Tx(kv.TxOpts{}, func(tx kv.Tx) error {
 		bits, err := val.MarshalJSON()
 		if err != nil {
 			return err
@@ -117,11 +120,12 @@ func (d *defaultDB) persistCollectionConfig(ctx context.Context, val CollectionS
 	}); err != nil {
 		return err
 	}
+	d.collections.Store(val.Collection(), val)
 	return nil
 }
 
 func (d *defaultDB) deleteCollectionConfig(ctx context.Context, collection string) error {
-	if err := d.kv.Tx(false, func(tx kv.Tx) error {
+	if err := d.kv.Tx(kv.TxOpts{}, func(tx kv.Tx) error {
 		err := tx.Delete(ctx, collectionConfigKey(ctx, collection))
 		if err != nil {
 			return err
@@ -130,12 +134,13 @@ func (d *defaultDB) deleteCollectionConfig(ctx context.Context, collection strin
 	}); err != nil {
 		return err
 	}
+	d.collections.Delete(collection)
 	return nil
 }
 
 func (d *defaultDB) getCollectionConfigs(ctx context.Context) ([]CollectionSchema, error) {
 	var existing []CollectionSchema
-	if err := d.kv.Tx(true, func(tx kv.Tx) error {
+	if err := d.kv.Tx(kv.TxOpts{IsReadOnly: true}, func(tx kv.Tx) error {
 		i, err := tx.NewIterator(kv.IterOpts{
 			Prefix: collectionConfigPrefix(ctx),
 		})
@@ -166,7 +171,7 @@ func (d *defaultDB) getCollectionConfigs(ctx context.Context) ([]CollectionSchem
 
 func (d *defaultDB) getPersistedCollection(ctx context.Context, collection string) (CollectionSchema, error) {
 	var cfg CollectionSchema
-	if err := d.kv.Tx(true, func(tx kv.Tx) error {
+	if err := d.kv.Tx(kv.TxOpts{IsReadOnly: true}, func(tx kv.Tx) error {
 		bits, err := tx.Get(ctx, collectionConfigKey(ctx, collection))
 		if err != nil {
 			return err

@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/autom8ter/gokvkit"
+	"github.com/autom8ter/gokvkit/kv"
 )
 
 func ExampleNew() {
@@ -36,7 +37,7 @@ properties:
 	if err := db.ConfigureCollection(ctx, []byte(accountSchema)); err != nil {
 		panic(err)
 	}
-	if err := db.Tx(ctx, gokvkit.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx gokvkit.Tx) error {
+	if err := db.Tx(ctx, kv.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx gokvkit.Tx) error {
 		// create a new account document
 		account, err := gokvkit.NewDocumentFrom(map[string]any{
 			"name": "acme.com",
