@@ -1,4 +1,5 @@
 # gokvkit [![GoDoc](https://godoc.org/github.com/autom8ter/gokvkit?status.svg)](https://godoc.org/github.com/autom8ter/gokvkit)
+![Coverage](https://img.shields.io/badge/Coverage-72.7%25-brightgreen)
 
 gokvkit is an embedded database built on top of pluggable key value storage
 
