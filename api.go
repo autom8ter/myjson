@@ -1,10 +1,10 @@
-package gokvkit
+package myjson
 
 import (
 	"context"
 	"encoding/json"
 
-	"github.com/autom8ter/gokvkit/kv"
+	"github.com/autom8ter/myjson/kv"
 )
 
 // CollectionSchema is a database collection configuration

@@ -7,8 +7,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/autom8ter/gokvkit/kv"
-	"github.com/autom8ter/gokvkit/kv/registry"
+	"github.com/autom8ter/myjson/kv"
+	"github.com/autom8ter/myjson/kv/registry"
 	"github.com/go-redis/redis/v9"
 	"github.com/segmentio/ksuid"
 	"github.com/spf13/cast"

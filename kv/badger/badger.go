@@ -5,9 +5,9 @@ import (
 	"context"
 	"time"
 
-	"github.com/autom8ter/gokvkit/kv"
-	"github.com/autom8ter/gokvkit/kv/registry"
 	"github.com/autom8ter/machine/v4"
+	"github.com/autom8ter/myjson/kv"
+	"github.com/autom8ter/myjson/kv/registry"
 	"github.com/dgraph-io/badger/v3"
 	"github.com/segmentio/ksuid"
 	"github.com/spf13/cast"

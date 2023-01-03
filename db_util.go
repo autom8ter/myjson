@@ -1,12 +1,12 @@
-package gokvkit
+package myjson
 
 import (
 	"context"
 	"fmt"
 	"time"
 
-	"github.com/autom8ter/gokvkit/errors"
-	"github.com/autom8ter/gokvkit/kv"
+	"github.com/autom8ter/myjson/errors"
+	"github.com/autom8ter/myjson/kv"
 )
 
 func (d *defaultDB) lockCollection(ctx context.Context, collection string) (func(), error) {
@@ -33,7 +33,7 @@ func (d *defaultDB) lockCollection(ctx context.Context, collection string) (func
 //	for {
 //		select {
 //		case <-ctx.Done():
-//			return nil, errors.New(errors.Forbidden, "failed to await lock release on collection: %s", collection)
+//			return nil, errors.Open(errors.Forbidden, "failed to await lock release on collection: %s", collection)
 //		case <-ticker.C:
 //			gotLock, err := lock.TryLock()
 //			if err != nil {

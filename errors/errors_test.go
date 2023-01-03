@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/autom8ter/gokvkit/errors"
+	"github.com/autom8ter/myjson/errors"
 	"github.com/stretchr/testify/assert"
 )
 

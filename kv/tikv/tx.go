@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/autom8ter/gokvkit/kv"
-	"github.com/autom8ter/gokvkit/kv/kvutil"
+	"github.com/autom8ter/myjson/kv"
+	"github.com/autom8ter/myjson/kv/kvutil"
 	tikvErr "github.com/tikv/client-go/v2/error"
 	"github.com/tikv/client-go/v2/txnkv/transaction"
 )
