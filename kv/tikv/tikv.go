@@ -29,7 +29,7 @@ func init() {
 
 type tikvKV struct {
 	db    *txnkv.Client
-	cache redis.Client
+	cache *redis.Client
 }
 
 func open(params map[string]interface{}) (kv.DB, error) {
@@ -42,7 +42,6 @@ func open(params map[string]interface{}) (kv.DB, error) {
 		return nil, err
 	}
 	cache := redis.NewClient(&redis.Options{
-		Network:  "",
 		Addr:     cast.ToString(params["redis_addr"]),
 		Username: cast.ToString(params["redis_user"]),
 		Password: cast.ToString(params["redis_password"]),
@@ -53,7 +52,8 @@ func open(params map[string]interface{}) (kv.DB, error) {
 		return nil, fmt.Errorf("failed to ping redis instance(%s): %s", cast.ToString(params["redis_addr"]), err.Err())
 	}
 	return &tikvKV{
-		db: client,
+		db:    client,
+		cache: cache,
 	}, nil
 }
 
@@ -109,7 +109,7 @@ func (b *tikvKV) NewLocker(key []byte, leaseInterval time.Duration) (kv.Locker, 
 }
 
 func (b *tikvKV) ChangeStream(ctx context.Context, prefix []byte, fn kv.ChangeStreamHandler) error {
-	ch := b.cache.PSubscribe(ctx, string(prefix)).Channel()
+	ch := b.cache.PSubscribe(ctx, "*").Channel()
 	for {
 		select {
 		case <-ctx.Done():

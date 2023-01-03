@@ -7,23 +7,29 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/autom8ter/gokvkit/kv"
+	"github.com/samber/lo"
 	"github.com/stretchr/testify/assert"
 )
 
 func Test(t *testing.T) {
 	ctx := context.Background()
-	db, err := open([]string{"http://pd0:2379"})
+	db, err := open(map[string]interface{}{
+		"pd_addr":    []string{"http://pd0:2379"},
+		"redis_addr": []string{"http://localhost:6379"},
+	})
 	assert.NoError(t, err)
 	data := map[string]string{}
 	for i := 0; i < 100; i++ {
 		data[fmt.Sprint(i)] = fmt.Sprint(i)
 	}
 	t.Run("set", func(t *testing.T) {
-		assert.Nil(t, db.Tx(false, func(tx kv.Tx) error {
+		assert.Nil(t, db.Tx(kv.TxOpts{}, func(tx kv.Tx) error {
 			for k, v := range data {
 				assert.Nil(t, tx.Set(ctx, []byte(k), []byte(v)))
 				g, err := tx.Get(ctx, []byte(k))
@@ -34,7 +40,7 @@ func Test(t *testing.T) {
 		}))
 	})
 	t.Run("get", func(t *testing.T) {
-		assert.Nil(t, db.Tx(true, func(tx kv.Tx) error {
+		assert.Nil(t, db.Tx(kv.TxOpts{IsReadOnly: true}, func(tx kv.Tx) error {
 			for k, v := range data {
 				d, err := tx.Get(ctx, []byte(k))
 				assert.NoError(t, err)
@@ -45,7 +51,7 @@ func Test(t *testing.T) {
 		}))
 	})
 	t.Run("iterate", func(t *testing.T) {
-		assert.Nil(t, db.Tx(true, func(tx kv.Tx) error {
+		assert.Nil(t, db.Tx(kv.TxOpts{IsReadOnly: true}, func(tx kv.Tx) error {
 			iter, err := tx.NewIterator(kv.IterOpts{
 				UpperBound: []byte("999"),
 			})
@@ -65,7 +71,7 @@ func Test(t *testing.T) {
 		}))
 	})
 	t.Run("iterate w/ prefix", func(t *testing.T) {
-		assert.Nil(t, db.Tx(true, func(tx kv.Tx) error {
+		assert.Nil(t, db.Tx(kv.TxOpts{IsReadOnly: true}, func(tx kv.Tx) error {
 			iter, err := tx.NewIterator(kv.IterOpts{
 				Prefix:     []byte("1"),
 				Seek:       nil,
@@ -87,7 +93,7 @@ func Test(t *testing.T) {
 		}))
 	})
 	t.Run("iterate w/ upper bound", func(t *testing.T) {
-		assert.Nil(t, db.Tx(true, func(tx kv.Tx) error {
+		assert.Nil(t, db.Tx(kv.TxOpts{IsReadOnly: true}, func(tx kv.Tx) error {
 			iter, err := tx.NewIterator(kv.IterOpts{
 				Prefix:     []byte("1"),
 				Seek:       nil,
@@ -108,7 +114,7 @@ func Test(t *testing.T) {
 		}))
 	})
 	t.Run("iterate in reverse", func(t *testing.T) {
-		assert.Nil(t, db.Tx(true, func(tx kv.Tx) error {
+		assert.Nil(t, db.Tx(kv.TxOpts{IsReadOnly: true}, func(tx kv.Tx) error {
 			iter, err := tx.NewIterator(kv.IterOpts{
 				Prefix: []byte("1"),
 				//Seek:       []byte("100"),
@@ -163,7 +169,7 @@ func Test(t *testing.T) {
 		assert.False(t, gotLock)
 	})
 	t.Run("set", func(t *testing.T) {
-		assert.Nil(t, db.Tx(false, func(tx kv.Tx) error {
+		assert.Nil(t, db.Tx(kv.TxOpts{}, func(tx kv.Tx) error {
 			for k, v := range data {
 				assert.Nil(t, tx.Set(ctx, []byte(k), []byte(v)))
 			}
@@ -175,7 +181,7 @@ func Test(t *testing.T) {
 		}))
 	})
 	t.Run("new tx", func(t *testing.T) {
-		tx, err := db.NewTx(false)
+		tx, err := db.NewTx(kv.TxOpts{})
 		assert.NoError(t, err)
 		defer func() {
 			assert.NoError(t, tx.Commit(ctx))
@@ -189,7 +195,7 @@ func Test(t *testing.T) {
 		}
 	})
 	t.Run("delete", func(t *testing.T) {
-		assert.Nil(t, db.Tx(false, func(tx kv.Tx) error {
+		assert.Nil(t, db.Tx(kv.TxOpts{}, func(tx kv.Tx) error {
 			for k, _ := range data {
 				assert.Nil(t, tx.Delete(ctx, []byte(k)))
 			}
@@ -202,7 +208,7 @@ func Test(t *testing.T) {
 	})
 	t.Run("new tx w/ rollback", func(t *testing.T) {
 		{
-			tx, err := db.NewTx(false)
+			tx, err := db.NewTx(kv.TxOpts{})
 			assert.NoError(t, err)
 			for k, v := range data {
 				assert.Nil(t, tx.Set(ctx, []byte(k), []byte(v)))
@@ -210,7 +216,7 @@ func Test(t *testing.T) {
 			tx.Rollback(ctx)
 			tx.Close(ctx)
 		}
-		tx, err := db.NewTx(false)
+		tx, err := db.NewTx(kv.TxOpts{})
 		assert.NoError(t, err)
 		for k, _ := range data {
 			val, _ := tx.Get(ctx, []byte(k))
@@ -228,7 +234,7 @@ func Test(t *testing.T) {
 	//	}
 	//	assert.NoError(t, db.DropPrefix(ctx, []byte("testing.")))
 	//	count := 0
-	//	assert.NoError(t, db.Tx(true, func(tx kv.Tx) error {
+	//	assert.NoError(t, db.Tx(kv.TxOpts{IsReadOnly: true}, func(tx kv.Tx) error {
 	//		iter, err := tx.NewIterator(kv.IterOpts{Prefix: []byte("testing.")})
 	//		assert.NoError(t, err)
 	//		defer iter.Close()
@@ -246,7 +252,10 @@ func Test(t *testing.T) {
 
 func TestChangeStream(t *testing.T) {
 	t.Run("change stream set", func(t *testing.T) {
-		db, err := open([]string{"http://pd0:2379"})
+		db, err := open(map[string]interface{}{
+			"pd_addr":    []string{"http://pd0:2379"},
+			"redis_addr": []string{"http://localhost:6379"},
+		})
 		assert.NoError(t, err)
 		data := map[string]string{}
 		for i := 0; i < 100; i++ {
@@ -264,7 +273,7 @@ func TestChangeStream(t *testing.T) {
 				return true, nil
 			}))
 		}()
-		assert.Nil(t, db.Tx(false, func(tx kv.Tx) error {
+		assert.Nil(t, db.Tx(kv.TxOpts{}, func(tx kv.Tx) error {
 			for k, v := range data {
 				assert.Nil(t, tx.Set(context.Background(), []byte(fmt.Sprintf("testing.%s", k)), []byte(v)))
 			}

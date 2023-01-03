@@ -57,7 +57,7 @@ type Database interface {
 	Tx(ctx context.Context, opts kv.TxOpts, fn TxFunc) error
 	// NewTx returns a new transaction. a transaction must call Commit method in order to persist changes
 	NewTx(opts kv.TxOpts) (Txn, error)
-	// ChangeStream streams changes to documents in the given collection.
+	// ChangeStream streams changes to documents in the given collection. CDC Persistence must be enabled to use this method.
 	ChangeStream(ctx context.Context, collection string, fn func(cdc CDC) (bool, error)) error
 	// Get gets a single document by id
 	Get(ctx context.Context, collection, id string) (*Document, error)

@@ -1,6 +1,12 @@
 version: '3.7'
 
 services:
+  redis:
+    container_name: redis
+    image: redis:5-alpine
+    ports:
+      - "6379:6379"
+    restart: always
   pd0:
     hostname: pd0
     container_name: pd0

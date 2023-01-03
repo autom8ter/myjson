@@ -85,6 +85,7 @@ func (t *tikvTx) Delete(ctx context.Context, key []byte) error {
 	if err := t.txn.Delete(key); err != nil {
 		return err
 	}
+	t.db.cache.Del(ctx, string(key))
 	t.entries = append(t.entries, kv.CDC{
 		Operation: kv.DELOP,
 		Key:       key,
