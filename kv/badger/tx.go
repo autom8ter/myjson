@@ -9,6 +9,7 @@ import (
 )
 
 type badgerTx struct {
+	batch   *badger.WriteBatch
 	txn     *badger.Txn
 	db      *badgerKV
 	machine machine.Machine
@@ -16,6 +17,9 @@ type badgerTx struct {
 }
 
 func (b *badgerTx) NewIterator(kopts kv.IterOpts) (kv.Iterator, error) {
+	if b.txn == nil {
+		b.txn = b.db.db.NewTransaction(false)
+	}
 	opts := badger.DefaultIteratorOptions
 	opts.PrefetchValues = true
 	opts.PrefetchSize = 10
@@ -33,6 +37,9 @@ func (b *badgerTx) NewIterator(kopts kv.IterOpts) (kv.Iterator, error) {
 }
 
 func (b *badgerTx) Get(ctx context.Context, key []byte) ([]byte, error) {
+	if b.txn == nil {
+		b.txn = b.db.db.NewTransaction(false)
+	}
 	i, err := b.txn.Get(key)
 	if err != nil {
 		if err == badger.ErrKeyNotFound {
@@ -49,8 +56,14 @@ func (b *badgerTx) Set(ctx context.Context, key, value []byte) error {
 		Key:   key,
 		Value: value,
 	}
-	if err := b.txn.SetEntry(e); err != nil {
-		return err
+	if b.batch != nil {
+		if err := b.batch.SetEntry(e); err != nil {
+			return err
+		}
+	} else if b.txn != nil {
+		if err := b.txn.SetEntry(e); err != nil {
+			return err
+		}
 	}
 	b.entries = append(b.entries, kv.CDC{
 		Operation: kv.SETOP,
@@ -65,17 +78,31 @@ func (b *badgerTx) Delete(ctx context.Context, key []byte) error {
 		Operation: kv.DELOP,
 		Key:       key,
 	})
+	if b.batch != nil {
+		return b.batch.Delete(key)
+	}
 	return b.txn.Delete(key)
 }
 
 func (b *badgerTx) Rollback(ctx context.Context) {
-	b.txn.Discard()
+	if b.batch != nil {
+		b.batch.Cancel()
+	}
+	if b.txn != nil {
+		b.txn.Discard()
+	}
 	b.entries = []kv.CDC{}
 }
 
 func (b *badgerTx) Commit(ctx context.Context) error {
-	if err := b.txn.Commit(); err != nil {
-		return err
+	if b.batch != nil {
+		if err := b.batch.Flush(); err != nil {
+			return err
+		}
+	} else if b.txn != nil {
+		if err := b.txn.Commit(); err != nil {
+			return err
+		}
 	}
 	for _, e := range b.entries {
 		b.machine.Publish(ctx, machine.Message{
@@ -87,5 +114,10 @@ func (b *badgerTx) Commit(ctx context.Context) error {
 }
 
 func (b *badgerTx) Close(ctx context.Context) {
-	b.txn.Discard()
+	if b.txn != nil {
+		b.txn.Discard()
+	}
+	if b.batch != nil {
+		b.batch.Cancel()
+	}
 }

@@ -42,6 +42,24 @@ func Test(t *testing.T) {
 			assert.Equal(t, id, u.GetString("_id"))
 		}))
 	})
+	t.Run("batch create", func(t *testing.T) {
+		assert.Nil(t, testutil.TestDB(func(ctx context.Context, db myjson.Database) {
+			var (
+				id  string
+				err error
+			)
+			assert.Nil(t, db.Tx(ctx, kv.TxOpts{IsReadOnly: false, IsBatch: true}, func(ctx context.Context, tx myjson.Tx) error {
+				id, err = tx.Create(ctx, "user", testutil.NewUserDoc())
+				assert.NoError(t, err)
+				return nil
+			}))
+			u, err := db.Get(ctx, "user", id)
+			assert.NoError(t, err)
+			fmt.Println(u.Get("timestamp"))
+			assert.NotNil(t, u)
+			assert.Equal(t, id, u.GetString("_id"))
+		}))
+	})
 	t.Run("create & stream", func(t *testing.T) {
 		assert.Nil(t, testutil.TestDB(func(ctx context.Context, db myjson.Database) {
 			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)

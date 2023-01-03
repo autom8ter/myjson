@@ -21,6 +21,14 @@ func Test(t *testing.T) {
 	for i := 0; i < 100; i++ {
 		data[fmt.Sprint(i)] = fmt.Sprint(i)
 	}
+	t.Run("batch set", func(t *testing.T) {
+		assert.Nil(t, db.Tx(kv.TxOpts{IsBatch: true}, func(tx kv.Tx) error {
+			for k, v := range data {
+				assert.Nil(t, tx.Set(context.Background(), []byte(k), []byte(v)))
+			}
+			return nil
+		}))
+	})
 	t.Run("set", func(t *testing.T) {
 		assert.Nil(t, db.Tx(kv.TxOpts{}, func(tx kv.Tx) error {
 			for k, v := range data {

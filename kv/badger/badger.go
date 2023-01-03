@@ -59,6 +59,9 @@ func (b *badgerKV) Tx(opts kv.TxOpts, fn func(kv.Tx) error) error {
 }
 
 func (b *badgerKV) NewTx(opts kv.TxOpts) (kv.Tx, error) {
+	if opts.IsBatch {
+		return &badgerTx{batch: b.db.NewWriteBatch(), db: b, machine: b.machine}, nil
+	}
 	return &badgerTx{txn: b.db.NewTransaction(!opts.IsReadOnly), db: b, machine: b.machine}, nil
 }
 
@@ -92,4 +95,16 @@ func (b *badgerKV) ChangeStream(ctx context.Context, prefix []byte, fn kv.Change
 		}
 		return true, nil
 	})
+}
+
+func (b *badgerKV) easyGet(ctx context.Context, key []byte) ([]byte, error) {
+	var (
+		val []byte
+		err error
+	)
+	err = b.Tx(kv.TxOpts{IsReadOnly: true}, func(tx kv.Tx) error {
+		val, err = tx.Get(ctx, key)
+		return err
+	})
+	return val, err
 }
