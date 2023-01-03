@@ -66,3 +66,24 @@ curl --location --request POST 'http://localhost:8080/collections/task/query' \
   "where": [{"field": "user", "op": "eq", "value": "$user"}]
 }'
 ```
+
+GET tasks joined to users:
+
+```
+curl --location --request POST 'http://localhost:8080/collections/task/query' \
+--header 'Content-Type: application/json' \
+--header 'Accept: application/json' \
+--data-raw '{
+  "select": [{"field": "user"}, {"field": "content"}, {"field": "usr.contact.email"}],
+  "join": [{
+      "collection": "user",
+      "on": [{
+        "field": "_id",
+        "op": "eq",
+        "value": "$user"
+      }],
+      "as": "usr"
+  }],
+  "limit": 10
+}'
+```

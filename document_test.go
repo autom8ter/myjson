@@ -134,6 +134,13 @@ func TestDocument(t *testing.T) {
 		assert.Equal(t, gokvkit.JSONOpRemove, diff[0].Op)
 		assert.Equal(t, before.Get("contact.email"), diff[0].BeforeValue)
 	})
+	t.Run("overwrite", func(t *testing.T) {
+		before := testutil.NewUserDoc()
+		after := before.Clone()
+		assert.Nil(t, after.Del("contact.email"))
+		assert.NoError(t, before.Overwrite(after.Value()))
+		assert.JSONEq(t, after.String(), before.String())
+	})
 
 	t.Run("where", func(t *testing.T) {
 		r, err = gokvkit.NewDocumentFrom(&usr)
@@ -378,9 +385,9 @@ func TestDocument(t *testing.T) {
 		d, _ := gokvkit.NewDocumentFrom(map[string]any{
 			"timestamp": date,
 		})
-		assert.Equal(t, "1993-08-01 00:00:00 -0600 MDT", d.GetString(`timestamp|@dateTrunc:month`))
-		assert.Equal(t, "1993-01-01 00:00:00 -0700 MST", d.GetString(`timestamp|@dateTrunc:year`))
-		assert.Equal(t, "1993-08-17 00:00:00 -0600 MDT", d.GetString(`timestamp|@dateTrunc:day`))
+		assert.Equal(t, "1993-08-01 00:00:00 +0000 UTC", d.GetString(`timestamp|@dateTrunc:month`))
+		assert.Equal(t, "1993-01-01 00:00:00 +0000 UTC", d.GetString(`timestamp|@dateTrunc:year`))
+		assert.Equal(t, "1993-08-17 00:00:00 +0000 UTC", d.GetString(`timestamp|@dateTrunc:day`))
 	})
 	t.Run("@unix", func(t *testing.T) {
 		date := time.Date(1993, time.August, 17, 0, 0, 0, 0, time.Local)

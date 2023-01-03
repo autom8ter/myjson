@@ -28,7 +28,7 @@ type lockMeta struct {
 
 func (b *badgerLock) IsLocked(ctx context.Context) (bool, error) {
 	isLocked := true
-	err := b.db.Tx(true, func(tx kv.Tx) error {
+	err := b.db.Tx(kv.TxOpts{IsReadOnly: true}, func(tx kv.Tx) error {
 		val, err := tx.Get(ctx, b.key)
 		if err != nil {
 			if err != badger.ErrKeyNotFound {
@@ -51,7 +51,7 @@ func (b *badgerLock) IsLocked(ctx context.Context) (bool, error) {
 func (b *badgerLock) TryLock(ctx context.Context) (bool, error) {
 	b.start = time.Now()
 	gotLock := false
-	err := b.db.Tx(false, func(tx kv.Tx) error {
+	err := b.db.Tx(kv.TxOpts{}, func(tx kv.Tx) error {
 		val, err := tx.Get(ctx, b.key)
 		if err != nil {
 			if err != badger.ErrKeyNotFound {
@@ -128,7 +128,7 @@ func (b *badgerLock) keepalive(ctx context.Context) error {
 		select {
 		case <-ticker.C:
 			// update lease
-			err := b.db.Tx(false, func(tx kv.Tx) error {
+			err := b.db.Tx(kv.TxOpts{}, func(tx kv.Tx) error {
 				val, err := b.getLock(ctx, tx)
 				if err != nil {
 					return err
@@ -142,7 +142,7 @@ func (b *badgerLock) keepalive(ctx context.Context) error {
 				return err
 			}
 		case <-b.unlock:
-			err := b.db.Tx(false, func(tx kv.Tx) error {
+			err := b.db.Tx(kv.TxOpts{}, func(tx kv.Tx) error {
 				val, err := b.getLock(ctx, tx)
 				if err != nil {
 					return err

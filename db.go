@@ -3,6 +3,7 @@ package gokvkit
 import (
 	"context"
 	_ "embed"
+	"encoding/json"
 	"sync"
 	"time"
 
@@ -11,15 +12,18 @@ import (
 	"github.com/autom8ter/gokvkit/kv/registry"
 	"github.com/autom8ter/gokvkit/util"
 	"github.com/autom8ter/machine/v4"
+	"github.com/dop251/goja"
 )
 
 // defaultDB is an embedded, durable NoSQL database with support for schemas, indexing, and aggregation
 type defaultDB struct {
-	kv        kv.DB
-	machine   machine.Machine
-	optimizer Optimizer
-	cdcStream Stream[CDC]
-	programs  sync.Map
+	persistCDC  bool
+	kv          kv.DB
+	machine     machine.Machine
+	optimizer   Optimizer
+	jsOverrides map[string]any
+	vmPool      chan *goja.Runtime
+	collections sync.Map
 }
 
 // New creates a new database instance from the given config
@@ -29,10 +33,11 @@ func New(ctx context.Context, provider string, providerParams map[string]any, op
 		return nil, errors.Wrap(err, errors.Internal, "failed to open kv database")
 	}
 	d := &defaultDB{
-		kv:        db,
-		machine:   machine.New(),
-		optimizer: defaultOptimizer{},
-		cdcStream: newStream[CDC](machine.New()),
+		kv:         db,
+		machine:    machine.New(),
+		optimizer:  defaultOptimizer{},
+		vmPool:     make(chan *goja.Runtime, 20),
+		persistCDC: false,
 	}
 
 	for _, o := range opts {
@@ -48,15 +53,45 @@ func New(ctx context.Context, provider string, providerParams map[string]any, op
 			return nil, errors.Wrap(err, errors.Internal, "failed to configure migration collection")
 		}
 	}
+	for _, c := range d.Collections(ctx) {
+		coll, err := d.getPersistedCollection(ctx, c)
+		if err != nil {
+			return nil, err
+		}
+		if coll != nil {
+			d.collections.Store(c, coll)
+		}
+	}
+	go func() {
+		ctx, cancel := context.WithCancel(ctx)
+		defer cancel()
+		ticker := time.NewTicker(5 * time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				for _, c := range d.Collections(ctx) {
+					coll, _ := d.getPersistedCollection(ctx, c)
+					if coll != nil {
+						d.collections.Store(c, coll)
+					}
+				}
+			default:
+				vm, _ := getJavascriptVM(ctx, d, d.jsOverrides)
+				if vm != nil {
+					d.vmPool <- vm
+				}
+			}
+		}
+	}()
 	return d, err
 }
 
-func (d *defaultDB) NewTx(opts TxOpts) (Txn, error) {
-	vm, _ := getJavascriptVM(context.Background(), d)
-	if err := vm.Set("tx_opts", opts); err != nil {
-		return nil, err
-	}
-	tx, err := d.kv.NewTx(opts.IsReadOnly)
+func (d *defaultDB) NewTx(opts kv.TxOpts) (Txn, error) {
+	vm := <-d.vmPool
+	tx, err := d.kv.NewTx(opts)
 	if err != nil {
 		return nil, err
 	}
@@ -68,7 +103,7 @@ func (d *defaultDB) NewTx(opts TxOpts) (Txn, error) {
 	}, nil
 }
 
-func (d *defaultDB) Tx(ctx context.Context, opts TxOpts, fn TxFunc) error {
+func (d *defaultDB) Tx(ctx context.Context, opts kv.TxOpts, fn TxFunc) error {
 	tx, err := d.NewTx(opts)
 	if err != nil {
 		return err
@@ -91,8 +126,8 @@ func (d *defaultDB) Get(ctx context.Context, collection, id string) (*Document, 
 		err      error
 	)
 
-	// Tx(ctx, TxOpts{IsReadOnly: true},
-	if err := d.Tx(ctx, TxOpts{IsReadOnly: true}, func(ctx context.Context, tx Tx) error {
+	// Tx(ctx, kv.TxOpts{IsReadOnly: true},
+	if err := d.Tx(ctx, kv.TxOpts{IsReadOnly: true}, func(ctx context.Context, tx Tx) error {
 		document, err = tx.Get(ctx, collection, id)
 		return err
 	}); err != nil {
@@ -103,7 +138,7 @@ func (d *defaultDB) Get(ctx context.Context, collection, id string) (*Document, 
 
 func (d *defaultDB) BatchGet(ctx context.Context, collection string, ids []string) (Documents, error) {
 	var documents []*Document
-	if err := d.Tx(ctx, TxOpts{IsReadOnly: true}, func(ctx context.Context, tx Tx) error {
+	if err := d.Tx(ctx, kv.TxOpts{IsReadOnly: true}, func(ctx context.Context, tx Tx) error {
 		for _, id := range ids {
 			document, err := tx.Get(ctx, collection, id)
 			if err != nil {
@@ -126,7 +161,7 @@ func (d *defaultDB) Query(ctx context.Context, collection string, query Query) (
 	if len(query.Select) == 0 {
 		query.Select = []Select{{Field: "*"}}
 	}
-	if err := d.Tx(ctx, TxOpts{IsReadOnly: true}, func(ctx context.Context, tx Tx) error {
+	if err := d.Tx(ctx, kv.TxOpts{IsReadOnly: true}, func(ctx context.Context, tx Tx) error {
 		page, err = tx.Query(ctx, collection, query)
 		return err
 	}); err != nil {
@@ -140,7 +175,7 @@ func (d *defaultDB) ForEach(ctx context.Context, collection string, opts ForEach
 		result Optimization
 		err    error
 	)
-	if err := d.Tx(ctx, TxOpts{IsReadOnly: true}, func(ctx context.Context, tx Tx) error {
+	if err := d.Tx(ctx, kv.TxOpts{IsReadOnly: true}, func(ctx context.Context, tx Tx) error {
 		result, err = tx.ForEach(ctx, collection, opts, fn)
 		return err
 	}); err != nil {
@@ -239,10 +274,21 @@ func (d *defaultDB) GetSchema(ctx context.Context, collection string) Collection
 }
 
 func (d *defaultDB) ChangeStream(ctx context.Context, collection string, fn func(cdc CDC) (bool, error)) error {
+	if !d.persistCDC {
+		return errors.New(errors.Forbidden, "cdc persistance is disabled")
+	}
 	if collection != "*" && !d.HasCollection(ctx, collection) {
 		return errors.New(errors.Validation, "collection does not exist: %s", collection)
 	}
-	return d.cdcStream.Pull(ctx, collection, fn)
+	pfx := indexPrefix(ctx, "cdc", "_id.primaryidx")
+	return d.kv.ChangeStream(ctx, pfx, func(cdc kv.CDC) (bool, error) {
+		var c CDC
+		json.Unmarshal(cdc.Value, &c)
+		if c.Collection == collection || collection == "*" {
+			return fn(c)
+		}
+		return true, nil
+	})
 }
 
 func (d *defaultDB) RawKV() kv.DB {
@@ -250,7 +296,7 @@ func (d *defaultDB) RawKV() kv.DB {
 }
 
 func (d *defaultDB) RunScript(ctx context.Context, function string, script string, params map[string]any) (any, error) {
-	vm, err := getJavascriptVM(ctx, d)
+	vm, err := getJavascriptVM(ctx, d, d.jsOverrides)
 	if err != nil {
 		return false, err
 	}
@@ -286,7 +332,7 @@ func (d *defaultDB) RunMigrations(ctx context.Context, migrations ...Migration) 
 		if err != nil {
 			return err
 		}
-		if err := d.Tx(ctx, TxOpts{IsReadOnly: false}, func(ctx context.Context, tx Tx) error {
+		if err := d.Tx(ctx, kv.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx Tx) error {
 			if err := tx.Set(ctx, migrationCollectionName, doc); err != nil {
 				return err
 			}
@@ -308,7 +354,7 @@ func (d *defaultDB) runMigration(ctx context.Context, m Migration) (bool, error)
 	if err := util.ValidateStruct(m); err != nil {
 		return false, errors.Wrap(err, 0, "migration is not valid")
 	}
-	vm, err := getJavascriptVM(ctx, d)
+	vm, err := getJavascriptVM(ctx, d, d.jsOverrides)
 	if err != nil {
 		return false, err
 	}

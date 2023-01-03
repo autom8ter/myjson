@@ -31,9 +31,6 @@ func (t *transaction) Commit(ctx context.Context) error {
 	if err := t.tx.Commit(ctx); err != nil {
 		return err
 	}
-	for _, cdc := range t.cdc {
-		t.db.cdcStream.Broadcast(ctx, cdc.Collection, cdc)
-	}
 	t.cdc = []CDC{}
 	return nil
 }

@@ -243,3 +243,34 @@ func Test(t *testing.T) {
 	//	assert.Equal(t, 0, count)
 	//})
 }
+
+func TestChangeStream(t *testing.T) {
+	t.Run("change stream set", func(t *testing.T) {
+		db, err := open([]string{"http://pd0:2379"})
+		assert.NoError(t, err)
+		data := map[string]string{}
+		for i := 0; i < 100; i++ {
+			data[fmt.Sprint(i)] = fmt.Sprint(i)
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+		defer cancel()
+		wg := sync.WaitGroup{}
+		wg.Add(1)
+		count := lo.ToPtr(int64(0))
+		go func() {
+			defer wg.Done()
+			assert.NoError(t, db.ChangeStream(ctx, []byte("testing."), func(cdc kv.CDC) (bool, error) {
+				atomic.AddInt64(count, 1)
+				return true, nil
+			}))
+		}()
+		assert.Nil(t, db.Tx(false, func(tx kv.Tx) error {
+			for k, v := range data {
+				assert.Nil(t, tx.Set(context.Background(), []byte(fmt.Sprintf("testing.%s", k)), []byte(v)))
+			}
+			return nil
+		}))
+		wg.Wait()
+		assert.Equal(t, int64(len(data)), *count)
+	})
+}

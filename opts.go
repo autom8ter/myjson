@@ -10,9 +10,16 @@ func WithOptimizer(o Optimizer) DBOpt {
 	}
 }
 
-// WithChangeStream overrides the default change stream provider so a distributed provider can be configured ex: nats, rabbitmq, kafka
-func WithChangeStream(c Stream[CDC]) DBOpt {
+// WithJavascriptOverrides adds global variables or methods to the embedded javascript vm(s)
+func WithJavascriptOverrides(overrides map[string]any) DBOpt {
 	return func(d *defaultDB) {
-		d.cdcStream = c
+		d.jsOverrides = overrides
+	}
+}
+
+// WithPersistCDC configures the database to persist all change-data-capture entries so that features like time-travel are possible
+func WithPersistCDC(persist bool) DBOpt {
+	return func(d *defaultDB) {
+		d.persistCDC = persist
 	}
 }

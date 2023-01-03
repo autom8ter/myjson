@@ -3,7 +3,7 @@ name: Generate code coverage badge
 on:
   pull_request:
     branches:
-      - main
+      - master
       - dev
 
 jobs:
@@ -20,7 +20,7 @@ jobs:
       - name: Setup go
         uses: actions/setup-go@v2
         with:
-          go-version: '1.14.4'
+          go-version: '1.18.1'
 
       - uses: actions/cache@v2
         with:
