@@ -100,8 +100,7 @@ func newCollectionSchema(yamlContent []byte) (CollectionSchema, error) {
 	return s, nil
 }
 
-func (c *collectionSchema) loadRef(fieldPath string, ref string) (gjson.Result, error) {
-	fieldPath = strings.ReplaceAll(fieldPath, "properties.", "")
+func (c *collectionSchema) loadRef(ref string) (gjson.Result, error) {
 	path := strings.TrimPrefix(ref, "#/")
 	path = strings.ReplaceAll(path, "/", ".")
 	if !strings.HasPrefix(path, refPrefix) {
@@ -118,15 +117,13 @@ func (s *collectionSchema) loadProperties(properties map[string]SchemaProperty, 
 	for key, value := range r.Map() {
 		path := strings.ReplaceAll(value.Path(s.raw.Raw), "properties.", "")
 		if value.Get("$ref").Exists() {
-			value, err = s.loadRef(value.Path(s.raw.Raw), value.Get("$ref").String())
+			value, err = s.loadRef(value.Get("$ref").String())
 			if err != nil {
 				return err
 			}
 
 		}
-		if strings.HasPrefix(path, refPrefix) {
-			path = strings.TrimPrefix(path, refPrefix)
-		}
+		path = strings.TrimPrefix(path, refPrefix)
 		schema := SchemaProperty{
 			Primary:     value.Get(string(primaryPath)).Bool(),
 			Name:        key,

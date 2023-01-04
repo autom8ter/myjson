@@ -93,9 +93,9 @@ func (t *tikvTx) Delete(ctx context.Context, key []byte) error {
 	return nil
 }
 
-func (t *tikvTx) Rollback(ctx context.Context) {
-	t.txn.Rollback()
+func (t *tikvTx) Rollback(ctx context.Context) error {
 	t.entries = []kv.CDC{}
+	return t.txn.Rollback()
 }
 
 func (t *tikvTx) Commit(ctx context.Context) error {
@@ -121,5 +121,4 @@ func (t *tikvTx) Commit(ctx context.Context) error {
 
 func (t *tikvTx) Close(ctx context.Context) {
 	t.entries = []kv.CDC{}
-	return
 }

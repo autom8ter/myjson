@@ -49,6 +49,7 @@ func (b *badgerKV) Tx(opts kv.TxOpts, fn func(kv.Tx) error) error {
 	}
 	err = fn(tx)
 	if err != nil {
+		//nolint:errcheck
 		tx.Rollback(context.Background())
 		return err
 	}
@@ -97,14 +98,15 @@ func (b *badgerKV) ChangeStream(ctx context.Context, prefix []byte, fn kv.Change
 	})
 }
 
-func (b *badgerKV) easyGet(ctx context.Context, key []byte) ([]byte, error) {
-	var (
-		val []byte
-		err error
-	)
-	err = b.Tx(kv.TxOpts{IsReadOnly: true}, func(tx kv.Tx) error {
-		val, err = tx.Get(ctx, key)
-		return err
-	})
-	return val, err
-}
+//
+//func (b *badgerKV) easyGet(ctx context.Context, key []byte) ([]byte, error) {
+//	var (
+//		val []byte
+//		err error
+//	)
+//	err = b.Tx(kv.TxOpts{IsReadOnly: true}, func(tx kv.Tx) error {
+//		val, err = tx.Get(ctx, key)
+//		return err
+//	})
+//	return val, err
+//}

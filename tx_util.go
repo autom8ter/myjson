@@ -289,7 +289,9 @@ func (t *transaction) updateSecondaryIndex(ctx context.Context, schema Collectio
 				if string(id) != docID {
 					return errors.New(errors.Validation, "duplicate value( %s ) found for unique index: %s", docID, idx.Name)
 				}
-				it.Next()
+				if err := it.Next(); err != nil {
+					return err
+				}
 			}
 		}
 		// only persist ids in secondary index - lookup full document in primary index
@@ -425,7 +427,9 @@ func (t *transaction) queryScan(ctx context.Context, collection string, where []
 				}
 			}
 		}
-		it.Next()
+		if err := it.Next(); err != nil {
+			return Optimization{}, err
+		}
 	}
 	return optimization, nil
 }

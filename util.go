@@ -10,11 +10,11 @@ import (
 
 	"github.com/autom8ter/myjson/errors"
 	"github.com/autom8ter/myjson/util"
-	"github.com/dop251/goja"
-
 	"github.com/samber/lo"
 	"github.com/spf13/cast"
 )
+
+type stringKey string
 
 type indexDiff struct {
 	toRemove []Index
@@ -255,27 +255,15 @@ func schemaToCtx(ctx context.Context, schema CollectionSchema) context.Context {
 	if schema == nil {
 		return ctx
 	}
-	return context.WithValue(ctx, fmt.Sprintf("%s.schema", schema.Collection()), schema)
+	return context.WithValue(ctx, stringKey(fmt.Sprintf("%s.schema", schema.Collection())), schema)
 }
 
 func schemaFromCtx(ctx context.Context, collection string) CollectionSchema {
-	c, ok := ctx.Value(fmt.Sprintf("%s.schema", collection)).(CollectionSchema)
+	c, ok := ctx.Value(stringKey(fmt.Sprintf("%s.schema", collection))).(CollectionSchema)
 	if !ok {
 		return nil
 	}
 	return c
-}
-
-func gojaToCtx(ctx context.Context, goja *goja.Runtime) context.Context {
-	return context.WithValue(ctx, "goja", goja)
-}
-
-func gojaFromCtx(ctx context.Context) *goja.Runtime {
-	g, ok := ctx.Value("goja").(*goja.Runtime)
-	if !ok {
-		return nil
-	}
-	return g
 }
 
 func isAggregateQuery(q Query) bool {

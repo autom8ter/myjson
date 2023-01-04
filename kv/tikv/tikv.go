@@ -64,7 +64,9 @@ func (b *tikvKV) Tx(opts kv.TxOpts, fn func(kv.Tx) error) error {
 	}
 	err = fn(tx)
 	if err != nil {
-		tx.Rollback(context.Background())
+		if rollbackErr := tx.Rollback(context.Background()); rollbackErr != nil {
+			return fmt.Errorf("%s - failed to rollback transaction: %s", err.Error(), rollbackErr.Error())
+		}
 		return err
 	}
 	if err := tx.Commit(context.Background()); err != nil {
@@ -116,6 +118,7 @@ func (b *tikvKV) ChangeStream(ctx context.Context, prefix []byte, fn kv.ChangeSt
 			return nil
 		case msg := <-ch:
 			var cdc kv.CDC
+			//nolint:errcheck
 			json.Unmarshal([]byte(msg.Payload), &cdc)
 			if bytes.HasPrefix(cdc.Key, prefix) {
 				contn, err := fn(cdc)
