@@ -35,9 +35,12 @@ func (t *transaction) Commit(ctx context.Context) error {
 	return nil
 }
 
-func (t *transaction) Rollback(ctx context.Context) {
-	t.tx.Rollback(ctx)
+func (t *transaction) Rollback(ctx context.Context) error {
+	if err := t.tx.Rollback(ctx); err != nil {
+		return err
+	}
 	t.cdc = []CDC{}
+	return nil
 }
 
 func (t *transaction) Update(ctx context.Context, collection string, id string, update map[string]any) error {

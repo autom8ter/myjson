@@ -29,11 +29,9 @@ func getJavascriptVM(ctx context.Context, db Database, overrides map[string]any)
 	if err := vm.Set("ksuid", newID); err != nil {
 		return nil, err
 	}
-	if overrides != nil {
-		for k, v := range overrides {
-			if err := vm.Set(k, v); err != nil {
-				return nil, err
-			}
+	for k, v := range overrides {
+		if err := vm.Set(k, v); err != nil {
+			return nil, err
 		}
 	}
 	return vm, nil

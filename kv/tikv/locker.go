@@ -38,6 +38,7 @@ func (b *tikvLock) IsLocked(ctx context.Context) (bool, error) {
 			return nil
 		}
 		var current lockMeta
+		//nolint:errcheck
 		json.Unmarshal(val, &current)
 		if time.Since(current.LastUpdate) > 4*b.leaseInterval && current.ID != b.id {
 			isLocked = false
@@ -64,6 +65,7 @@ func (b *tikvLock) TryLock(ctx context.Context) (bool, error) {
 			return nil
 		}
 		var current lockMeta
+		//nolint:errcheck
 		json.Unmarshal(val, &current)
 		if time.Since(current.LastUpdate) > 4*b.leaseInterval && current.ID != b.id {
 			if err := b.setLock(ctx, tx); err != nil {
@@ -75,6 +77,7 @@ func (b *tikvLock) TryLock(ctx context.Context) (bool, error) {
 		return nil
 	})
 	if err == nil && gotLock {
+		//nolint:errcheck
 		go b.keepalive(ctx)
 	}
 	return gotLock, err

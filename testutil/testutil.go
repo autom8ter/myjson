@@ -3,7 +3,6 @@ package testutil
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"time"
 
@@ -62,8 +61,8 @@ func NewTaskDoc(usrID string) *myjson.Document {
 }
 
 func TestDB(fn func(ctx context.Context, db myjson.Database), opts ...myjson.DBOpt) error {
-	os.MkdirAll("tmp", 0700)
-	dir, err := ioutil.TempDir("./tmp", "")
+	_ = os.MkdirAll("tmp", 0700)
+	dir, err := os.MkdirTemp("./tmp", "")
 	if err != nil {
 		return err
 	}
