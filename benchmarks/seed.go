@@ -8,6 +8,7 @@ import (
 	"github.com/autom8ter/myjson/testutil"
 )
 
+//nolint:deadcode,unused
 func seedDatabase(ctx context.Context, db myjson.Database) error {
 	results, err := db.Query(ctx, "account", myjson.Q().Query())
 	if err != nil {
@@ -17,7 +18,9 @@ func seedDatabase(ctx context.Context, db myjson.Database) error {
 		for _, a := range results.Documents {
 			for i := 0; i < 10; i++ {
 				u := testutil.NewUserDoc()
-				u.Set("account_id", a.Get("_id"))
+				if err := u.Set("account_id", a.Get("_id")); err != nil {
+					return err
+				}
 				usrID, err := tx.Create(ctx, "user", u)
 				if err != nil {
 					return err

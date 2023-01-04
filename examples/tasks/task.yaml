@@ -21,7 +21,7 @@ properties:
     description: The content of the task
   timestamp:
     type: string
-triggers:
+x-triggers:
   set_timestamp:
     order: 1
     events:

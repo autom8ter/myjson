@@ -160,7 +160,9 @@ func (d *defaultDB) getCollectionConfigs(ctx context.Context) ([]CollectionSchem
 				}
 				existing = append(existing, cfg)
 			}
-			i.Next()
+			if err := i.Next(); err != nil {
+				return err
+			}
 		}
 		return nil
 	}); err != nil {

@@ -110,11 +110,15 @@ func (d *defaultDB) Tx(ctx context.Context, opts kv.TxOpts, fn TxFunc) error {
 	}
 	defer tx.Close(ctx)
 	if err := fn(ctx, tx); err != nil {
-		tx.Rollback(ctx)
+		if rollbackError := tx.Rollback(ctx); rollbackError != nil {
+			return errors.Wrap(err, 0, "failed to rollback transaction: "+rollbackError.Error())
+		}
 		return errors.Wrap(err, 0, "tx: rolled back transaction")
 	}
 	if err := tx.Commit(ctx); err != nil {
-		tx.Rollback(ctx)
+		if rollbackError := tx.Rollback(ctx); rollbackError != nil {
+			return errors.Wrap(err, 0, "failed to rollback transaction: "+rollbackError.Error())
+		}
 		return errors.Wrap(err, 0, "tx: failed to commit transaction - rolled back")
 	}
 	return nil
@@ -283,6 +287,7 @@ func (d *defaultDB) ChangeStream(ctx context.Context, collection string, fn func
 	pfx := indexPrefix(ctx, "cdc", "_id.primaryidx")
 	return d.kv.ChangeStream(ctx, pfx, func(cdc kv.CDC) (bool, error) {
 		var c CDC
+		//nolint:errcheck
 		json.Unmarshal(cdc.Value, &c)
 		if c.Collection == collection || collection == "*" {
 			return fn(c)

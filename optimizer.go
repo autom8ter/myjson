@@ -94,14 +94,12 @@ func getMatchedFieldValues(fields []string, where []Where) map[string]any {
 	if len(fields) == 0 {
 		return map[string]any{}
 	}
-	var whereFields []string
 	var whereValues = map[string]any{}
 	for _, f := range fields {
 		for _, w := range where {
 			if w.Field != f {
 				continue
 			}
-			whereFields = append(whereFields, w.Field)
 			whereValues[w.Field] = w.Value
 		}
 	}

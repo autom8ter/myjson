@@ -47,7 +47,7 @@ properties:
   annotations:
     type: object
 
-triggers:
+x-triggers:
   set_timestamp:
     order: 1
     events:

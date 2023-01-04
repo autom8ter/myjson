@@ -5,9 +5,47 @@ run:
   # Timeout for analysis, e.g. 30s, 5m.
   # Default: 1m
   timeout: 5m
+  # exit code when at least one issue was found, default is 1
+  issues-exit-code: 1
   # Include test files or not.
   # Default: true
   tests: false
-  modules-download-mode: readonly
   allow-parallel-runners: false
   go: '1.18'
+linters:
+  disable-all: true
+  enable:
+    - bodyclose
+    - deadcode
+    - depguard
+    #    - dupl
+    - errcheck
+    - exportloopref
+    #    - exhaustive
+    #    - funlen
+    #    - goconst
+    #    - gocritic
+    #    - gocyclo
+    - gofmt
+    - goimports
+    #    - gomnd
+    #    - goprintffuncname
+    #    - gosec
+    - gosimple
+    - govet
+    - ineffassign
+    #    - lll
+    #    - misspell
+    - nakedret
+    #    - noctx
+    - nolintlint
+#    - rowserrcheck
+    - staticcheck
+    #    - structcheck
+    #    - stylecheck
+    - typecheck
+    - unconvert
+    #    - unparam
+    - unused
+    - varcheck
+#    - whitespace

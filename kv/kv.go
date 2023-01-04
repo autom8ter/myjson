@@ -49,7 +49,7 @@ type Tx interface {
 	// Commit commits the transaction
 	Commit(ctx context.Context) error
 	// Rollback rolls back any changes made by the transaction
-	Rollback(ctx context.Context)
+	Rollback(ctx context.Context) error
 	// Close closes the transaction
 	Close(ctx context.Context)
 }

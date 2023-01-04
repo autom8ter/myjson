@@ -84,7 +84,7 @@ func (b *badgerTx) Delete(ctx context.Context, key []byte) error {
 	return b.txn.Delete(key)
 }
 
-func (b *badgerTx) Rollback(ctx context.Context) {
+func (b *badgerTx) Rollback(ctx context.Context) error {
 	if b.batch != nil {
 		b.batch.Cancel()
 	}
@@ -92,6 +92,7 @@ func (b *badgerTx) Rollback(ctx context.Context) {
 		b.txn.Discard()
 	}
 	b.entries = []kv.CDC{}
+	return nil
 }
 
 func (b *badgerTx) Commit(ctx context.Context) error {

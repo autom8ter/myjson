@@ -103,7 +103,7 @@ type Txn interface {
 	// Commit commits the transaction to the database
 	Commit(ctx context.Context) error
 	// Rollback rollsback all changes made to the datbase
-	Rollback(ctx context.Context)
+	Rollback(ctx context.Context) error
 	// Close closes the transaction - it should be deferred after
 	Close(ctx context.Context)
 	Tx
