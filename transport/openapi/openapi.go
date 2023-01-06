@@ -76,58 +76,47 @@ func getSpec(ctx context.Context, db myjson.Database, cfg Config) ([]byte, error
 
 // Serve starts an openapi http server serving the database
 func (o *openAPIServer) Serve(ctx context.Context, db myjson.Database) error {
-	o.router.Path("/openapi.yaml").
+	r := o.router.Path("/api").Subrouter()
+	r.Use(o.mwares...)
+	r.Path("/openapi.yaml").
 		Methods(http.MethodGet).
 		HandlerFunc(handlers.SpecHandler(func(ctx context.Context) ([]byte, error) {
 			return getSpec(ctx, db, o.params)
 		}))
-	o.router.HandleFunc("/tx", handlers.TxHandler(db, websocket.Upgrader{
+	r.HandleFunc("/tx", handlers.TxHandler(db, websocket.Upgrader{
 		ReadBufferSize:  1024,
 		WriteBufferSize: 1024,
 	}))
-	{
-		r := o.router.Path("/api").Subrouter()
-		r.Use(o.mwares...)
-		r.Path("/schema").
-			Methods(http.MethodGet).
-			HandlerFunc(handlers.GetSchemasHandler(db))
-		r.Path("/schema/{collection}").
-			Methods(http.MethodGet).
-			HandlerFunc(handlers.GetSchemaHandler(db))
-
-		r.Path("/schema/{collection}").
-			Methods(http.MethodPut).
-			HandlerFunc(handlers.PutSchemaHandler(db))
-
-		r.Path("/collections/{collection}/docs").
-			Methods(http.MethodPost).
-			HandlerFunc(handlers.CreateDocHandler(db))
-
-		r.Path("/collections/{collection}/docs/{docID}").
-			Methods(http.MethodPut).
-			HandlerFunc(handlers.SetDocHandler(db))
-
-		r.Path("/collections/{collection}/docs/{docID}").
-			Methods(http.MethodPatch).
-			HandlerFunc(handlers.PatchDocHandler(db))
-
-		r.Path("/collections/{collection}/docs/{docID}").
-			Methods(http.MethodDelete).
-			HandlerFunc(handlers.DeleteDocHandler(db))
-
-		r.Path("/collections/{collection}/docs/{docID}").
-			Methods(http.MethodGet).
-			HandlerFunc(handlers.GetDocHandler(db))
-
-		r.Path("/collections/{collection}/query").
-			Methods(http.MethodPost).
-			HandlerFunc(handlers.QueryHandler(db))
-
-		r.Path("/collections/{collection}/batch").
-			Methods(http.MethodPut).
-			HandlerFunc(handlers.BatchSetHandler(db))
-	}
-
+	r.Path("/schema").
+		Methods(http.MethodGet).
+		HandlerFunc(handlers.GetSchemasHandler(db))
+	r.Path("/schema/{collection}").
+		Methods(http.MethodGet).
+		HandlerFunc(handlers.GetSchemaHandler(db))
+	r.Path("/schema/{collection}").
+		Methods(http.MethodPut).
+		HandlerFunc(handlers.PutSchemaHandler(db))
+	r.Path("/collections/{collection}/docs").
+		Methods(http.MethodPost).
+		HandlerFunc(handlers.CreateDocHandler(db))
+	r.Path("/collections/{collection}/docs/{docID}").
+		Methods(http.MethodPut).
+		HandlerFunc(handlers.SetDocHandler(db))
+	r.Path("/collections/{collection}/docs/{docID}").
+		Methods(http.MethodPatch).
+		HandlerFunc(handlers.PatchDocHandler(db))
+	r.Path("/collections/{collection}/docs/{docID}").
+		Methods(http.MethodDelete).
+		HandlerFunc(handlers.DeleteDocHandler(db))
+	r.Path("/collections/{collection}/docs/{docID}").
+		Methods(http.MethodGet).
+		HandlerFunc(handlers.GetDocHandler(db))
+	r.Path("/collections/{collection}/query").
+		Methods(http.MethodPost).
+		HandlerFunc(handlers.QueryHandler(db))
+	r.Path("/collections/{collection}/batch").
+		Methods(http.MethodPut).
+		HandlerFunc(handlers.BatchSetHandler(db))
 	egp, ctx := errgroup.WithContext(ctx)
 	egp.Go(func() error {
 		return http.ListenAndServe(fmt.Sprintf(":%v", o.params.Port), o.router)

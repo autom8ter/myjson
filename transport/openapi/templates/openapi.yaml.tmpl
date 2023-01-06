@@ -71,7 +71,7 @@ paths:
             schema:
               type: string
         required: true
-  /collections/{{ .collection }}:
+  /collections/{{ .collection }}/docs:
     post:
       tags:
         - {{ title .collection }}
@@ -191,7 +191,7 @@ paths:
             schema:
               type: object
         required: true
-  /collections/{{ .collection }}/cmd/query:
+  /collections/{{ .collection }}/query:
     post:
       tags:
         - {{ title .collection }}
@@ -217,7 +217,7 @@ paths:
             schema:
               $ref: '#/components/schemas/Query'
         required: true
-  /collections/{{ .collection }}/cmd/batchset:
+  /collections/{{ .collection }}/batchset:
     put:
       tags:
         - {{ title .collection }}
@@ -251,108 +251,8 @@ components:
       schema:
         type: string
   schemas:
-    Query:
-      type: object
-      description: Query is a query against a collection of documents
-      required:
-        - select
-      properties:
-        select:
-          type: array
-          items:
-            type: object
-            description: select is a list of fields to select from each record in the datbase(optional)
-            properties:
-              field:
-                type: string
-                description: the select's field
-              aggregate:
-                type: string
-                description: an aggregate function to apply against the field
-                enum:
-                  - sum
-                  - count
-                  - max
-                  - min
-              function:
-                type: string
-                description: a function to apply against the field
-                enum:
-                  - toLower
-                  - toUpper
-              as:
-                type: string
-                description: as is outputs the value of the field as an alias
-            required:
-              - field
-        groupBy:
-          type: array
-          items:
-            type: string
-        where:
-          type: array
-          items:
-            type: object
-            description: where is a filter applied against a query
-            properties:
-              field:
-                type: string
-              op:
-                type: string
-                enum:
-                  - eq
-                  - neq
-                  - gt
-                  - gte
-                  - lt
-                  - lte
-                  - in
-                  - contains
-              value: {}
-            required:
-              - field
-              - op
-              - value
-        orderBy:
-          type: array
-          items:
-            type: object
-            description: orderBy orders results by a field and a direction
-            properties:
-              field:
-                type: string
-              direction:
-                type: string
-                enum:
-                  - asc
-                  - desc
-            required:
-              - field
-              - direction
-        page:
-          type: integer
-          minimum: 0
-        limit:
-          type: integer
-          minimum: 0
-    Page:
-      type: object
-      description: Page is a list of documents returned from a query
-      required:
-        - documents
-        - next_page
-        - count
-      properties:
-        documents:
-          type: array
-          items:
-            type: object
-        next_page:
-          type: integer
-          minimum: 0
-        count:
-          type: integer
-          minimum: 0
+    Query: {{ .page_schema | nindent 6 }}
+    Page: {{ .page_schema | nindent 6 }}
 {{- range .collections }}
     {{ title .collection }}: {{ .schema | nindent 6 }}
 {{end}}

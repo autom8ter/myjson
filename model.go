@@ -169,6 +169,94 @@ func (q Query) Validate(ctx context.Context) error {
 	return nil
 }
 
+// Schema returns the JSON schema for the Query struct in YAML format
+func (q Query) Schema() string {
+	return `
+type: object
+description: Query is a query against a collection of documents
+required:
+  - select
+properties:
+  select:
+    type: array
+    items:
+      type: object
+      description: select is a list of fields to select from each record in the datbase(optional)
+      properties:
+        field:
+          type: string
+          description: the select's field
+        aggregate:
+          type: string
+          description: an aggregate function to apply against the field
+          enum:
+            - sum
+            - count
+            - max
+            - min
+        function:
+          type: string
+          description: a function to apply against the field
+          enum:
+            - toLower
+            - toUpper
+        as:
+          type: string
+          description: as is outputs the value of the field as an alias
+      required:
+        - field
+  groupBy:
+    type: array
+    items:
+      type: string
+  where:
+    type: array
+    items:
+      type: object
+      description: where is a filter applied against a query
+      properties:
+        field:
+          type: string
+        op:
+          type: string
+          enum:
+            - eq
+            - neq
+            - gt
+            - gte
+            - lt
+            - lte
+            - in
+            - contains
+        value: { }
+      required:
+        - field
+        - op
+        - value
+  orderBy:
+    type: array
+    items:
+      type: object
+      description: orderBy orders results by a field and a direction
+      properties:
+        field:
+          type: string
+        direction:
+          type: string
+          enum:
+            - asc
+            - desc
+      required:
+        - field
+        - direction
+  page:
+    type: integer
+    minimum: 0
+  limit:
+    type: integer
+    minimum: 0`
+}
+
 type ctxKey int
 
 const (
@@ -292,6 +380,28 @@ type Page struct {
 	Count int `json:"count"`
 	// Stats are statistics collected from a document aggregation query
 	Stats PageStats `json:"stats,omitempty"`
+}
+
+// Schema returns the JSON schema for the Page struct in YAML format
+func (p Page) Schema() string {
+	return `
+type: object
+description: Page is a list of documents returned from a query
+required:
+  - documents
+  - next_page
+  - count
+properties:
+  documents:
+    type: array
+    items:
+      type: object
+  next_page:
+    type: integer
+    minimum: 0
+  count:
+    type: integer
+    minimum: 0`
 }
 
 // PageStats are statistics collected from a query returning a page
