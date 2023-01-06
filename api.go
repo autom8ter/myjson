@@ -79,6 +79,8 @@ type Database interface {
 	RunMigrations(ctx context.Context, migrations ...Migration) error
 	// RawKV returns the database key value provider - it should be used with caution and only when standard database functionality is insufficient.
 	RawKV() kv.DB
+	// Serve serves the database over the given transport
+	Serve(ctx context.Context, t Transport) error
 	// Close closes the database
 	Close(ctx context.Context) error
 }
@@ -131,4 +133,9 @@ type Tx interface {
 	// CDC's are persisted to the cdc collection when the transaction is commited.
 	CDC() []CDC
 	DB() Database
+}
+
+// Transport serves the database over a network
+type Transport interface {
+	Serve(ctx context.Context, db Database) error
 }

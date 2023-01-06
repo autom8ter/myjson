@@ -89,6 +89,10 @@ func Open(ctx context.Context, provider string, providerParams map[string]any, o
 	return d, err
 }
 
+func (d *defaultDB) Serve(ctx context.Context, t Transport) error {
+	return t.Serve(ctx, d)
+}
+
 func (d *defaultDB) NewTx(opts kv.TxOpts) (Txn, error) {
 	vm := <-d.vmPool
 	tx, err := d.kv.NewTx(opts)
