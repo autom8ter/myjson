@@ -169,8 +169,8 @@ func (q Query) Validate(ctx context.Context) error {
 	return nil
 }
 
-// Schema returns the JSON schema for the Query struct in YAML format
-func (q Query) Schema() string {
+// QuerySchema returns the JSON schema for the Query struct in YAML format
+func QuerySchema() string {
 	return `
 type: object
 description: Query is a query against a collection of documents
@@ -382,8 +382,8 @@ type Page struct {
 	Stats PageStats `json:"stats,omitempty"`
 }
 
-// Schema returns the JSON schema for the Page struct in YAML format
-func (p Page) Schema() string {
+// PageSchema returns the JSON schema for the Page struct in YAML format
+func PageSchema() string {
 	return `
 type: object
 description: Page is a list of documents returned from a query

@@ -29,13 +29,11 @@ func TestOpenAPI(t *testing.T) {
 			})
 			assert.NoError(t, err)
 			oapi := o.(*openAPIServer)
-			oapi.registerRoutes(db)
-			bits, err := oapi.getSpec(ctx, db)
-			assert.NoError(t, err)
+			assert.NoError(t, oapi.registerRoutes(ctx, db))
 			//f, _ := os.Create("testdata/openapi.yaml")
 			//defer f.Close()
-			//f.Write(bits)
-			assert.YAMLEq(t, expectedSchema, string(bits))
+			//f.Write(oapi.spec)
+			assert.YAMLEq(t, expectedSchema, string(oapi.spec))
 		}))
 	})
 	t.Run("walk router", func(t *testing.T) {
@@ -48,7 +46,7 @@ func TestOpenAPI(t *testing.T) {
 			})
 			assert.NoError(t, err)
 			oapi := o.(*openAPIServer)
-			oapi.registerRoutes(db)
+			assert.NoError(t, oapi.registerRoutes(ctx, db))
 			assert.NoError(t, oapi.router.Walk(func(route *mux.Route, router *mux.Router, ancestors []*mux.Route) error {
 				fmt.Println(route.GetName())
 				return nil

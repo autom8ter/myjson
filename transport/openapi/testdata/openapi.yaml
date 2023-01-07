@@ -102,7 +102,7 @@ paths:
             schema:
               $ref: '#/components/schemas/Account'
         required: true
-  /api/collections/account/{docID}:
+  /api/collections/account/docs/{docID}:
     get:
       tags:
         - Account
@@ -221,7 +221,7 @@ paths:
             schema:
               $ref: '#/components/schemas/Query'
         required: true
-  /api/collections/account/batchset:
+  /api/collections/account/batch:
     put:
       tags:
         - Account
@@ -314,7 +314,7 @@ paths:
             schema:
               $ref: '#/components/schemas/Cdc'
         required: true
-  /api/collections/cdc/{docID}:
+  /api/collections/cdc/docs/{docID}:
     get:
       tags:
         - Cdc
@@ -433,7 +433,7 @@ paths:
             schema:
               $ref: '#/components/schemas/Query'
         required: true
-  /api/collections/cdc/batchset:
+  /api/collections/cdc/batch:
     put:
       tags:
         - Cdc
@@ -526,7 +526,7 @@ paths:
             schema:
               $ref: '#/components/schemas/Migration'
         required: true
-  /api/collections/migration/{docID}:
+  /api/collections/migration/docs/{docID}:
     get:
       tags:
         - Migration
@@ -645,7 +645,7 @@ paths:
             schema:
               $ref: '#/components/schemas/Query'
         required: true
-  /api/collections/migration/batchset:
+  /api/collections/migration/batch:
     put:
       tags:
         - Migration
@@ -738,7 +738,7 @@ paths:
             schema:
               $ref: '#/components/schemas/Task'
         required: true
-  /api/collections/task/{docID}:
+  /api/collections/task/docs/{docID}:
     get:
       tags:
         - Task
@@ -857,7 +857,7 @@ paths:
             schema:
               $ref: '#/components/schemas/Query'
         required: true
-  /api/collections/task/batchset:
+  /api/collections/task/batch:
     put:
       tags:
         - Task
@@ -950,7 +950,7 @@ paths:
             schema:
               $ref: '#/components/schemas/User'
         required: true
-  /api/collections/user/{docID}:
+  /api/collections/user/docs/{docID}:
     get:
       tags:
         - User
@@ -1069,7 +1069,7 @@ paths:
             schema:
               $ref: '#/components/schemas/Query'
         required: true
-  /api/collections/user/batchset:
+  /api/collections/user/batch:
     put:
       tags:
         - User

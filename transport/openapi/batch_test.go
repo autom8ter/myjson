@@ -9,11 +9,11 @@ import (
 	"github.com/autom8ter/myjson"
 	"github.com/autom8ter/myjson/testutil"
 	"github.com/autom8ter/myjson/transport/openapi/testdata"
-	"github.com/samber/lo"
+	"github.com/brianvoe/gofakeit/v6"
 	"github.com/stretchr/testify/assert"
 )
 
-func TestQuery(t *testing.T) {
+func TestBatch(t *testing.T) {
 	assert.NoError(t, testutil.TestDB(func(ctx context.Context, db myjson.Database) {
 		o, err := New(Config{
 			Title:       "testing",
@@ -28,18 +28,22 @@ func TestQuery(t *testing.T) {
 		defer s.Close()
 		client, err := testdata.NewClient(s.URL)
 		assert.NoError(t, err)
-		results, err := client.QueryAccount(ctx, testdata.QueryAccountJSONRequestBody{
-			GroupBy: nil,
-			Limit:   lo.ToPtr(1),
-			OrderBy: nil,
-			Page:    nil,
-			Select:  nil,
-			Where:   nil,
+
+		results, err := client.BatchSetAccount(ctx, testdata.BatchSetAccountJSONRequestBody{
+			{
+				Id:   "0",
+				Name: gofakeit.Company(),
+			},
+			{
+				Id:   "1",
+				Name: gofakeit.Company(),
+			},
+			{
+				Id:   "2",
+				Name: gofakeit.Company(),
+			},
 		})
-		assert.Equal(t, 200, results.StatusCode)
 		bits, _ := io.ReadAll(results.Body)
-		assert.NoError(t, err)
-		resp, _ := myjson.NewDocumentFromBytes(bits)
-		assert.Equal(t, "0", resp.Get("documents.0._id"))
+		assert.Equal(t, 200, results.StatusCode, string(bits))
 	}))
 }

@@ -2,3 +2,4 @@
 tmp
 kv/tikv/docker/data
 examples/tasks/tmp
+*tmp

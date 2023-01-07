@@ -259,14 +259,14 @@ type BatchSetAccountJSONRequestBody = BatchSetAccountJSONBody
 // CreateAccountJSONRequestBody defines body for CreateAccount for application/json ContentType.
 type CreateAccountJSONRequestBody = Account
 
-// QueryAccountJSONRequestBody defines body for QueryAccount for application/json ContentType.
-type QueryAccountJSONRequestBody = Query
-
 // EditAccountJSONRequestBody defines body for EditAccount for application/json ContentType.
 type EditAccountJSONRequestBody = EditAccountJSONBody
 
 // SetAccountJSONRequestBody defines body for SetAccount for application/json ContentType.
 type SetAccountJSONRequestBody = Account
+
+// QueryAccountJSONRequestBody defines body for QueryAccount for application/json ContentType.
+type QueryAccountJSONRequestBody = Query
 
 // BatchSetCdcJSONRequestBody defines body for BatchSetCdc for application/json ContentType.
 type BatchSetCdcJSONRequestBody = BatchSetCdcJSONBody
@@ -274,14 +274,14 @@ type BatchSetCdcJSONRequestBody = BatchSetCdcJSONBody
 // CreateCdcJSONRequestBody defines body for CreateCdc for application/json ContentType.
 type CreateCdcJSONRequestBody = Cdc
 
-// QueryCdcJSONRequestBody defines body for QueryCdc for application/json ContentType.
-type QueryCdcJSONRequestBody = Query
-
 // EditCdcJSONRequestBody defines body for EditCdc for application/json ContentType.
 type EditCdcJSONRequestBody = EditCdcJSONBody
 
 // SetCdcJSONRequestBody defines body for SetCdc for application/json ContentType.
 type SetCdcJSONRequestBody = Cdc
+
+// QueryCdcJSONRequestBody defines body for QueryCdc for application/json ContentType.
+type QueryCdcJSONRequestBody = Query
 
 // BatchSetMigrationJSONRequestBody defines body for BatchSetMigration for application/json ContentType.
 type BatchSetMigrationJSONRequestBody = BatchSetMigrationJSONBody
@@ -289,14 +289,14 @@ type BatchSetMigrationJSONRequestBody = BatchSetMigrationJSONBody
 // CreateMigrationJSONRequestBody defines body for CreateMigration for application/json ContentType.
 type CreateMigrationJSONRequestBody = Migration
 
-// QueryMigrationJSONRequestBody defines body for QueryMigration for application/json ContentType.
-type QueryMigrationJSONRequestBody = Query
-
 // EditMigrationJSONRequestBody defines body for EditMigration for application/json ContentType.
 type EditMigrationJSONRequestBody = EditMigrationJSONBody
 
 // SetMigrationJSONRequestBody defines body for SetMigration for application/json ContentType.
 type SetMigrationJSONRequestBody = Migration
+
+// QueryMigrationJSONRequestBody defines body for QueryMigration for application/json ContentType.
+type QueryMigrationJSONRequestBody = Query
 
 // BatchSetTaskJSONRequestBody defines body for BatchSetTask for application/json ContentType.
 type BatchSetTaskJSONRequestBody = BatchSetTaskJSONBody
@@ -304,14 +304,14 @@ type BatchSetTaskJSONRequestBody = BatchSetTaskJSONBody
 // CreateTaskJSONRequestBody defines body for CreateTask for application/json ContentType.
 type CreateTaskJSONRequestBody = Task
 
-// QueryTaskJSONRequestBody defines body for QueryTask for application/json ContentType.
-type QueryTaskJSONRequestBody = Query
-
 // EditTaskJSONRequestBody defines body for EditTask for application/json ContentType.
 type EditTaskJSONRequestBody = EditTaskJSONBody
 
 // SetTaskJSONRequestBody defines body for SetTask for application/json ContentType.
 type SetTaskJSONRequestBody = Task
+
+// QueryTaskJSONRequestBody defines body for QueryTask for application/json ContentType.
+type QueryTaskJSONRequestBody = Query
 
 // BatchSetUserJSONRequestBody defines body for BatchSetUser for application/json ContentType.
 type BatchSetUserJSONRequestBody = BatchSetUserJSONBody
@@ -319,14 +319,14 @@ type BatchSetUserJSONRequestBody = BatchSetUserJSONBody
 // CreateUserJSONRequestBody defines body for CreateUser for application/json ContentType.
 type CreateUserJSONRequestBody = User
 
-// QueryUserJSONRequestBody defines body for QueryUser for application/json ContentType.
-type QueryUserJSONRequestBody = Query
-
 // EditUserJSONRequestBody defines body for EditUser for application/json ContentType.
 type EditUserJSONRequestBody = EditUserJSONBody
 
 // SetUserJSONRequestBody defines body for SetUser for application/json ContentType.
 type SetUserJSONRequestBody = User
+
+// QueryUserJSONRequestBody defines body for QueryUser for application/json ContentType.
+type QueryUserJSONRequestBody = Query
 
 // SetAccountSchemaJSONRequestBody defines body for SetAccountSchema for application/json ContentType.
 type SetAccountSchemaJSONRequestBody = SetAccountSchemaJSONBody

@@ -411,7 +411,12 @@ properties:
     type: string
     description: The user's name.
   contact:
-    $ref: "#/common/contact"
+    type: object
+    properties:
+      email:
+        type: string
+        description: The user's email.
+        x-unique: true
   age:
     description: Age in years which must be equal to or greater than zero.
     type: integer
@@ -461,17 +466,6 @@ x-triggers:
     # script is the javascript to execute
     script: |
       doc.set('timestamp', new Date().toISOString())
-
-# common holds reusable objects that are referenced in the JSON schema
-common:
-  contact:
-    type: object
-    properties:
-      email:
-        type: string
-        description: The user's email.
-        x-unique: true
-
 ```
 
 ## Tikv Setup Guide (full scale)

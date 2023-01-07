@@ -15,6 +15,6 @@ func Error(w http.ResponseWriter, err error) {
 	}
 	w.WriteHeader(status)
 	// remove the internal error
-	json.NewEncoder(w).Encode(e.RemoveError())
+	json.NewEncoder(w).Encode(e)
 	return
 }

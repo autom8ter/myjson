@@ -7,7 +7,6 @@ import (
 	"github.com/autom8ter/myjson"
 	"github.com/autom8ter/myjson/errors"
 	"github.com/autom8ter/myjson/transport/openapi/httpError"
-	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/mux"
 )
 
@@ -18,7 +17,7 @@ func (o *openAPIServer) getDocHandler(db myjson.Database) http.HandlerFunc {
 			httpError.Error(w, errors.New(errors.Validation, "collection does not exist"))
 			return
 		}
-		docID := chi.URLParam(r, "docID")
+		docID := mux.Vars(r)["docID"]
 		doc, err := db.Get(r.Context(), collection, docID)
 		if err != nil {
 			httpError.Error(w, errors.Wrap(err, http.StatusNotFound, "failed to get document"))

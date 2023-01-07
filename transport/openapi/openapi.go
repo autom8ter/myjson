@@ -6,11 +6,16 @@ import (
 	_ "embed"
 	"fmt"
 	"net/http"
+	"sync"
 	"text/template"
+	"time"
 
 	"github.com/Masterminds/sprig/v3"
 	"github.com/autom8ter/myjson"
 	"github.com/autom8ter/myjson/util"
+	"github.com/getkin/kin-openapi/openapi3"
+	"github.com/getkin/kin-openapi/routers"
+	"github.com/getkin/kin-openapi/routers/gorillamux"
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
 	"golang.org/x/sync/errgroup"
@@ -28,10 +33,13 @@ type Config struct {
 }
 
 type openAPIServer struct {
-	params   Config
-	router   *mux.Router
-	mwares   []mux.MiddlewareFunc
-	upgrader websocket.Upgrader
+	params        Config
+	router        *mux.Router
+	mwares        []mux.MiddlewareFunc
+	upgrader      websocket.Upgrader
+	spec          []byte
+	specMu        sync.RWMutex
+	openapiRouter routers.Router
 }
 
 // New creates a new openapi server
@@ -48,7 +56,7 @@ func New(params Config, mwares ...mux.MiddlewareFunc) (myjson.Transport, error) 
 	return o, nil
 }
 
-func (o *openAPIServer) getSpec(ctx context.Context, db myjson.Database) ([]byte, error) {
+func getSpec(ctx context.Context, config Config, db myjson.Database) ([]byte, error) {
 	t, err := template.New("").Funcs(sprig.FuncMap()).Parse(openapiTemplate)
 	if err != nil {
 		return nil, err
@@ -64,9 +72,9 @@ func (o *openAPIServer) getSpec(ctx context.Context, db myjson.Database) ([]byte
 	}
 	buf := bytes.NewBuffer(nil)
 	err = t.Execute(buf, map[string]any{
-		"title":        o.params.Title,
-		"description":  o.params.Description,
-		"version":      o.params.Version,
+		"title":        config.Title,
+		"description":  config.Description,
+		"version":      config.Version,
 		"query_schema": myjson.QuerySchema(),
 		"page_schema":  myjson.PageSchema(),
 		"collections":  coll,
@@ -77,9 +85,13 @@ func (o *openAPIServer) getSpec(ctx context.Context, db myjson.Database) ([]byte
 	return buf.Bytes(), nil
 }
 
-func (o *openAPIServer) registerRoutes(db myjson.Database) {
+func (o *openAPIServer) registerRoutes(ctx context.Context, db myjson.Database) error {
+	if err := o.refreshSpec(db); err != nil {
+		return err
+	}
 	o.router.Use(o.mwares...)
-	o.router.HandleFunc("/api/openapi.yaml", o.specHandler(db)).Methods(http.MethodGet)
+	o.router.HandleFunc("/openapi.yaml", o.specHandler()).Methods(http.MethodGet)
+	o.router.HandleFunc("/openapi.json", o.specHandler()).Methods(http.MethodGet)
 	o.router.HandleFunc("/api/tx", o.txHandler(db))
 	o.router.HandleFunc("/api/schema", o.getSchemasHandler(db)).Methods(http.MethodGet)
 	o.router.HandleFunc("/api/schema/{collection}", o.getSchemaHandler(db)).Methods(http.MethodGet)
@@ -91,14 +103,55 @@ func (o *openAPIServer) registerRoutes(db myjson.Database) {
 	o.router.HandleFunc("/api/collections/{collection}/docs/{docID}", o.getDocHandler(db)).Methods(http.MethodGet)
 	o.router.HandleFunc("/api/collections/{collection}/query", o.queryHandler(db)).Methods(http.MethodPost)
 	o.router.HandleFunc("/api/collections/{collection}/batch", o.batchSetHandler(db)).Methods(http.MethodPut)
+	return nil
+}
+
+func (o *openAPIServer) refreshSpec(db myjson.Database) error {
+	o.specMu.Lock()
+	defer o.specMu.Unlock()
+	spec, err := getSpec(context.Background(), o.params, db)
+	if err != nil {
+		return err
+	}
+	o.spec = spec
+	loader := openapi3.NewLoader()
+	doc, err := loader.LoadFromData(o.spec)
+	if err != nil {
+		return err
+	}
+	if err := doc.Validate(loader.Context); err != nil {
+		return err
+	}
+	router, err := gorillamux.NewRouter(doc)
+	if err != nil {
+		return err
+	}
+	o.openapiRouter = router
+	return nil
 }
 
 // Serve starts an openapi http server serving the database
 func (o *openAPIServer) Serve(ctx context.Context, db myjson.Database) error {
-	o.registerRoutes(db)
+	if err := o.registerRoutes(ctx, db); err != nil {
+		return err
+	}
 	egp, ctx := errgroup.WithContext(ctx)
 	egp.Go(func() error {
 		return http.ListenAndServe(fmt.Sprintf(":%v", o.params.Port), o.router)
+	})
+	egp.Go(func() error {
+		ticker := time.NewTimer(1 * time.Minute)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return nil
+			case <-ticker.C:
+				if err := o.refreshSpec(db); err != nil {
+					return err
+				}
+			}
+		}
 	})
 	return egp.Wait()
 }

@@ -3,14 +3,13 @@ package util
 import (
 	"encoding/binary"
 	"encoding/json"
-	"fmt"
 	"time"
 
 	"github.com/autom8ter/myjson/errors"
+	"github.com/ghodss/yaml"
 	"github.com/go-playground/validator/v10"
 	"github.com/mitchellh/mapstructure"
 	"github.com/spf13/cast"
-	"gopkg.in/yaml.v2"
 )
 
 var validate = validator.New()
@@ -62,44 +61,15 @@ func EncodeIndexValue(value any) []byte {
 	}
 }
 
-func convertMap(m map[interface{}]interface{}) map[string]interface{} {
-	res := map[string]interface{}{}
-	for k, v := range m {
-		switch v2 := v.(type) {
-		case map[interface{}]interface{}:
-			res[fmt.Sprint(k)] = convertMap(v2)
-		default:
-			res[fmt.Sprint(k)] = v
-		}
-	}
-	return res
-}
-
 func YAMLToJSON(yamlContent []byte) ([]byte, error) {
 	if isJSON(string(yamlContent)) {
 		return yamlContent, nil
 	}
-	var body map[interface{}]interface{}
-	if err := yaml.Unmarshal(yamlContent, &body); err != nil {
-		return nil, errors.Wrap(err, errors.Validation, "failed to convert yaml to json")
-	}
-	jsonContent, err := json.Marshal(convertMap(body))
-	if err != nil {
-		return nil, errors.Wrap(err, errors.Validation, "failed to convert yaml to json")
-	}
-	return jsonContent, nil
+	return yaml.YAMLToJSON(yamlContent)
 }
 
 func JSONToYAML(jsonContent []byte) ([]byte, error) {
-	var body map[string]interface{}
-	if err := json.Unmarshal(jsonContent, &body); err != nil {
-		return nil, errors.Wrap(err, 0, "failed to convert json to yaml")
-	}
-	yamlContent, err := yaml.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	return yamlContent, nil
+	return yaml.JSONToYAML(jsonContent)
 }
 
 func isJSON(str string) bool {

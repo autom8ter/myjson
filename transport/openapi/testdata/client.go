@@ -99,11 +99,6 @@ type ClientInterface interface {
 
 	CreateAccount(ctx context.Context, body CreateAccountJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// QueryAccount request with any body
-	QueryAccountWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	QueryAccount(ctx context.Context, body QueryAccountJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
-
 	// DeleteAccount request
 	DeleteAccount(ctx context.Context, docID DocID, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -120,6 +115,11 @@ type ClientInterface interface {
 
 	SetAccount(ctx context.Context, docID DocID, body SetAccountJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// QueryAccount request with any body
+	QueryAccountWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	QueryAccount(ctx context.Context, body QueryAccountJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// BatchSetCdc request with any body
 	BatchSetCdcWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -129,11 +129,6 @@ type ClientInterface interface {
 	CreateCdcWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	CreateCdc(ctx context.Context, body CreateCdcJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// QueryCdc request with any body
-	QueryCdcWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	QueryCdc(ctx context.Context, body QueryCdcJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// DeleteCdc request
 	DeleteCdc(ctx context.Context, docID DocID, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -151,6 +146,11 @@ type ClientInterface interface {
 
 	SetCdc(ctx context.Context, docID DocID, body SetCdcJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// QueryCdc request with any body
+	QueryCdcWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	QueryCdc(ctx context.Context, body QueryCdcJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// BatchSetMigration request with any body
 	BatchSetMigrationWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -160,11 +160,6 @@ type ClientInterface interface {
 	CreateMigrationWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	CreateMigration(ctx context.Context, body CreateMigrationJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// QueryMigration request with any body
-	QueryMigrationWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	QueryMigration(ctx context.Context, body QueryMigrationJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// DeleteMigration request
 	DeleteMigration(ctx context.Context, docID DocID, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -182,6 +177,11 @@ type ClientInterface interface {
 
 	SetMigration(ctx context.Context, docID DocID, body SetMigrationJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// QueryMigration request with any body
+	QueryMigrationWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	QueryMigration(ctx context.Context, body QueryMigrationJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// BatchSetTask request with any body
 	BatchSetTaskWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -191,11 +191,6 @@ type ClientInterface interface {
 	CreateTaskWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	CreateTask(ctx context.Context, body CreateTaskJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// QueryTask request with any body
-	QueryTaskWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	QueryTask(ctx context.Context, body QueryTaskJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// DeleteTask request
 	DeleteTask(ctx context.Context, docID DocID, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -213,6 +208,11 @@ type ClientInterface interface {
 
 	SetTask(ctx context.Context, docID DocID, body SetTaskJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// QueryTask request with any body
+	QueryTaskWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	QueryTask(ctx context.Context, body QueryTaskJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// BatchSetUser request with any body
 	BatchSetUserWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -222,11 +222,6 @@ type ClientInterface interface {
 	CreateUserWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	CreateUser(ctx context.Context, body CreateUserJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// QueryUser request with any body
-	QueryUserWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	QueryUser(ctx context.Context, body QueryUserJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// DeleteUser request
 	DeleteUser(ctx context.Context, docID DocID, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -243,6 +238,11 @@ type ClientInterface interface {
 	SetUserWithBody(ctx context.Context, docID DocID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	SetUser(ctx context.Context, docID DocID, body SetUserJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// QueryUser request with any body
+	QueryUserWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	QueryUser(ctx context.Context, body QueryUserJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetSchemas request
 	GetSchemas(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -336,30 +336,6 @@ func (c *Client) CreateAccount(ctx context.Context, body CreateAccountJSONReques
 	return c.Client.Do(req)
 }
 
-func (c *Client) QueryAccountWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewQueryAccountRequestWithBody(c.Server, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) QueryAccount(ctx context.Context, body QueryAccountJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewQueryAccountRequest(c.Server, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
 func (c *Client) DeleteAccount(ctx context.Context, docID DocID, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewDeleteAccountRequest(c.Server, docID)
 	if err != nil {
@@ -432,6 +408,30 @@ func (c *Client) SetAccount(ctx context.Context, docID DocID, body SetAccountJSO
 	return c.Client.Do(req)
 }
 
+func (c *Client) QueryAccountWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewQueryAccountRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) QueryAccount(ctx context.Context, body QueryAccountJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewQueryAccountRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 func (c *Client) BatchSetCdcWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewBatchSetCdcRequestWithBody(c.Server, contentType, body)
 	if err != nil {
@@ -470,30 +470,6 @@ func (c *Client) CreateCdcWithBody(ctx context.Context, contentType string, body
 
 func (c *Client) CreateCdc(ctx context.Context, body CreateCdcJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewCreateCdcRequest(c.Server, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) QueryCdcWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewQueryCdcRequestWithBody(c.Server, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) QueryCdc(ctx context.Context, body QueryCdcJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewQueryCdcRequest(c.Server, body)
 	if err != nil {
 		return nil, err
 	}
@@ -576,6 +552,30 @@ func (c *Client) SetCdc(ctx context.Context, docID DocID, body SetCdcJSONRequest
 	return c.Client.Do(req)
 }
 
+func (c *Client) QueryCdcWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewQueryCdcRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) QueryCdc(ctx context.Context, body QueryCdcJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewQueryCdcRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 func (c *Client) BatchSetMigrationWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewBatchSetMigrationRequestWithBody(c.Server, contentType, body)
 	if err != nil {
@@ -614,30 +614,6 @@ func (c *Client) CreateMigrationWithBody(ctx context.Context, contentType string
 
 func (c *Client) CreateMigration(ctx context.Context, body CreateMigrationJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewCreateMigrationRequest(c.Server, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) QueryMigrationWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewQueryMigrationRequestWithBody(c.Server, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) QueryMigration(ctx context.Context, body QueryMigrationJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewQueryMigrationRequest(c.Server, body)
 	if err != nil {
 		return nil, err
 	}
@@ -720,6 +696,30 @@ func (c *Client) SetMigration(ctx context.Context, docID DocID, body SetMigratio
 	return c.Client.Do(req)
 }
 
+func (c *Client) QueryMigrationWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewQueryMigrationRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) QueryMigration(ctx context.Context, body QueryMigrationJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewQueryMigrationRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 func (c *Client) BatchSetTaskWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewBatchSetTaskRequestWithBody(c.Server, contentType, body)
 	if err != nil {
@@ -758,30 +758,6 @@ func (c *Client) CreateTaskWithBody(ctx context.Context, contentType string, bod
 
 func (c *Client) CreateTask(ctx context.Context, body CreateTaskJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewCreateTaskRequest(c.Server, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) QueryTaskWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewQueryTaskRequestWithBody(c.Server, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) QueryTask(ctx context.Context, body QueryTaskJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewQueryTaskRequest(c.Server, body)
 	if err != nil {
 		return nil, err
 	}
@@ -864,6 +840,30 @@ func (c *Client) SetTask(ctx context.Context, docID DocID, body SetTaskJSONReque
 	return c.Client.Do(req)
 }
 
+func (c *Client) QueryTaskWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewQueryTaskRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) QueryTask(ctx context.Context, body QueryTaskJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewQueryTaskRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 func (c *Client) BatchSetUserWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewBatchSetUserRequestWithBody(c.Server, contentType, body)
 	if err != nil {
@@ -902,30 +902,6 @@ func (c *Client) CreateUserWithBody(ctx context.Context, contentType string, bod
 
 func (c *Client) CreateUser(ctx context.Context, body CreateUserJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewCreateUserRequest(c.Server, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) QueryUserWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewQueryUserRequestWithBody(c.Server, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) QueryUser(ctx context.Context, body QueryUserJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewQueryUserRequest(c.Server, body)
 	if err != nil {
 		return nil, err
 	}
@@ -998,6 +974,30 @@ func (c *Client) SetUserWithBody(ctx context.Context, docID DocID, contentType s
 
 func (c *Client) SetUser(ctx context.Context, docID DocID, body SetUserJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewSetUserRequest(c.Server, docID, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) QueryUserWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewQueryUserRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) QueryUser(ctx context.Context, body QueryUserJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewQueryUserRequest(c.Server, body)
 	if err != nil {
 		return nil, err
 	}
@@ -1220,7 +1220,7 @@ func NewBatchSetAccountRequestWithBody(server string, contentType string, body i
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/collections/account/batchset")
+	operationPath := fmt.Sprintf("/api/collections/account/batch")
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -1280,46 +1280,6 @@ func NewCreateAccountRequestWithBody(server string, contentType string, body io.
 	return req, nil
 }
 
-// NewQueryAccountRequest calls the generic QueryAccount builder with application/json body
-func NewQueryAccountRequest(server string, body QueryAccountJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewQueryAccountRequestWithBody(server, "application/json", bodyReader)
-}
-
-// NewQueryAccountRequestWithBody generates requests for QueryAccount with any type of body
-func NewQueryAccountRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/api/collections/account/query")
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest("POST", queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	return req, nil
-}
-
 // NewDeleteAccountRequest generates requests for DeleteAccount
 func NewDeleteAccountRequest(server string, docID DocID) (*http.Request, error) {
 	var err error
@@ -1336,7 +1296,7 @@ func NewDeleteAccountRequest(server string, docID DocID) (*http.Request, error) 
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/collections/account/%s", pathParam0)
+	operationPath := fmt.Sprintf("/api/collections/account/docs/%s", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -1370,7 +1330,7 @@ func NewGetAccountRequest(server string, docID DocID) (*http.Request, error) {
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/collections/account/%s", pathParam0)
+	operationPath := fmt.Sprintf("/api/collections/account/docs/%s", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -1415,7 +1375,7 @@ func NewEditAccountRequestWithBody(server string, docID DocID, contentType strin
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/collections/account/%s", pathParam0)
+	operationPath := fmt.Sprintf("/api/collections/account/docs/%s", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -1462,7 +1422,7 @@ func NewSetAccountRequestWithBody(server string, docID DocID, contentType string
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/collections/account/%s", pathParam0)
+	operationPath := fmt.Sprintf("/api/collections/account/docs/%s", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -1473,6 +1433,46 @@ func NewSetAccountRequestWithBody(server string, docID DocID, contentType string
 	}
 
 	req, err := http.NewRequest("PUT", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewQueryAccountRequest calls the generic QueryAccount builder with application/json body
+func NewQueryAccountRequest(server string, body QueryAccountJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewQueryAccountRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewQueryAccountRequestWithBody generates requests for QueryAccount with any type of body
+func NewQueryAccountRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/collections/account/query")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
 	if err != nil {
 		return nil, err
 	}
@@ -1502,7 +1502,7 @@ func NewBatchSetCdcRequestWithBody(server string, contentType string, body io.Re
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/collections/cdc/batchset")
+	operationPath := fmt.Sprintf("/api/collections/cdc/batch")
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -1562,46 +1562,6 @@ func NewCreateCdcRequestWithBody(server string, contentType string, body io.Read
 	return req, nil
 }
 
-// NewQueryCdcRequest calls the generic QueryCdc builder with application/json body
-func NewQueryCdcRequest(server string, body QueryCdcJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewQueryCdcRequestWithBody(server, "application/json", bodyReader)
-}
-
-// NewQueryCdcRequestWithBody generates requests for QueryCdc with any type of body
-func NewQueryCdcRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/api/collections/cdc/query")
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest("POST", queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	return req, nil
-}
-
 // NewDeleteCdcRequest generates requests for DeleteCdc
 func NewDeleteCdcRequest(server string, docID DocID) (*http.Request, error) {
 	var err error
@@ -1618,7 +1578,7 @@ func NewDeleteCdcRequest(server string, docID DocID) (*http.Request, error) {
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/collections/cdc/%s", pathParam0)
+	operationPath := fmt.Sprintf("/api/collections/cdc/docs/%s", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -1652,7 +1612,7 @@ func NewGetCdcRequest(server string, docID DocID) (*http.Request, error) {
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/collections/cdc/%s", pathParam0)
+	operationPath := fmt.Sprintf("/api/collections/cdc/docs/%s", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -1697,7 +1657,7 @@ func NewEditCdcRequestWithBody(server string, docID DocID, contentType string, b
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/collections/cdc/%s", pathParam0)
+	operationPath := fmt.Sprintf("/api/collections/cdc/docs/%s", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -1744,7 +1704,7 @@ func NewSetCdcRequestWithBody(server string, docID DocID, contentType string, bo
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/collections/cdc/%s", pathParam0)
+	operationPath := fmt.Sprintf("/api/collections/cdc/docs/%s", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -1755,6 +1715,46 @@ func NewSetCdcRequestWithBody(server string, docID DocID, contentType string, bo
 	}
 
 	req, err := http.NewRequest("PUT", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewQueryCdcRequest calls the generic QueryCdc builder with application/json body
+func NewQueryCdcRequest(server string, body QueryCdcJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewQueryCdcRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewQueryCdcRequestWithBody generates requests for QueryCdc with any type of body
+func NewQueryCdcRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/collections/cdc/query")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
 	if err != nil {
 		return nil, err
 	}
@@ -1784,7 +1784,7 @@ func NewBatchSetMigrationRequestWithBody(server string, contentType string, body
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/collections/migration/batchset")
+	operationPath := fmt.Sprintf("/api/collections/migration/batch")
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -1844,46 +1844,6 @@ func NewCreateMigrationRequestWithBody(server string, contentType string, body i
 	return req, nil
 }
 
-// NewQueryMigrationRequest calls the generic QueryMigration builder with application/json body
-func NewQueryMigrationRequest(server string, body QueryMigrationJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewQueryMigrationRequestWithBody(server, "application/json", bodyReader)
-}
-
-// NewQueryMigrationRequestWithBody generates requests for QueryMigration with any type of body
-func NewQueryMigrationRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/api/collections/migration/query")
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest("POST", queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	return req, nil
-}
-
 // NewDeleteMigrationRequest generates requests for DeleteMigration
 func NewDeleteMigrationRequest(server string, docID DocID) (*http.Request, error) {
 	var err error
@@ -1900,7 +1860,7 @@ func NewDeleteMigrationRequest(server string, docID DocID) (*http.Request, error
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/collections/migration/%s", pathParam0)
+	operationPath := fmt.Sprintf("/api/collections/migration/docs/%s", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -1934,7 +1894,7 @@ func NewGetMigrationRequest(server string, docID DocID) (*http.Request, error) {
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/collections/migration/%s", pathParam0)
+	operationPath := fmt.Sprintf("/api/collections/migration/docs/%s", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -1979,7 +1939,7 @@ func NewEditMigrationRequestWithBody(server string, docID DocID, contentType str
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/collections/migration/%s", pathParam0)
+	operationPath := fmt.Sprintf("/api/collections/migration/docs/%s", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -2026,7 +1986,7 @@ func NewSetMigrationRequestWithBody(server string, docID DocID, contentType stri
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/collections/migration/%s", pathParam0)
+	operationPath := fmt.Sprintf("/api/collections/migration/docs/%s", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -2037,6 +1997,46 @@ func NewSetMigrationRequestWithBody(server string, docID DocID, contentType stri
 	}
 
 	req, err := http.NewRequest("PUT", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewQueryMigrationRequest calls the generic QueryMigration builder with application/json body
+func NewQueryMigrationRequest(server string, body QueryMigrationJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewQueryMigrationRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewQueryMigrationRequestWithBody generates requests for QueryMigration with any type of body
+func NewQueryMigrationRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/collections/migration/query")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
 	if err != nil {
 		return nil, err
 	}
@@ -2066,7 +2066,7 @@ func NewBatchSetTaskRequestWithBody(server string, contentType string, body io.R
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/collections/task/batchset")
+	operationPath := fmt.Sprintf("/api/collections/task/batch")
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -2126,46 +2126,6 @@ func NewCreateTaskRequestWithBody(server string, contentType string, body io.Rea
 	return req, nil
 }
 
-// NewQueryTaskRequest calls the generic QueryTask builder with application/json body
-func NewQueryTaskRequest(server string, body QueryTaskJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewQueryTaskRequestWithBody(server, "application/json", bodyReader)
-}
-
-// NewQueryTaskRequestWithBody generates requests for QueryTask with any type of body
-func NewQueryTaskRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/api/collections/task/query")
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest("POST", queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	return req, nil
-}
-
 // NewDeleteTaskRequest generates requests for DeleteTask
 func NewDeleteTaskRequest(server string, docID DocID) (*http.Request, error) {
 	var err error
@@ -2182,7 +2142,7 @@ func NewDeleteTaskRequest(server string, docID DocID) (*http.Request, error) {
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/collections/task/%s", pathParam0)
+	operationPath := fmt.Sprintf("/api/collections/task/docs/%s", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -2216,7 +2176,7 @@ func NewGetTaskRequest(server string, docID DocID) (*http.Request, error) {
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/collections/task/%s", pathParam0)
+	operationPath := fmt.Sprintf("/api/collections/task/docs/%s", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -2261,7 +2221,7 @@ func NewEditTaskRequestWithBody(server string, docID DocID, contentType string, 
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/collections/task/%s", pathParam0)
+	operationPath := fmt.Sprintf("/api/collections/task/docs/%s", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -2308,7 +2268,7 @@ func NewSetTaskRequestWithBody(server string, docID DocID, contentType string, b
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/collections/task/%s", pathParam0)
+	operationPath := fmt.Sprintf("/api/collections/task/docs/%s", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -2319,6 +2279,46 @@ func NewSetTaskRequestWithBody(server string, docID DocID, contentType string, b
 	}
 
 	req, err := http.NewRequest("PUT", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewQueryTaskRequest calls the generic QueryTask builder with application/json body
+func NewQueryTaskRequest(server string, body QueryTaskJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewQueryTaskRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewQueryTaskRequestWithBody generates requests for QueryTask with any type of body
+func NewQueryTaskRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/collections/task/query")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
 	if err != nil {
 		return nil, err
 	}
@@ -2348,7 +2348,7 @@ func NewBatchSetUserRequestWithBody(server string, contentType string, body io.R
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/collections/user/batchset")
+	operationPath := fmt.Sprintf("/api/collections/user/batch")
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -2408,46 +2408,6 @@ func NewCreateUserRequestWithBody(server string, contentType string, body io.Rea
 	return req, nil
 }
 
-// NewQueryUserRequest calls the generic QueryUser builder with application/json body
-func NewQueryUserRequest(server string, body QueryUserJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewQueryUserRequestWithBody(server, "application/json", bodyReader)
-}
-
-// NewQueryUserRequestWithBody generates requests for QueryUser with any type of body
-func NewQueryUserRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/api/collections/user/query")
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest("POST", queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	return req, nil
-}
-
 // NewDeleteUserRequest generates requests for DeleteUser
 func NewDeleteUserRequest(server string, docID DocID) (*http.Request, error) {
 	var err error
@@ -2464,7 +2424,7 @@ func NewDeleteUserRequest(server string, docID DocID) (*http.Request, error) {
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/collections/user/%s", pathParam0)
+	operationPath := fmt.Sprintf("/api/collections/user/docs/%s", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -2498,7 +2458,7 @@ func NewGetUserRequest(server string, docID DocID) (*http.Request, error) {
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/collections/user/%s", pathParam0)
+	operationPath := fmt.Sprintf("/api/collections/user/docs/%s", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -2543,7 +2503,7 @@ func NewEditUserRequestWithBody(server string, docID DocID, contentType string, 
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/collections/user/%s", pathParam0)
+	operationPath := fmt.Sprintf("/api/collections/user/docs/%s", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -2590,7 +2550,7 @@ func NewSetUserRequestWithBody(server string, docID DocID, contentType string, b
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/collections/user/%s", pathParam0)
+	operationPath := fmt.Sprintf("/api/collections/user/docs/%s", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -2601,6 +2561,46 @@ func NewSetUserRequestWithBody(server string, docID DocID, contentType string, b
 	}
 
 	req, err := http.NewRequest("PUT", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewQueryUserRequest calls the generic QueryUser builder with application/json body
+func NewQueryUserRequest(server string, body QueryUserJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewQueryUserRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewQueryUserRequestWithBody generates requests for QueryUser with any type of body
+func NewQueryUserRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/collections/user/query")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
 	if err != nil {
 		return nil, err
 	}
@@ -3025,11 +3025,6 @@ type ClientWithResponsesInterface interface {
 
 	CreateAccountWithResponse(ctx context.Context, body CreateAccountJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateAccountResponse, error)
 
-	// QueryAccount request with any body
-	QueryAccountWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*QueryAccountResponse, error)
-
-	QueryAccountWithResponse(ctx context.Context, body QueryAccountJSONRequestBody, reqEditors ...RequestEditorFn) (*QueryAccountResponse, error)
-
 	// DeleteAccount request
 	DeleteAccountWithResponse(ctx context.Context, docID DocID, reqEditors ...RequestEditorFn) (*DeleteAccountResponse, error)
 
@@ -3046,6 +3041,11 @@ type ClientWithResponsesInterface interface {
 
 	SetAccountWithResponse(ctx context.Context, docID DocID, body SetAccountJSONRequestBody, reqEditors ...RequestEditorFn) (*SetAccountResponse, error)
 
+	// QueryAccount request with any body
+	QueryAccountWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*QueryAccountResponse, error)
+
+	QueryAccountWithResponse(ctx context.Context, body QueryAccountJSONRequestBody, reqEditors ...RequestEditorFn) (*QueryAccountResponse, error)
+
 	// BatchSetCdc request with any body
 	BatchSetCdcWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*BatchSetCdcResponse, error)
 
@@ -3055,11 +3055,6 @@ type ClientWithResponsesInterface interface {
 	CreateCdcWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateCdcResponse, error)
 
 	CreateCdcWithResponse(ctx context.Context, body CreateCdcJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateCdcResponse, error)
-
-	// QueryCdc request with any body
-	QueryCdcWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*QueryCdcResponse, error)
-
-	QueryCdcWithResponse(ctx context.Context, body QueryCdcJSONRequestBody, reqEditors ...RequestEditorFn) (*QueryCdcResponse, error)
 
 	// DeleteCdc request
 	DeleteCdcWithResponse(ctx context.Context, docID DocID, reqEditors ...RequestEditorFn) (*DeleteCdcResponse, error)
@@ -3077,6 +3072,11 @@ type ClientWithResponsesInterface interface {
 
 	SetCdcWithResponse(ctx context.Context, docID DocID, body SetCdcJSONRequestBody, reqEditors ...RequestEditorFn) (*SetCdcResponse, error)
 
+	// QueryCdc request with any body
+	QueryCdcWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*QueryCdcResponse, error)
+
+	QueryCdcWithResponse(ctx context.Context, body QueryCdcJSONRequestBody, reqEditors ...RequestEditorFn) (*QueryCdcResponse, error)
+
 	// BatchSetMigration request with any body
 	BatchSetMigrationWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*BatchSetMigrationResponse, error)
 
@@ -3086,11 +3086,6 @@ type ClientWithResponsesInterface interface {
 	CreateMigrationWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateMigrationResponse, error)
 
 	CreateMigrationWithResponse(ctx context.Context, body CreateMigrationJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateMigrationResponse, error)
-
-	// QueryMigration request with any body
-	QueryMigrationWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*QueryMigrationResponse, error)
-
-	QueryMigrationWithResponse(ctx context.Context, body QueryMigrationJSONRequestBody, reqEditors ...RequestEditorFn) (*QueryMigrationResponse, error)
 
 	// DeleteMigration request
 	DeleteMigrationWithResponse(ctx context.Context, docID DocID, reqEditors ...RequestEditorFn) (*DeleteMigrationResponse, error)
@@ -3108,6 +3103,11 @@ type ClientWithResponsesInterface interface {
 
 	SetMigrationWithResponse(ctx context.Context, docID DocID, body SetMigrationJSONRequestBody, reqEditors ...RequestEditorFn) (*SetMigrationResponse, error)
 
+	// QueryMigration request with any body
+	QueryMigrationWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*QueryMigrationResponse, error)
+
+	QueryMigrationWithResponse(ctx context.Context, body QueryMigrationJSONRequestBody, reqEditors ...RequestEditorFn) (*QueryMigrationResponse, error)
+
 	// BatchSetTask request with any body
 	BatchSetTaskWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*BatchSetTaskResponse, error)
 
@@ -3117,11 +3117,6 @@ type ClientWithResponsesInterface interface {
 	CreateTaskWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateTaskResponse, error)
 
 	CreateTaskWithResponse(ctx context.Context, body CreateTaskJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateTaskResponse, error)
-
-	// QueryTask request with any body
-	QueryTaskWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*QueryTaskResponse, error)
-
-	QueryTaskWithResponse(ctx context.Context, body QueryTaskJSONRequestBody, reqEditors ...RequestEditorFn) (*QueryTaskResponse, error)
 
 	// DeleteTask request
 	DeleteTaskWithResponse(ctx context.Context, docID DocID, reqEditors ...RequestEditorFn) (*DeleteTaskResponse, error)
@@ -3139,6 +3134,11 @@ type ClientWithResponsesInterface interface {
 
 	SetTaskWithResponse(ctx context.Context, docID DocID, body SetTaskJSONRequestBody, reqEditors ...RequestEditorFn) (*SetTaskResponse, error)
 
+	// QueryTask request with any body
+	QueryTaskWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*QueryTaskResponse, error)
+
+	QueryTaskWithResponse(ctx context.Context, body QueryTaskJSONRequestBody, reqEditors ...RequestEditorFn) (*QueryTaskResponse, error)
+
 	// BatchSetUser request with any body
 	BatchSetUserWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*BatchSetUserResponse, error)
 
@@ -3148,11 +3148,6 @@ type ClientWithResponsesInterface interface {
 	CreateUserWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateUserResponse, error)
 
 	CreateUserWithResponse(ctx context.Context, body CreateUserJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateUserResponse, error)
-
-	// QueryUser request with any body
-	QueryUserWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*QueryUserResponse, error)
-
-	QueryUserWithResponse(ctx context.Context, body QueryUserJSONRequestBody, reqEditors ...RequestEditorFn) (*QueryUserResponse, error)
 
 	// DeleteUser request
 	DeleteUserWithResponse(ctx context.Context, docID DocID, reqEditors ...RequestEditorFn) (*DeleteUserResponse, error)
@@ -3169,6 +3164,11 @@ type ClientWithResponsesInterface interface {
 	SetUserWithBodyWithResponse(ctx context.Context, docID DocID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SetUserResponse, error)
 
 	SetUserWithResponse(ctx context.Context, docID DocID, body SetUserJSONRequestBody, reqEditors ...RequestEditorFn) (*SetUserResponse, error)
+
+	// QueryUser request with any body
+	QueryUserWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*QueryUserResponse, error)
+
+	QueryUserWithResponse(ctx context.Context, body QueryUserJSONRequestBody, reqEditors ...RequestEditorFn) (*QueryUserResponse, error)
 
 	// GetSchemas request
 	GetSchemasWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetSchemasResponse, error)
@@ -3251,28 +3251,6 @@ func (r CreateAccountResponse) Status() string {
 
 // StatusCode returns HTTPResponse.StatusCode
 func (r CreateAccountResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-type QueryAccountResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	JSON200      *[]Page
-}
-
-// Status returns HTTPResponse.Status
-func (r QueryAccountResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r QueryAccountResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
@@ -3366,6 +3344,28 @@ func (r SetAccountResponse) StatusCode() int {
 	return 0
 }
 
+type QueryAccountResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *[]Page
+}
+
+// Status returns HTTPResponse.Status
+func (r QueryAccountResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r QueryAccountResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
 type BatchSetCdcResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -3403,28 +3403,6 @@ func (r CreateCdcResponse) Status() string {
 
 // StatusCode returns HTTPResponse.StatusCode
 func (r CreateCdcResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-type QueryCdcResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	JSON200      *[]Page
-}
-
-// Status returns HTTPResponse.Status
-func (r QueryCdcResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r QueryCdcResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
@@ -3518,6 +3496,28 @@ func (r SetCdcResponse) StatusCode() int {
 	return 0
 }
 
+type QueryCdcResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *[]Page
+}
+
+// Status returns HTTPResponse.Status
+func (r QueryCdcResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r QueryCdcResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
 type BatchSetMigrationResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -3555,28 +3555,6 @@ func (r CreateMigrationResponse) Status() string {
 
 // StatusCode returns HTTPResponse.StatusCode
 func (r CreateMigrationResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-type QueryMigrationResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	JSON200      *[]Page
-}
-
-// Status returns HTTPResponse.Status
-func (r QueryMigrationResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r QueryMigrationResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
@@ -3670,6 +3648,28 @@ func (r SetMigrationResponse) StatusCode() int {
 	return 0
 }
 
+type QueryMigrationResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *[]Page
+}
+
+// Status returns HTTPResponse.Status
+func (r QueryMigrationResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r QueryMigrationResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
 type BatchSetTaskResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -3707,28 +3707,6 @@ func (r CreateTaskResponse) Status() string {
 
 // StatusCode returns HTTPResponse.StatusCode
 func (r CreateTaskResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-type QueryTaskResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	JSON200      *[]Page
-}
-
-// Status returns HTTPResponse.Status
-func (r QueryTaskResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r QueryTaskResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
@@ -3822,6 +3800,28 @@ func (r SetTaskResponse) StatusCode() int {
 	return 0
 }
 
+type QueryTaskResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *[]Page
+}
+
+// Status returns HTTPResponse.Status
+func (r QueryTaskResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r QueryTaskResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
 type BatchSetUserResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -3859,28 +3859,6 @@ func (r CreateUserResponse) Status() string {
 
 // StatusCode returns HTTPResponse.StatusCode
 func (r CreateUserResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-type QueryUserResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	JSON200      *[]Page
-}
-
-// Status returns HTTPResponse.Status
-func (r QueryUserResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r QueryUserResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
@@ -3968,6 +3946,28 @@ func (r SetUserResponse) Status() string {
 
 // StatusCode returns HTTPResponse.StatusCode
 func (r SetUserResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type QueryUserResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *[]Page
+}
+
+// Status returns HTTPResponse.Status
+func (r QueryUserResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r QueryUserResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
@@ -4250,23 +4250,6 @@ func (c *ClientWithResponses) CreateAccountWithResponse(ctx context.Context, bod
 	return ParseCreateAccountResponse(rsp)
 }
 
-// QueryAccountWithBodyWithResponse request with arbitrary body returning *QueryAccountResponse
-func (c *ClientWithResponses) QueryAccountWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*QueryAccountResponse, error) {
-	rsp, err := c.QueryAccountWithBody(ctx, contentType, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseQueryAccountResponse(rsp)
-}
-
-func (c *ClientWithResponses) QueryAccountWithResponse(ctx context.Context, body QueryAccountJSONRequestBody, reqEditors ...RequestEditorFn) (*QueryAccountResponse, error) {
-	rsp, err := c.QueryAccount(ctx, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseQueryAccountResponse(rsp)
-}
-
 // DeleteAccountWithResponse request returning *DeleteAccountResponse
 func (c *ClientWithResponses) DeleteAccountWithResponse(ctx context.Context, docID DocID, reqEditors ...RequestEditorFn) (*DeleteAccountResponse, error) {
 	rsp, err := c.DeleteAccount(ctx, docID, reqEditors...)
@@ -4319,6 +4302,23 @@ func (c *ClientWithResponses) SetAccountWithResponse(ctx context.Context, docID 
 	return ParseSetAccountResponse(rsp)
 }
 
+// QueryAccountWithBodyWithResponse request with arbitrary body returning *QueryAccountResponse
+func (c *ClientWithResponses) QueryAccountWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*QueryAccountResponse, error) {
+	rsp, err := c.QueryAccountWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseQueryAccountResponse(rsp)
+}
+
+func (c *ClientWithResponses) QueryAccountWithResponse(ctx context.Context, body QueryAccountJSONRequestBody, reqEditors ...RequestEditorFn) (*QueryAccountResponse, error) {
+	rsp, err := c.QueryAccount(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseQueryAccountResponse(rsp)
+}
+
 // BatchSetCdcWithBodyWithResponse request with arbitrary body returning *BatchSetCdcResponse
 func (c *ClientWithResponses) BatchSetCdcWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*BatchSetCdcResponse, error) {
 	rsp, err := c.BatchSetCdcWithBody(ctx, contentType, body, reqEditors...)
@@ -4351,23 +4351,6 @@ func (c *ClientWithResponses) CreateCdcWithResponse(ctx context.Context, body Cr
 		return nil, err
 	}
 	return ParseCreateCdcResponse(rsp)
-}
-
-// QueryCdcWithBodyWithResponse request with arbitrary body returning *QueryCdcResponse
-func (c *ClientWithResponses) QueryCdcWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*QueryCdcResponse, error) {
-	rsp, err := c.QueryCdcWithBody(ctx, contentType, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseQueryCdcResponse(rsp)
-}
-
-func (c *ClientWithResponses) QueryCdcWithResponse(ctx context.Context, body QueryCdcJSONRequestBody, reqEditors ...RequestEditorFn) (*QueryCdcResponse, error) {
-	rsp, err := c.QueryCdc(ctx, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseQueryCdcResponse(rsp)
 }
 
 // DeleteCdcWithResponse request returning *DeleteCdcResponse
@@ -4422,6 +4405,23 @@ func (c *ClientWithResponses) SetCdcWithResponse(ctx context.Context, docID DocI
 	return ParseSetCdcResponse(rsp)
 }
 
+// QueryCdcWithBodyWithResponse request with arbitrary body returning *QueryCdcResponse
+func (c *ClientWithResponses) QueryCdcWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*QueryCdcResponse, error) {
+	rsp, err := c.QueryCdcWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseQueryCdcResponse(rsp)
+}
+
+func (c *ClientWithResponses) QueryCdcWithResponse(ctx context.Context, body QueryCdcJSONRequestBody, reqEditors ...RequestEditorFn) (*QueryCdcResponse, error) {
+	rsp, err := c.QueryCdc(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseQueryCdcResponse(rsp)
+}
+
 // BatchSetMigrationWithBodyWithResponse request with arbitrary body returning *BatchSetMigrationResponse
 func (c *ClientWithResponses) BatchSetMigrationWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*BatchSetMigrationResponse, error) {
 	rsp, err := c.BatchSetMigrationWithBody(ctx, contentType, body, reqEditors...)
@@ -4454,23 +4454,6 @@ func (c *ClientWithResponses) CreateMigrationWithResponse(ctx context.Context, b
 		return nil, err
 	}
 	return ParseCreateMigrationResponse(rsp)
-}
-
-// QueryMigrationWithBodyWithResponse request with arbitrary body returning *QueryMigrationResponse
-func (c *ClientWithResponses) QueryMigrationWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*QueryMigrationResponse, error) {
-	rsp, err := c.QueryMigrationWithBody(ctx, contentType, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseQueryMigrationResponse(rsp)
-}
-
-func (c *ClientWithResponses) QueryMigrationWithResponse(ctx context.Context, body QueryMigrationJSONRequestBody, reqEditors ...RequestEditorFn) (*QueryMigrationResponse, error) {
-	rsp, err := c.QueryMigration(ctx, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseQueryMigrationResponse(rsp)
 }
 
 // DeleteMigrationWithResponse request returning *DeleteMigrationResponse
@@ -4525,6 +4508,23 @@ func (c *ClientWithResponses) SetMigrationWithResponse(ctx context.Context, docI
 	return ParseSetMigrationResponse(rsp)
 }
 
+// QueryMigrationWithBodyWithResponse request with arbitrary body returning *QueryMigrationResponse
+func (c *ClientWithResponses) QueryMigrationWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*QueryMigrationResponse, error) {
+	rsp, err := c.QueryMigrationWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseQueryMigrationResponse(rsp)
+}
+
+func (c *ClientWithResponses) QueryMigrationWithResponse(ctx context.Context, body QueryMigrationJSONRequestBody, reqEditors ...RequestEditorFn) (*QueryMigrationResponse, error) {
+	rsp, err := c.QueryMigration(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseQueryMigrationResponse(rsp)
+}
+
 // BatchSetTaskWithBodyWithResponse request with arbitrary body returning *BatchSetTaskResponse
 func (c *ClientWithResponses) BatchSetTaskWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*BatchSetTaskResponse, error) {
 	rsp, err := c.BatchSetTaskWithBody(ctx, contentType, body, reqEditors...)
@@ -4557,23 +4557,6 @@ func (c *ClientWithResponses) CreateTaskWithResponse(ctx context.Context, body C
 		return nil, err
 	}
 	return ParseCreateTaskResponse(rsp)
-}
-
-// QueryTaskWithBodyWithResponse request with arbitrary body returning *QueryTaskResponse
-func (c *ClientWithResponses) QueryTaskWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*QueryTaskResponse, error) {
-	rsp, err := c.QueryTaskWithBody(ctx, contentType, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseQueryTaskResponse(rsp)
-}
-
-func (c *ClientWithResponses) QueryTaskWithResponse(ctx context.Context, body QueryTaskJSONRequestBody, reqEditors ...RequestEditorFn) (*QueryTaskResponse, error) {
-	rsp, err := c.QueryTask(ctx, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseQueryTaskResponse(rsp)
 }
 
 // DeleteTaskWithResponse request returning *DeleteTaskResponse
@@ -4628,6 +4611,23 @@ func (c *ClientWithResponses) SetTaskWithResponse(ctx context.Context, docID Doc
 	return ParseSetTaskResponse(rsp)
 }
 
+// QueryTaskWithBodyWithResponse request with arbitrary body returning *QueryTaskResponse
+func (c *ClientWithResponses) QueryTaskWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*QueryTaskResponse, error) {
+	rsp, err := c.QueryTaskWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseQueryTaskResponse(rsp)
+}
+
+func (c *ClientWithResponses) QueryTaskWithResponse(ctx context.Context, body QueryTaskJSONRequestBody, reqEditors ...RequestEditorFn) (*QueryTaskResponse, error) {
+	rsp, err := c.QueryTask(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseQueryTaskResponse(rsp)
+}
+
 // BatchSetUserWithBodyWithResponse request with arbitrary body returning *BatchSetUserResponse
 func (c *ClientWithResponses) BatchSetUserWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*BatchSetUserResponse, error) {
 	rsp, err := c.BatchSetUserWithBody(ctx, contentType, body, reqEditors...)
@@ -4660,23 +4660,6 @@ func (c *ClientWithResponses) CreateUserWithResponse(ctx context.Context, body C
 		return nil, err
 	}
 	return ParseCreateUserResponse(rsp)
-}
-
-// QueryUserWithBodyWithResponse request with arbitrary body returning *QueryUserResponse
-func (c *ClientWithResponses) QueryUserWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*QueryUserResponse, error) {
-	rsp, err := c.QueryUserWithBody(ctx, contentType, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseQueryUserResponse(rsp)
-}
-
-func (c *ClientWithResponses) QueryUserWithResponse(ctx context.Context, body QueryUserJSONRequestBody, reqEditors ...RequestEditorFn) (*QueryUserResponse, error) {
-	rsp, err := c.QueryUser(ctx, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseQueryUserResponse(rsp)
 }
 
 // DeleteUserWithResponse request returning *DeleteUserResponse
@@ -4729,6 +4712,23 @@ func (c *ClientWithResponses) SetUserWithResponse(ctx context.Context, docID Doc
 		return nil, err
 	}
 	return ParseSetUserResponse(rsp)
+}
+
+// QueryUserWithBodyWithResponse request with arbitrary body returning *QueryUserResponse
+func (c *ClientWithResponses) QueryUserWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*QueryUserResponse, error) {
+	rsp, err := c.QueryUserWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseQueryUserResponse(rsp)
+}
+
+func (c *ClientWithResponses) QueryUserWithResponse(ctx context.Context, body QueryUserJSONRequestBody, reqEditors ...RequestEditorFn) (*QueryUserResponse, error) {
+	rsp, err := c.QueryUser(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseQueryUserResponse(rsp)
 }
 
 // GetSchemasWithResponse request returning *GetSchemasResponse
@@ -4912,32 +4912,6 @@ func ParseCreateAccountResponse(rsp *http.Response) (*CreateAccountResponse, err
 	return response, nil
 }
 
-// ParseQueryAccountResponse parses an HTTP response from a QueryAccountWithResponse call
-func ParseQueryAccountResponse(rsp *http.Response) (*QueryAccountResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &QueryAccountResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest []Page
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON200 = &dest
-
-	}
-
-	return response, nil
-}
-
 // ParseDeleteAccountResponse parses an HTTP response from a DeleteAccountWithResponse call
 func ParseDeleteAccountResponse(rsp *http.Response) (*DeleteAccountResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -5032,6 +5006,32 @@ func ParseSetAccountResponse(rsp *http.Response) (*SetAccountResponse, error) {
 	return response, nil
 }
 
+// ParseQueryAccountResponse parses an HTTP response from a QueryAccountWithResponse call
+func ParseQueryAccountResponse(rsp *http.Response) (*QueryAccountResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &QueryAccountResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest []Page
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	}
+
+	return response, nil
+}
+
 // ParseBatchSetCdcResponse parses an HTTP response from a BatchSetCdcWithResponse call
 func ParseBatchSetCdcResponse(rsp *http.Response) (*BatchSetCdcResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -5064,32 +5064,6 @@ func ParseCreateCdcResponse(rsp *http.Response) (*CreateCdcResponse, error) {
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest Cdc
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON200 = &dest
-
-	}
-
-	return response, nil
-}
-
-// ParseQueryCdcResponse parses an HTTP response from a QueryCdcWithResponse call
-func ParseQueryCdcResponse(rsp *http.Response) (*QueryCdcResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &QueryCdcResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest []Page
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
@@ -5194,6 +5168,32 @@ func ParseSetCdcResponse(rsp *http.Response) (*SetCdcResponse, error) {
 	return response, nil
 }
 
+// ParseQueryCdcResponse parses an HTTP response from a QueryCdcWithResponse call
+func ParseQueryCdcResponse(rsp *http.Response) (*QueryCdcResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &QueryCdcResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest []Page
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	}
+
+	return response, nil
+}
+
 // ParseBatchSetMigrationResponse parses an HTTP response from a BatchSetMigrationWithResponse call
 func ParseBatchSetMigrationResponse(rsp *http.Response) (*BatchSetMigrationResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -5226,32 +5226,6 @@ func ParseCreateMigrationResponse(rsp *http.Response) (*CreateMigrationResponse,
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest Migration
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON200 = &dest
-
-	}
-
-	return response, nil
-}
-
-// ParseQueryMigrationResponse parses an HTTP response from a QueryMigrationWithResponse call
-func ParseQueryMigrationResponse(rsp *http.Response) (*QueryMigrationResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &QueryMigrationResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest []Page
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
@@ -5356,6 +5330,32 @@ func ParseSetMigrationResponse(rsp *http.Response) (*SetMigrationResponse, error
 	return response, nil
 }
 
+// ParseQueryMigrationResponse parses an HTTP response from a QueryMigrationWithResponse call
+func ParseQueryMigrationResponse(rsp *http.Response) (*QueryMigrationResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &QueryMigrationResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest []Page
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	}
+
+	return response, nil
+}
+
 // ParseBatchSetTaskResponse parses an HTTP response from a BatchSetTaskWithResponse call
 func ParseBatchSetTaskResponse(rsp *http.Response) (*BatchSetTaskResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -5388,32 +5388,6 @@ func ParseCreateTaskResponse(rsp *http.Response) (*CreateTaskResponse, error) {
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest Task
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON200 = &dest
-
-	}
-
-	return response, nil
-}
-
-// ParseQueryTaskResponse parses an HTTP response from a QueryTaskWithResponse call
-func ParseQueryTaskResponse(rsp *http.Response) (*QueryTaskResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &QueryTaskResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest []Page
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
@@ -5518,6 +5492,32 @@ func ParseSetTaskResponse(rsp *http.Response) (*SetTaskResponse, error) {
 	return response, nil
 }
 
+// ParseQueryTaskResponse parses an HTTP response from a QueryTaskWithResponse call
+func ParseQueryTaskResponse(rsp *http.Response) (*QueryTaskResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &QueryTaskResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest []Page
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	}
+
+	return response, nil
+}
+
 // ParseBatchSetUserResponse parses an HTTP response from a BatchSetUserWithResponse call
 func ParseBatchSetUserResponse(rsp *http.Response) (*BatchSetUserResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -5550,32 +5550,6 @@ func ParseCreateUserResponse(rsp *http.Response) (*CreateUserResponse, error) {
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest User
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON200 = &dest
-
-	}
-
-	return response, nil
-}
-
-// ParseQueryUserResponse parses an HTTP response from a QueryUserWithResponse call
-func ParseQueryUserResponse(rsp *http.Response) (*QueryUserResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &QueryUserResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest []Page
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
@@ -5670,6 +5644,32 @@ func ParseSetUserResponse(rsp *http.Response) (*SetUserResponse, error) {
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest User
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseQueryUserResponse parses an HTTP response from a QueryUserWithResponse call
+func ParseQueryUserResponse(rsp *http.Response) (*QueryUserResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &QueryUserResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest []Page
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}

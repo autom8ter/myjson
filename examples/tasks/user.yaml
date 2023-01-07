@@ -16,7 +16,12 @@ properties:
     type: string
     description: The user's name.
   contact:
-    $ref: "#/common/contact"
+    type: object
+    properties:
+      email:
+        type: string
+        description: The user's email.
+        x-unique: true
   age:
     description: Age in years which must be equal to or greater than zero.
     type: integer
@@ -57,14 +62,3 @@ x-triggers:
     script: |
       doc.set('timestamp', new Date().toISOString())
 
-common:
-  contact:
-    type: object
-    properties:
-      email:
-        type: string
-        description: The user's email.
-        x-unique: true
-
-
-  

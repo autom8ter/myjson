@@ -98,7 +98,7 @@ paths:
             schema:
               $ref: '#/components/schemas/{{ title .collection }}'
         required: true
-  /api/collections/{{ .collection }}/{docID}:
+  /api/collections/{{ .collection }}/docs/{docID}:
     get:
       tags:
         - {{ title .collection }}
@@ -217,7 +217,7 @@ paths:
             schema:
               $ref: '#/components/schemas/Query'
         required: true
-  /api/collections/{{ .collection }}/batchset:
+  /api/collections/{{ .collection }}/batch:
     put:
       tags:
         - {{ title .collection }}

@@ -7,8 +7,8 @@ import (
 	"github.com/autom8ter/myjson"
 	"github.com/autom8ter/myjson/errors"
 	"github.com/autom8ter/myjson/transport/openapi/httpError"
+	"github.com/ghodss/yaml"
 	"github.com/gorilla/mux"
-	"gopkg.in/yaml.v3"
 )
 
 func (o *openAPIServer) getSchemasHandler(db myjson.Database) http.HandlerFunc {
@@ -19,8 +19,13 @@ func (o *openAPIServer) getSchemasHandler(db myjson.Database) http.HandlerFunc {
 			schema, _ := db.GetSchema(r.Context(), c).MarshalYAML()
 			resp[c] = string(schema)
 		}
+		bits, err := yaml.Marshal(&resp)
+		if err != nil {
+			httpError.Error(w, errors.Wrap(err, http.StatusBadRequest, "failed to marshal response"))
+			return
+		}
 		w.WriteHeader(http.StatusOK)
-		yaml.NewEncoder(w).Encode(&resp)
+		w.Write(bits)
 	})
 }
 
