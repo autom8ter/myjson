@@ -137,8 +137,7 @@ type TxClient struct {
 	conn *websocket.Conn
 }
 
-func (t TxClient) Process(ctx context.Context, input chan TxInput) (chan TxOutput, chan error) {
-	output := make(chan TxOutput)
+func (t TxClient) Process(ctx context.Context, input chan TxInput, outputHandler func(output TxOutput) error) chan error {
 	errs := make(chan error, 1)
 	go func() {
 		ctx, cancel := context.WithCancel(ctx)
@@ -148,29 +147,33 @@ func (t TxClient) Process(ctx context.Context, input chan TxInput) (chan TxOutpu
 			for {
 				select {
 				case <-ctx.Done():
-					close(output)
 					return nil
 				default:
 					var msg TxOutput
 					if err := t.conn.ReadJSON(&msg); err != nil {
 						return nil
 					}
-					output <- msg
+
+					if err := outputHandler(msg); err != nil {
+						return err
+					}
 				}
 			}
 		})
 		egp.Go(func() error {
+			defer cancel()
 			for msg := range input {
 				if err := t.conn.WriteJSON(msg); err != nil {
 					return err
 				}
+				if msg.Action == Commit {
+					return nil
+				}
 			}
-			cancel()
 			return nil
 		})
 		errs <- egp.Wait()
 		t.conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""))
-		close(errs)
 	}()
-	return output, errs
+	return errs
 }

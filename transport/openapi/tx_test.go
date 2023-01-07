@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/http/httptest"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
@@ -35,25 +34,10 @@ func TestTx(t *testing.T) {
 		assert.NoError(t, err, s.URL)
 		client := TxClient{conn: c}
 		input := make(chan TxInput)
-		output, errs := client.Process(ctx, input)
-		assert.NoError(t, err)
-
-		wg := sync.WaitGroup{}
-		wg.Add(1)
-		defer c.Close()
-		go func() {
-			defer wg.Done()
-			for o := range output {
-				fmt.Println(o)
-			}
-		}()
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			for e := range errs {
-				assert.NoError(t, e)
-			}
-		}()
+		done := client.Process(ctx, input, func(output TxOutput) error {
+			fmt.Println(output)
+			return nil
+		})
 		for i := 0; i < 100; i++ {
 			input <- TxInput{
 				Action:     Set,
@@ -67,7 +51,6 @@ func TestTx(t *testing.T) {
 		input <- TxInput{
 			Action: Commit,
 		}
-		close(input)
-		wg.Wait()
+		assert.NoError(t, <-done)
 	}))
 }
