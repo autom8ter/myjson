@@ -12,6 +12,7 @@ import (
 
 func (o *openAPIServer) getDocHandler(db myjson.Database) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
 		collection := mux.Vars(r)["collection"]
 		if !db.HasCollection(r.Context(), collection) {
 			httpError.Error(w, errors.New(errors.Validation, "collection does not exist"))

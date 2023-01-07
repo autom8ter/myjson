@@ -2,7 +2,6 @@ package openapi
 
 import (
 	"context"
-	"io"
 	"net/http/httptest"
 	"testing"
 
@@ -25,11 +24,12 @@ func TestGet(t *testing.T) {
 		assert.NoError(t, oapi.registerRoutes(ctx, db))
 		s := httptest.NewServer(oapi.router)
 		defer s.Close()
-		client, err := testdata.NewClient(s.URL)
+		client, err := testdata.NewClientWithResponses(s.URL)
 		assert.NoError(t, err)
 
-		account, err := client.GetAccount(ctx, "0")
-		bits, _ := io.ReadAll(account.Body)
-		assert.Equal(t, 200, account.StatusCode, string(bits))
+		account, err := client.GetAccountWithResponse(ctx, "0")
+		assert.NoError(t, err)
+		assert.NotEmpty(t, account.JSON200)
+		assert.Equal(t, 200, account.StatusCode(), string(account.Body))
 	}))
 }

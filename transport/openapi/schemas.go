@@ -13,6 +13,7 @@ import (
 
 func (o *openAPIServer) getSchemasHandler(db myjson.Database) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
 		var resp = map[string]any{}
 		var collections = db.Collections(r.Context())
 		for _, c := range collections {
@@ -31,6 +32,7 @@ func (o *openAPIServer) getSchemasHandler(db myjson.Database) http.HandlerFunc {
 
 func (o *openAPIServer) getSchemaHandler(db myjson.Database) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
 		collection := mux.Vars(r)["collection"]
 		if !db.HasCollection(r.Context(), collection) {
 			httpError.Error(w, errors.New(errors.Validation, "collection does not exist"))
@@ -44,6 +46,7 @@ func (o *openAPIServer) getSchemaHandler(db myjson.Database) http.HandlerFunc {
 
 func (o *openAPIServer) putSchemaHandler(db myjson.Database) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
 		bits, err := io.ReadAll(r.Body)
 		if err != nil {
 			httpError.Error(w, errors.Wrap(err, http.StatusBadRequest, "failed to read request body"))

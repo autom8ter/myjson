@@ -2,7 +2,6 @@ package openapi
 
 import (
 	"context"
-	"io"
 	"net/http/httptest"
 	"testing"
 
@@ -26,10 +25,10 @@ func TestBatch(t *testing.T) {
 		assert.NoError(t, oapi.registerRoutes(ctx, db))
 		s := httptest.NewServer(oapi.router)
 		defer s.Close()
-		client, err := testdata.NewClient(s.URL)
+		client, err := testdata.NewClientWithResponses(s.URL)
 		assert.NoError(t, err)
 
-		results, err := client.BatchSetAccount(ctx, testdata.BatchSetAccountJSONRequestBody{
+		results, err := client.BatchSetAccountWithResponse(ctx, testdata.BatchSetAccountJSONRequestBody{
 			{
 				Id:   "0",
 				Name: gofakeit.Company(),
@@ -43,7 +42,7 @@ func TestBatch(t *testing.T) {
 				Name: gofakeit.Company(),
 			},
 		})
-		bits, _ := io.ReadAll(results.Body)
-		assert.Equal(t, 200, results.StatusCode, string(bits))
+
+		assert.Equal(t, 200, results.StatusCode, string(results.Body))
 	}))
 }
