@@ -43,6 +43,6 @@ func TestBatch(t *testing.T) {
 			},
 		})
 
-		assert.Equal(t, 200, results.StatusCode, string(results.Body))
+		assert.Equal(t, 200, results.StatusCode(), string(results.Body))
 	}))
 }

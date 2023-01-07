@@ -27,27 +27,27 @@ type lockMeta struct {
 }
 
 func (b *badgerLock) IsLocked(ctx context.Context) (bool, error) {
-	return false, nil
-	//isLocked := true
-	//err := b.db.Tx(kv.TxOpts{IsReadOnly: true}, func(tx kv.Tx) error {
-	//	val, err := tx.Get(ctx, b.key)
-	//	if err != nil {
-	//		if err != badger.ErrKeyNotFound {
-	//			return err
-	//		}
-	//		isLocked = false
-	//		return nil
-	//	}
-	//	var current lockMeta
-	//	//nolint:errcheck
-	//	json.Unmarshal(val, &current)
-	//	if time.Since(current.LastUpdate) > 4*b.leaseInterval && current.ID != b.id {
-	//		isLocked = false
-	//		return nil
-	//	}
-	//	return nil
-	//})
-	//return isLocked, err
+	//return false, nil
+	isLocked := true
+	err := b.db.Tx(kv.TxOpts{IsReadOnly: true}, func(tx kv.Tx) error {
+		val, err := tx.Get(ctx, b.key)
+		if err != nil {
+			if err != badger.ErrKeyNotFound {
+				return err
+			}
+			isLocked = false
+			return nil
+		}
+		var current lockMeta
+		//nolint:errcheck
+		json.Unmarshal(val, &current)
+		if time.Since(current.LastUpdate) > 4*b.leaseInterval && current.ID != b.id {
+			isLocked = false
+			return nil
+		}
+		return nil
+	})
+	return isLocked, err
 }
 
 func (b *badgerLock) TryLock(ctx context.Context) (bool, error) {
