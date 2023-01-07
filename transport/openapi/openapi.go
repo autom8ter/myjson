@@ -18,6 +18,7 @@ import (
 	"github.com/getkin/kin-openapi/routers/gorillamux"
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
+	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -40,6 +41,7 @@ type openAPIServer struct {
 	spec          []byte
 	specMu        sync.RWMutex
 	openapiRouter routers.Router
+	logger        *zap.Logger
 }
 
 // New creates a new openapi server
@@ -47,11 +49,16 @@ func New(params Config, mwares ...mux.MiddlewareFunc) (myjson.Transport, error) 
 	if err := util.ValidateStruct(params); err != nil {
 		return nil, err
 	}
+	l, err := zap.NewProduction()
+	if err != nil {
+		return nil, err
+	}
 	o := &openAPIServer{
 		params:   params,
 		router:   mux.NewRouter(),
 		mwares:   mwares,
 		upgrader: websocket.Upgrader{ReadBufferSize: 1024, WriteBufferSize: 1024},
+		logger:   l,
 	}
 	return o, nil
 }
@@ -132,6 +139,7 @@ func (o *openAPIServer) refreshSpec(db myjson.Database) error {
 
 // Serve starts an openapi http server serving the database
 func (o *openAPIServer) Serve(ctx context.Context, db myjson.Database) error {
+	defer o.logger.Sync()
 	if err := o.registerRoutes(ctx, db); err != nil {
 		return err
 	}

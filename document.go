@@ -603,3 +603,48 @@ func (documents Documents) Map(mapper func(t *Document, i int) *Document) Docume
 func (documents Documents) ForEach(fn func(next *Document, i int)) {
 	lo.ForEach[*Document](documents, fn)
 }
+
+// DocBuilder is a builder for creating a document
+type DocBuilder struct {
+	doc *Document
+	err error
+}
+
+// D creates a new document builder
+func D() *DocBuilder {
+	return &DocBuilder{
+		doc: NewDocument(),
+	}
+}
+
+// From creates a new document builder from the input document
+func (b *DocBuilder) From(d *Document) *DocBuilder {
+	if b.err != nil {
+		return b
+	}
+	if err := b.doc.Overwrite(d.Value()); err != nil {
+		b.err = err
+	}
+	return b
+}
+
+// DocBuilder sets the key value pairs on the document
+func (b *DocBuilder) Set(values map[string]any) *DocBuilder {
+	if b.err != nil {
+		return b
+	}
+	if err := b.doc.SetAll(values); err != nil {
+		b.err = err
+	}
+	return b
+}
+
+// Doc returns the document
+func (b *DocBuilder) Doc() *Document {
+	return b.doc
+}
+
+// Err returns an error if one exists
+func (b *DocBuilder) Err() error {
+	return b.err
+}

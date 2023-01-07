@@ -8,6 +8,8 @@ import (
 	"github.com/autom8ter/myjson/errors"
 	"github.com/autom8ter/myjson/kv"
 	"github.com/autom8ter/myjson/transport/openapi/httpError"
+	"github.com/gorilla/websocket"
+	"golang.org/x/sync/errgroup"
 )
 
 type TxAction string
@@ -37,22 +39,27 @@ type TxOutput struct {
 
 func (o *openAPIServer) txHandler(db myjson.Database) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+
 		conn, err := o.upgrader.Upgrade(w, r, nil)
 		if err != nil {
 			httpError.Error(w, errors.Wrap(err, http.StatusBadRequest, "failed to upgrade socket tx request"))
 			return
 		}
+		defer conn.Close()
 		ctx, cancel := context.WithCancel(r.Context())
 		defer cancel()
-		tx, err := db.NewTx(kv.TxOpts{})
+		tx, err := db.NewTx(kv.TxOpts{
+			IsReadOnly: r.URL.Query().Get("readonly") == "true",
+			IsBatch:    r.URL.Query().Get("batch") == "true",
+		})
 		if err != nil {
 			httpError.Error(w, errors.Wrap(err, http.StatusBadRequest, "failed to create tx"))
 			return
 		}
+		defer tx.Close(ctx)
 		for {
 			select {
 			case <-ctx.Done():
-				conn.Close()
 				return
 			default:
 				var msg TxInput
@@ -61,22 +68,37 @@ func (o *openAPIServer) txHandler(db myjson.Database) http.HandlerFunc {
 						Value: nil,
 						Error: errors.Extract(err),
 					})
-					continue
+					return
 				}
+				if msg.Collection != "" {
+					if !db.HasCollection(ctx, msg.Collection) {
+						conn.WriteJSON(&TxOutput{
+							Value: msg.Value,
+							Error: errors.Extract(errors.New(errors.Validation, "collection does not exist")),
+						})
+						continue
+					}
+					schema := db.GetSchema(ctx, msg.Collection)
+					if msg.DocID != "" && msg.Value != nil && schema.GetPrimaryKey(msg.Value) == "" {
+						if err := schema.SetPrimaryKey(msg.Value, msg.DocID); err != nil {
+							conn.WriteJSON(&TxOutput{
+								Value: msg.Value,
+								Error: errors.Extract(errors.Wrap(err, errors.Validation, "failed to set document primary key")),
+							})
+							continue
+						}
+					}
+				}
+
 				switch msg.Action {
 				case Rollback:
 					tx.Rollback(ctx)
 					cancel()
-					break
+					return
 				case Commit:
-					if err := tx.Commit(ctx); err != nil {
-						conn.WriteJSON(&TxOutput{
-							Value: nil,
-							Error: errors.Extract(err),
-						})
-					}
+					tx.Commit(ctx)
 					cancel()
-					break
+					return
 				case Set:
 					err := tx.Set(ctx, msg.Collection, msg.Value)
 					var output = &TxOutput{
@@ -109,4 +131,46 @@ func (o *openAPIServer) txHandler(db myjson.Database) http.HandlerFunc {
 			}
 		}
 	}
+}
+
+type TxClient struct {
+	conn *websocket.Conn
+}
+
+func (t TxClient) Process(ctx context.Context, input chan TxInput) (chan TxOutput, chan error) {
+	output := make(chan TxOutput)
+	errs := make(chan error, 1)
+	go func() {
+		ctx, cancel := context.WithCancel(ctx)
+		defer cancel()
+		egp, ctx := errgroup.WithContext(ctx)
+		egp.Go(func() error {
+			for {
+				select {
+				case <-ctx.Done():
+					close(output)
+					return nil
+				default:
+					var msg TxOutput
+					if err := t.conn.ReadJSON(&msg); err != nil {
+						return nil
+					}
+					output <- msg
+				}
+			}
+		})
+		egp.Go(func() error {
+			for msg := range input {
+				if err := t.conn.WriteJSON(msg); err != nil {
+					return err
+				}
+			}
+			cancel()
+			return nil
+		})
+		errs <- egp.Wait()
+		t.conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""))
+		close(errs)
+	}()
+	return output, errs
 }
