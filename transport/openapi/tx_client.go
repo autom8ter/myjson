@@ -42,9 +42,6 @@ func (t *TxSocket) Write(ctx context.Context, input TxInput) error {
 }
 
 func (t *TxSocket) Read(ctx context.Context) (TxOutput, error) {
-	if ctx.Err() != nil {
-		return TxOutput{}, nil
-	}
 	var output TxOutput
 	if err := t.conn.ReadJSON(&output); err != nil {
 		return TxOutput{}, err

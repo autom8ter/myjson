@@ -30,6 +30,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+	defer db.Close(ctx)
 
 	if err := db.ConfigureCollection(ctx, []byte(accountSchema)); err != nil {
 		panic(err)

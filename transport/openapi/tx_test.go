@@ -90,4 +90,34 @@ func TestTx(t *testing.T) {
 			}))
 		}))
 	})
+	t.Run("query", func(t *testing.T) {
+		assert.NoError(t, testutil.TestDB(func(ctx context.Context, db myjson.Database) {
+			ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+			defer cancel()
+			o, err := New(Config{
+				Title:       "testing",
+				Version:     "v0.0.0",
+				Description: "testing openapi schema",
+				Port:        8080,
+			})
+			assert.NoError(t, err)
+			oapi := o.(*openAPIServer)
+			assert.NoError(t, oapi.registerRoutes(ctx, db))
+			s := httptest.NewServer(oapi.router)
+			defer s.Close()
+			client := NewTxClient(s.URL)
+			tx, err := client.NewTx(nil)
+			assert.NoError(t, err, s.URL)
+
+			defer tx.Close()
+			assert.NoError(t, tx.Write(ctx, TxInput{
+				Action:     Query,
+				Collection: "account",
+				Query:      myjson.Q().Query(),
+			}))
+			out, err := tx.Read(ctx)
+			assert.NoError(t, err)
+			fmt.Println(out)
+		}))
+	})
 }
