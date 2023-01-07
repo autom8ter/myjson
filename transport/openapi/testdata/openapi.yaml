@@ -1,0 +1,1400 @@
+openapi: 3.0.2
+info:
+  version: v0.0.0
+  title: testing
+  description: |
+        testing openapi schema
+tags: 
+  - name: Account
+    description: Account operations 
+  - name: Cdc
+    description: Cdc operations 
+  - name: Migration
+    description: Migration operations 
+  - name: Task
+    description: Task operations 
+  - name: User
+    description: User operations 
+
+paths:
+  /api/schema:
+    get:
+      tags:
+        - schema
+      summary: get collection schemas
+      operationId: getSchemas
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: string
+        '400':
+          description: Invalid schema
+        '500':
+          description: Internal Server Error
+  # account collection endpoints
+  /api/schema/account:
+    get:
+      tags:
+        - Account
+        - schema
+      summary: get Account collection schemas
+      operationId: getAccountSchema
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: string
+        '400':
+          description: Invalid schema
+        '500':
+          description: Internal Server Error
+    put:
+      tags:
+        - Account
+      summary: set Account collection schemas
+      operationId: setAccountSchema
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: string
+        '400':
+          description: Invalid schema
+        '500':
+          description: Internal Server Error
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: string
+        required: true
+  /api/collections/account/docs:
+    post:
+      tags:
+        - Account
+      summary: create a Account document
+      description: This creates a document in the Account collection
+      operationId: createAccount
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Account"
+        '400':
+          description: Invalid document
+        '404':
+          description: Not found
+        '500':
+          description: Internal Server Error
+      
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Account'
+        required: true
+  /api/collections/account/{docID}:
+    get:
+      tags:
+        - Account
+      summary: get a Account document by id
+      description: This retrieves an existing document in the Account collection by id
+      operationId: getAccount
+      parameters:
+        - $ref: "#/components/parameters/DocID"
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Account"
+        '400':
+          description: Invalid request
+        '404':
+          description: Not found
+        '500':
+          description: Internal Server Error
+    delete:
+      tags:
+        - Account
+      summary: delete a Account document by id
+      description: This deletes an existing document in the Account collection by id
+      operationId: deleteAccount
+      parameters:
+        - $ref: "#/components/parameters/DocID"
+      responses:
+        '200':
+          description: OK
+        '400':
+          description: Invalid request
+        '404':
+          description: Not found
+        '500':
+          description: Internal Server Error
+    put:
+      tags:
+        - Account
+      summary: update a Account document
+      description: This updates an existing document in the Account collection
+      operationId: setAccount
+      parameters:
+        - $ref: "#/components/parameters/DocID"
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Account"
+        '400':
+          description: Invalid update
+        '404':
+          description: Not found
+        '500':
+          description: Internal Server Error
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Account'
+        required: true
+    patch:
+      tags:
+        - Account
+      summary: edit fields of an Account document
+      description: This edits a document in the Account collection
+      operationId: editAccount
+      parameters:
+        - $ref: "#/components/parameters/DocID"
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Account"
+        '400':
+          description: Invalid document
+        '404':
+          description: Not found
+        '500':
+          description: Internal Server Error
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+        required: true
+  /api/collections/account/query:
+    post:
+      tags:
+        - Account
+      summary: query Account collection
+      description: This operation queries documents in the Account collection
+      operationId: queryAccount
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Page"
+        '400':
+          description: Invalid Account Query
+        '500':
+          description: Internal Server Error
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Query'
+        required: true
+  /api/collections/account/batchset:
+    put:
+      tags:
+        - Account
+      summary: batch set 1-many Account documents
+      description: This set 1-many documents in the Account collection
+      operationId: batchSetAccount
+      responses:
+        '200':
+          description: OK
+        '400':
+          description: Invalid document(s)
+        '404':
+          description: Not found
+        '500':
+          description: Internal Server Error
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: '#/components/schemas/Account'
+        required: true
+
+  # cdc collection endpoints
+  /api/schema/cdc:
+    get:
+      tags:
+        - Cdc
+        - schema
+      summary: get Cdc collection schemas
+      operationId: getCdcSchema
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: string
+        '400':
+          description: Invalid schema
+        '500':
+          description: Internal Server Error
+    put:
+      tags:
+        - Cdc
+      summary: set Cdc collection schemas
+      operationId: setCdcSchema
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: string
+        '400':
+          description: Invalid schema
+        '500':
+          description: Internal Server Error
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: string
+        required: true
+  /api/collections/cdc/docs:
+    post:
+      tags:
+        - Cdc
+      summary: create a Cdc document
+      description: This creates a document in the Cdc collection
+      operationId: createCdc
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Cdc"
+        '400':
+          description: Invalid document
+        '404':
+          description: Not found
+        '500':
+          description: Internal Server Error
+      
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Cdc'
+        required: true
+  /api/collections/cdc/{docID}:
+    get:
+      tags:
+        - Cdc
+      summary: get a Cdc document by id
+      description: This retrieves an existing document in the Cdc collection by id
+      operationId: getCdc
+      parameters:
+        - $ref: "#/components/parameters/DocID"
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Cdc"
+        '400':
+          description: Invalid request
+        '404':
+          description: Not found
+        '500':
+          description: Internal Server Error
+    delete:
+      tags:
+        - Cdc
+      summary: delete a Cdc document by id
+      description: This deletes an existing document in the Cdc collection by id
+      operationId: deleteCdc
+      parameters:
+        - $ref: "#/components/parameters/DocID"
+      responses:
+        '200':
+          description: OK
+        '400':
+          description: Invalid request
+        '404':
+          description: Not found
+        '500':
+          description: Internal Server Error
+    put:
+      tags:
+        - Cdc
+      summary: update a Cdc document
+      description: This updates an existing document in the Cdc collection
+      operationId: setCdc
+      parameters:
+        - $ref: "#/components/parameters/DocID"
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Cdc"
+        '400':
+          description: Invalid update
+        '404':
+          description: Not found
+        '500':
+          description: Internal Server Error
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Cdc'
+        required: true
+    patch:
+      tags:
+        - Cdc
+      summary: edit fields of an Cdc document
+      description: This edits a document in the Cdc collection
+      operationId: editCdc
+      parameters:
+        - $ref: "#/components/parameters/DocID"
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Cdc"
+        '400':
+          description: Invalid document
+        '404':
+          description: Not found
+        '500':
+          description: Internal Server Error
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+        required: true
+  /api/collections/cdc/query:
+    post:
+      tags:
+        - Cdc
+      summary: query Cdc collection
+      description: This operation queries documents in the Cdc collection
+      operationId: queryCdc
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Page"
+        '400':
+          description: Invalid Cdc Query
+        '500':
+          description: Internal Server Error
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Query'
+        required: true
+  /api/collections/cdc/batchset:
+    put:
+      tags:
+        - Cdc
+      summary: batch set 1-many Cdc documents
+      description: This set 1-many documents in the Cdc collection
+      operationId: batchSetCdc
+      responses:
+        '200':
+          description: OK
+        '400':
+          description: Invalid document(s)
+        '404':
+          description: Not found
+        '500':
+          description: Internal Server Error
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: '#/components/schemas/Cdc'
+        required: true
+
+  # migration collection endpoints
+  /api/schema/migration:
+    get:
+      tags:
+        - Migration
+        - schema
+      summary: get Migration collection schemas
+      operationId: getMigrationSchema
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: string
+        '400':
+          description: Invalid schema
+        '500':
+          description: Internal Server Error
+    put:
+      tags:
+        - Migration
+      summary: set Migration collection schemas
+      operationId: setMigrationSchema
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: string
+        '400':
+          description: Invalid schema
+        '500':
+          description: Internal Server Error
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: string
+        required: true
+  /api/collections/migration/docs:
+    post:
+      tags:
+        - Migration
+      summary: create a Migration document
+      description: This creates a document in the Migration collection
+      operationId: createMigration
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Migration"
+        '400':
+          description: Invalid document
+        '404':
+          description: Not found
+        '500':
+          description: Internal Server Error
+      
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Migration'
+        required: true
+  /api/collections/migration/{docID}:
+    get:
+      tags:
+        - Migration
+      summary: get a Migration document by id
+      description: This retrieves an existing document in the Migration collection by id
+      operationId: getMigration
+      parameters:
+        - $ref: "#/components/parameters/DocID"
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Migration"
+        '400':
+          description: Invalid request
+        '404':
+          description: Not found
+        '500':
+          description: Internal Server Error
+    delete:
+      tags:
+        - Migration
+      summary: delete a Migration document by id
+      description: This deletes an existing document in the Migration collection by id
+      operationId: deleteMigration
+      parameters:
+        - $ref: "#/components/parameters/DocID"
+      responses:
+        '200':
+          description: OK
+        '400':
+          description: Invalid request
+        '404':
+          description: Not found
+        '500':
+          description: Internal Server Error
+    put:
+      tags:
+        - Migration
+      summary: update a Migration document
+      description: This updates an existing document in the Migration collection
+      operationId: setMigration
+      parameters:
+        - $ref: "#/components/parameters/DocID"
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Migration"
+        '400':
+          description: Invalid update
+        '404':
+          description: Not found
+        '500':
+          description: Internal Server Error
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Migration'
+        required: true
+    patch:
+      tags:
+        - Migration
+      summary: edit fields of an Migration document
+      description: This edits a document in the Migration collection
+      operationId: editMigration
+      parameters:
+        - $ref: "#/components/parameters/DocID"
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Migration"
+        '400':
+          description: Invalid document
+        '404':
+          description: Not found
+        '500':
+          description: Internal Server Error
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+        required: true
+  /api/collections/migration/query:
+    post:
+      tags:
+        - Migration
+      summary: query Migration collection
+      description: This operation queries documents in the Migration collection
+      operationId: queryMigration
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Page"
+        '400':
+          description: Invalid Migration Query
+        '500':
+          description: Internal Server Error
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Query'
+        required: true
+  /api/collections/migration/batchset:
+    put:
+      tags:
+        - Migration
+      summary: batch set 1-many Migration documents
+      description: This set 1-many documents in the Migration collection
+      operationId: batchSetMigration
+      responses:
+        '200':
+          description: OK
+        '400':
+          description: Invalid document(s)
+        '404':
+          description: Not found
+        '500':
+          description: Internal Server Error
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: '#/components/schemas/Migration'
+        required: true
+
+  # task collection endpoints
+  /api/schema/task:
+    get:
+      tags:
+        - Task
+        - schema
+      summary: get Task collection schemas
+      operationId: getTaskSchema
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: string
+        '400':
+          description: Invalid schema
+        '500':
+          description: Internal Server Error
+    put:
+      tags:
+        - Task
+      summary: set Task collection schemas
+      operationId: setTaskSchema
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: string
+        '400':
+          description: Invalid schema
+        '500':
+          description: Internal Server Error
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: string
+        required: true
+  /api/collections/task/docs:
+    post:
+      tags:
+        - Task
+      summary: create a Task document
+      description: This creates a document in the Task collection
+      operationId: createTask
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Task"
+        '400':
+          description: Invalid document
+        '404':
+          description: Not found
+        '500':
+          description: Internal Server Error
+      
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Task'
+        required: true
+  /api/collections/task/{docID}:
+    get:
+      tags:
+        - Task
+      summary: get a Task document by id
+      description: This retrieves an existing document in the Task collection by id
+      operationId: getTask
+      parameters:
+        - $ref: "#/components/parameters/DocID"
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Task"
+        '400':
+          description: Invalid request
+        '404':
+          description: Not found
+        '500':
+          description: Internal Server Error
+    delete:
+      tags:
+        - Task
+      summary: delete a Task document by id
+      description: This deletes an existing document in the Task collection by id
+      operationId: deleteTask
+      parameters:
+        - $ref: "#/components/parameters/DocID"
+      responses:
+        '200':
+          description: OK
+        '400':
+          description: Invalid request
+        '404':
+          description: Not found
+        '500':
+          description: Internal Server Error
+    put:
+      tags:
+        - Task
+      summary: update a Task document
+      description: This updates an existing document in the Task collection
+      operationId: setTask
+      parameters:
+        - $ref: "#/components/parameters/DocID"
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Task"
+        '400':
+          description: Invalid update
+        '404':
+          description: Not found
+        '500':
+          description: Internal Server Error
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Task'
+        required: true
+    patch:
+      tags:
+        - Task
+      summary: edit fields of an Task document
+      description: This edits a document in the Task collection
+      operationId: editTask
+      parameters:
+        - $ref: "#/components/parameters/DocID"
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Task"
+        '400':
+          description: Invalid document
+        '404':
+          description: Not found
+        '500':
+          description: Internal Server Error
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+        required: true
+  /api/collections/task/query:
+    post:
+      tags:
+        - Task
+      summary: query Task collection
+      description: This operation queries documents in the Task collection
+      operationId: queryTask
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Page"
+        '400':
+          description: Invalid Task Query
+        '500':
+          description: Internal Server Error
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Query'
+        required: true
+  /api/collections/task/batchset:
+    put:
+      tags:
+        - Task
+      summary: batch set 1-many Task documents
+      description: This set 1-many documents in the Task collection
+      operationId: batchSetTask
+      responses:
+        '200':
+          description: OK
+        '400':
+          description: Invalid document(s)
+        '404':
+          description: Not found
+        '500':
+          description: Internal Server Error
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: '#/components/schemas/Task'
+        required: true
+
+  # user collection endpoints
+  /api/schema/user:
+    get:
+      tags:
+        - User
+        - schema
+      summary: get User collection schemas
+      operationId: getUserSchema
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: string
+        '400':
+          description: Invalid schema
+        '500':
+          description: Internal Server Error
+    put:
+      tags:
+        - User
+      summary: set User collection schemas
+      operationId: setUserSchema
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: string
+        '400':
+          description: Invalid schema
+        '500':
+          description: Internal Server Error
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: string
+        required: true
+  /api/collections/user/docs:
+    post:
+      tags:
+        - User
+      summary: create a User document
+      description: This creates a document in the User collection
+      operationId: createUser
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        '400':
+          description: Invalid document
+        '404':
+          description: Not found
+        '500':
+          description: Internal Server Error
+      
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/User'
+        required: true
+  /api/collections/user/{docID}:
+    get:
+      tags:
+        - User
+      summary: get a User document by id
+      description: This retrieves an existing document in the User collection by id
+      operationId: getUser
+      parameters:
+        - $ref: "#/components/parameters/DocID"
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        '400':
+          description: Invalid request
+        '404':
+          description: Not found
+        '500':
+          description: Internal Server Error
+    delete:
+      tags:
+        - User
+      summary: delete a User document by id
+      description: This deletes an existing document in the User collection by id
+      operationId: deleteUser
+      parameters:
+        - $ref: "#/components/parameters/DocID"
+      responses:
+        '200':
+          description: OK
+        '400':
+          description: Invalid request
+        '404':
+          description: Not found
+        '500':
+          description: Internal Server Error
+    put:
+      tags:
+        - User
+      summary: update a User document
+      description: This updates an existing document in the User collection
+      operationId: setUser
+      parameters:
+        - $ref: "#/components/parameters/DocID"
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        '400':
+          description: Invalid update
+        '404':
+          description: Not found
+        '500':
+          description: Internal Server Error
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/User'
+        required: true
+    patch:
+      tags:
+        - User
+      summary: edit fields of an User document
+      description: This edits a document in the User collection
+      operationId: editUser
+      parameters:
+        - $ref: "#/components/parameters/DocID"
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        '400':
+          description: Invalid document
+        '404':
+          description: Not found
+        '500':
+          description: Internal Server Error
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+        required: true
+  /api/collections/user/query:
+    post:
+      tags:
+        - User
+      summary: query User collection
+      description: This operation queries documents in the User collection
+      operationId: queryUser
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Page"
+        '400':
+          description: Invalid User Query
+        '500':
+          description: Internal Server Error
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Query'
+        required: true
+  /api/collections/user/batchset:
+    put:
+      tags:
+        - User
+      summary: batch set 1-many User documents
+      description: This set 1-many documents in the User collection
+      operationId: batchSetUser
+      responses:
+        '200':
+          description: OK
+        '400':
+          description: Invalid document(s)
+        '404':
+          description: Not found
+        '500':
+          description: Internal Server Error
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: '#/components/schemas/User'
+        required: true
+
+components:
+  parameters:
+    DocID:
+      name: docID
+      in: path
+      required: true
+      schema:
+        type: string
+  schemas:
+    Query: 
+      
+      type: object
+      description: Query is a query against a collection of documents
+      required:
+        - select
+      properties:
+        select:
+          type: array
+          items:
+            type: object
+            description: select is a list of fields to select from each record in the datbase(optional)
+            properties:
+              field:
+                type: string
+                description: the select's field
+              aggregate:
+                type: string
+                description: an aggregate function to apply against the field
+                enum:
+                  - sum
+                  - count
+                  - max
+                  - min
+              function:
+                type: string
+                description: a function to apply against the field
+                enum:
+                  - toLower
+                  - toUpper
+              as:
+                type: string
+                description: as is outputs the value of the field as an alias
+            required:
+              - field
+        groupBy:
+          type: array
+          items:
+            type: string
+        where:
+          type: array
+          items:
+            type: object
+            description: where is a filter applied against a query
+            properties:
+              field:
+                type: string
+              op:
+                type: string
+                enum:
+                  - eq
+                  - neq
+                  - gt
+                  - gte
+                  - lt
+                  - lte
+                  - in
+                  - contains
+              value: { }
+            required:
+              - field
+              - op
+              - value
+        orderBy:
+          type: array
+          items:
+            type: object
+            description: orderBy orders results by a field and a direction
+            properties:
+              field:
+                type: string
+              direction:
+                type: string
+                enum:
+                  - asc
+                  - desc
+            required:
+              - field
+              - direction
+        page:
+          type: integer
+          minimum: 0
+        limit:
+          type: integer
+          minimum: 0
+    Page: 
+      
+      type: object
+      description: Page is a list of documents returned from a query
+      required:
+        - documents
+        - next_page
+        - count
+      properties:
+        documents:
+          type: array
+          items:
+            type: object
+        next_page:
+          type: integer
+          minimum: 0
+        count:
+          type: integer
+          minimum: 0
+    Account: 
+      properties:
+        _id:
+          description: The account's id.
+          type: string
+          x-primary: true
+        name:
+          description: The accounts's name.
+          type: string
+      required:
+      - _id
+      - name
+      type: object
+      x-collection: account
+      
+
+    Cdc: 
+      properties:
+        _id:
+          description: The cdc entry id.
+          type: string
+          x-primary: true
+        action:
+          description: The action taken upon the document
+          enum:
+          - create
+          - update
+          - delete
+          - set
+          type: string
+        collection:
+          description: The collection the document belongs to
+          type: string
+          x-index:
+            collection_document_idx:
+              additional_fields:
+              - documentID
+              enabled: true
+        diff:
+          description: An array of changes made to a document
+          items:
+            properties:
+              op:
+                enum:
+                - replace
+                - add
+                - remove
+                type: string
+              path:
+                type: string
+              value: {}
+            type: object
+          type: array
+        documentID:
+          description: The id of the document being changed
+          type: string
+          x-index:
+            document_id_idx:
+              enabled: true
+        metadata:
+          description: The context metadata when the change was commited
+          type: object
+        timestamp:
+          description: The unix nanosecond timestamp when the change was commited
+          type: integer
+          x-index:
+            timestamp_idx:
+              enabled: true
+      required:
+      - collection
+      - action
+      - diff
+      type: object
+      x-collection: cdc
+      
+
+    Migration: 
+      properties:
+        _id:
+          description: The migration's id
+          type: string
+          x-primary: true
+        dirty:
+          description: Whether the migration failed or not
+          type: boolean
+        error:
+          description: An error message if one was encountered
+          type: string
+        script:
+          description: The migration script's content
+          type: string
+        timestamp:
+          description: The unix timestamp when the migration executed
+          type: integer
+      required:
+      - _id
+      - timestamp
+      - script
+      - dirty
+      type: object
+      x-collection: migration
+      
+
+    Task: 
+      properties:
+        _id:
+          description: The user's id.
+          type: string
+          x-primary: true
+        content:
+          description: The content of the task
+          type: string
+        user:
+          description: The id of the user who owns the task
+          type: string
+          x-foreign:
+            cascade: true
+            collection: user
+            field: _id
+      required:
+      - _id
+      - user
+      - content
+      type: object
+      x-collection: task
+      
+
+    User: 
+      properties:
+        _id:
+          description: The user's id.
+          type: string
+          x-primary: true
+        account_id:
+          type: string
+          x-foreign:
+            cascade: true
+            collection: account
+            field: _id
+          x-index:
+            account_email_idx:
+              additional_fields:
+              - contact.email
+        age:
+          description: Age in years which must be equal to or greater than zero.
+          minimum: 0
+          type: integer
+        annotations:
+          type: object
+        contact:
+          properties:
+            email:
+              description: The user's email.
+              type: string
+              x-unique: true
+          type: object
+        gender:
+          description: The user's gender.
+          enum:
+          - male
+          - female
+          type: string
+        language:
+          description: The user's first language.
+          type: string
+          x-index:
+            language_idx: {}
+        name:
+          description: The user's name.
+          type: string
+        timestamp:
+          type: string
+      required:
+      - _id
+      - name
+      - age
+      - contact
+      - gender
+      - account_id
+      type: object
+      x-collection: user
+      x-triggers:
+        set_timestamp:
+          events:
+          - on_create
+          - on_update
+          - on_set
+          order: 1
+          script: |
+            doc.set('timestamp', new Date().toISOString())
+      

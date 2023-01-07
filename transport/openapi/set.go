@@ -1,7 +1,8 @@
-package handlers
+package openapi
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 
 	"github.com/autom8ter/myjson"
@@ -12,7 +13,7 @@ import (
 	"github.com/gorilla/mux"
 )
 
-func DeleteDocHandler(db myjson.Database) http.HandlerFunc {
+func (o *openAPIServer) setDocHandler(db myjson.Database) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		collection := mux.Vars(r)["collection"]
 		if !db.HasCollection(r.Context(), collection) {
@@ -20,8 +21,17 @@ func DeleteDocHandler(db myjson.Database) http.HandlerFunc {
 			return
 		}
 		docID := chi.URLParam(r, "docID")
+		var doc = myjson.NewDocument()
+		if err := json.NewDecoder(r.Body).Decode(&doc); err != nil {
+			httpError.Error(w, errors.Wrap(err, http.StatusBadRequest, "failed to decode update"))
+			return
+		}
+		if err := db.GetSchema(r.Context(), collection).SetPrimaryKey(doc, docID); err != nil {
+			httpError.Error(w, errors.New(errors.Validation, "bad id: %s", docID))
+			return
+		}
 		if err := db.Tx(r.Context(), kv.TxOpts{}, func(ctx context.Context, tx myjson.Tx) error {
-			err := tx.Delete(ctx, collection, docID)
+			err := tx.Set(ctx, collection, doc)
 			if err != nil {
 				return err
 			}
@@ -30,6 +40,11 @@ func DeleteDocHandler(db myjson.Database) http.HandlerFunc {
 			httpError.Error(w, err)
 			return
 		}
-		w.WriteHeader(http.StatusOK)
+		doc, err := db.Get(r.Context(), collection, docID)
+		if err != nil {
+			httpError.Error(w, errors.Wrap(err, http.StatusBadRequest, "failed to edit document"))
+			return
+		}
+		json.NewEncoder(w).Encode(doc)
 	}
 }

@@ -1,4 +1,4 @@
-package handlers
+package openapi
 
 import (
 	"context"
@@ -8,8 +8,6 @@ import (
 	"github.com/autom8ter/myjson/errors"
 	"github.com/autom8ter/myjson/kv"
 	"github.com/autom8ter/myjson/transport/openapi/httpError"
-
-	"github.com/gorilla/websocket"
 )
 
 type TxAction string
@@ -37,9 +35,9 @@ type TxOutput struct {
 	Error *errors.Error    `json:"error,omitempty"`
 }
 
-func TxHandler(db myjson.Database, upgrader websocket.Upgrader) http.HandlerFunc {
+func (o *openAPIServer) txHandler(db myjson.Database) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		conn, err := upgrader.Upgrade(w, r, nil)
+		conn, err := o.upgrader.Upgrade(w, r, nil)
 		if err != nil {
 			httpError.Error(w, errors.Wrap(err, http.StatusBadRequest, "failed to upgrade socket tx request"))
 			return

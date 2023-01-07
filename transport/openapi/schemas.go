@@ -1,4 +1,4 @@
-package handlers
+package openapi
 
 import (
 	"io"
@@ -11,7 +11,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-func GetSchemasHandler(db myjson.Database) http.HandlerFunc {
+func (o *openAPIServer) getSchemasHandler(db myjson.Database) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var resp = map[string]any{}
 		var collections = db.Collections(r.Context())
@@ -24,7 +24,7 @@ func GetSchemasHandler(db myjson.Database) http.HandlerFunc {
 	})
 }
 
-func GetSchemaHandler(db myjson.Database) http.HandlerFunc {
+func (o *openAPIServer) getSchemaHandler(db myjson.Database) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		collection := mux.Vars(r)["collection"]
 		if !db.HasCollection(r.Context(), collection) {
@@ -37,7 +37,7 @@ func GetSchemaHandler(db myjson.Database) http.HandlerFunc {
 	})
 }
 
-func PutSchemaHandler(db myjson.Database) http.HandlerFunc {
+func (o *openAPIServer) putSchemaHandler(db myjson.Database) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		bits, err := io.ReadAll(r.Body)
 		if err != nil {

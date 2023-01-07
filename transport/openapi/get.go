@@ -1,4 +1,4 @@
-package handlers
+package openapi
 
 import (
 	"encoding/json"
@@ -11,7 +11,7 @@ import (
 	"github.com/gorilla/mux"
 )
 
-func GetDocHandler(db myjson.Database) http.HandlerFunc {
+func (o *openAPIServer) getDocHandler(db myjson.Database) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		collection := mux.Vars(r)["collection"]
 		if !db.HasCollection(r.Context(), collection) {
