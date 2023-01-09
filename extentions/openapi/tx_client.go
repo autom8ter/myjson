@@ -34,14 +34,14 @@ type TxSocket struct {
 	conn *websocket.Conn
 }
 
-func (t *TxSocket) Write(ctx context.Context, input TxInput) error {
+func (t *TxSocket) WriteJSON(ctx context.Context, input TxInput) error {
 	if err := t.conn.WriteJSON(&input); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (t *TxSocket) Read(ctx context.Context) (TxOutput, error) {
+func (t *TxSocket) ReadJSON(ctx context.Context) (TxOutput, error) {
 	var output TxOutput
 	if err := t.conn.ReadJSON(&output); err != nil {
 		return TxOutput{}, err

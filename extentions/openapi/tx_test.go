@@ -34,7 +34,7 @@ func TestTx(t *testing.T) {
 
 			defer tx.Close()
 			for i := 0; i < 100; i++ {
-				assert.NoError(t, tx.Write(ctx, TxInput{
+				assert.NoError(t, tx.WriteJSON(ctx, TxInput{
 					Action:     Set,
 					Collection: "account",
 					DocID:      "0",
@@ -42,11 +42,11 @@ func TestTx(t *testing.T) {
 						"name": gofakeit.Company(),
 					}).Doc(),
 				}))
-				out, err := tx.Read(ctx)
+				out, err := tx.ReadJSON(ctx)
 				assert.NoError(t, err)
 				fmt.Println(out)
 			}
-			assert.NoError(t, tx.Write(ctx, TxInput{
+			assert.NoError(t, tx.WriteJSON(ctx, TxInput{
 				Action: Commit,
 			}))
 		}))
@@ -71,7 +71,7 @@ func TestTx(t *testing.T) {
 
 			defer tx.Close()
 			for i := 0; i < 100; i++ {
-				assert.NoError(t, tx.Write(ctx, TxInput{
+				assert.NoError(t, tx.WriteJSON(ctx, TxInput{
 					Action:     Set,
 					Collection: "account",
 					DocID:      "0",
@@ -79,11 +79,11 @@ func TestTx(t *testing.T) {
 						"name": gofakeit.Company(),
 					}).Doc(),
 				}))
-				out, err := tx.Read(ctx)
+				out, err := tx.ReadJSON(ctx)
 				assert.NoError(t, err)
 				fmt.Println(out)
 			}
-			assert.NoError(t, tx.Write(ctx, TxInput{
+			assert.NoError(t, tx.WriteJSON(ctx, TxInput{
 				Action: Rollback,
 			}))
 		}))
@@ -107,12 +107,12 @@ func TestTx(t *testing.T) {
 			assert.NoError(t, err, s.URL)
 
 			defer tx.Close()
-			assert.NoError(t, tx.Write(ctx, TxInput{
+			assert.NoError(t, tx.WriteJSON(ctx, TxInput{
 				Action:     Query,
 				Collection: "account",
 				Query:      myjson.Q().Query(),
 			}))
-			out, err := tx.Read(ctx)
+			out, err := tx.ReadJSON(ctx)
 			assert.NoError(t, err)
 			fmt.Println(out)
 		}))

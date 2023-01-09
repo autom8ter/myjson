@@ -12,6 +12,30 @@ servers: {{ range .servers }}
   - url: {{ .server }}
 {{end}} {{end}}
 paths:
+  /openapi.yaml:
+    get:
+      summary: Get OpenAPI specification
+      tags:
+        - OpenAPI
+      responses:
+        '200':
+          description: OpenAPI specification
+          content:
+            application/x-yaml:
+              schema:
+                type: string
+  /openapi.json:
+    get:
+      summary: Get OpenAPI specification
+      tags:
+        - OpenAPI
+      responses:
+        '200':
+          description: OpenAPI specification
+          content:
+            application/json:
+              schema:
+                type: string
   /api/schema:
     get:
       tags:
@@ -22,9 +46,11 @@ paths:
         '200':
           description: OK
           content:
-            application/x-yaml:
+            application/json:
               schema:
-                type: string
+                type: array
+                items:
+                  type: string
         '400':
           description: Invalid schema
         '500':
@@ -84,7 +110,7 @@ paths:
           description: Internal Server Error
       requestBody:
         content:
-          application/json:
+          application/x-yaml:
             schema:
               type: string
         required: true

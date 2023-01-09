@@ -18,6 +18,7 @@ import (
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/getkin/kin-openapi/routers"
 	"github.com/getkin/kin-openapi/routers/gorillamux"
+	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
 	"go.uber.org/zap"
@@ -29,38 +30,56 @@ var openapiTemplate string
 
 // Config are custom params for generating an openapi specification
 type Config struct {
-	Title       string `json:"title" yaml:"title" validate:"required"`
-	Version     string `json:"version" yaml:"version" validate:"required"`
-	Description string `json:"description" yaml:"description" validate:"required"`
-	Port        int    `json:"port" yaml:"port" validate:"required"`
+	Title        string   `json:"title" yaml:"title" validate:"required"`
+	Version      string   `json:"version" yaml:"version" validate:"required"`
+	Description  string   `json:"description" yaml:"description" validate:"required"`
+	Port         int      `json:"port" yaml:"port" validate:"required"`
+	AllowOrigins []string `json:"allowOrigins"`
+	LogLevel     string   `json:"logLevel"`
 }
 
 type OpenAPIServer struct {
 	params        Config
 	router        *mux.Router
-	mwares        []mux.MiddlewareFunc
 	upgrader      websocket.Upgrader
 	spec          []byte
 	specMu        sync.RWMutex
 	openapiRouter routers.Router
-	logger        *zap.Logger
+	logger        Logger
 }
 
 // New creates a new openapi server
-func New(params Config, mwares ...mux.MiddlewareFunc) (*OpenAPIServer, error) {
+func New(params Config, opts ...Opt) (*OpenAPIServer, error) {
 	if err := util.ValidateStruct(params); err != nil {
 		return nil, err
 	}
-	l, err := zap.NewProduction()
+	cfg := zap.NewProductionConfig()
+	switch params.LogLevel {
+	case "error", "ERROR":
+		cfg.Level = zap.NewAtomicLevelAt(zap.ErrorLevel)
+	case "warn", "WARN":
+		cfg.Level = zap.NewAtomicLevelAt(zap.WarnLevel)
+	case "info", "INFO":
+		cfg.Level = zap.NewAtomicLevelAt(zap.InfoLevel)
+	default:
+		cfg.Level = zap.NewAtomicLevelAt(zap.DebugLevel)
+	}
+
+	l, err := cfg.Build(
+		zap.WithCaller(true),
+		zap.AddCallerSkip(1),
+	)
 	if err != nil {
 		return nil, err
 	}
 	o := &OpenAPIServer{
 		params:   params,
 		router:   mux.NewRouter(),
-		mwares:   mwares,
 		upgrader: websocket.Upgrader{ReadBufferSize: 1024, WriteBufferSize: 1024},
-		logger:   l,
+		logger:   zapLogger{logger: l},
+	}
+	for _, opt := range opts {
+		opt(o)
 	}
 	return o, nil
 }
@@ -98,7 +117,18 @@ func (o *OpenAPIServer) RegisterRoutes(ctx context.Context, db myjson.Database) 
 	if err := o.refreshSpec(db); err != nil {
 		return err
 	}
-	o.router.Use(o.mwares...)
+	mwares := []mux.MiddlewareFunc{
+		handlers.CORS(
+			handlers.AllowedMethods([]string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"}),
+			handlers.AllowedOrigins(o.params.AllowOrigins),
+			handlers.AllowedHeaders([]string{"Content-Type", "Authorization"}),
+		),
+
+		o.openAPIValidator(),
+		o.loggerWare(),
+		handlers.RecoveryHandler(),
+	}
+	o.router.Use(mwares...)
 	o.router.HandleFunc("/openapi.yaml", o.specHandler()).Methods(http.MethodGet)
 	o.router.HandleFunc("/openapi.json", o.specHandler()).Methods(http.MethodGet)
 	o.router.HandleFunc("/api/sdk", o.getSDKHandler(db)).Methods(http.MethodGet)
@@ -199,7 +229,7 @@ func (oapi *OpenAPIServer) GenerateSDK(db myjson.Database, packageName string, w
 
 // Serve starts an openapi http server serving the database
 func (o *OpenAPIServer) Serve(ctx context.Context, db myjson.Database) error {
-	defer o.logger.Sync()
+	defer o.logger.Sync(ctx)
 	if err := o.RegisterRoutes(ctx, db); err != nil {
 		return err
 	}
@@ -222,4 +252,9 @@ func (o *OpenAPIServer) Serve(ctx context.Context, db myjson.Database) error {
 		}
 	})
 	return egp.Wait()
+}
+
+// Logger returns the openapi logging instance
+func (o *OpenAPIServer) Logger() Logger {
+	return o.logger
 }

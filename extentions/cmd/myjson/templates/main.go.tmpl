@@ -32,9 +32,22 @@ func main() {
     if err := json.Unmarshal([]byte(*providerParams), &params); err != nil {
         fmt.Println("failed to parse provider params: ", err.Error())
     }
-    db, err := myjson.Open(ctx, *provider, params)
+    oapi, err := openapi.New(openapi.Config{
+        Title:       "{{.title}}",
+        Version:     "{{.version}}",
+        Description: "{{.description}}",
+        Port:        *port,
+    })
     if err != nil {
         fmt.Println("failed to initialize project: ", err.Error())
+        return
+    }
+
+    db, err := myjson.Open(ctx, *provider, params)
+    if err != nil {
+        oapi.Logger().Error(ctx, "failed to initialize project: ", map[string]any{
+            "error": err,
+        })
         return
     }
     defer db.Close(ctx)
@@ -60,22 +73,13 @@ func main() {
         }
         return nil
     }); err != nil {
-        fmt.Println("failed to initialize project: ", err.Error())
+        oapi.Logger().Error(ctx, "failed to initialize project: ", map[string]any{
+            "error": err,
+        })
         return
     }
-    fmt.Println("registered collections: ", db.Collections(ctx))
-    oapi, err := openapi.New(openapi.Config{
-        Title:       "{{.title}}",
-        Version:     "{{.version}}",
-        Description: "{{.description}}",
-        Port:        *port,
-    })
-    if err != nil {
-        fmt.Println("failed to initialize project: ", err.Error())
-        return
-    }
-
-    fmt.Printf("starting openapi http server on port :%v\n", port)
+    oapi.Logger().Debug(ctx, fmt.Sprintf("registered collections: %v", db.Collections(ctx)), map[string]any{})
+    oapi.Logger().Debug(ctx, fmt.Sprintf("starting openapi http server on port: %v", *port), map[string]any{})
     if err := oapi.Serve(ctx, db); err != nil {
         fmt.Println(err)
     }
