@@ -6,10 +6,10 @@ import (
 	"fmt"
 
 	"github.com/autom8ter/myjson"
+	"github.com/autom8ter/myjson/extentions/openapi"
 	"github.com/autom8ter/myjson/kv"
 	_ "github.com/autom8ter/myjson/kv/badger"
 	"github.com/autom8ter/myjson/testutil"
-	"github.com/autom8ter/myjson/transport/openapi"
 	"github.com/brianvoe/gofakeit/v6"
 )
 

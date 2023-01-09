@@ -6,12 +6,12 @@ import (
 
 	"github.com/autom8ter/myjson"
 	"github.com/autom8ter/myjson/errors"
-	"github.com/autom8ter/myjson/transport/openapi/httpError"
+	"github.com/autom8ter/myjson/extentions/openapi/httpError"
 	"github.com/ghodss/yaml"
 	"github.com/gorilla/mux"
 )
 
-func (o *openAPIServer) getSchemasHandler(db myjson.Database) http.HandlerFunc {
+func (o *OpenAPIServer) getSchemasHandler(db myjson.Database) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		var resp = map[string]any{}
@@ -30,7 +30,7 @@ func (o *openAPIServer) getSchemasHandler(db myjson.Database) http.HandlerFunc {
 	})
 }
 
-func (o *openAPIServer) getSchemaHandler(db myjson.Database) http.HandlerFunc {
+func (o *OpenAPIServer) getSchemaHandler(db myjson.Database) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		collection := mux.Vars(r)["collection"]
@@ -44,7 +44,7 @@ func (o *openAPIServer) getSchemaHandler(db myjson.Database) http.HandlerFunc {
 	})
 }
 
-func (o *openAPIServer) putSchemaHandler(db myjson.Database) http.HandlerFunc {
+func (o *OpenAPIServer) putSchemaHandler(db myjson.Database) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		bits, err := io.ReadAll(r.Body)

@@ -7,32 +7,28 @@ import (
 	"testing"
 
 	"github.com/autom8ter/myjson"
+	"github.com/autom8ter/myjson/extentions/openapi/testdata"
 	"github.com/autom8ter/myjson/testutil"
-	"github.com/autom8ter/myjson/transport/openapi/testdata"
-	"github.com/brianvoe/gofakeit/v6"
 	"github.com/stretchr/testify/assert"
 )
 
-func TestPatch(t *testing.T) {
+func TestDelete(t *testing.T) {
 	assert.NoError(t, testutil.TestDB(func(ctx context.Context, db myjson.Database) {
-		o, err := New(Config{
+		oapi, err := New(Config{
 			Title:       "testing",
 			Version:     "v0.0.0",
 			Description: "testing openapi schema",
 			Port:        8080,
 		})
 		assert.NoError(t, err)
-		oapi := o.(*openAPIServer)
-		assert.NoError(t, oapi.registerRoutes(ctx, db))
+		assert.NoError(t, oapi.RegisterRoutes(ctx, db))
 		s := httptest.NewServer(oapi.router)
 		defer s.Close()
 		client, err := testdata.NewClient(s.URL)
 		assert.NoError(t, err)
 
-		results, err := client.EditAccount(ctx, "0", testdata.EditAccountJSONRequestBody{
-			"name": gofakeit.Company(),
-		})
-		bits, _ := io.ReadAll(results.Body)
-		assert.Equal(t, 200, results.StatusCode, string(bits))
+		account, err := client.DeleteAccount(ctx, "0")
+		bits, _ := io.ReadAll(account.Body)
+		assert.Equal(t, 200, account.StatusCode, string(bits))
 	}))
 }

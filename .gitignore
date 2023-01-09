@@ -3,3 +3,5 @@ tmp
 kv/tikv/docker/data
 examples/tasks/tmp
 *tmp
+db
+openapi.yaml

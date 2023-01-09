@@ -6,8 +6,8 @@ import (
 
 	"github.com/autom8ter/myjson"
 	"github.com/autom8ter/myjson/errors"
+	"github.com/autom8ter/myjson/extentions/openapi/httpError"
 	"github.com/autom8ter/myjson/kv"
-	"github.com/autom8ter/myjson/transport/openapi/httpError"
 	"github.com/gorilla/websocket"
 )
 
@@ -39,7 +39,7 @@ type TxOutput struct {
 	Error  *errors.Error    `json:"error,omitempty"`
 }
 
-func (o *openAPIServer) txHandler(db myjson.Database) http.HandlerFunc {
+func (o *OpenAPIServer) txHandler(db myjson.Database) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 
 		conn, err := o.upgrader.Upgrade(w, r, nil)

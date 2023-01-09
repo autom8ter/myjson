@@ -1,16 +1,17 @@
 package openapi
 
 import (
-	"encoding/json"
+	"context"
 	"net/http"
 
 	"github.com/autom8ter/myjson"
 	"github.com/autom8ter/myjson/errors"
-	"github.com/autom8ter/myjson/transport/openapi/httpError"
+	"github.com/autom8ter/myjson/extentions/openapi/httpError"
+	"github.com/autom8ter/myjson/kv"
 	"github.com/gorilla/mux"
 )
 
-func (o *openAPIServer) getDocHandler(db myjson.Database) http.HandlerFunc {
+func (o *OpenAPIServer) deleteDocHandler(db myjson.Database) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		collection := mux.Vars(r)["collection"]
@@ -19,11 +20,16 @@ func (o *openAPIServer) getDocHandler(db myjson.Database) http.HandlerFunc {
 			return
 		}
 		docID := mux.Vars(r)["docID"]
-		doc, err := db.Get(r.Context(), collection, docID)
-		if err != nil {
-			httpError.Error(w, errors.Wrap(err, http.StatusNotFound, "failed to get document"))
+		if err := db.Tx(r.Context(), kv.TxOpts{}, func(ctx context.Context, tx myjson.Tx) error {
+			err := tx.Delete(ctx, collection, docID)
+			if err != nil {
+				return err
+			}
+			return nil
+		}); err != nil {
+			httpError.Error(w, err)
 			return
 		}
-		json.NewEncoder(w).Encode(doc)
+		w.WriteHeader(http.StatusOK)
 	}
 }

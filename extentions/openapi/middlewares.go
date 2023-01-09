@@ -7,7 +7,7 @@ import (
 
 	"github.com/autom8ter/myjson"
 	"github.com/autom8ter/myjson/errors"
-	"github.com/autom8ter/myjson/transport/openapi/httpError"
+	"github.com/autom8ter/myjson/extentions/openapi/httpError"
 	"github.com/gorilla/mux"
 
 	"github.com/getkin/kin-openapi/openapi3filter"
@@ -17,7 +17,7 @@ import (
 // adds openapi.path_params to the inbound metadata
 // adds openapi.route to the inbound metadata
 // adds openapi.header.${headerName} to the metadata
-func (o *openAPIServer) openAPIValidator() mux.MiddlewareFunc {
+func (o *OpenAPIServer) openAPIValidator() mux.MiddlewareFunc {
 	return func(handler http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			o.specMu.RLock()

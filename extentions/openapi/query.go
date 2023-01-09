@@ -6,11 +6,11 @@ import (
 
 	"github.com/autom8ter/myjson"
 	"github.com/autom8ter/myjson/errors"
-	"github.com/autom8ter/myjson/transport/openapi/httpError"
+	"github.com/autom8ter/myjson/extentions/openapi/httpError"
 	"github.com/gorilla/mux"
 )
 
-func (o *openAPIServer) queryHandler(db myjson.Database) http.HandlerFunc {
+func (o *OpenAPIServer) queryHandler(db myjson.Database) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		collection := mux.Vars(r)["collection"]

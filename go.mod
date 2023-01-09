@@ -6,12 +6,12 @@ require (
 	github.com/Masterminds/sprig/v3 v3.2.3
 	github.com/autom8ter/machine/v4 v4.0.0-20221003043928-593fc3a020bb
 	github.com/brianvoe/gofakeit/v6 v6.19.0
+	github.com/dave/jennifer v1.6.0
 	github.com/deepmap/oapi-codegen v1.12.4
 	github.com/dgraph-io/badger/v3 v3.2103.2
 	github.com/dop251/goja v0.0.0-20221224150820-cc4634e76e9a
 	github.com/getkin/kin-openapi v0.112.0
 	github.com/ghodss/yaml v1.0.0
-	github.com/go-chi/chi/v5 v5.0.8
 	github.com/go-playground/validator/v10 v10.11.1
 	github.com/go-redis/redis/v9 v9.0.0-rc.2
 	github.com/gorilla/mux v1.8.0
@@ -22,13 +22,14 @@ require (
 	github.com/samber/lo v1.28.2
 	github.com/segmentio/ksuid v1.0.4
 	github.com/spf13/cast v1.5.0
+	github.com/spf13/cobra v1.6.1
 	github.com/stretchr/testify v1.8.1
 	github.com/tidwall/gjson v1.14.3
 	github.com/tidwall/sjson v1.2.5
 	github.com/tikv/client-go/v2 v2.0.3
 	github.com/xeipuuv/gojsonschema v1.2.0
+	go.uber.org/zap v1.24.0
 	golang.org/x/sync v0.1.0
-	gopkg.in/yaml.v2 v2.4.0
 )
 
 require (
@@ -86,7 +87,6 @@ require (
 	github.com/prometheus/procfs v0.9.0 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20220927061507-ef77025ab5aa // indirect
 	github.com/shopspring/decimal v1.2.0 // indirect
-	github.com/spf13/cobra v1.6.1 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/stathat/consistent v1.0.0 // indirect
 	github.com/tidwall/match v1.1.1 // indirect
@@ -101,7 +101,6 @@ require (
 	go.opencensus.io v0.23.0 // indirect
 	go.uber.org/atomic v1.10.0 // indirect
 	go.uber.org/multierr v1.9.0 // indirect
-	go.uber.org/zap v1.24.0 // indirect
 	golang.org/x/crypto v0.3.0 // indirect
 	golang.org/x/exp v0.0.0-20220921164117-439092de6870 // indirect
 	golang.org/x/net v0.4.0 // indirect
@@ -111,5 +110,6 @@ require (
 	google.golang.org/grpc v1.51.0 // indirect
 	google.golang.org/protobuf v1.28.1 // indirect
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0 // indirect
+	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )

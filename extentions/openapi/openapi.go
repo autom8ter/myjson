@@ -33,7 +33,7 @@ type Config struct {
 	Port        int    `json:"port" yaml:"port" validate:"required"`
 }
 
-type openAPIServer struct {
+type OpenAPIServer struct {
 	params        Config
 	router        *mux.Router
 	mwares        []mux.MiddlewareFunc
@@ -45,7 +45,7 @@ type openAPIServer struct {
 }
 
 // New creates a new openapi server
-func New(params Config, mwares ...mux.MiddlewareFunc) (myjson.Transport, error) {
+func New(params Config, mwares ...mux.MiddlewareFunc) (*OpenAPIServer, error) {
 	if err := util.ValidateStruct(params); err != nil {
 		return nil, err
 	}
@@ -53,7 +53,7 @@ func New(params Config, mwares ...mux.MiddlewareFunc) (myjson.Transport, error) 
 	if err != nil {
 		return nil, err
 	}
-	o := &openAPIServer{
+	o := &OpenAPIServer{
 		params:   params,
 		router:   mux.NewRouter(),
 		mwares:   mwares,
@@ -92,7 +92,7 @@ func getSpec(ctx context.Context, config Config, db myjson.Database) ([]byte, er
 	return buf.Bytes(), nil
 }
 
-func (o *openAPIServer) registerRoutes(ctx context.Context, db myjson.Database) error {
+func (o *OpenAPIServer) RegisterRoutes(ctx context.Context, db myjson.Database) error {
 	if err := o.refreshSpec(db); err != nil {
 		return err
 	}
@@ -113,7 +113,7 @@ func (o *openAPIServer) registerRoutes(ctx context.Context, db myjson.Database) 
 	return nil
 }
 
-func (o *openAPIServer) refreshSpec(db myjson.Database) error {
+func (o *OpenAPIServer) refreshSpec(db myjson.Database) error {
 	o.specMu.Lock()
 	defer o.specMu.Unlock()
 	spec, err := getSpec(context.Background(), o.params, db)
@@ -137,10 +137,24 @@ func (o *openAPIServer) refreshSpec(db myjson.Database) error {
 	return nil
 }
 
+// Spec returns the openapi specification
+func (o *OpenAPIServer) Spec(db myjson.Database) ([]byte, error) {
+	o.specMu.RLock()
+	defer o.specMu.RUnlock()
+	if o.spec == nil {
+		spec, err := getSpec(context.Background(), o.params, db)
+		if err != nil {
+			return nil, err
+		}
+		return spec, nil
+	}
+	return o.spec, nil
+}
+
 // Serve starts an openapi http server serving the database
-func (o *openAPIServer) Serve(ctx context.Context, db myjson.Database) error {
+func (o *OpenAPIServer) Serve(ctx context.Context, db myjson.Database) error {
 	defer o.logger.Sync()
-	if err := o.registerRoutes(ctx, db); err != nil {
+	if err := o.RegisterRoutes(ctx, db); err != nil {
 		return err
 	}
 	egp, ctx := errgroup.WithContext(ctx)

@@ -18,15 +18,14 @@ func TestTx(t *testing.T) {
 		assert.NoError(t, testutil.TestDB(func(ctx context.Context, db myjson.Database) {
 			ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 			defer cancel()
-			o, err := New(Config{
+			oapi, err := New(Config{
 				Title:       "testing",
 				Version:     "v0.0.0",
 				Description: "testing openapi schema",
 				Port:        8080,
 			})
 			assert.NoError(t, err)
-			oapi := o.(*openAPIServer)
-			assert.NoError(t, oapi.registerRoutes(ctx, db))
+			assert.NoError(t, oapi.RegisterRoutes(ctx, db))
 			s := httptest.NewServer(oapi.router)
 			defer s.Close()
 			client := NewTxClient(s.URL)
@@ -56,15 +55,14 @@ func TestTx(t *testing.T) {
 		assert.NoError(t, testutil.TestDB(func(ctx context.Context, db myjson.Database) {
 			ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 			defer cancel()
-			o, err := New(Config{
+			oapi, err := New(Config{
 				Title:       "testing",
 				Version:     "v0.0.0",
 				Description: "testing openapi schema",
 				Port:        8080,
 			})
 			assert.NoError(t, err)
-			oapi := o.(*openAPIServer)
-			assert.NoError(t, oapi.registerRoutes(ctx, db))
+			assert.NoError(t, oapi.RegisterRoutes(ctx, db))
 			s := httptest.NewServer(oapi.router)
 			defer s.Close()
 			client := NewTxClient(s.URL)
@@ -94,15 +92,14 @@ func TestTx(t *testing.T) {
 		assert.NoError(t, testutil.TestDB(func(ctx context.Context, db myjson.Database) {
 			ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 			defer cancel()
-			o, err := New(Config{
+			oapi, err := New(Config{
 				Title:       "testing",
 				Version:     "v0.0.0",
 				Description: "testing openapi schema",
 				Port:        8080,
 			})
 			assert.NoError(t, err)
-			oapi := o.(*openAPIServer)
-			assert.NoError(t, oapi.registerRoutes(ctx, db))
+			assert.NoError(t, oapi.RegisterRoutes(ctx, db))
 			s := httptest.NewServer(oapi.router)
 			defer s.Close()
 			client := NewTxClient(s.URL)

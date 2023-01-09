@@ -12,86 +12,10 @@ import (
 	"github.com/spf13/cobra"
 )
 
+//go:embed templates/main.go.tmpl
+var mainTemplate string
+
 func initCmd() *cobra.Command {
-	var mainTemplate = `package main
-
-import (
-	"context"
-	"encoding/json"
-	"flag"
-	"fmt"
-	"io"
-	"os"
-	"path/filepath"
-	"strings"
-
-	"github.com/autom8ter/myjson"
-	_ "github.com/autom8ter/myjson/kv/badger"
-	_ "github.com/autom8ter/myjson/kv/tikv"
-	"github.com/autom8ter/myjson/transport/openapi"
-)
-
-var (
-	provider       = flag.String("provider", "badger", "provider")
-	providerParams = flag.String("provider-params", "{\"storage_path\": \"./tmp\"}", "provider params (json)")
-)
-
-func main() {
-	flag.Parse()
-	ctx := context.Background()
-	params := map[string]interface{}{}
-	if err := json.Unmarshal([]byte(*providerParams), &params); err != nil {
-		fmt.Println("failed to parse provider params: ", err.Error())
-	}
-	db, err := myjson.Open(ctx, *provider, params)
-	if err != nil {
-		fmt.Println("failed to initialize project: ", err.Error())
-		return
-	}
-	defer db.Close(ctx)
-	if err := filepath.Walk("./schema", func(path string, info os.FileInfo, err error) error {
-		if info.IsDir() {
-			return nil
-		}
-		if strings.HasSuffix(path, ".yaml") {
-			f, err := os.Open(path)
-			if err != nil {
-				return err
-			}
-			defer f.Close()
-			bits, err := io.ReadAll(f)
-			if err != nil {
-				return err
-			}
-			if err := db.ConfigureCollection(ctx, bits); err != nil {
-				if err != nil {
-					return err
-				}
-			}
-		}
-		return nil
-	}); err != nil {
-		fmt.Println("failed to initialize project: ", err.Error())
-		return
-	}
-	oapi, err := openapi.New(openapi.Config{
-		Title:       "{{.title}}",
-		Version:     "{{.version}}",
-		Description: "{{.description}}",
-		Port:        8080,
-	})
-	if err != nil {
-		fmt.Println("failed to initialize project: ", err.Error())
-		return
-	}
-
-	fmt.Println("starting openapi http server on port :8080")
-	if err := oapi.Serve(ctx, db); err != nil {
-		fmt.Println(err)
-	}
-}
-
-`
 	var (
 		projectPath string
 		version     string
