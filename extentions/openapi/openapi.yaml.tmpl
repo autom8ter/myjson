@@ -29,6 +29,23 @@ paths:
           description: Invalid schema
         '500':
           description: Internal Server Error
+  /api/sdk:
+    get:
+      tags:
+        - schema
+      summary: generate a go sdk for this API
+      operationId: getSDK
+      responses:
+        '200':
+          description: OK
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+        '400':
+          description: Invalid schema
+        '500':
+          description: Internal Server Error
 {{- range .collections }}
   # {{ .collection }} collection endpoints
   /api/schema/{{ .collection }}:

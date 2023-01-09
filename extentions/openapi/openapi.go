@@ -5,6 +5,7 @@ import (
 	"context"
 	_ "embed"
 	"fmt"
+	"io"
 	"net/http"
 	"sync"
 	"text/template"
@@ -13,6 +14,7 @@ import (
 	"github.com/Masterminds/sprig/v3"
 	"github.com/autom8ter/myjson"
 	"github.com/autom8ter/myjson/util"
+	"github.com/deepmap/oapi-codegen/pkg/codegen"
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/getkin/kin-openapi/routers"
 	"github.com/getkin/kin-openapi/routers/gorillamux"
@@ -99,6 +101,7 @@ func (o *OpenAPIServer) RegisterRoutes(ctx context.Context, db myjson.Database) 
 	o.router.Use(o.mwares...)
 	o.router.HandleFunc("/openapi.yaml", o.specHandler()).Methods(http.MethodGet)
 	o.router.HandleFunc("/openapi.json", o.specHandler()).Methods(http.MethodGet)
+	o.router.HandleFunc("/api/sdk", o.getSDKHandler(db)).Methods(http.MethodGet)
 	o.router.HandleFunc("/api/tx", o.txHandler(db))
 	o.router.HandleFunc("/api/schema", o.getSchemasHandler(db)).Methods(http.MethodGet)
 	o.router.HandleFunc("/api/schema/{collection}", o.getSchemaHandler(db)).Methods(http.MethodGet)
@@ -149,6 +152,49 @@ func (o *OpenAPIServer) Spec(db myjson.Database) ([]byte, error) {
 		return spec, nil
 	}
 	return o.spec, nil
+}
+
+// GenerateSDK generates a go SDK based on the database API schema
+func (oapi *OpenAPIServer) GenerateSDK(db myjson.Database, packageName string, w io.Writer) error {
+	spec, err := oapi.Spec(db)
+	if err != nil {
+		fmt.Println("failed to get openapi spec: ", err.Error())
+		return err
+	}
+	loader := openapi3.NewLoader()
+	swaggerSpec, err := loader.LoadFromData(spec)
+	if err != nil {
+		return err
+	}
+	code, err := codegen.Generate(swaggerSpec, codegen.Configuration{
+		PackageName: packageName,
+		Generate: codegen.GenerateOptions{
+			Client:       true,
+			Models:       true,
+			EmbeddedSpec: true,
+		},
+		Compatibility: codegen.CompatibilityOptions{},
+		OutputOptions: codegen.OutputOptions{
+			SkipFmt:            false,
+			SkipPrune:          false,
+			IncludeTags:        nil,
+			ExcludeTags:        nil,
+			UserTemplates:      nil,
+			ExcludeSchemas:     nil,
+			ResponseTypeSuffix: "",
+			ClientTypeName:     "",
+		},
+		ImportMapping:     nil,
+		AdditionalImports: nil,
+	})
+	if err != nil {
+		return err
+	}
+	_, err = w.Write([]byte(code))
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 // Serve starts an openapi http server serving the database

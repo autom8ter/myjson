@@ -75,21 +75,7 @@ func main() {
         return
     }
 
-    spec, err := oapi.Spec(db)
-    if err != nil {
-        fmt.Println("failed to get openapi spec: ", err.Error())
-        return
-    }
-    of, err := os.Create("./openapi.yaml")
-    if err != nil {
-        fmt.Println("failed to create openapi spec: ", err.Error())
-        return
-    }
-    defer of.Close()
-    if _, err := of.Write(spec); err != nil {
-        fmt.Println("failed to write ./openapi.yaml: ", err.Error())
-        return
-    }
+
 
     fmt.Println("starting openapi http server on port :8080")
     if err := oapi.Serve(ctx, db); err != nil {
