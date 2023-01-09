@@ -19,11 +19,11 @@ import (
 // go run tmp/main.go --schema-path=./tmp/schema
 
 var (
-	schemaPath = flag.String("schema-path", "./schema", "the path to the collection schema files")
+    schemaPath     = flag.String("schema-path", "./schema", "the path to the collection schema files")
     provider       = flag.String("provider", "badger", "provider")
     providerParams = flag.String("provider-params", "{\"storage_path\": \"./db\"}", "provider params (json)")
+    port           = flag.Int("port", 8080, "the port to serve on")
 )
-
 
 func main() {
     flag.Parse()
@@ -68,16 +68,14 @@ func main() {
         Title:       "{{.title}}",
         Version:     "{{.version}}",
         Description: "{{.description}}",
-        Port:        8080,
+        Port:        *port,
     })
     if err != nil {
         fmt.Println("failed to initialize project: ", err.Error())
         return
     }
 
-
-
-    fmt.Println("starting openapi http server on port :8080")
+    fmt.Printf("starting openapi http server on port :%v\n", port)
     if err := oapi.Serve(ctx, db); err != nil {
         fmt.Println(err)
     }
