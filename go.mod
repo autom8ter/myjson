@@ -6,7 +6,6 @@ require (
 	github.com/Masterminds/sprig/v3 v3.2.3
 	github.com/autom8ter/machine/v4 v4.0.0-20221003043928-593fc3a020bb
 	github.com/brianvoe/gofakeit/v6 v6.19.0
-	github.com/dave/jennifer v1.6.0
 	github.com/deepmap/oapi-codegen v1.12.4
 	github.com/dgraph-io/badger/v3 v3.2103.2
 	github.com/dop251/goja v0.0.0-20221224150820-cc4634e76e9a
