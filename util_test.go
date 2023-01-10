@@ -140,7 +140,7 @@ func TestUtil(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, expected, reduced.GetFloat("age_sum"))
 	})
-	t.Run("documents - orderBy", func(t *testing.T) {
+	t.Run("documents - orderBy (desc/desc)", func(t *testing.T) {
 		var docs Documents
 		for i := 0; i < 100; i++ {
 			doc := newUserDoc()
@@ -160,6 +160,86 @@ func TestUtil(t *testing.T) {
 		docs.ForEach(func(next *Document, i int) {
 			if len(docs) > i+1 {
 				assert.GreaterOrEqual(t, next.GetFloat("account_id"), docs[i+1].GetFloat("account_id"), i)
+				if next.GetFloat("account_id") == docs[i+1].GetFloat("account_id") {
+					assert.GreaterOrEqual(t, next.GetFloat("age"), docs[i+1].GetFloat("age"), i)
+				}
+			}
+		})
+	})
+	t.Run("documents - orderBy (asc/asc)", func(t *testing.T) {
+		var docs Documents
+		for i := 0; i < 100; i++ {
+			doc := newUserDoc()
+			assert.Nil(t, doc.Set("account_id", gofakeit.IntRange(1, 5)))
+			docs = append(docs, doc)
+		}
+		docs = orderByDocs(docs, []OrderBy{
+			{
+				Field:     "account_id",
+				Direction: OrderByDirectionAsc,
+			},
+			{
+				Field:     "age",
+				Direction: OrderByDirectionAsc,
+			},
+		})
+		docs.ForEach(func(next *Document, i int) {
+			if len(docs) > i+1 {
+				assert.LessOrEqual(t, next.GetFloat("account_id"), docs[i+1].GetFloat("account_id"), i)
+				if next.GetFloat("account_id") == docs[i+1].GetFloat("account_id") {
+					assert.LessOrEqual(t, next.GetFloat("age"), docs[i+1].GetFloat("age"), i)
+				}
+			}
+		})
+	})
+	t.Run("documents - orderBy (asc/desc)", func(t *testing.T) {
+		var docs Documents
+		for i := 0; i < 100; i++ {
+			doc := newUserDoc()
+			assert.Nil(t, doc.Set("account_id", gofakeit.IntRange(1, 5)))
+			docs = append(docs, doc)
+		}
+		docs = orderByDocs(docs, []OrderBy{
+			{
+				Field:     "account_id",
+				Direction: OrderByDirectionAsc,
+			},
+			{
+				Field:     "age",
+				Direction: OrderByDirectionDesc,
+			},
+		})
+		fmt.Println(util.PrettyJSONString(docs))
+		docs.ForEach(func(next *Document, i int) {
+			if len(docs) > i+1 {
+				assert.LessOrEqual(t, next.GetFloat("account_id"), docs[i+1].GetFloat("account_id"), i)
+				if next.GetFloat("account_id") == docs[i+1].GetFloat("account_id") {
+					assert.GreaterOrEqual(t, next.GetFloat("age"), docs[i+1].GetFloat("age"), i)
+				}
+			}
+		})
+	})
+	t.Run("documents - orderBy (desc/asc)", func(t *testing.T) {
+		var docs Documents
+		for i := 0; i < 100; i++ {
+			doc := newUserDoc()
+			assert.Nil(t, doc.Set("account_id", gofakeit.IntRange(1, 5)))
+			docs = append(docs, doc)
+		}
+		docs = orderByDocs(docs, []OrderBy{
+			{
+				Field:     "account_id",
+				Direction: OrderByDirectionAsc,
+			},
+			{
+				Field:     "age",
+				Direction: OrderByDirectionDesc,
+			},
+		})
+		fmt.Println(util.PrettyJSONString(docs))
+		docs.ForEach(func(next *Document, i int) {
+			if len(docs) > i+1 {
+				assert.LessOrEqual(t, next.GetFloat("account_id"), docs[i+1].GetFloat("account_id"), i)
 				if next.GetFloat("account_id") == docs[i+1].GetFloat("account_id") {
 					assert.GreaterOrEqual(t, next.GetFloat("age"), docs[i+1].GetFloat("age"), i)
 				}

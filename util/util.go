@@ -39,6 +39,12 @@ func JSONString(input any) string {
 	return string(bits)
 }
 
+// PrettyJSONString returns a pretty json string of the input
+func PrettyJSONString(input any) string {
+	bits, _ := json.MarshalIndent(input, "", "    ")
+	return string(bits)
+}
+
 func EncodeIndexValue(value any) []byte {
 	if value == nil {
 		return []byte("")
