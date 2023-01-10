@@ -9,6 +9,7 @@ import (
 )
 
 type badgerTx struct {
+	opts    kv.TxOpts
 	batch   *badger.WriteBatch
 	txn     *badger.Txn
 	db      *badgerKV
@@ -18,7 +19,7 @@ type badgerTx struct {
 
 func (b *badgerTx) NewIterator(kopts kv.IterOpts) (kv.Iterator, error) {
 	if b.txn == nil {
-		b.txn = b.db.db.NewTransaction(false)
+		b.txn = b.db.db.NewTransaction(!b.opts.IsReadOnly)
 	}
 	opts := badger.DefaultIteratorOptions
 	opts.PrefetchValues = true
@@ -37,9 +38,9 @@ func (b *badgerTx) NewIterator(kopts kv.IterOpts) (kv.Iterator, error) {
 }
 
 func (b *badgerTx) Get(ctx context.Context, key []byte) ([]byte, error) {
-	//if b.txn == nil {
-	//	b.txn = b.db.db.NewTransaction(false)
-	//}
+	if b.txn == nil {
+		b.txn = b.db.db.NewTransaction(!b.opts.IsReadOnly)
+	}
 	i, err := b.txn.Get(key)
 	if err != nil {
 		if err == badger.ErrKeyNotFound {
