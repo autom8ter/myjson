@@ -188,7 +188,7 @@ func (t *transaction) Query(ctx context.Context, collection string, query Query)
 		Count:     len(results),
 		Stats: PageStats{
 			ExecutionTime: time.Since(now),
-			Optimization:  match,
+			Explain:       match,
 		},
 	}, nil
 }
@@ -198,8 +198,6 @@ func (t *transaction) Get(ctx context.Context, collection string, id string) (*D
 	if c == nil {
 		return nil, errors.New(errors.Validation, "tx: unsupported collection: %s", collection)
 	}
-	md, _ := GetMetadata(ctx)
-	md.Set(string(txCtx), t.tx)
 	primaryIndex := c.PrimaryIndex()
 	val, err := t.tx.Get(ctx, seekPrefix(ctx, collection, primaryIndex, map[string]any{
 		c.PrimaryKey(): id,
@@ -213,9 +211,6 @@ func (t *transaction) Get(ctx context.Context, collection string, id string) (*D
 	doc, err := NewDocumentFromBytes(val)
 	if err != nil {
 		return nil, err
-	}
-	if doc == nil {
-		return nil, errors.New(errors.NotFound, "%s not found", id)
 	}
 	if doc == nil {
 		return nil, errors.New(errors.NotFound, "%s not found", id)
@@ -265,7 +260,7 @@ func (t *transaction) aggregate(ctx context.Context, collection string, query Qu
 		Count:     len(reduced),
 		Stats: PageStats{
 			ExecutionTime: time.Since(now),
-			Optimization:  match,
+			Explain:       match,
 		},
 	}, nil
 }
@@ -285,7 +280,7 @@ func docsHaving(where []Where, results Documents) (Documents, error) {
 	return results, nil
 }
 
-func (t *transaction) ForEach(ctx context.Context, collection string, opts ForEachOpts, fn ForEachFunc) (Optimization, error) {
+func (t *transaction) ForEach(ctx context.Context, collection string, opts ForEachOpts, fn ForEachFunc) (Explain, error) {
 	return t.queryScan(ctx, collection, opts.Where, opts.Join, fn)
 }
 

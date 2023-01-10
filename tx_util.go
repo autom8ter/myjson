@@ -95,7 +95,10 @@ func (t *transaction) persistCommand(ctx context.Context, command *Command) erro
 	if c == nil {
 		return fmt.Errorf("tx: collection: %s does not exist", command.Collection)
 	}
-	md, _ := GetMetadata(ctx)
+	if c.IsReadOnly() && !isInternal(ctx) {
+		return fmt.Errorf("tx: collection: %s is read only", command.Collection)
+	}
+
 	docID := c.GetPrimaryKey(command.Document)
 	if command.Timestamp == 0 {
 		command.Timestamp = time.Now().UnixNano()
@@ -108,7 +111,7 @@ func (t *transaction) persistCommand(ctx context.Context, command *Command) erro
 		return err
 	}
 	before, _ := t.Get(ctx, command.Collection, docID)
-	if md.Exists(string(isIndexingKey)) {
+	if isIndexing(ctx) {
 		for _, i := range t.db.GetSchema(ctx, command.Collection).Indexing() {
 			if i.Primary {
 				continue
@@ -166,7 +169,9 @@ func (t *transaction) persistCommand(ctx context.Context, command *Command) erro
 		if err != nil {
 			return errors.Wrap(err, errors.Internal, "failed to persist cdc")
 		}
+
 		if t.db.persistCDC {
+			ctx = context.WithValue(ctx, internalKey, true)
 			if err := t.persistCommand(ctx, &Command{
 				Collection: "cdc",
 				Action:     Create,
@@ -308,33 +313,33 @@ func (t *transaction) updateSecondaryIndex(ctx context.Context, schema Collectio
 	return nil
 }
 
-func (t *transaction) queryScan(ctx context.Context, collection string, where []Where, join []Join, fn ForEachFunc) (Optimization, error) {
+func (t *transaction) queryScan(ctx context.Context, collection string, where []Where, join []Join, fn ForEachFunc) (Explain, error) {
 	if fn == nil {
-		return Optimization{}, errors.New(errors.Validation, "empty scan handler")
+		return Explain{}, errors.New(errors.Validation, "empty scan handler")
 	}
 	c, ctx := t.db.getSchema(ctx, collection)
 	if c == nil {
-		return Optimization{}, errors.New(errors.Validation, "tx: unsupported collection: %s", collection)
+		return Explain{}, errors.New(errors.Validation, "tx: unsupported collection: %s", collection)
 	}
 	var err error
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	if t.db.collectionIsLocked(ctx, collection) {
-		return Optimization{}, errors.New(errors.Forbidden, "collection %s is locked", collection)
+		return Explain{}, errors.New(errors.Forbidden, "collection %s is locked", collection)
 	}
-	optimization, err := t.db.optimizer.Optimize(t.db.GetSchema(ctx, collection), where)
+	explain, err := t.db.optimizer.Optimize(t.db.GetSchema(ctx, collection), where)
 	if err != nil {
-		return Optimization{}, err
+		return Explain{}, err
 	}
 
-	pfx := seekPrefix(ctx, collection, optimization.Index, optimization.MatchedValues)
+	pfx := seekPrefix(ctx, collection, explain.Index, explain.MatchedValues)
 	opts := kv.IterOpts{
 		Prefix:  pfx.Path(),
-		Reverse: optimization.Reverse,
+		Reverse: explain.Reverse,
 	}
-	if optimization.SeekFields != nil {
-		for _, field := range optimization.SeekFields {
-			pfx = pfx.Append(field, optimization.SeekValues[field])
+	if explain.SeekFields != nil {
+		for _, field := range explain.SeekFields {
+			pfx = pfx.Append(field, explain.SeekValues[field])
 		}
 		opts.Seek = pfx.Path()
 	} else {
@@ -342,26 +347,26 @@ func (t *transaction) queryScan(ctx context.Context, collection string, where []
 	}
 	it, err := t.tx.NewIterator(opts)
 	if err != nil {
-		return Optimization{}, err
+		return Explain{}, err
 	}
 	defer it.Close()
 	for it.Valid() {
 		var document *Document
-		if optimization.Index.Primary {
+		if explain.Index.Primary {
 			bits, err := it.Value()
 			if err != nil {
-				return optimization, err
+				return explain, err
 			}
 			document, err = NewDocumentFromBytes(bits)
 			if err != nil {
-				return optimization, err
+				return explain, err
 			}
 		} else {
 			split := bytes.Split(it.Key(), []byte("\x00"))
 			id := split[len(split)-1]
 			document, err = t.Get(ctx, collection, string(id))
 			if err != nil {
-				return optimization, err
+				return explain, err
 			}
 		}
 		var documents = []*Document{document}
@@ -394,17 +399,17 @@ func (t *transaction) queryScan(ctx context.Context, collection string, where []
 					Where:  newJoin.On,
 				})
 				if err != nil {
-					return Optimization{}, err
+					return Explain{}, err
 				}
 				for i, d := range results.Documents {
 					if len(documents) > i {
 						if err := documents[i].MergeJoin(d, j.As); err != nil {
-							return Optimization{}, err
+							return Explain{}, err
 						}
 					} else {
 						cloned := documents[0].Clone()
 						if err := cloned.MergeJoin(d, j.As); err != nil {
-							return Optimization{}, err
+							return Explain{}, err
 						}
 						documents = append(documents, cloned)
 					}
@@ -415,23 +420,23 @@ func (t *transaction) queryScan(ctx context.Context, collection string, where []
 		for _, d := range documents {
 			pass, err := d.Where(where)
 			if err != nil {
-				return Optimization{}, err
+				return Explain{}, err
 			}
 			if pass {
 				shouldContinue, err := fn(d)
 				if err != nil {
-					return Optimization{}, err
+					return Explain{}, err
 				}
 				if !shouldContinue {
-					return Optimization{}, nil
+					return Explain{}, nil
 				}
 			}
 		}
 		if err := it.Next(); err != nil {
-			return Optimization{}, err
+			return Explain{}, err
 		}
 	}
-	return optimization, nil
+	return explain, nil
 }
 
 func (t *transaction) applyCommandTriggers(ctx context.Context, c CollectionSchema, command *Command) error {

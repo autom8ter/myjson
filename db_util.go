@@ -64,13 +64,13 @@ func (d *defaultDB) addIndex(ctx context.Context, collection string, index Index
 	if err := d.persistCollectionConfig(ctx, schema); err != nil {
 		return err
 	}
-	meta, _ := GetMetadata(ctx)
-	meta.Set(string(internalKey), true)
-	meta.Set(string(isIndexingKey), true)
+	ctx = context.WithValue(ctx, isIndexingKey, true)
+	ctx = context.WithValue(ctx, internalKey, true)
+
 	if !index.Primary {
 		if err := d.Tx(ctx, kv.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx Tx) error {
-			_, err := d.ForEach(meta.ToContext(ctx), collection, ForEachOpts{}, func(doc *Document) (bool, error) {
-				if err := tx.Set(meta.ToContext(ctx), collection, doc); err != nil {
+			_, err := d.ForEach(ctx, collection, ForEachOpts{}, func(doc *Document) (bool, error) {
+				if err := tx.Set(ctx, collection, doc); err != nil {
 					return false, err
 				}
 				return true, nil

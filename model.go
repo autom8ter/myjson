@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	// import embed package
 	_ "embed"
 
 	"github.com/autom8ter/myjson/errors"
@@ -298,12 +299,12 @@ type Page struct {
 type PageStats struct {
 	// ExecutionTime is the execution time to get the page
 	ExecutionTime time.Duration `json:"execution_time,omitempty"`
-	// Optimization is the optimizer's output for the query that returned a page
-	Optimization Optimization `json:"optimization,omitempty"`
+	// Explain is the optimizer's output for the query that returned a page
+	Explain Explain `json:"explain,omitempty"`
 }
 
-// Optimization
-type Optimization struct {
+// Explain is the optimizer's output for a query
+type Explain struct {
 	// Collection
 	Collection string `json:"collection"`
 	// Index is the index the query optimizer chose
@@ -354,7 +355,7 @@ type Index struct {
 	// Unique indicates that it's a primary index
 	Primary bool `json:"primary"`
 	// ForeignKey indecates that it's an index for a foreign key
-	ForeignKey *ForeignKey `json:"foreignKey,omitempty"`
+	ForeignKey *ForeignKey `json:"foreign_key,omitempty"`
 }
 
 type EventType string

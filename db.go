@@ -2,6 +2,7 @@ package myjson
 
 import (
 	"context"
+	// import embed package
 	_ "embed"
 	"encoding/json"
 	"sync"
@@ -89,6 +90,10 @@ func Open(ctx context.Context, provider string, providerParams map[string]any, o
 	return d, err
 }
 
+func (d *defaultDB) Serve(ctx context.Context, t Transport) error {
+	return t.Serve(ctx, d)
+}
+
 func (d *defaultDB) NewTx(opts kv.TxOpts) (Txn, error) {
 	vm := <-d.vmPool
 	tx, err := d.kv.NewTx(opts)
@@ -174,9 +179,9 @@ func (d *defaultDB) Query(ctx context.Context, collection string, query Query) (
 	return page, nil
 }
 
-func (d *defaultDB) ForEach(ctx context.Context, collection string, opts ForEachOpts, fn ForEachFunc) (Optimization, error) {
+func (d *defaultDB) ForEach(ctx context.Context, collection string, opts ForEachOpts, fn ForEachFunc) (Explain, error) {
 	var (
-		result Optimization
+		result Explain
 		err    error
 	)
 	if err := d.Tx(ctx, kv.TxOpts{IsReadOnly: true}, func(ctx context.Context, tx Tx) error {
@@ -203,10 +208,8 @@ func (d *defaultDB) ConfigureCollection(ctx context.Context, collectionSchemaByt
 	if err != nil {
 		return err
 	}
-	meta, _ := GetMetadata(ctx)
-	meta.Set(string(isIndexingKey), true)
-	meta.Set(string(internalKey), true)
-	ctx = meta.ToContext(ctx)
+	ctx = context.WithValue(ctx, isIndexingKey, true)
+	ctx = context.WithValue(ctx, internalKey, true)
 	collection, err := newCollectionSchema(jsonBytes)
 	if err != nil {
 		return err
@@ -321,6 +324,7 @@ func (d *defaultDB) RunMigrations(ctx context.Context, migrations ...Migration) 
 		err     error
 		skipped bool
 	)
+	ctx = context.WithValue(ctx, internalKey, true)
 	for _, m := range migrations {
 		m.Dirty = false
 		m.Timestamp = time.Now().Unix()
@@ -344,9 +348,6 @@ func (d *defaultDB) RunMigrations(ctx context.Context, migrations ...Migration) 
 			return nil
 		}); err != nil {
 			return err
-		}
-		if err != nil {
-			break
 		}
 	}
 	return err
@@ -372,4 +373,9 @@ func (d *defaultDB) runMigration(ctx context.Context, m Migration) (bool, error)
 
 func (d *defaultDB) Close(ctx context.Context) error {
 	return errors.Wrap(d.kv.Close(ctx), 0, "")
+}
+
+// NewDoc creates a new document builder
+func (d *defaultDB) NewDoc() *DocBuilder {
+	return D()
 }

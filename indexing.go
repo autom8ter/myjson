@@ -45,32 +45,32 @@ type indexPathPrefix struct {
 	fieldMap  []indexFieldValue
 }
 
-func (p indexPathPrefix) Append(field string, value any) indexPathPrefix {
-	fields := append(p.fields, []byte(field), util.EncodeIndexValue(value))
-	fieldMap := append(p.fieldMap, indexFieldValue{
+func (i indexPathPrefix) Append(field string, value any) indexPathPrefix {
+	fields := append(i.fields, []byte(field), util.EncodeIndexValue(value))
+	fieldMap := append(i.fieldMap, indexFieldValue{
 		Field: field,
 		Value: value,
 	})
 	return indexPathPrefix{
-		prefix:   p.prefix,
+		prefix:   i.prefix,
 		fields:   fields,
 		fieldMap: fieldMap,
 	}
 }
 
-func (p indexPathPrefix) Seek(value any) indexPathPrefix {
+func (i indexPathPrefix) Seek(value any) indexPathPrefix {
 	return indexPathPrefix{
-		prefix:    p.prefix,
+		prefix:    i.prefix,
 		seekValue: value,
-		fields:    p.fields,
-		fieldMap:  p.fieldMap,
+		fields:    i.fields,
+		fieldMap:  i.fieldMap,
 	}
 }
 
-func (p indexPathPrefix) Path() []byte {
-	var path = append(p.prefix, p.fields...)
-	if p.seekValue != nil {
-		path = append(path, util.EncodeIndexValue(p.seekValue))
+func (i indexPathPrefix) Path() []byte {
+	var path = append(i.prefix, i.fields...)
+	if i.seekValue != nil {
+		path = append(path, util.EncodeIndexValue(i.seekValue))
 	}
 	return bytes.Join(path, nullByte)
 }

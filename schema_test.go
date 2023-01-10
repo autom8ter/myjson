@@ -2,6 +2,7 @@ package myjson
 
 import (
 	"context"
+	// import embed package
 	_ "embed"
 	"fmt"
 	"testing"

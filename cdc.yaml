@@ -1,6 +1,8 @@
 type: object
 x-collection: cdc
+x-read-only: true
 required:
+  - _id
   - collection
   - action
   - diff

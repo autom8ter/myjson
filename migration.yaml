@@ -1,5 +1,6 @@
 type: object
 x-collection: migration
+x-read-only: true
 required:
   - _id
   - timestamp

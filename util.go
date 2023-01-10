@@ -88,18 +88,13 @@ func orderByDocs(d Documents, orderBys []OrderBy) Documents {
 			}
 			for index < len(orderBys) {
 				order := orderBys[index]
-				if d[i].Get(order.Field) != d[j].Get(order.Field) {
-					return compareField(order.Field, d[i], d[j])
-				}
-				if d[i].Get(order.Field) != d[j].Get(order.Field) {
-					if order.Direction == OrderByDirectionDesc {
-						if d[i].Get(orderBy.Field) != d[j].Get(orderBy.Field) {
-							return compareField(orderBy.Field, d[i], d[j])
-						}
-					} else {
-						if d[i].Get(orderBy.Field) != d[j].Get(orderBy.Field) {
-							return !compareField(orderBy.Field, d[i], d[j])
-						}
+				if order.Direction == OrderByDirectionDesc {
+					if d[i].Get(order.Field) != d[j].Get(order.Field) {
+						return compareField(order.Field, d[i], d[j])
+					}
+				} else {
+					if d[i].Get(order.Field) != d[j].Get(order.Field) {
+						return !compareField(order.Field, d[i], d[j])
 					}
 				}
 				index++
@@ -115,16 +110,13 @@ func orderByDocs(d Documents, orderBys []OrderBy) Documents {
 			for index < len(orderBys) {
 				order := orderBys[index]
 				if d[i].Get(order.Field) != d[j].Get(order.Field) {
-					return !compareField(order.Field, d[i], d[j])
-				}
-				if d[i].Get(order.Field) != d[j].Get(order.Field) {
 					if order.Direction == OrderByDirectionDesc {
-						if d[i].Get(orderBy.Field) != d[j].Get(orderBy.Field) {
-							return compareField(orderBy.Field, d[i], d[j])
+						if d[i].Get(order.Field) != d[j].Get(order.Field) {
+							return compareField(order.Field, d[i], d[j])
 						}
 					} else {
-						if d[i].Get(orderBy.Field) != d[j].Get(orderBy.Field) {
-							return !compareField(orderBy.Field, d[i], d[j])
+						if d[i].Get(order.Field) != d[j].Get(order.Field) {
+							return !compareField(order.Field, d[i], d[j])
 						}
 					}
 				}

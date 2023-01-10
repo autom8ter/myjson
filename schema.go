@@ -9,6 +9,8 @@ import (
 
 	"github.com/autom8ter/myjson/errors"
 	"github.com/autom8ter/myjson/util"
+	"github.com/samber/lo"
+	"github.com/spf13/cast"
 	"github.com/tidwall/gjson"
 	"github.com/xeipuuv/gojsonschema"
 )
@@ -22,6 +24,7 @@ type collectionSchema struct {
 	properties    map[string]SchemaProperty
 	propertyPaths map[string]SchemaProperty
 	triggers      []Trigger
+	readOnly      bool
 	mu            sync.RWMutex
 }
 
@@ -35,6 +38,7 @@ const (
 	primaryPath      schemaPath = "x-primary"
 	uniquePath       schemaPath = "x-unique"
 	triggersPath     schemaPath = "x-triggers"
+	readOnlyPath     schemaPath = "x-read-only"
 	refPrefix                   = "common."
 )
 
@@ -58,14 +62,9 @@ func newCollectionSchema(yamlContent []byte) (CollectionSchema, error) {
 		indexing:      map[string]Index{},
 		properties:    map[string]SchemaProperty{},
 		propertyPaths: map[string]SchemaProperty{},
-	}
-	if err != nil {
-		return nil, err
+		readOnly:      r.Get(string(readOnlyPath)).Bool(),
 	}
 	if err := s.loadProperties(s.properties, s.raw.Get("properties")); err != nil {
-		return nil, err
-	}
-	if err != nil {
 		return nil, err
 	}
 	for _, f := range s.propertyPaths {
@@ -97,6 +96,9 @@ func newCollectionSchema(yamlContent []byte) (CollectionSchema, error) {
 	sort.Slice(s.triggers, func(i, j int) bool {
 		return s.triggers[i].Order < s.triggers[j].Order
 	})
+	if required := cast.ToStringSlice(s.raw.Get("required").Value()); !lo.Contains(required, s.PrimaryKey()) {
+		return nil, errors.New(errors.Validation, "primary key is required: %s %v %v", s.Collection(), required, s.PrimaryIndex())
+	}
 	return s, nil
 }
 
@@ -109,15 +111,15 @@ func (c *collectionSchema) loadRef(ref string) (gjson.Result, error) {
 	return c.raw.Get(path), nil
 }
 
-func (s *collectionSchema) loadProperties(properties map[string]SchemaProperty, r gjson.Result) error {
+func (c *collectionSchema) loadProperties(properties map[string]SchemaProperty, r gjson.Result) error {
 	if !r.Exists() {
 		return nil
 	}
 	var err error
 	for key, value := range r.Map() {
-		path := strings.ReplaceAll(value.Path(s.raw.Raw), "properties.", "")
+		path := strings.ReplaceAll(value.Path(c.raw.Raw), "properties.", "")
 		if value.Get("$ref").Exists() {
-			value, err = s.loadRef(value.Get("$ref").String())
+			value, err = c.loadRef(value.Get("$ref").String())
 			if err != nil {
 				return err
 			}
@@ -135,7 +137,7 @@ func (s *collectionSchema) loadProperties(properties map[string]SchemaProperty, 
 		}
 
 		if props := value.Get("properties"); props.Exists() && schema.Type == "object" {
-			if err := s.loadProperties(schema.Properties, props); err != nil {
+			if err := c.loadProperties(schema.Properties, props); err != nil {
 				return err
 			}
 		}
@@ -155,7 +157,7 @@ func (s *collectionSchema) loadProperties(properties map[string]SchemaProperty, 
 				for name, idx := range indexing {
 					fields := []string{path}
 					fields = append(fields, idx.AdditionalFields...)
-					s.indexing[name] = Index{
+					c.indexing[name] = Index{
 						Name:    name,
 						Fields:  fields,
 						Unique:  false,
@@ -165,23 +167,23 @@ func (s *collectionSchema) loadProperties(properties map[string]SchemaProperty, 
 			}
 		}
 		properties[key] = schema
-		s.propertyPaths[path] = schema
+		c.propertyPaths[path] = schema
 		switch {
 		case schema.Primary:
-			if s.primaryIndex.Name != "" {
+			if c.primaryIndex.Name != "" {
 				return errors.New(errors.Validation, "multiple primary keys found")
 			}
 			idxName := fmt.Sprintf("%s.primaryidx", path)
-			s.indexing[idxName] = Index{
+			c.indexing[idxName] = Index{
 				Name:    idxName,
 				Fields:  []string{path},
 				Unique:  true,
 				Primary: true,
 			}
-			s.primaryIndex = s.indexing[idxName]
+			c.primaryIndex = c.indexing[idxName]
 		case schema.Unique:
 			idxName := fmt.Sprintf("%s.uniqueidx", path)
-			s.indexing[idxName] = Index{
+			c.indexing[idxName] = Index{
 				Name:    idxName,
 				Fields:  []string{path},
 				Unique:  true,
@@ -189,7 +191,7 @@ func (s *collectionSchema) loadProperties(properties map[string]SchemaProperty, 
 			}
 		case schema.ForeignKey != nil:
 			idxName := fmt.Sprintf("%s.foreignidx", path)
-			s.indexing[idxName] = Index{
+			c.indexing[idxName] = Index{
 				Name:       idxName,
 				Fields:     []string{path},
 				Unique:     schema.Unique,
@@ -214,13 +216,18 @@ func (c *collectionSchema) refreshSchema(jsonContent []byte) error {
 	c.indexing = newSchema.indexing
 	c.propertyPaths = newSchema.propertyPaths
 	c.properties = newSchema.properties
+	c.readOnly = newSchema.readOnly
 	return nil
 }
 
 func (c *collectionSchema) MarshalYAML() ([]byte, error) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	return util.JSONToYAML([]byte(c.raw.Raw))
+	y, err := util.JSONToYAML([]byte(c.raw.Raw))
+	if err != nil {
+		return nil, errors.Wrap(err, 0, "failed to convert schema to yaml: %s", c.collection)
+	}
+	return y, nil
 }
 
 func (c *collectionSchema) UnmarshalYAML(bytes []byte) error {
@@ -328,4 +335,10 @@ func (c *collectionSchema) Triggers() []Trigger {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	return c.triggers
+}
+
+func (c *collectionSchema) IsReadOnly() bool {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.readOnly
 }

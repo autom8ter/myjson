@@ -27,6 +27,7 @@ type lockMeta struct {
 }
 
 func (b *badgerLock) IsLocked(ctx context.Context) (bool, error) {
+	//return false, nil
 	isLocked := true
 	err := b.db.Tx(kv.TxOpts{IsReadOnly: true}, func(tx kv.Tx) error {
 		val, err := tx.Get(ctx, b.key)
