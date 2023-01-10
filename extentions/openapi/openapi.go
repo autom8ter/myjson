@@ -18,9 +18,14 @@ import (
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/getkin/kin-openapi/routers"
 	"github.com/getkin/kin-openapi/routers/gorillamux"
+	"github.com/ghodss/yaml"
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
+	"github.com/samber/lo"
+	"github.com/spf13/cast"
+	"github.com/tidwall/gjson"
+	"github.com/tidwall/sjson"
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 )
@@ -92,10 +97,32 @@ func getSpec(ctx context.Context, config Config, db myjson.Database) ([]byte, er
 	var coll []map[string]interface{}
 	var collections = db.Collections(ctx)
 	for _, c := range collections {
-		schema, _ := db.GetSchema(ctx, c).MarshalYAML()
+		schema := db.GetSchema(ctx, c)
+		yamlSchema, _ := schema.MarshalYAML()
+		createSchema, err := schema.MarshalJSON()
+		if err != nil {
+			return nil, err
+		}
+		required := cast.ToStringSlice(gjson.GetBytes(createSchema, "required").Value())
+		if len(required) > 0 {
+			index := lo.IndexOf(required, schema.PrimaryKey())
+			if index != -1 {
+				required = util.RemoveElement(index, required)
+			}
+		}
+		createSchema, err = sjson.SetBytes(createSchema, "required", required)
+		if err != nil {
+			return nil, err
+		}
+		createSchema, err = yaml.JSONToYAML(createSchema)
+		if err != nil {
+			return nil, err
+		}
 		coll = append(coll, map[string]interface{}{
-			"collection": c,
-			"schema":     string(schema),
+			"collection":    c,
+			"schema":        string(yamlSchema),
+			"create_schema": string(createSchema),
+			"is_read_only":  schema.IsReadOnly(),
 		})
 	}
 	buf := bytes.NewBuffer(nil)

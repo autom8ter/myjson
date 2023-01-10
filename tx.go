@@ -198,8 +198,6 @@ func (t *transaction) Get(ctx context.Context, collection string, id string) (*D
 	if c == nil {
 		return nil, errors.New(errors.Validation, "tx: unsupported collection: %s", collection)
 	}
-	md, _ := GetMetadata(ctx)
-	md.Set(string(txCtx), t.tx)
 	primaryIndex := c.PrimaryIndex()
 	val, err := t.tx.Get(ctx, seekPrefix(ctx, collection, primaryIndex, map[string]any{
 		c.PrimaryKey(): id,

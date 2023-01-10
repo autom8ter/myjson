@@ -95,7 +95,10 @@ func (t *transaction) persistCommand(ctx context.Context, command *Command) erro
 	if c == nil {
 		return fmt.Errorf("tx: collection: %s does not exist", command.Collection)
 	}
-	md, _ := GetMetadata(ctx)
+	if c.IsReadOnly() && !isInternal(ctx) {
+		return fmt.Errorf("tx: collection: %s is read only", command.Collection)
+	}
+
 	docID := c.GetPrimaryKey(command.Document)
 	if command.Timestamp == 0 {
 		command.Timestamp = time.Now().UnixNano()
@@ -108,7 +111,7 @@ func (t *transaction) persistCommand(ctx context.Context, command *Command) erro
 		return err
 	}
 	before, _ := t.Get(ctx, command.Collection, docID)
-	if md.Exists(string(isIndexingKey)) {
+	if isIndexing(ctx) {
 		for _, i := range t.db.GetSchema(ctx, command.Collection).Indexing() {
 			if i.Primary {
 				continue
@@ -166,7 +169,9 @@ func (t *transaction) persistCommand(ctx context.Context, command *Command) erro
 		if err != nil {
 			return errors.Wrap(err, errors.Internal, "failed to persist cdc")
 		}
+
 		if t.db.persistCDC {
+			ctx = context.WithValue(ctx, internalKey, true)
 			if err := t.persistCommand(ctx, &Command{
 				Collection: "cdc",
 				Action:     Create,

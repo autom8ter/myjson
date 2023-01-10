@@ -207,10 +207,8 @@ func (d *defaultDB) ConfigureCollection(ctx context.Context, collectionSchemaByt
 	if err != nil {
 		return err
 	}
-	meta, _ := GetMetadata(ctx)
-	meta.Set(string(isIndexingKey), true)
-	meta.Set(string(internalKey), true)
-	ctx = meta.ToContext(ctx)
+	ctx = context.WithValue(ctx, isIndexingKey, true)
+	ctx = context.WithValue(ctx, internalKey, true)
 	collection, err := newCollectionSchema(jsonBytes)
 	if err != nil {
 		return err
@@ -325,6 +323,7 @@ func (d *defaultDB) RunMigrations(ctx context.Context, migrations ...Migration) 
 		err     error
 		skipped bool
 	)
+	ctx = context.WithValue(ctx, internalKey, true)
 	for _, m := range migrations {
 		m.Dirty = false
 		m.Timestamp = time.Now().Unix()

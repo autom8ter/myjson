@@ -74,7 +74,7 @@ paths:
           description: Internal Server Error
 {{- range .collections }}
   # {{ .collection }} collection endpoints
-  /api/schema/{{ .collection }}:
+  /api/collections/{{ .collection }}/schema:
     get:
       tags:
         - {{ title .collection }}
@@ -92,6 +92,7 @@ paths:
           description: Invalid schema
         '500':
           description: Internal Server Error
+        {{- if not .is_read_only }}
     put:
       tags:
         - {{ title .collection }}
@@ -139,8 +140,9 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/{{ title .collection }}'
+              $ref: '#/components/schemas/Create{{ title .collection }}'
         required: true
+              {{- end }}
   /api/collections/{{ .collection }}/docs/{docID}:
     get:
       tags:
@@ -163,6 +165,7 @@ paths:
           description: Not found
         '500':
           description: Internal Server Error
+        {{- if not .is_read_only }}
     delete:
       tags:
         - {{ title .collection }}
@@ -234,6 +237,7 @@ paths:
             schema:
               type: object
         required: true
+                {{- end }}
   /api/collections/{{ .collection }}/query:
     post:
       tags:
@@ -260,6 +264,7 @@ paths:
             schema:
               $ref: '#/components/schemas/Query'
         required: true
+  {{- if not .is_read_only }}
   /api/collections/{{ .collection }}/batch:
     put:
       tags:
@@ -284,6 +289,7 @@ paths:
               items:
                 $ref: '#/components/schemas/{{ title .collection }}'
         required: true
+                {{end}}
 {{end}}
 components:
   parameters:
@@ -298,4 +304,7 @@ components:
     Page: {{ .page_schema | nindent 6 }}
 {{- range .collections }}
     {{ title .collection }}: {{ .schema | nindent 6 }}
+    {{- if not .is_read_only }}
+    Create{{ title .collection }}: {{ .create_schema | nindent 6 }}
+    {{ end }}
 {{end}}

@@ -9,6 +9,8 @@ import (
 
 	"github.com/autom8ter/myjson/errors"
 	"github.com/autom8ter/myjson/util"
+	"github.com/samber/lo"
+	"github.com/spf13/cast"
 	"github.com/tidwall/gjson"
 	"github.com/xeipuuv/gojsonschema"
 )
@@ -22,6 +24,7 @@ type collectionSchema struct {
 	properties    map[string]SchemaProperty
 	propertyPaths map[string]SchemaProperty
 	triggers      []Trigger
+	readOnly      bool
 	mu            sync.RWMutex
 }
 
@@ -35,6 +38,7 @@ const (
 	primaryPath      schemaPath = "x-primary"
 	uniquePath       schemaPath = "x-unique"
 	triggersPath     schemaPath = "x-triggers"
+	readOnlyPath     schemaPath = "x-read-only"
 	refPrefix                   = "common."
 )
 
@@ -58,6 +62,7 @@ func newCollectionSchema(yamlContent []byte) (CollectionSchema, error) {
 		indexing:      map[string]Index{},
 		properties:    map[string]SchemaProperty{},
 		propertyPaths: map[string]SchemaProperty{},
+		readOnly:      r.Get(string(readOnlyPath)).Bool(),
 	}
 	if err != nil {
 		return nil, err
@@ -97,6 +102,9 @@ func newCollectionSchema(yamlContent []byte) (CollectionSchema, error) {
 	sort.Slice(s.triggers, func(i, j int) bool {
 		return s.triggers[i].Order < s.triggers[j].Order
 	})
+	if required := cast.ToStringSlice(s.raw.Get("required").Value()); !lo.Contains(required, s.PrimaryKey()) {
+		return nil, errors.New(errors.Validation, "primary key is required: %s %v %v", s.Collection(), required, s.PrimaryIndex())
+	}
 	return s, nil
 }
 
@@ -214,6 +222,7 @@ func (c *collectionSchema) refreshSchema(jsonContent []byte) error {
 	c.indexing = newSchema.indexing
 	c.propertyPaths = newSchema.propertyPaths
 	c.properties = newSchema.properties
+	c.readOnly = newSchema.readOnly
 	return nil
 }
 
@@ -328,4 +337,10 @@ func (c *collectionSchema) Triggers() []Trigger {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	return c.triggers
+}
+
+func (c *collectionSchema) IsReadOnly() bool {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.readOnly
 }

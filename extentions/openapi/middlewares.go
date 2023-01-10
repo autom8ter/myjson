@@ -34,6 +34,13 @@ func (o *OpenAPIServer) openAPIValidator() mux.MiddlewareFunc {
 				httpError.Error(w, errors.Wrap(err, http.StatusNotFound, "route not found"))
 				return
 			}
+
+			md.SetAll(map[string]any{
+				"openapi.path_params":  pathParams,
+				"openapi.path":         route.Path,
+				"openapi.operation_id": route.Operation.OperationID,
+				"openapi.method":       route.Method,
+			})
 			requestValidationInput := &openapi3filter.RequestValidationInput{
 				Request:    r,
 				PathParams: pathParams,
@@ -43,12 +50,6 @@ func (o *OpenAPIServer) openAPIValidator() mux.MiddlewareFunc {
 					return nil
 				}},
 			}
-			md.SetAll(map[string]any{
-				"openapi.path_params":  pathParams,
-				"openapi.path":         route.Path,
-				"openapi.operation_id": route.Operation.OperationID,
-				"openapi.method":       route.Method,
-			})
 			if err := openapi3filter.ValidateRequest(r.Context(), requestValidationInput); err != nil {
 				bits, _ := io.ReadAll(r.Body)
 				o.logger.Error(r.Context(), "OPENAPI VALIDATION FAILURE", map[string]any{

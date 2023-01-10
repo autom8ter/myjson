@@ -31,6 +31,8 @@ type CollectionSchema interface {
 	PropertyPaths() map[string]SchemaProperty
 	// Triggers returns a map of triggers keyed by name that are assigned to the collection
 	Triggers() []Trigger
+	// IsReadOnly returns whether the collection is read only
+	IsReadOnly() bool
 	// MarshalYAML returns the collection schema as yaml bytes
 	MarshalYAML() ([]byte, error)
 	// UnmarshalYAML refreshes the collection schema with the given json bytes
