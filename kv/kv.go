@@ -107,14 +107,6 @@ type Locker interface {
 	IsLocked(ctx context.Context) (bool, error)
 }
 
-// KVConfig configures a key value database from the given provider
-type KVConfig struct {
-	// Provider is the name of the kv provider (badger)
-	Provider string `json:"provider"`
-	// Params are the kv providers params
-	Params map[string]any `json:"params"`
-}
-
 // TxOp is an transaction operation type
 type TxOp string
 

@@ -215,9 +215,6 @@ func (t *transaction) Get(ctx context.Context, collection string, id string) (*D
 	if doc == nil {
 		return nil, errors.New(errors.NotFound, "%s not found", id)
 	}
-	if doc == nil {
-		return nil, errors.New(errors.NotFound, "%s not found", id)
-	}
 	return doc, nil
 }
 

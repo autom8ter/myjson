@@ -28,14 +28,12 @@ func (t *tikvTx) NewIterator(kopts kv.IterOpts) (kv.Iterator, error) {
 			}
 			// iter.Seek(kopts.Seek) // TODO: how to seek?
 			return &tikvIterator{iter: iter, opts: kopts}, nil
-		} else {
-			iter, err := t.txn.IterReverse(kvutil.NextPrefix(kopts.Seek))
-			if err != nil {
-				return nil, err
-			}
-			return &tikvIterator{iter: iter, opts: kopts}, nil
 		}
-
+		iter, err := t.txn.IterReverse(kvutil.NextPrefix(kopts.Seek))
+		if err != nil {
+			return nil, err
+		}
+		return &tikvIterator{iter: iter, opts: kopts}, nil
 	}
 	iter, err := t.txn.Iter(kopts.Prefix, kvutil.NextPrefix(kopts.UpperBound))
 	if err != nil {

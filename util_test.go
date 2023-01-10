@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/autom8ter/myjson/util"
-
+	// import embed package
 	_ "embed"
 
 	"github.com/brianvoe/gofakeit/v6"

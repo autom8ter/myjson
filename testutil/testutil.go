@@ -10,9 +10,10 @@ import (
 	"github.com/autom8ter/myjson/kv"
 
 	"github.com/brianvoe/gofakeit/v6"
-
+	// import embed package
 	_ "embed"
 
+	// import badger kv provider
 	_ "github.com/autom8ter/myjson/kv/badger"
 )
 

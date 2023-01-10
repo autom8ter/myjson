@@ -82,14 +82,13 @@ func Wrap(err error, code Code, msg string, args ...any) error {
 			e.Code = code
 		}
 		return e
-	} else {
-		e = &Error{
-			Code: code,
-			Err:  err.Error(),
-		}
-		if msg != "" {
-			e.Messages = append(e.Messages, fmt.Sprintf(msg, args...))
-		}
-		return e
 	}
+	e = &Error{
+		Code: code,
+		Err:  err.Error(),
+	}
+	if msg != "" {
+		e.Messages = append(e.Messages, fmt.Sprintf(msg, args...))
+	}
+	return e
 }

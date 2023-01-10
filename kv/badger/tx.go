@@ -37,9 +37,9 @@ func (b *badgerTx) NewIterator(kopts kv.IterOpts) (kv.Iterator, error) {
 }
 
 func (b *badgerTx) Get(ctx context.Context, key []byte) ([]byte, error) {
-	if b.txn == nil {
-		b.txn = b.db.db.NewTransaction(false)
-	}
+	//if b.txn == nil {
+	//	b.txn = b.db.db.NewTransaction(false)
+	//}
 	i, err := b.txn.Get(key)
 	if err != nil {
 		if err == badger.ErrKeyNotFound {

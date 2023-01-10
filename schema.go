@@ -64,13 +64,7 @@ func newCollectionSchema(yamlContent []byte) (CollectionSchema, error) {
 		propertyPaths: map[string]SchemaProperty{},
 		readOnly:      r.Get(string(readOnlyPath)).Bool(),
 	}
-	if err != nil {
-		return nil, err
-	}
 	if err := s.loadProperties(s.properties, s.raw.Get("properties")); err != nil {
-		return nil, err
-	}
-	if err != nil {
 		return nil, err
 	}
 	for _, f := range s.propertyPaths {
@@ -117,15 +111,15 @@ func (c *collectionSchema) loadRef(ref string) (gjson.Result, error) {
 	return c.raw.Get(path), nil
 }
 
-func (s *collectionSchema) loadProperties(properties map[string]SchemaProperty, r gjson.Result) error {
+func (c *collectionSchema) loadProperties(properties map[string]SchemaProperty, r gjson.Result) error {
 	if !r.Exists() {
 		return nil
 	}
 	var err error
 	for key, value := range r.Map() {
-		path := strings.ReplaceAll(value.Path(s.raw.Raw), "properties.", "")
+		path := strings.ReplaceAll(value.Path(c.raw.Raw), "properties.", "")
 		if value.Get("$ref").Exists() {
-			value, err = s.loadRef(value.Get("$ref").String())
+			value, err = c.loadRef(value.Get("$ref").String())
 			if err != nil {
 				return err
 			}
@@ -143,7 +137,7 @@ func (s *collectionSchema) loadProperties(properties map[string]SchemaProperty, 
 		}
 
 		if props := value.Get("properties"); props.Exists() && schema.Type == "object" {
-			if err := s.loadProperties(schema.Properties, props); err != nil {
+			if err := c.loadProperties(schema.Properties, props); err != nil {
 				return err
 			}
 		}
@@ -163,7 +157,7 @@ func (s *collectionSchema) loadProperties(properties map[string]SchemaProperty, 
 				for name, idx := range indexing {
 					fields := []string{path}
 					fields = append(fields, idx.AdditionalFields...)
-					s.indexing[name] = Index{
+					c.indexing[name] = Index{
 						Name:    name,
 						Fields:  fields,
 						Unique:  false,
@@ -173,23 +167,23 @@ func (s *collectionSchema) loadProperties(properties map[string]SchemaProperty, 
 			}
 		}
 		properties[key] = schema
-		s.propertyPaths[path] = schema
+		c.propertyPaths[path] = schema
 		switch {
 		case schema.Primary:
-			if s.primaryIndex.Name != "" {
+			if c.primaryIndex.Name != "" {
 				return errors.New(errors.Validation, "multiple primary keys found")
 			}
 			idxName := fmt.Sprintf("%s.primaryidx", path)
-			s.indexing[idxName] = Index{
+			c.indexing[idxName] = Index{
 				Name:    idxName,
 				Fields:  []string{path},
 				Unique:  true,
 				Primary: true,
 			}
-			s.primaryIndex = s.indexing[idxName]
+			c.primaryIndex = c.indexing[idxName]
 		case schema.Unique:
 			idxName := fmt.Sprintf("%s.uniqueidx", path)
-			s.indexing[idxName] = Index{
+			c.indexing[idxName] = Index{
 				Name:    idxName,
 				Fields:  []string{path},
 				Unique:  true,
@@ -197,7 +191,7 @@ func (s *collectionSchema) loadProperties(properties map[string]SchemaProperty, 
 			}
 		case schema.ForeignKey != nil:
 			idxName := fmt.Sprintf("%s.foreignidx", path)
-			s.indexing[idxName] = Index{
+			c.indexing[idxName] = Index{
 				Name:       idxName,
 				Fields:     []string{path},
 				Unique:     schema.Unique,

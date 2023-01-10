@@ -2,6 +2,7 @@ package myjson
 
 import (
 	"context"
+	// import embed package
 	_ "embed"
 	"encoding/json"
 	"sync"
@@ -348,9 +349,6 @@ func (d *defaultDB) RunMigrations(ctx context.Context, migrations ...Migration) 
 		}); err != nil {
 			return err
 		}
-		if err != nil {
-			break
-		}
 	}
 	return err
 }
@@ -375,4 +373,9 @@ func (d *defaultDB) runMigration(ctx context.Context, m Migration) (bool, error)
 
 func (d *defaultDB) Close(ctx context.Context) error {
 	return errors.Wrap(d.kv.Close(ctx), 0, "")
+}
+
+// NewDoc creates a new document builder
+func (d *defaultDB) NewDoc() *DocBuilder {
+	return D()
 }

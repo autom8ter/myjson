@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	// import embed package
 	_ "embed"
 
 	"github.com/autom8ter/myjson/errors"
@@ -302,7 +303,7 @@ type PageStats struct {
 	Explain Explain `json:"explain,omitempty"`
 }
 
-// Explain
+// Explain is the optimizer's output for a query
 type Explain struct {
 	// Collection
 	Collection string `json:"collection"`

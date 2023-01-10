@@ -18,7 +18,7 @@ linters:
     - bodyclose
     - deadcode
     - depguard
-    #    - dupl
+    - dupl
     - errcheck
     - exportloopref
     #    - exhaustive
@@ -34,6 +34,7 @@ linters:
     - gosimple
     - govet
     - ineffassign
+    - revive
     #    - lll
     #    - misspell
     - nakedret
@@ -48,4 +49,5 @@ linters:
     #    - unparam
     - unused
     - varcheck
+    - nilerr
 #    - whitespace

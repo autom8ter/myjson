@@ -83,6 +83,8 @@ type Database interface {
 	RawKV() kv.DB
 	// Serve serves the database over the given transport
 	Serve(ctx context.Context, t Transport) error
+	// NewDoc creates a new document builder instance
+	NewDoc() *DocBuilder
 	// Close closes the database
 	Close(ctx context.Context) error
 }
@@ -134,10 +136,11 @@ type Tx interface {
 	// CDC returns the change data capture array associated with the transaction.
 	// CDC's are persisted to the cdc collection when the transaction is commited.
 	CDC() []CDC
+	// DB returns the transactions underlying database
 	DB() Database
 }
 
-// Transport serves the database over a network
+// Transport serves the database over a network (optional for integration with different transport mechanisms)
 type Transport interface {
 	Serve(ctx context.Context, db Database) error
 }
