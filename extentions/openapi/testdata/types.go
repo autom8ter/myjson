@@ -18,6 +18,12 @@ const (
 	Replace CdcDiffOp = "replace"
 )
 
+// Defines values for CreateUserGender.
+const (
+	CreateUserGenderFemale CreateUserGender = "female"
+	CreateUserGenderMale   CreateUserGender = "male"
+)
+
 // Defines values for QueryOrderByDirection.
 const (
 	Asc  QueryOrderByDirection = "asc"
@@ -52,8 +58,8 @@ const (
 
 // Defines values for UserGender.
 const (
-	Female UserGender = "female"
-	Male   UserGender = "male"
+	UserGenderFemale UserGender = "female"
+	UserGenderMale   UserGender = "male"
 )
 
 // Account defines model for Account.
@@ -68,7 +74,7 @@ type Account struct {
 // Cdc defines model for Cdc.
 type Cdc struct {
 	// Id The cdc entry id.
-	Id *string `json:"_id,omitempty"`
+	Id string `json:"_id"`
 
 	// Action The action taken upon the document
 	Action CdcAction `json:"action"`
@@ -98,6 +104,55 @@ type CdcAction string
 
 // CdcDiffOp defines model for Cdc.Diff.Op.
 type CdcDiffOp string
+
+// CreateAccount defines model for CreateAccount.
+type CreateAccount struct {
+	// Id The account's id.
+	Id *string `json:"_id,omitempty"`
+
+	// Name The accounts's name.
+	Name string `json:"name"`
+}
+
+// CreateTask defines model for CreateTask.
+type CreateTask struct {
+	// Id The user's id.
+	Id *string `json:"_id,omitempty"`
+
+	// Content The content of the task
+	Content string `json:"content"`
+
+	// User The id of the user who owns the task
+	User string `json:"user"`
+}
+
+// CreateUser defines model for CreateUser.
+type CreateUser struct {
+	// Id The user's id.
+	Id        *string `json:"_id,omitempty"`
+	AccountId string  `json:"account_id"`
+
+	// Age Age in years which must be equal to or greater than zero.
+	Age         int                     `json:"age"`
+	Annotations *map[string]interface{} `json:"annotations,omitempty"`
+	Contact     struct {
+		// Email The user's email.
+		Email *string `json:"email,omitempty"`
+	} `json:"contact"`
+
+	// Gender The user's gender.
+	Gender CreateUserGender `json:"gender"`
+
+	// Language The user's first language.
+	Language *string `json:"language,omitempty"`
+
+	// Name The user's name.
+	Name      string  `json:"name"`
+	Timestamp *string `json:"timestamp,omitempty"`
+}
+
+// CreateUserGender The user's gender.
+type CreateUserGender string
 
 // Migration defines model for Migration.
 type Migration struct {
@@ -214,18 +269,6 @@ type BatchSetAccountJSONBody = []Account
 // EditAccountJSONBody defines parameters for EditAccount.
 type EditAccountJSONBody = map[string]interface{}
 
-// BatchSetCdcJSONBody defines parameters for BatchSetCdc.
-type BatchSetCdcJSONBody = []Cdc
-
-// EditCdcJSONBody defines parameters for EditCdc.
-type EditCdcJSONBody = map[string]interface{}
-
-// BatchSetMigrationJSONBody defines parameters for BatchSetMigration.
-type BatchSetMigrationJSONBody = []Migration
-
-// EditMigrationJSONBody defines parameters for EditMigration.
-type EditMigrationJSONBody = map[string]interface{}
-
 // BatchSetTaskJSONBody defines parameters for BatchSetTask.
 type BatchSetTaskJSONBody = []Task
 
@@ -238,26 +281,11 @@ type BatchSetUserJSONBody = []User
 // EditUserJSONBody defines parameters for EditUser.
 type EditUserJSONBody = map[string]interface{}
 
-// SetAccountSchemaJSONBody defines parameters for SetAccountSchema.
-type SetAccountSchemaJSONBody = string
-
-// SetCdcSchemaJSONBody defines parameters for SetCdcSchema.
-type SetCdcSchemaJSONBody = string
-
-// SetMigrationSchemaJSONBody defines parameters for SetMigrationSchema.
-type SetMigrationSchemaJSONBody = string
-
-// SetTaskSchemaJSONBody defines parameters for SetTaskSchema.
-type SetTaskSchemaJSONBody = string
-
-// SetUserSchemaJSONBody defines parameters for SetUserSchema.
-type SetUserSchemaJSONBody = string
-
 // BatchSetAccountJSONRequestBody defines body for BatchSetAccount for application/json ContentType.
 type BatchSetAccountJSONRequestBody = BatchSetAccountJSONBody
 
 // CreateAccountJSONRequestBody defines body for CreateAccount for application/json ContentType.
-type CreateAccountJSONRequestBody = Account
+type CreateAccountJSONRequestBody = CreateAccount
 
 // EditAccountJSONRequestBody defines body for EditAccount for application/json ContentType.
 type EditAccountJSONRequestBody = EditAccountJSONBody
@@ -268,32 +296,8 @@ type SetAccountJSONRequestBody = Account
 // QueryAccountJSONRequestBody defines body for QueryAccount for application/json ContentType.
 type QueryAccountJSONRequestBody = Query
 
-// BatchSetCdcJSONRequestBody defines body for BatchSetCdc for application/json ContentType.
-type BatchSetCdcJSONRequestBody = BatchSetCdcJSONBody
-
-// CreateCdcJSONRequestBody defines body for CreateCdc for application/json ContentType.
-type CreateCdcJSONRequestBody = Cdc
-
-// EditCdcJSONRequestBody defines body for EditCdc for application/json ContentType.
-type EditCdcJSONRequestBody = EditCdcJSONBody
-
-// SetCdcJSONRequestBody defines body for SetCdc for application/json ContentType.
-type SetCdcJSONRequestBody = Cdc
-
 // QueryCdcJSONRequestBody defines body for QueryCdc for application/json ContentType.
 type QueryCdcJSONRequestBody = Query
-
-// BatchSetMigrationJSONRequestBody defines body for BatchSetMigration for application/json ContentType.
-type BatchSetMigrationJSONRequestBody = BatchSetMigrationJSONBody
-
-// CreateMigrationJSONRequestBody defines body for CreateMigration for application/json ContentType.
-type CreateMigrationJSONRequestBody = Migration
-
-// EditMigrationJSONRequestBody defines body for EditMigration for application/json ContentType.
-type EditMigrationJSONRequestBody = EditMigrationJSONBody
-
-// SetMigrationJSONRequestBody defines body for SetMigration for application/json ContentType.
-type SetMigrationJSONRequestBody = Migration
 
 // QueryMigrationJSONRequestBody defines body for QueryMigration for application/json ContentType.
 type QueryMigrationJSONRequestBody = Query
@@ -302,7 +306,7 @@ type QueryMigrationJSONRequestBody = Query
 type BatchSetTaskJSONRequestBody = BatchSetTaskJSONBody
 
 // CreateTaskJSONRequestBody defines body for CreateTask for application/json ContentType.
-type CreateTaskJSONRequestBody = Task
+type CreateTaskJSONRequestBody = CreateTask
 
 // EditTaskJSONRequestBody defines body for EditTask for application/json ContentType.
 type EditTaskJSONRequestBody = EditTaskJSONBody
@@ -317,7 +321,7 @@ type QueryTaskJSONRequestBody = Query
 type BatchSetUserJSONRequestBody = BatchSetUserJSONBody
 
 // CreateUserJSONRequestBody defines body for CreateUser for application/json ContentType.
-type CreateUserJSONRequestBody = User
+type CreateUserJSONRequestBody = CreateUser
 
 // EditUserJSONRequestBody defines body for EditUser for application/json ContentType.
 type EditUserJSONRequestBody = EditUserJSONBody
@@ -327,18 +331,3 @@ type SetUserJSONRequestBody = User
 
 // QueryUserJSONRequestBody defines body for QueryUser for application/json ContentType.
 type QueryUserJSONRequestBody = Query
-
-// SetAccountSchemaJSONRequestBody defines body for SetAccountSchema for application/json ContentType.
-type SetAccountSchemaJSONRequestBody = SetAccountSchemaJSONBody
-
-// SetCdcSchemaJSONRequestBody defines body for SetCdcSchema for application/json ContentType.
-type SetCdcSchemaJSONRequestBody = SetCdcSchemaJSONBody
-
-// SetMigrationSchemaJSONRequestBody defines body for SetMigrationSchema for application/json ContentType.
-type SetMigrationSchemaJSONRequestBody = SetMigrationSchemaJSONBody
-
-// SetTaskSchemaJSONRequestBody defines body for SetTaskSchema for application/json ContentType.
-type SetTaskSchemaJSONRequestBody = SetTaskSchemaJSONBody
-
-// SetUserSchemaJSONRequestBody defines body for SetUserSchema for application/json ContentType.
-type SetUserSchemaJSONRequestBody = SetUserSchemaJSONBody

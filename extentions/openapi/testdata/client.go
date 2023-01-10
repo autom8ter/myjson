@@ -13,6 +13,8 @@ import (
 	"net/url"
 	"strings"
 
+	"gopkg.in/yaml.v2"
+
 	"github.com/deepmap/oapi-codegen/pkg/runtime"
 )
 
@@ -120,67 +122,33 @@ type ClientInterface interface {
 
 	QueryAccount(ctx context.Context, body QueryAccountJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// BatchSetCdc request with any body
-	BatchSetCdcWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+	// GetAccountSchema request
+	GetAccountSchema(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	BatchSetCdc(ctx context.Context, body BatchSetCdcJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// CreateCdc request with any body
-	CreateCdcWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	CreateCdc(ctx context.Context, body CreateCdcJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// DeleteCdc request
-	DeleteCdc(ctx context.Context, docID DocID, reqEditors ...RequestEditorFn) (*http.Response, error)
+	// SetAccountSchema request with any body
+	SetAccountSchemaWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetCdc request
 	GetCdc(ctx context.Context, docID DocID, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// EditCdc request with any body
-	EditCdcWithBody(ctx context.Context, docID DocID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	EditCdc(ctx context.Context, docID DocID, body EditCdcJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// SetCdc request with any body
-	SetCdcWithBody(ctx context.Context, docID DocID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	SetCdc(ctx context.Context, docID DocID, body SetCdcJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// QueryCdc request with any body
 	QueryCdcWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	QueryCdc(ctx context.Context, body QueryCdcJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// BatchSetMigration request with any body
-	BatchSetMigrationWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	BatchSetMigration(ctx context.Context, body BatchSetMigrationJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// CreateMigration request with any body
-	CreateMigrationWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	CreateMigration(ctx context.Context, body CreateMigrationJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// DeleteMigration request
-	DeleteMigration(ctx context.Context, docID DocID, reqEditors ...RequestEditorFn) (*http.Response, error)
+	// GetCdcSchema request
+	GetCdcSchema(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetMigration request
 	GetMigration(ctx context.Context, docID DocID, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// EditMigration request with any body
-	EditMigrationWithBody(ctx context.Context, docID DocID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	EditMigration(ctx context.Context, docID DocID, body EditMigrationJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// SetMigration request with any body
-	SetMigrationWithBody(ctx context.Context, docID DocID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	SetMigration(ctx context.Context, docID DocID, body SetMigrationJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// QueryMigration request with any body
 	QueryMigrationWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	QueryMigration(ctx context.Context, body QueryMigrationJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetMigrationSchema request
+	GetMigrationSchema(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// BatchSetTask request with any body
 	BatchSetTaskWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -213,6 +181,12 @@ type ClientInterface interface {
 
 	QueryTask(ctx context.Context, body QueryTaskJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// GetTaskSchema request
+	GetTaskSchema(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// SetTaskSchema request with any body
+	SetTaskSchemaWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// BatchSetUser request with any body
 	BatchSetUserWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -244,48 +218,23 @@ type ClientInterface interface {
 
 	QueryUser(ctx context.Context, body QueryUserJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// GetSchemas request
-	GetSchemas(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// GetAccountSchema request
-	GetAccountSchema(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// SetAccountSchema request with any body
-	SetAccountSchemaWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	SetAccountSchema(ctx context.Context, body SetAccountSchemaJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// GetCdcSchema request
-	GetCdcSchema(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// SetCdcSchema request with any body
-	SetCdcSchemaWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	SetCdcSchema(ctx context.Context, body SetCdcSchemaJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// GetMigrationSchema request
-	GetMigrationSchema(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// SetMigrationSchema request with any body
-	SetMigrationSchemaWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	SetMigrationSchema(ctx context.Context, body SetMigrationSchemaJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// GetTaskSchema request
-	GetTaskSchema(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// SetTaskSchema request with any body
-	SetTaskSchemaWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	SetTaskSchema(ctx context.Context, body SetTaskSchemaJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
-
 	// GetUserSchema request
 	GetUserSchema(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// SetUserSchema request with any body
 	SetUserSchemaWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	SetUserSchema(ctx context.Context, body SetUserSchemaJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+	// GetSchemas request
+	GetSchemas(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetSDK request
+	GetSDK(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetOpenapiJson request
+	GetOpenapiJson(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetOpenapiYaml request
+	GetOpenapiYaml(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 }
 
 func (c *Client) BatchSetAccountWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -432,8 +381,8 @@ func (c *Client) QueryAccount(ctx context.Context, body QueryAccountJSONRequestB
 	return c.Client.Do(req)
 }
 
-func (c *Client) BatchSetCdcWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewBatchSetCdcRequestWithBody(c.Server, contentType, body)
+func (c *Client) GetAccountSchema(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetAccountSchemaRequest(c.Server)
 	if err != nil {
 		return nil, err
 	}
@@ -444,44 +393,8 @@ func (c *Client) BatchSetCdcWithBody(ctx context.Context, contentType string, bo
 	return c.Client.Do(req)
 }
 
-func (c *Client) BatchSetCdc(ctx context.Context, body BatchSetCdcJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewBatchSetCdcRequest(c.Server, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) CreateCdcWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewCreateCdcRequestWithBody(c.Server, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) CreateCdc(ctx context.Context, body CreateCdcJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewCreateCdcRequest(c.Server, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) DeleteCdc(ctx context.Context, docID DocID, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewDeleteCdcRequest(c.Server, docID)
+func (c *Client) SetAccountSchemaWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSetAccountSchemaRequestWithBody(c.Server, contentType, body)
 	if err != nil {
 		return nil, err
 	}
@@ -494,54 +407,6 @@ func (c *Client) DeleteCdc(ctx context.Context, docID DocID, reqEditors ...Reque
 
 func (c *Client) GetCdc(ctx context.Context, docID DocID, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetCdcRequest(c.Server, docID)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) EditCdcWithBody(ctx context.Context, docID DocID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewEditCdcRequestWithBody(c.Server, docID, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) EditCdc(ctx context.Context, docID DocID, body EditCdcJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewEditCdcRequest(c.Server, docID, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) SetCdcWithBody(ctx context.Context, docID DocID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewSetCdcRequestWithBody(c.Server, docID, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) SetCdc(ctx context.Context, docID DocID, body SetCdcJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewSetCdcRequest(c.Server, docID, body)
 	if err != nil {
 		return nil, err
 	}
@@ -576,56 +441,8 @@ func (c *Client) QueryCdc(ctx context.Context, body QueryCdcJSONRequestBody, req
 	return c.Client.Do(req)
 }
 
-func (c *Client) BatchSetMigrationWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewBatchSetMigrationRequestWithBody(c.Server, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) BatchSetMigration(ctx context.Context, body BatchSetMigrationJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewBatchSetMigrationRequest(c.Server, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) CreateMigrationWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewCreateMigrationRequestWithBody(c.Server, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) CreateMigration(ctx context.Context, body CreateMigrationJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewCreateMigrationRequest(c.Server, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) DeleteMigration(ctx context.Context, docID DocID, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewDeleteMigrationRequest(c.Server, docID)
+func (c *Client) GetCdcSchema(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetCdcSchemaRequest(c.Server)
 	if err != nil {
 		return nil, err
 	}
@@ -638,54 +455,6 @@ func (c *Client) DeleteMigration(ctx context.Context, docID DocID, reqEditors ..
 
 func (c *Client) GetMigration(ctx context.Context, docID DocID, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetMigrationRequest(c.Server, docID)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) EditMigrationWithBody(ctx context.Context, docID DocID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewEditMigrationRequestWithBody(c.Server, docID, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) EditMigration(ctx context.Context, docID DocID, body EditMigrationJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewEditMigrationRequest(c.Server, docID, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) SetMigrationWithBody(ctx context.Context, docID DocID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewSetMigrationRequestWithBody(c.Server, docID, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) SetMigration(ctx context.Context, docID DocID, body SetMigrationJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewSetMigrationRequest(c.Server, docID, body)
 	if err != nil {
 		return nil, err
 	}
@@ -710,6 +479,18 @@ func (c *Client) QueryMigrationWithBody(ctx context.Context, contentType string,
 
 func (c *Client) QueryMigration(ctx context.Context, body QueryMigrationJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewQueryMigrationRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) GetMigrationSchema(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetMigrationSchemaRequest(c.Server)
 	if err != nil {
 		return nil, err
 	}
@@ -864,6 +645,30 @@ func (c *Client) QueryTask(ctx context.Context, body QueryTaskJSONRequestBody, r
 	return c.Client.Do(req)
 }
 
+func (c *Client) GetTaskSchema(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetTaskSchemaRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) SetTaskSchemaWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSetTaskSchemaRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 func (c *Client) BatchSetUserWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewBatchSetUserRequestWithBody(c.Server, contentType, body)
 	if err != nil {
@@ -1008,162 +813,6 @@ func (c *Client) QueryUser(ctx context.Context, body QueryUserJSONRequestBody, r
 	return c.Client.Do(req)
 }
 
-func (c *Client) GetSchemas(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewGetSchemasRequest(c.Server)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) GetAccountSchema(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewGetAccountSchemaRequest(c.Server)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) SetAccountSchemaWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewSetAccountSchemaRequestWithBody(c.Server, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) SetAccountSchema(ctx context.Context, body SetAccountSchemaJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewSetAccountSchemaRequest(c.Server, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) GetCdcSchema(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewGetCdcSchemaRequest(c.Server)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) SetCdcSchemaWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewSetCdcSchemaRequestWithBody(c.Server, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) SetCdcSchema(ctx context.Context, body SetCdcSchemaJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewSetCdcSchemaRequest(c.Server, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) GetMigrationSchema(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewGetMigrationSchemaRequest(c.Server)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) SetMigrationSchemaWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewSetMigrationSchemaRequestWithBody(c.Server, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) SetMigrationSchema(ctx context.Context, body SetMigrationSchemaJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewSetMigrationSchemaRequest(c.Server, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) GetTaskSchema(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewGetTaskSchemaRequest(c.Server)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) SetTaskSchemaWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewSetTaskSchemaRequestWithBody(c.Server, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) SetTaskSchema(ctx context.Context, body SetTaskSchemaJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewSetTaskSchemaRequest(c.Server, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
 func (c *Client) GetUserSchema(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetUserSchemaRequest(c.Server)
 	if err != nil {
@@ -1188,8 +837,44 @@ func (c *Client) SetUserSchemaWithBody(ctx context.Context, contentType string, 
 	return c.Client.Do(req)
 }
 
-func (c *Client) SetUserSchema(ctx context.Context, body SetUserSchemaJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewSetUserSchemaRequest(c.Server, body)
+func (c *Client) GetSchemas(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetSchemasRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) GetSDK(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetSDKRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) GetOpenapiJson(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetOpenapiJsonRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) GetOpenapiYaml(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetOpenapiYamlRequest(c.Server)
 	if err != nil {
 		return nil, err
 	}
@@ -1482,19 +1167,8 @@ func NewQueryAccountRequestWithBody(server string, contentType string, body io.R
 	return req, nil
 }
 
-// NewBatchSetCdcRequest calls the generic BatchSetCdc builder with application/json body
-func NewBatchSetCdcRequest(server string, body BatchSetCdcJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewBatchSetCdcRequestWithBody(server, "application/json", bodyReader)
-}
-
-// NewBatchSetCdcRequestWithBody generates requests for BatchSetCdc with any type of body
-func NewBatchSetCdcRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+// NewGetAccountSchemaRequest generates requests for GetAccountSchema
+func NewGetAccountSchemaRequest(server string) (*http.Request, error) {
 	var err error
 
 	serverURL, err := url.Parse(server)
@@ -1502,7 +1176,34 @@ func NewBatchSetCdcRequestWithBody(server string, contentType string, body io.Re
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/collections/cdc/batch")
+	operationPath := fmt.Sprintf("/api/collections/account/schema")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewSetAccountSchemaRequestWithBody generates requests for SetAccountSchema with any type of body
+func NewSetAccountSchemaRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/collections/account/schema")
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -1518,80 +1219,6 @@ func NewBatchSetCdcRequestWithBody(server string, contentType string, body io.Re
 	}
 
 	req.Header.Add("Content-Type", contentType)
-
-	return req, nil
-}
-
-// NewCreateCdcRequest calls the generic CreateCdc builder with application/json body
-func NewCreateCdcRequest(server string, body CreateCdcJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewCreateCdcRequestWithBody(server, "application/json", bodyReader)
-}
-
-// NewCreateCdcRequestWithBody generates requests for CreateCdc with any type of body
-func NewCreateCdcRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/api/collections/cdc/docs")
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest("POST", queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	return req, nil
-}
-
-// NewDeleteCdcRequest generates requests for DeleteCdc
-func NewDeleteCdcRequest(server string, docID DocID) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "docID", runtime.ParamLocationPath, docID)
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/api/collections/cdc/docs/%s", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest("DELETE", queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
 
 	return req, nil
 }
@@ -1626,100 +1253,6 @@ func NewGetCdcRequest(server string, docID DocID) (*http.Request, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	return req, nil
-}
-
-// NewEditCdcRequest calls the generic EditCdc builder with application/json body
-func NewEditCdcRequest(server string, docID DocID, body EditCdcJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewEditCdcRequestWithBody(server, docID, "application/json", bodyReader)
-}
-
-// NewEditCdcRequestWithBody generates requests for EditCdc with any type of body
-func NewEditCdcRequestWithBody(server string, docID DocID, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "docID", runtime.ParamLocationPath, docID)
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/api/collections/cdc/docs/%s", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest("PATCH", queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	return req, nil
-}
-
-// NewSetCdcRequest calls the generic SetCdc builder with application/json body
-func NewSetCdcRequest(server string, docID DocID, body SetCdcJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewSetCdcRequestWithBody(server, docID, "application/json", bodyReader)
-}
-
-// NewSetCdcRequestWithBody generates requests for SetCdc with any type of body
-func NewSetCdcRequestWithBody(server string, docID DocID, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "docID", runtime.ParamLocationPath, docID)
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/api/collections/cdc/docs/%s", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest("PUT", queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
 
 	return req, nil
 }
@@ -1764,19 +1297,8 @@ func NewQueryCdcRequestWithBody(server string, contentType string, body io.Reade
 	return req, nil
 }
 
-// NewBatchSetMigrationRequest calls the generic BatchSetMigration builder with application/json body
-func NewBatchSetMigrationRequest(server string, body BatchSetMigrationJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewBatchSetMigrationRequestWithBody(server, "application/json", bodyReader)
-}
-
-// NewBatchSetMigrationRequestWithBody generates requests for BatchSetMigration with any type of body
-func NewBatchSetMigrationRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+// NewGetCdcSchemaRequest generates requests for GetCdcSchema
+func NewGetCdcSchemaRequest(server string) (*http.Request, error) {
 	var err error
 
 	serverURL, err := url.Parse(server)
@@ -1784,7 +1306,7 @@ func NewBatchSetMigrationRequestWithBody(server string, contentType string, body
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/collections/migration/batch")
+	operationPath := fmt.Sprintf("/api/collections/cdc/schema")
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -1794,83 +1316,7 @@ func NewBatchSetMigrationRequestWithBody(server string, contentType string, body
 		return nil, err
 	}
 
-	req, err := http.NewRequest("PUT", queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	return req, nil
-}
-
-// NewCreateMigrationRequest calls the generic CreateMigration builder with application/json body
-func NewCreateMigrationRequest(server string, body CreateMigrationJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewCreateMigrationRequestWithBody(server, "application/json", bodyReader)
-}
-
-// NewCreateMigrationRequestWithBody generates requests for CreateMigration with any type of body
-func NewCreateMigrationRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/api/collections/migration/docs")
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest("POST", queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	return req, nil
-}
-
-// NewDeleteMigrationRequest generates requests for DeleteMigration
-func NewDeleteMigrationRequest(server string, docID DocID) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "docID", runtime.ParamLocationPath, docID)
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/api/collections/migration/docs/%s", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest("DELETE", queryURL.String(), nil)
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -1912,100 +1358,6 @@ func NewGetMigrationRequest(server string, docID DocID) (*http.Request, error) {
 	return req, nil
 }
 
-// NewEditMigrationRequest calls the generic EditMigration builder with application/json body
-func NewEditMigrationRequest(server string, docID DocID, body EditMigrationJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewEditMigrationRequestWithBody(server, docID, "application/json", bodyReader)
-}
-
-// NewEditMigrationRequestWithBody generates requests for EditMigration with any type of body
-func NewEditMigrationRequestWithBody(server string, docID DocID, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "docID", runtime.ParamLocationPath, docID)
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/api/collections/migration/docs/%s", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest("PATCH", queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	return req, nil
-}
-
-// NewSetMigrationRequest calls the generic SetMigration builder with application/json body
-func NewSetMigrationRequest(server string, docID DocID, body SetMigrationJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewSetMigrationRequestWithBody(server, docID, "application/json", bodyReader)
-}
-
-// NewSetMigrationRequestWithBody generates requests for SetMigration with any type of body
-func NewSetMigrationRequestWithBody(server string, docID DocID, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "docID", runtime.ParamLocationPath, docID)
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/api/collections/migration/docs/%s", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest("PUT", queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	return req, nil
-}
-
 // NewQueryMigrationRequest calls the generic QueryMigration builder with application/json body
 func NewQueryMigrationRequest(server string, body QueryMigrationJSONRequestBody) (*http.Request, error) {
 	var bodyReader io.Reader
@@ -2042,6 +1394,33 @@ func NewQueryMigrationRequestWithBody(server string, contentType string, body io
 	}
 
 	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewGetMigrationSchemaRequest generates requests for GetMigrationSchema
+func NewGetMigrationSchemaRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/collections/migration/schema")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
 
 	return req, nil
 }
@@ -2319,6 +1698,62 @@ func NewQueryTaskRequestWithBody(server string, contentType string, body io.Read
 	}
 
 	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewGetTaskSchemaRequest generates requests for GetTaskSchema
+func NewGetTaskSchemaRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/collections/task/schema")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewSetTaskSchemaRequestWithBody generates requests for SetTaskSchema with any type of body
+func NewSetTaskSchemaRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/collections/task/schema")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("PUT", queryURL.String(), body)
 	if err != nil {
 		return nil, err
 	}
@@ -2610,6 +2045,62 @@ func NewQueryUserRequestWithBody(server string, contentType string, body io.Read
 	return req, nil
 }
 
+// NewGetUserSchemaRequest generates requests for GetUserSchema
+func NewGetUserSchemaRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/collections/user/schema")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewSetUserSchemaRequestWithBody generates requests for SetUserSchema with any type of body
+func NewSetUserSchemaRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/collections/user/schema")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("PUT", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
 // NewGetSchemasRequest generates requests for GetSchemas
 func NewGetSchemasRequest(server string) (*http.Request, error) {
 	var err error
@@ -2637,8 +2128,8 @@ func NewGetSchemasRequest(server string) (*http.Request, error) {
 	return req, nil
 }
 
-// NewGetAccountSchemaRequest generates requests for GetAccountSchema
-func NewGetAccountSchemaRequest(server string) (*http.Request, error) {
+// NewGetSDKRequest generates requests for GetSDK
+func NewGetSDKRequest(server string) (*http.Request, error) {
 	var err error
 
 	serverURL, err := url.Parse(server)
@@ -2646,7 +2137,7 @@ func NewGetAccountSchemaRequest(server string) (*http.Request, error) {
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/schema/account")
+	operationPath := fmt.Sprintf("/api/sdk")
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -2664,19 +2155,8 @@ func NewGetAccountSchemaRequest(server string) (*http.Request, error) {
 	return req, nil
 }
 
-// NewSetAccountSchemaRequest calls the generic SetAccountSchema builder with application/json body
-func NewSetAccountSchemaRequest(server string, body SetAccountSchemaJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewSetAccountSchemaRequestWithBody(server, "application/json", bodyReader)
-}
-
-// NewSetAccountSchemaRequestWithBody generates requests for SetAccountSchema with any type of body
-func NewSetAccountSchemaRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+// NewGetOpenapiJsonRequest generates requests for GetOpenapiJson
+func NewGetOpenapiJsonRequest(server string) (*http.Request, error) {
 	var err error
 
 	serverURL, err := url.Parse(server)
@@ -2684,36 +2164,7 @@ func NewSetAccountSchemaRequestWithBody(server string, contentType string, body 
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/schema/account")
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest("PUT", queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	return req, nil
-}
-
-// NewGetCdcSchemaRequest generates requests for GetCdcSchema
-func NewGetCdcSchemaRequest(server string) (*http.Request, error) {
-	var err error
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/api/schema/cdc")
+	operationPath := fmt.Sprintf("/openapi.json")
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -2731,19 +2182,8 @@ func NewGetCdcSchemaRequest(server string) (*http.Request, error) {
 	return req, nil
 }
 
-// NewSetCdcSchemaRequest calls the generic SetCdcSchema builder with application/json body
-func NewSetCdcSchemaRequest(server string, body SetCdcSchemaJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewSetCdcSchemaRequestWithBody(server, "application/json", bodyReader)
-}
-
-// NewSetCdcSchemaRequestWithBody generates requests for SetCdcSchema with any type of body
-func NewSetCdcSchemaRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+// NewGetOpenapiYamlRequest generates requests for GetOpenapiYaml
+func NewGetOpenapiYamlRequest(server string) (*http.Request, error) {
 	var err error
 
 	serverURL, err := url.Parse(server)
@@ -2751,36 +2191,7 @@ func NewSetCdcSchemaRequestWithBody(server string, contentType string, body io.R
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/schema/cdc")
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest("PUT", queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	return req, nil
-}
-
-// NewGetMigrationSchemaRequest generates requests for GetMigrationSchema
-func NewGetMigrationSchemaRequest(server string) (*http.Request, error) {
-	var err error
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/api/schema/migration")
+	operationPath := fmt.Sprintf("/openapi.yaml")
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -2794,180 +2205,6 @@ func NewGetMigrationSchemaRequest(server string) (*http.Request, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	return req, nil
-}
-
-// NewSetMigrationSchemaRequest calls the generic SetMigrationSchema builder with application/json body
-func NewSetMigrationSchemaRequest(server string, body SetMigrationSchemaJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewSetMigrationSchemaRequestWithBody(server, "application/json", bodyReader)
-}
-
-// NewSetMigrationSchemaRequestWithBody generates requests for SetMigrationSchema with any type of body
-func NewSetMigrationSchemaRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/api/schema/migration")
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest("PUT", queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	return req, nil
-}
-
-// NewGetTaskSchemaRequest generates requests for GetTaskSchema
-func NewGetTaskSchemaRequest(server string) (*http.Request, error) {
-	var err error
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/api/schema/task")
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest("GET", queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewSetTaskSchemaRequest calls the generic SetTaskSchema builder with application/json body
-func NewSetTaskSchemaRequest(server string, body SetTaskSchemaJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewSetTaskSchemaRequestWithBody(server, "application/json", bodyReader)
-}
-
-// NewSetTaskSchemaRequestWithBody generates requests for SetTaskSchema with any type of body
-func NewSetTaskSchemaRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/api/schema/task")
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest("PUT", queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	return req, nil
-}
-
-// NewGetUserSchemaRequest generates requests for GetUserSchema
-func NewGetUserSchemaRequest(server string) (*http.Request, error) {
-	var err error
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/api/schema/user")
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest("GET", queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewSetUserSchemaRequest calls the generic SetUserSchema builder with application/json body
-func NewSetUserSchemaRequest(server string, body SetUserSchemaJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewSetUserSchemaRequestWithBody(server, "application/json", bodyReader)
-}
-
-// NewSetUserSchemaRequestWithBody generates requests for SetUserSchema with any type of body
-func NewSetUserSchemaRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/api/schema/user")
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest("PUT", queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
 
 	return req, nil
 }
@@ -3046,67 +2283,33 @@ type ClientWithResponsesInterface interface {
 
 	QueryAccountWithResponse(ctx context.Context, body QueryAccountJSONRequestBody, reqEditors ...RequestEditorFn) (*QueryAccountResponse, error)
 
-	// BatchSetCdc request with any body
-	BatchSetCdcWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*BatchSetCdcResponse, error)
+	// GetAccountSchema request
+	GetAccountSchemaWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetAccountSchemaResponse, error)
 
-	BatchSetCdcWithResponse(ctx context.Context, body BatchSetCdcJSONRequestBody, reqEditors ...RequestEditorFn) (*BatchSetCdcResponse, error)
-
-	// CreateCdc request with any body
-	CreateCdcWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateCdcResponse, error)
-
-	CreateCdcWithResponse(ctx context.Context, body CreateCdcJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateCdcResponse, error)
-
-	// DeleteCdc request
-	DeleteCdcWithResponse(ctx context.Context, docID DocID, reqEditors ...RequestEditorFn) (*DeleteCdcResponse, error)
+	// SetAccountSchema request with any body
+	SetAccountSchemaWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SetAccountSchemaResponse, error)
 
 	// GetCdc request
 	GetCdcWithResponse(ctx context.Context, docID DocID, reqEditors ...RequestEditorFn) (*GetCdcResponse, error)
-
-	// EditCdc request with any body
-	EditCdcWithBodyWithResponse(ctx context.Context, docID DocID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*EditCdcResponse, error)
-
-	EditCdcWithResponse(ctx context.Context, docID DocID, body EditCdcJSONRequestBody, reqEditors ...RequestEditorFn) (*EditCdcResponse, error)
-
-	// SetCdc request with any body
-	SetCdcWithBodyWithResponse(ctx context.Context, docID DocID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SetCdcResponse, error)
-
-	SetCdcWithResponse(ctx context.Context, docID DocID, body SetCdcJSONRequestBody, reqEditors ...RequestEditorFn) (*SetCdcResponse, error)
 
 	// QueryCdc request with any body
 	QueryCdcWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*QueryCdcResponse, error)
 
 	QueryCdcWithResponse(ctx context.Context, body QueryCdcJSONRequestBody, reqEditors ...RequestEditorFn) (*QueryCdcResponse, error)
 
-	// BatchSetMigration request with any body
-	BatchSetMigrationWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*BatchSetMigrationResponse, error)
-
-	BatchSetMigrationWithResponse(ctx context.Context, body BatchSetMigrationJSONRequestBody, reqEditors ...RequestEditorFn) (*BatchSetMigrationResponse, error)
-
-	// CreateMigration request with any body
-	CreateMigrationWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateMigrationResponse, error)
-
-	CreateMigrationWithResponse(ctx context.Context, body CreateMigrationJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateMigrationResponse, error)
-
-	// DeleteMigration request
-	DeleteMigrationWithResponse(ctx context.Context, docID DocID, reqEditors ...RequestEditorFn) (*DeleteMigrationResponse, error)
+	// GetCdcSchema request
+	GetCdcSchemaWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetCdcSchemaResponse, error)
 
 	// GetMigration request
 	GetMigrationWithResponse(ctx context.Context, docID DocID, reqEditors ...RequestEditorFn) (*GetMigrationResponse, error)
-
-	// EditMigration request with any body
-	EditMigrationWithBodyWithResponse(ctx context.Context, docID DocID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*EditMigrationResponse, error)
-
-	EditMigrationWithResponse(ctx context.Context, docID DocID, body EditMigrationJSONRequestBody, reqEditors ...RequestEditorFn) (*EditMigrationResponse, error)
-
-	// SetMigration request with any body
-	SetMigrationWithBodyWithResponse(ctx context.Context, docID DocID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SetMigrationResponse, error)
-
-	SetMigrationWithResponse(ctx context.Context, docID DocID, body SetMigrationJSONRequestBody, reqEditors ...RequestEditorFn) (*SetMigrationResponse, error)
 
 	// QueryMigration request with any body
 	QueryMigrationWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*QueryMigrationResponse, error)
 
 	QueryMigrationWithResponse(ctx context.Context, body QueryMigrationJSONRequestBody, reqEditors ...RequestEditorFn) (*QueryMigrationResponse, error)
+
+	// GetMigrationSchema request
+	GetMigrationSchemaWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetMigrationSchemaResponse, error)
 
 	// BatchSetTask request with any body
 	BatchSetTaskWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*BatchSetTaskResponse, error)
@@ -3139,6 +2342,12 @@ type ClientWithResponsesInterface interface {
 
 	QueryTaskWithResponse(ctx context.Context, body QueryTaskJSONRequestBody, reqEditors ...RequestEditorFn) (*QueryTaskResponse, error)
 
+	// GetTaskSchema request
+	GetTaskSchemaWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetTaskSchemaResponse, error)
+
+	// SetTaskSchema request with any body
+	SetTaskSchemaWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SetTaskSchemaResponse, error)
+
 	// BatchSetUser request with any body
 	BatchSetUserWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*BatchSetUserResponse, error)
 
@@ -3170,48 +2379,23 @@ type ClientWithResponsesInterface interface {
 
 	QueryUserWithResponse(ctx context.Context, body QueryUserJSONRequestBody, reqEditors ...RequestEditorFn) (*QueryUserResponse, error)
 
-	// GetSchemas request
-	GetSchemasWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetSchemasResponse, error)
-
-	// GetAccountSchema request
-	GetAccountSchemaWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetAccountSchemaResponse, error)
-
-	// SetAccountSchema request with any body
-	SetAccountSchemaWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SetAccountSchemaResponse, error)
-
-	SetAccountSchemaWithResponse(ctx context.Context, body SetAccountSchemaJSONRequestBody, reqEditors ...RequestEditorFn) (*SetAccountSchemaResponse, error)
-
-	// GetCdcSchema request
-	GetCdcSchemaWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetCdcSchemaResponse, error)
-
-	// SetCdcSchema request with any body
-	SetCdcSchemaWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SetCdcSchemaResponse, error)
-
-	SetCdcSchemaWithResponse(ctx context.Context, body SetCdcSchemaJSONRequestBody, reqEditors ...RequestEditorFn) (*SetCdcSchemaResponse, error)
-
-	// GetMigrationSchema request
-	GetMigrationSchemaWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetMigrationSchemaResponse, error)
-
-	// SetMigrationSchema request with any body
-	SetMigrationSchemaWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SetMigrationSchemaResponse, error)
-
-	SetMigrationSchemaWithResponse(ctx context.Context, body SetMigrationSchemaJSONRequestBody, reqEditors ...RequestEditorFn) (*SetMigrationSchemaResponse, error)
-
-	// GetTaskSchema request
-	GetTaskSchemaWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetTaskSchemaResponse, error)
-
-	// SetTaskSchema request with any body
-	SetTaskSchemaWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SetTaskSchemaResponse, error)
-
-	SetTaskSchemaWithResponse(ctx context.Context, body SetTaskSchemaJSONRequestBody, reqEditors ...RequestEditorFn) (*SetTaskSchemaResponse, error)
-
 	// GetUserSchema request
 	GetUserSchemaWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetUserSchemaResponse, error)
 
 	// SetUserSchema request with any body
 	SetUserSchemaWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SetUserSchemaResponse, error)
 
-	SetUserSchemaWithResponse(ctx context.Context, body SetUserSchemaJSONRequestBody, reqEditors ...RequestEditorFn) (*SetUserSchemaResponse, error)
+	// GetSchemas request
+	GetSchemasWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetSchemasResponse, error)
+
+	// GetSDK request
+	GetSDKWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetSDKResponse, error)
+
+	// GetOpenapiJson request
+	GetOpenapiJsonWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetOpenapiJsonResponse, error)
+
+	// GetOpenapiYaml request
+	GetOpenapiYamlWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetOpenapiYamlResponse, error)
 }
 
 type BatchSetAccountResponse struct {
@@ -3366,13 +2550,14 @@ func (r QueryAccountResponse) StatusCode() int {
 	return 0
 }
 
-type BatchSetCdcResponse struct {
+type GetAccountSchemaResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
+	YAML200      *string
 }
 
 // Status returns HTTPResponse.Status
-func (r BatchSetCdcResponse) Status() string {
+func (r GetAccountSchemaResponse) Status() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Status
 	}
@@ -3380,21 +2565,21 @@ func (r BatchSetCdcResponse) Status() string {
 }
 
 // StatusCode returns HTTPResponse.StatusCode
-func (r BatchSetCdcResponse) StatusCode() int {
+func (r GetAccountSchemaResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
 	return 0
 }
 
-type CreateCdcResponse struct {
+type SetAccountSchemaResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
-	JSON200      *Cdc
+	YAML200      *string
 }
 
 // Status returns HTTPResponse.Status
-func (r CreateCdcResponse) Status() string {
+func (r SetAccountSchemaResponse) Status() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Status
 	}
@@ -3402,28 +2587,7 @@ func (r CreateCdcResponse) Status() string {
 }
 
 // StatusCode returns HTTPResponse.StatusCode
-func (r CreateCdcResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-type DeleteCdcResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-}
-
-// Status returns HTTPResponse.Status
-func (r DeleteCdcResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r DeleteCdcResponse) StatusCode() int {
+func (r SetAccountSchemaResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
@@ -3452,50 +2616,6 @@ func (r GetCdcResponse) StatusCode() int {
 	return 0
 }
 
-type EditCdcResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	JSON200      *Cdc
-}
-
-// Status returns HTTPResponse.Status
-func (r EditCdcResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r EditCdcResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-type SetCdcResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	JSON200      *Cdc
-}
-
-// Status returns HTTPResponse.Status
-func (r SetCdcResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r SetCdcResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
 type QueryCdcResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -3518,13 +2638,14 @@ func (r QueryCdcResponse) StatusCode() int {
 	return 0
 }
 
-type BatchSetMigrationResponse struct {
+type GetCdcSchemaResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
+	YAML200      *string
 }
 
 // Status returns HTTPResponse.Status
-func (r BatchSetMigrationResponse) Status() string {
+func (r GetCdcSchemaResponse) Status() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Status
 	}
@@ -3532,50 +2653,7 @@ func (r BatchSetMigrationResponse) Status() string {
 }
 
 // StatusCode returns HTTPResponse.StatusCode
-func (r BatchSetMigrationResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-type CreateMigrationResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	JSON200      *Migration
-}
-
-// Status returns HTTPResponse.Status
-func (r CreateMigrationResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r CreateMigrationResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-type DeleteMigrationResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-}
-
-// Status returns HTTPResponse.Status
-func (r DeleteMigrationResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r DeleteMigrationResponse) StatusCode() int {
+func (r GetCdcSchemaResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
@@ -3604,50 +2682,6 @@ func (r GetMigrationResponse) StatusCode() int {
 	return 0
 }
 
-type EditMigrationResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	JSON200      *Migration
-}
-
-// Status returns HTTPResponse.Status
-func (r EditMigrationResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r EditMigrationResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-type SetMigrationResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	JSON200      *Migration
-}
-
-// Status returns HTTPResponse.Status
-func (r SetMigrationResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r SetMigrationResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
 type QueryMigrationResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -3664,6 +2698,28 @@ func (r QueryMigrationResponse) Status() string {
 
 // StatusCode returns HTTPResponse.StatusCode
 func (r QueryMigrationResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type GetMigrationSchemaResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	YAML200      *string
+}
+
+// Status returns HTTPResponse.Status
+func (r GetMigrationSchemaResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetMigrationSchemaResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
@@ -3822,6 +2878,50 @@ func (r QueryTaskResponse) StatusCode() int {
 	return 0
 }
 
+type GetTaskSchemaResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	YAML200      *string
+}
+
+// Status returns HTTPResponse.Status
+func (r GetTaskSchemaResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetTaskSchemaResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type SetTaskSchemaResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	YAML200      *string
+}
+
+// Status returns HTTPResponse.Status
+func (r SetTaskSchemaResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r SetTaskSchemaResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
 type BatchSetUserResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -3974,208 +3074,10 @@ func (r QueryUserResponse) StatusCode() int {
 	return 0
 }
 
-type GetSchemasResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	JSON200      *string
-}
-
-// Status returns HTTPResponse.Status
-func (r GetSchemasResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r GetSchemasResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-type GetAccountSchemaResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	JSON200      *string
-}
-
-// Status returns HTTPResponse.Status
-func (r GetAccountSchemaResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r GetAccountSchemaResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-type SetAccountSchemaResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	JSON200      *string
-}
-
-// Status returns HTTPResponse.Status
-func (r SetAccountSchemaResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r SetAccountSchemaResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-type GetCdcSchemaResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	JSON200      *string
-}
-
-// Status returns HTTPResponse.Status
-func (r GetCdcSchemaResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r GetCdcSchemaResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-type SetCdcSchemaResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	JSON200      *string
-}
-
-// Status returns HTTPResponse.Status
-func (r SetCdcSchemaResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r SetCdcSchemaResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-type GetMigrationSchemaResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	JSON200      *string
-}
-
-// Status returns HTTPResponse.Status
-func (r GetMigrationSchemaResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r GetMigrationSchemaResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-type SetMigrationSchemaResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	JSON200      *string
-}
-
-// Status returns HTTPResponse.Status
-func (r SetMigrationSchemaResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r SetMigrationSchemaResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-type GetTaskSchemaResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	JSON200      *string
-}
-
-// Status returns HTTPResponse.Status
-func (r GetTaskSchemaResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r GetTaskSchemaResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-type SetTaskSchemaResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	JSON200      *string
-}
-
-// Status returns HTTPResponse.Status
-func (r SetTaskSchemaResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r SetTaskSchemaResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
 type GetUserSchemaResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
-	JSON200      *string
+	YAML200      *string
 }
 
 // Status returns HTTPResponse.Status
@@ -4197,7 +3099,7 @@ func (r GetUserSchemaResponse) StatusCode() int {
 type SetUserSchemaResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
-	JSON200      *string
+	YAML200      *string
 }
 
 // Status returns HTTPResponse.Status
@@ -4210,6 +3112,93 @@ func (r SetUserSchemaResponse) Status() string {
 
 // StatusCode returns HTTPResponse.StatusCode
 func (r SetUserSchemaResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type GetSchemasResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *[]string
+}
+
+// Status returns HTTPResponse.Status
+func (r GetSchemasResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetSchemasResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type GetSDKResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+}
+
+// Status returns HTTPResponse.Status
+func (r GetSDKResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetSDKResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type GetOpenapiJsonResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *string
+}
+
+// Status returns HTTPResponse.Status
+func (r GetOpenapiJsonResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetOpenapiJsonResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type GetOpenapiYamlResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	YAML200      *string
+}
+
+// Status returns HTTPResponse.Status
+func (r GetOpenapiYamlResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetOpenapiYamlResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
@@ -4319,47 +3308,22 @@ func (c *ClientWithResponses) QueryAccountWithResponse(ctx context.Context, body
 	return ParseQueryAccountResponse(rsp)
 }
 
-// BatchSetCdcWithBodyWithResponse request with arbitrary body returning *BatchSetCdcResponse
-func (c *ClientWithResponses) BatchSetCdcWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*BatchSetCdcResponse, error) {
-	rsp, err := c.BatchSetCdcWithBody(ctx, contentType, body, reqEditors...)
+// GetAccountSchemaWithResponse request returning *GetAccountSchemaResponse
+func (c *ClientWithResponses) GetAccountSchemaWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetAccountSchemaResponse, error) {
+	rsp, err := c.GetAccountSchema(ctx, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
-	return ParseBatchSetCdcResponse(rsp)
+	return ParseGetAccountSchemaResponse(rsp)
 }
 
-func (c *ClientWithResponses) BatchSetCdcWithResponse(ctx context.Context, body BatchSetCdcJSONRequestBody, reqEditors ...RequestEditorFn) (*BatchSetCdcResponse, error) {
-	rsp, err := c.BatchSetCdc(ctx, body, reqEditors...)
+// SetAccountSchemaWithBodyWithResponse request with arbitrary body returning *SetAccountSchemaResponse
+func (c *ClientWithResponses) SetAccountSchemaWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SetAccountSchemaResponse, error) {
+	rsp, err := c.SetAccountSchemaWithBody(ctx, contentType, body, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
-	return ParseBatchSetCdcResponse(rsp)
-}
-
-// CreateCdcWithBodyWithResponse request with arbitrary body returning *CreateCdcResponse
-func (c *ClientWithResponses) CreateCdcWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateCdcResponse, error) {
-	rsp, err := c.CreateCdcWithBody(ctx, contentType, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseCreateCdcResponse(rsp)
-}
-
-func (c *ClientWithResponses) CreateCdcWithResponse(ctx context.Context, body CreateCdcJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateCdcResponse, error) {
-	rsp, err := c.CreateCdc(ctx, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseCreateCdcResponse(rsp)
-}
-
-// DeleteCdcWithResponse request returning *DeleteCdcResponse
-func (c *ClientWithResponses) DeleteCdcWithResponse(ctx context.Context, docID DocID, reqEditors ...RequestEditorFn) (*DeleteCdcResponse, error) {
-	rsp, err := c.DeleteCdc(ctx, docID, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseDeleteCdcResponse(rsp)
+	return ParseSetAccountSchemaResponse(rsp)
 }
 
 // GetCdcWithResponse request returning *GetCdcResponse
@@ -4369,40 +3333,6 @@ func (c *ClientWithResponses) GetCdcWithResponse(ctx context.Context, docID DocI
 		return nil, err
 	}
 	return ParseGetCdcResponse(rsp)
-}
-
-// EditCdcWithBodyWithResponse request with arbitrary body returning *EditCdcResponse
-func (c *ClientWithResponses) EditCdcWithBodyWithResponse(ctx context.Context, docID DocID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*EditCdcResponse, error) {
-	rsp, err := c.EditCdcWithBody(ctx, docID, contentType, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseEditCdcResponse(rsp)
-}
-
-func (c *ClientWithResponses) EditCdcWithResponse(ctx context.Context, docID DocID, body EditCdcJSONRequestBody, reqEditors ...RequestEditorFn) (*EditCdcResponse, error) {
-	rsp, err := c.EditCdc(ctx, docID, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseEditCdcResponse(rsp)
-}
-
-// SetCdcWithBodyWithResponse request with arbitrary body returning *SetCdcResponse
-func (c *ClientWithResponses) SetCdcWithBodyWithResponse(ctx context.Context, docID DocID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SetCdcResponse, error) {
-	rsp, err := c.SetCdcWithBody(ctx, docID, contentType, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseSetCdcResponse(rsp)
-}
-
-func (c *ClientWithResponses) SetCdcWithResponse(ctx context.Context, docID DocID, body SetCdcJSONRequestBody, reqEditors ...RequestEditorFn) (*SetCdcResponse, error) {
-	rsp, err := c.SetCdc(ctx, docID, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseSetCdcResponse(rsp)
 }
 
 // QueryCdcWithBodyWithResponse request with arbitrary body returning *QueryCdcResponse
@@ -4422,47 +3352,13 @@ func (c *ClientWithResponses) QueryCdcWithResponse(ctx context.Context, body Que
 	return ParseQueryCdcResponse(rsp)
 }
 
-// BatchSetMigrationWithBodyWithResponse request with arbitrary body returning *BatchSetMigrationResponse
-func (c *ClientWithResponses) BatchSetMigrationWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*BatchSetMigrationResponse, error) {
-	rsp, err := c.BatchSetMigrationWithBody(ctx, contentType, body, reqEditors...)
+// GetCdcSchemaWithResponse request returning *GetCdcSchemaResponse
+func (c *ClientWithResponses) GetCdcSchemaWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetCdcSchemaResponse, error) {
+	rsp, err := c.GetCdcSchema(ctx, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
-	return ParseBatchSetMigrationResponse(rsp)
-}
-
-func (c *ClientWithResponses) BatchSetMigrationWithResponse(ctx context.Context, body BatchSetMigrationJSONRequestBody, reqEditors ...RequestEditorFn) (*BatchSetMigrationResponse, error) {
-	rsp, err := c.BatchSetMigration(ctx, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseBatchSetMigrationResponse(rsp)
-}
-
-// CreateMigrationWithBodyWithResponse request with arbitrary body returning *CreateMigrationResponse
-func (c *ClientWithResponses) CreateMigrationWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateMigrationResponse, error) {
-	rsp, err := c.CreateMigrationWithBody(ctx, contentType, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseCreateMigrationResponse(rsp)
-}
-
-func (c *ClientWithResponses) CreateMigrationWithResponse(ctx context.Context, body CreateMigrationJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateMigrationResponse, error) {
-	rsp, err := c.CreateMigration(ctx, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseCreateMigrationResponse(rsp)
-}
-
-// DeleteMigrationWithResponse request returning *DeleteMigrationResponse
-func (c *ClientWithResponses) DeleteMigrationWithResponse(ctx context.Context, docID DocID, reqEditors ...RequestEditorFn) (*DeleteMigrationResponse, error) {
-	rsp, err := c.DeleteMigration(ctx, docID, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseDeleteMigrationResponse(rsp)
+	return ParseGetCdcSchemaResponse(rsp)
 }
 
 // GetMigrationWithResponse request returning *GetMigrationResponse
@@ -4472,40 +3368,6 @@ func (c *ClientWithResponses) GetMigrationWithResponse(ctx context.Context, docI
 		return nil, err
 	}
 	return ParseGetMigrationResponse(rsp)
-}
-
-// EditMigrationWithBodyWithResponse request with arbitrary body returning *EditMigrationResponse
-func (c *ClientWithResponses) EditMigrationWithBodyWithResponse(ctx context.Context, docID DocID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*EditMigrationResponse, error) {
-	rsp, err := c.EditMigrationWithBody(ctx, docID, contentType, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseEditMigrationResponse(rsp)
-}
-
-func (c *ClientWithResponses) EditMigrationWithResponse(ctx context.Context, docID DocID, body EditMigrationJSONRequestBody, reqEditors ...RequestEditorFn) (*EditMigrationResponse, error) {
-	rsp, err := c.EditMigration(ctx, docID, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseEditMigrationResponse(rsp)
-}
-
-// SetMigrationWithBodyWithResponse request with arbitrary body returning *SetMigrationResponse
-func (c *ClientWithResponses) SetMigrationWithBodyWithResponse(ctx context.Context, docID DocID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SetMigrationResponse, error) {
-	rsp, err := c.SetMigrationWithBody(ctx, docID, contentType, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseSetMigrationResponse(rsp)
-}
-
-func (c *ClientWithResponses) SetMigrationWithResponse(ctx context.Context, docID DocID, body SetMigrationJSONRequestBody, reqEditors ...RequestEditorFn) (*SetMigrationResponse, error) {
-	rsp, err := c.SetMigration(ctx, docID, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseSetMigrationResponse(rsp)
 }
 
 // QueryMigrationWithBodyWithResponse request with arbitrary body returning *QueryMigrationResponse
@@ -4523,6 +3385,15 @@ func (c *ClientWithResponses) QueryMigrationWithResponse(ctx context.Context, bo
 		return nil, err
 	}
 	return ParseQueryMigrationResponse(rsp)
+}
+
+// GetMigrationSchemaWithResponse request returning *GetMigrationSchemaResponse
+func (c *ClientWithResponses) GetMigrationSchemaWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetMigrationSchemaResponse, error) {
+	rsp, err := c.GetMigrationSchema(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetMigrationSchemaResponse(rsp)
 }
 
 // BatchSetTaskWithBodyWithResponse request with arbitrary body returning *BatchSetTaskResponse
@@ -4628,6 +3499,24 @@ func (c *ClientWithResponses) QueryTaskWithResponse(ctx context.Context, body Qu
 	return ParseQueryTaskResponse(rsp)
 }
 
+// GetTaskSchemaWithResponse request returning *GetTaskSchemaResponse
+func (c *ClientWithResponses) GetTaskSchemaWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetTaskSchemaResponse, error) {
+	rsp, err := c.GetTaskSchema(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetTaskSchemaResponse(rsp)
+}
+
+// SetTaskSchemaWithBodyWithResponse request with arbitrary body returning *SetTaskSchemaResponse
+func (c *ClientWithResponses) SetTaskSchemaWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SetTaskSchemaResponse, error) {
+	rsp, err := c.SetTaskSchemaWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseSetTaskSchemaResponse(rsp)
+}
+
 // BatchSetUserWithBodyWithResponse request with arbitrary body returning *BatchSetUserResponse
 func (c *ClientWithResponses) BatchSetUserWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*BatchSetUserResponse, error) {
 	rsp, err := c.BatchSetUserWithBody(ctx, contentType, body, reqEditors...)
@@ -4731,119 +3620,6 @@ func (c *ClientWithResponses) QueryUserWithResponse(ctx context.Context, body Qu
 	return ParseQueryUserResponse(rsp)
 }
 
-// GetSchemasWithResponse request returning *GetSchemasResponse
-func (c *ClientWithResponses) GetSchemasWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetSchemasResponse, error) {
-	rsp, err := c.GetSchemas(ctx, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseGetSchemasResponse(rsp)
-}
-
-// GetAccountSchemaWithResponse request returning *GetAccountSchemaResponse
-func (c *ClientWithResponses) GetAccountSchemaWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetAccountSchemaResponse, error) {
-	rsp, err := c.GetAccountSchema(ctx, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseGetAccountSchemaResponse(rsp)
-}
-
-// SetAccountSchemaWithBodyWithResponse request with arbitrary body returning *SetAccountSchemaResponse
-func (c *ClientWithResponses) SetAccountSchemaWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SetAccountSchemaResponse, error) {
-	rsp, err := c.SetAccountSchemaWithBody(ctx, contentType, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseSetAccountSchemaResponse(rsp)
-}
-
-func (c *ClientWithResponses) SetAccountSchemaWithResponse(ctx context.Context, body SetAccountSchemaJSONRequestBody, reqEditors ...RequestEditorFn) (*SetAccountSchemaResponse, error) {
-	rsp, err := c.SetAccountSchema(ctx, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseSetAccountSchemaResponse(rsp)
-}
-
-// GetCdcSchemaWithResponse request returning *GetCdcSchemaResponse
-func (c *ClientWithResponses) GetCdcSchemaWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetCdcSchemaResponse, error) {
-	rsp, err := c.GetCdcSchema(ctx, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseGetCdcSchemaResponse(rsp)
-}
-
-// SetCdcSchemaWithBodyWithResponse request with arbitrary body returning *SetCdcSchemaResponse
-func (c *ClientWithResponses) SetCdcSchemaWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SetCdcSchemaResponse, error) {
-	rsp, err := c.SetCdcSchemaWithBody(ctx, contentType, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseSetCdcSchemaResponse(rsp)
-}
-
-func (c *ClientWithResponses) SetCdcSchemaWithResponse(ctx context.Context, body SetCdcSchemaJSONRequestBody, reqEditors ...RequestEditorFn) (*SetCdcSchemaResponse, error) {
-	rsp, err := c.SetCdcSchema(ctx, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseSetCdcSchemaResponse(rsp)
-}
-
-// GetMigrationSchemaWithResponse request returning *GetMigrationSchemaResponse
-func (c *ClientWithResponses) GetMigrationSchemaWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetMigrationSchemaResponse, error) {
-	rsp, err := c.GetMigrationSchema(ctx, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseGetMigrationSchemaResponse(rsp)
-}
-
-// SetMigrationSchemaWithBodyWithResponse request with arbitrary body returning *SetMigrationSchemaResponse
-func (c *ClientWithResponses) SetMigrationSchemaWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SetMigrationSchemaResponse, error) {
-	rsp, err := c.SetMigrationSchemaWithBody(ctx, contentType, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseSetMigrationSchemaResponse(rsp)
-}
-
-func (c *ClientWithResponses) SetMigrationSchemaWithResponse(ctx context.Context, body SetMigrationSchemaJSONRequestBody, reqEditors ...RequestEditorFn) (*SetMigrationSchemaResponse, error) {
-	rsp, err := c.SetMigrationSchema(ctx, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseSetMigrationSchemaResponse(rsp)
-}
-
-// GetTaskSchemaWithResponse request returning *GetTaskSchemaResponse
-func (c *ClientWithResponses) GetTaskSchemaWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetTaskSchemaResponse, error) {
-	rsp, err := c.GetTaskSchema(ctx, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseGetTaskSchemaResponse(rsp)
-}
-
-// SetTaskSchemaWithBodyWithResponse request with arbitrary body returning *SetTaskSchemaResponse
-func (c *ClientWithResponses) SetTaskSchemaWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SetTaskSchemaResponse, error) {
-	rsp, err := c.SetTaskSchemaWithBody(ctx, contentType, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseSetTaskSchemaResponse(rsp)
-}
-
-func (c *ClientWithResponses) SetTaskSchemaWithResponse(ctx context.Context, body SetTaskSchemaJSONRequestBody, reqEditors ...RequestEditorFn) (*SetTaskSchemaResponse, error) {
-	rsp, err := c.SetTaskSchema(ctx, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseSetTaskSchemaResponse(rsp)
-}
-
 // GetUserSchemaWithResponse request returning *GetUserSchemaResponse
 func (c *ClientWithResponses) GetUserSchemaWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetUserSchemaResponse, error) {
 	rsp, err := c.GetUserSchema(ctx, reqEditors...)
@@ -4862,12 +3638,40 @@ func (c *ClientWithResponses) SetUserSchemaWithBodyWithResponse(ctx context.Cont
 	return ParseSetUserSchemaResponse(rsp)
 }
 
-func (c *ClientWithResponses) SetUserSchemaWithResponse(ctx context.Context, body SetUserSchemaJSONRequestBody, reqEditors ...RequestEditorFn) (*SetUserSchemaResponse, error) {
-	rsp, err := c.SetUserSchema(ctx, body, reqEditors...)
+// GetSchemasWithResponse request returning *GetSchemasResponse
+func (c *ClientWithResponses) GetSchemasWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetSchemasResponse, error) {
+	rsp, err := c.GetSchemas(ctx, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
-	return ParseSetUserSchemaResponse(rsp)
+	return ParseGetSchemasResponse(rsp)
+}
+
+// GetSDKWithResponse request returning *GetSDKResponse
+func (c *ClientWithResponses) GetSDKWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetSDKResponse, error) {
+	rsp, err := c.GetSDK(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetSDKResponse(rsp)
+}
+
+// GetOpenapiJsonWithResponse request returning *GetOpenapiJsonResponse
+func (c *ClientWithResponses) GetOpenapiJsonWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetOpenapiJsonResponse, error) {
+	rsp, err := c.GetOpenapiJson(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetOpenapiJsonResponse(rsp)
+}
+
+// GetOpenapiYamlWithResponse request returning *GetOpenapiYamlResponse
+func (c *ClientWithResponses) GetOpenapiYamlWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetOpenapiYamlResponse, error) {
+	rsp, err := c.GetOpenapiYaml(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetOpenapiYamlResponse(rsp)
 }
 
 // ParseBatchSetAccountResponse parses an HTTP response from a BatchSetAccountWithResponse call
@@ -5032,59 +3836,53 @@ func ParseQueryAccountResponse(rsp *http.Response) (*QueryAccountResponse, error
 	return response, nil
 }
 
-// ParseBatchSetCdcResponse parses an HTTP response from a BatchSetCdcWithResponse call
-func ParseBatchSetCdcResponse(rsp *http.Response) (*BatchSetCdcResponse, error) {
+// ParseGetAccountSchemaResponse parses an HTTP response from a GetAccountSchemaWithResponse call
+func ParseGetAccountSchemaResponse(rsp *http.Response) (*GetAccountSchemaResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
 	}
 
-	response := &BatchSetCdcResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	return response, nil
-}
-
-// ParseCreateCdcResponse parses an HTTP response from a CreateCdcWithResponse call
-func ParseCreateCdcResponse(rsp *http.Response) (*CreateCdcResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &CreateCdcResponse{
+	response := &GetAccountSchemaResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
 
 	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest Cdc
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "yaml") && rsp.StatusCode == 200:
+		var dest string
+		if err := yaml.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.JSON200 = &dest
+		response.YAML200 = &dest
 
 	}
 
 	return response, nil
 }
 
-// ParseDeleteCdcResponse parses an HTTP response from a DeleteCdcWithResponse call
-func ParseDeleteCdcResponse(rsp *http.Response) (*DeleteCdcResponse, error) {
+// ParseSetAccountSchemaResponse parses an HTTP response from a SetAccountSchemaWithResponse call
+func ParseSetAccountSchemaResponse(rsp *http.Response) (*SetAccountSchemaResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
 	}
 
-	response := &DeleteCdcResponse{
+	response := &SetAccountSchemaResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "yaml") && rsp.StatusCode == 200:
+		var dest string
+		if err := yaml.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.YAML200 = &dest
+
 	}
 
 	return response, nil
@@ -5099,58 +3897,6 @@ func ParseGetCdcResponse(rsp *http.Response) (*GetCdcResponse, error) {
 	}
 
 	response := &GetCdcResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest Cdc
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON200 = &dest
-
-	}
-
-	return response, nil
-}
-
-// ParseEditCdcResponse parses an HTTP response from a EditCdcWithResponse call
-func ParseEditCdcResponse(rsp *http.Response) (*EditCdcResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &EditCdcResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest Cdc
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON200 = &dest
-
-	}
-
-	return response, nil
-}
-
-// ParseSetCdcResponse parses an HTTP response from a SetCdcWithResponse call
-func ParseSetCdcResponse(rsp *http.Response) (*SetCdcResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &SetCdcResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
@@ -5194,59 +3940,27 @@ func ParseQueryCdcResponse(rsp *http.Response) (*QueryCdcResponse, error) {
 	return response, nil
 }
 
-// ParseBatchSetMigrationResponse parses an HTTP response from a BatchSetMigrationWithResponse call
-func ParseBatchSetMigrationResponse(rsp *http.Response) (*BatchSetMigrationResponse, error) {
+// ParseGetCdcSchemaResponse parses an HTTP response from a GetCdcSchemaWithResponse call
+func ParseGetCdcSchemaResponse(rsp *http.Response) (*GetCdcSchemaResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
 	}
 
-	response := &BatchSetMigrationResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	return response, nil
-}
-
-// ParseCreateMigrationResponse parses an HTTP response from a CreateMigrationWithResponse call
-func ParseCreateMigrationResponse(rsp *http.Response) (*CreateMigrationResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &CreateMigrationResponse{
+	response := &GetCdcSchemaResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
 
 	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest Migration
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "yaml") && rsp.StatusCode == 200:
+		var dest string
+		if err := yaml.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.JSON200 = &dest
+		response.YAML200 = &dest
 
-	}
-
-	return response, nil
-}
-
-// ParseDeleteMigrationResponse parses an HTTP response from a DeleteMigrationWithResponse call
-func ParseDeleteMigrationResponse(rsp *http.Response) (*DeleteMigrationResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &DeleteMigrationResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
 	}
 
 	return response, nil
@@ -5261,58 +3975,6 @@ func ParseGetMigrationResponse(rsp *http.Response) (*GetMigrationResponse, error
 	}
 
 	response := &GetMigrationResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest Migration
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON200 = &dest
-
-	}
-
-	return response, nil
-}
-
-// ParseEditMigrationResponse parses an HTTP response from a EditMigrationWithResponse call
-func ParseEditMigrationResponse(rsp *http.Response) (*EditMigrationResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &EditMigrationResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest Migration
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON200 = &dest
-
-	}
-
-	return response, nil
-}
-
-// ParseSetMigrationResponse parses an HTTP response from a SetMigrationWithResponse call
-func ParseSetMigrationResponse(rsp *http.Response) (*SetMigrationResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &SetMigrationResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
@@ -5350,6 +4012,32 @@ func ParseQueryMigrationResponse(rsp *http.Response) (*QueryMigrationResponse, e
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetMigrationSchemaResponse parses an HTTP response from a GetMigrationSchemaWithResponse call
+func ParseGetMigrationSchemaResponse(rsp *http.Response) (*GetMigrationSchemaResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetMigrationSchemaResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "yaml") && rsp.StatusCode == 200:
+		var dest string
+		if err := yaml.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.YAML200 = &dest
 
 	}
 
@@ -5518,6 +4206,58 @@ func ParseQueryTaskResponse(rsp *http.Response) (*QueryTaskResponse, error) {
 	return response, nil
 }
 
+// ParseGetTaskSchemaResponse parses an HTTP response from a GetTaskSchemaWithResponse call
+func ParseGetTaskSchemaResponse(rsp *http.Response) (*GetTaskSchemaResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetTaskSchemaResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "yaml") && rsp.StatusCode == 200:
+		var dest string
+		if err := yaml.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.YAML200 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseSetTaskSchemaResponse parses an HTTP response from a SetTaskSchemaWithResponse call
+func ParseSetTaskSchemaResponse(rsp *http.Response) (*SetTaskSchemaResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &SetTaskSchemaResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "yaml") && rsp.StatusCode == 200:
+		var dest string
+		if err := yaml.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.YAML200 = &dest
+
+	}
+
+	return response, nil
+}
+
 // ParseBatchSetUserResponse parses an HTTP response from a BatchSetUserWithResponse call
 func ParseBatchSetUserResponse(rsp *http.Response) (*BatchSetUserResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -5680,240 +4420,6 @@ func ParseQueryUserResponse(rsp *http.Response) (*QueryUserResponse, error) {
 	return response, nil
 }
 
-// ParseGetSchemasResponse parses an HTTP response from a GetSchemasWithResponse call
-func ParseGetSchemasResponse(rsp *http.Response) (*GetSchemasResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &GetSchemasResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest string
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON200 = &dest
-
-	}
-
-	return response, nil
-}
-
-// ParseGetAccountSchemaResponse parses an HTTP response from a GetAccountSchemaWithResponse call
-func ParseGetAccountSchemaResponse(rsp *http.Response) (*GetAccountSchemaResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &GetAccountSchemaResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest string
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON200 = &dest
-
-	}
-
-	return response, nil
-}
-
-// ParseSetAccountSchemaResponse parses an HTTP response from a SetAccountSchemaWithResponse call
-func ParseSetAccountSchemaResponse(rsp *http.Response) (*SetAccountSchemaResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &SetAccountSchemaResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest string
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON200 = &dest
-
-	}
-
-	return response, nil
-}
-
-// ParseGetCdcSchemaResponse parses an HTTP response from a GetCdcSchemaWithResponse call
-func ParseGetCdcSchemaResponse(rsp *http.Response) (*GetCdcSchemaResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &GetCdcSchemaResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest string
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON200 = &dest
-
-	}
-
-	return response, nil
-}
-
-// ParseSetCdcSchemaResponse parses an HTTP response from a SetCdcSchemaWithResponse call
-func ParseSetCdcSchemaResponse(rsp *http.Response) (*SetCdcSchemaResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &SetCdcSchemaResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest string
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON200 = &dest
-
-	}
-
-	return response, nil
-}
-
-// ParseGetMigrationSchemaResponse parses an HTTP response from a GetMigrationSchemaWithResponse call
-func ParseGetMigrationSchemaResponse(rsp *http.Response) (*GetMigrationSchemaResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &GetMigrationSchemaResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest string
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON200 = &dest
-
-	}
-
-	return response, nil
-}
-
-// ParseSetMigrationSchemaResponse parses an HTTP response from a SetMigrationSchemaWithResponse call
-func ParseSetMigrationSchemaResponse(rsp *http.Response) (*SetMigrationSchemaResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &SetMigrationSchemaResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest string
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON200 = &dest
-
-	}
-
-	return response, nil
-}
-
-// ParseGetTaskSchemaResponse parses an HTTP response from a GetTaskSchemaWithResponse call
-func ParseGetTaskSchemaResponse(rsp *http.Response) (*GetTaskSchemaResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &GetTaskSchemaResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest string
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON200 = &dest
-
-	}
-
-	return response, nil
-}
-
-// ParseSetTaskSchemaResponse parses an HTTP response from a SetTaskSchemaWithResponse call
-func ParseSetTaskSchemaResponse(rsp *http.Response) (*SetTaskSchemaResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &SetTaskSchemaResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest string
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON200 = &dest
-
-	}
-
-	return response, nil
-}
-
 // ParseGetUserSchemaResponse parses an HTTP response from a GetUserSchemaWithResponse call
 func ParseGetUserSchemaResponse(rsp *http.Response) (*GetUserSchemaResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -5928,12 +4434,12 @@ func ParseGetUserSchemaResponse(rsp *http.Response) (*GetUserSchemaResponse, err
 	}
 
 	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+	case strings.Contains(rsp.Header.Get("Content-Type"), "yaml") && rsp.StatusCode == 200:
 		var dest string
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+		if err := yaml.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.JSON200 = &dest
+		response.YAML200 = &dest
 
 	}
 
@@ -5954,12 +4460,106 @@ func ParseSetUserSchemaResponse(rsp *http.Response) (*SetUserSchemaResponse, err
 	}
 
 	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "yaml") && rsp.StatusCode == 200:
+		var dest string
+		if err := yaml.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.YAML200 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetSchemasResponse parses an HTTP response from a GetSchemasWithResponse call
+func ParseGetSchemasResponse(rsp *http.Response) (*GetSchemasResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetSchemasResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest []string
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetSDKResponse parses an HTTP response from a GetSDKWithResponse call
+func ParseGetSDKResponse(rsp *http.Response) (*GetSDKResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetSDKResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	return response, nil
+}
+
+// ParseGetOpenapiJsonResponse parses an HTTP response from a GetOpenapiJsonWithResponse call
+func ParseGetOpenapiJsonResponse(rsp *http.Response) (*GetOpenapiJsonResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetOpenapiJsonResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest string
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetOpenapiYamlResponse parses an HTTP response from a GetOpenapiYamlWithResponse call
+func ParseGetOpenapiYamlResponse(rsp *http.Response) (*GetOpenapiYamlResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetOpenapiYamlResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "yaml") && rsp.StatusCode == 200:
+		var dest string
+		if err := yaml.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.YAML200 = &dest
 
 	}
 

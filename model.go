@@ -177,78 +177,9 @@ description: Query is a query against a collection of documents
 required:
   - select
 properties:
-  select:
-    type: array
-    items:
-      type: object
-      description: select is a list of fields to select from each record in the datbase(optional)
-      properties:
-        field:
-          type: string
-          description: the select's field
-        aggregate:
-          type: string
-          description: an aggregate function to apply against the field
-          enum:
-            - sum
-            - count
-            - max
-            - min
-        function:
-          type: string
-          description: a function to apply against the field
-          enum:
-            - toLower
-            - toUpper
-        as:
-          type: string
-          description: as is outputs the value of the field as an alias
-      required:
-        - field
-  groupBy:
-    type: array
-    items:
-      type: string
-  where:
-    type: array
-    items:
-      type: object
-      description: where is a filter applied against a query
-      properties:
-        field:
-          type: string
-        op:
-          type: string
-          enum:
-            - eq
-            - neq
-            - gt
-            - gte
-            - lt
-            - lte
-            - in
-            - contains
-        value: { }
-      required:
-        - field
-        - op
-        - value
-  orderBy:
-    type: array
-    items:
-      type: object
-      description: orderBy orders results by a field and a direction
-      properties:
-        field:
-          type: string
-        direction:
-          type: string
-          enum:
-            - asc
-            - desc
-      required:
-        - field
-        - direction
+
+
+
   page:
     type: integer
     minimum: 0

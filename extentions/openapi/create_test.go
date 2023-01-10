@@ -28,8 +28,7 @@ func TestCreate(t *testing.T) {
 		client, err := testdata.NewClient(s.URL)
 		assert.NoError(t, err)
 
-		results, err := client.CreateAccount(ctx, testdata.SetAccountJSONRequestBody{
-			Id:   "0",
+		results, err := client.CreateAccount(ctx, testdata.CreateAccountJSONRequestBody{
 			Name: gofakeit.Company(),
 		})
 		bits, _ := io.ReadAll(results.Body)

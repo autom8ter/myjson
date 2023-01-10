@@ -24,12 +24,11 @@ func TestGetAccountSchema(t *testing.T) {
 		assert.NoError(t, oapi.RegisterRoutes(ctx, db))
 		s := httptest.NewServer(oapi.router)
 		defer s.Close()
-		client, err := testdata.NewClient(s.URL)
+		client, err := testdata.NewClientWithResponses(s.URL)
 		assert.NoError(t, err)
 
-		account, err := client.GetAccountSchema(ctx)
-		bits, _ := io.ReadAll(account.Body)
-		assert.Equal(t, 200, account.StatusCode, string(bits))
+		account, err := client.GetAccountSchemaWithResponse(ctx)
+		assert.Equal(t, 200, account.StatusCode())
 	}))
 }
 

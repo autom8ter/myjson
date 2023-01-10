@@ -300,7 +300,93 @@ components:
       schema:
         type: string
   schemas:
-    Query: {{ .query_schema | nindent 6 }}
+    Select:
+      type: array
+      items:
+        type: object
+        description: select is a list of fields to select from each record in the datbase(optional)
+        required:
+          - field
+        properties:
+          field:
+            type: string
+            description: the select's field
+          aggregate:
+            type: string
+            description: an aggregate function to apply against the field
+            enum:
+              - sum
+              - count
+              - max
+              - min
+          function:
+            type: string
+            description: a function to apply against the field
+            enum:
+              - toLower
+              - toUpper
+          as:
+            type: string
+            description: as is outputs the value of the field as an alias
+    Where:
+      type: array
+      items:
+        type: object
+        description: where is a list of conditions to filter records in the database(optional)
+        required:
+          - field
+          - op
+          - value
+        properties:
+          field:
+            type: string
+          op:
+            type: string
+            enum:
+              - eq
+              - neq
+              - gt
+              - gte
+              - lt
+              - lte
+              - in
+              - contains
+          value: { }
+    OrderBy:
+      type: array
+      items:
+        type: object
+        description: orderBy orders results by a field and a direction
+        required:
+          - field
+          - direction
+        properties:
+          field:
+            type: string
+          direction:
+            type: string
+            enum:
+              - asc
+              - desc
+    Query:
+      type: object
+      properties:
+        select:
+          $ref: '#/components/schemas/Select'
+        where:
+          $ref: '#/components/schemas/Where'
+        orderBy:
+          $ref: '#/components/schemas/OrderBy'
+        groupBy:
+          type: array
+          items:
+            type: string
+        page:
+          type: integer
+          minimum: 0
+        limit:
+          type: integer
+          minimum: 0
     Page: {{ .page_schema | nindent 6 }}
 {{- range .collections }}
     {{ title .collection }}: {{ .schema | nindent 6 }}

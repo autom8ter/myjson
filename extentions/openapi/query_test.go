@@ -32,7 +32,6 @@ func TestQuery(t *testing.T) {
 			Limit:   lo.ToPtr(1),
 			OrderBy: nil,
 			Page:    nil,
-			Select:  nil,
 			Where:   nil,
 		})
 		assert.Equal(t, 200, results.StatusCode)
