@@ -10,6 +10,8 @@ import (
 	// import embed package
 	_ "embed"
 
+	_ "embed"
+
 	"github.com/brianvoe/gofakeit/v6"
 	"github.com/stretchr/testify/assert"
 )

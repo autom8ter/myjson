@@ -1,5 +1,5 @@
 # myjson [![GoDoc](https://godoc.org/github.com/autom8ter/myjson?status.svg)](https://godoc.org/github.com/autom8ter/myjson)
-![Coverage](https://img.shields.io/badge/Coverage-72.2%25-brightgreen)
+![Coverage](https://img.shields.io/badge/Coverage-72.5%25-brightgreen)
 
 ```
 ███    ███ ██    ██      ██ ███████  ██████  ███    ██ 
