@@ -188,7 +188,7 @@ func (t *transaction) Query(ctx context.Context, collection string, query Query)
 		Count:     len(results),
 		Stats: PageStats{
 			ExecutionTime: time.Since(now),
-			Optimization:  match,
+			Explain:       match,
 		},
 	}, nil
 }
@@ -263,7 +263,7 @@ func (t *transaction) aggregate(ctx context.Context, collection string, query Qu
 		Count:     len(reduced),
 		Stats: PageStats{
 			ExecutionTime: time.Since(now),
-			Optimization:  match,
+			Explain:       match,
 		},
 	}, nil
 }
@@ -283,7 +283,7 @@ func docsHaving(where []Where, results Documents) (Documents, error) {
 	return results, nil
 }
 
-func (t *transaction) ForEach(ctx context.Context, collection string, opts ForEachOpts, fn ForEachFunc) (Optimization, error) {
+func (t *transaction) ForEach(ctx context.Context, collection string, opts ForEachOpts, fn ForEachFunc) (Explain, error) {
 	return t.queryScan(ctx, collection, opts.Where, opts.Join, fn)
 }
 

@@ -7,8 +7,8 @@ import (
 
 type defaultOptimizer struct{}
 
-func defaultOptimization(c CollectionSchema) Optimization {
-	return Optimization{
+func defaultExplain(c CollectionSchema) Explain {
+	return Explain{
 		Collection:    c.Collection(),
 		Index:         c.PrimaryIndex(),
 		MatchedFields: []string{},
@@ -19,26 +19,26 @@ func defaultOptimization(c CollectionSchema) Optimization {
 	}
 }
 
-func (o defaultOptimizer) Optimize(c CollectionSchema, where []Where) (Optimization, error) {
+func (o defaultOptimizer) Optimize(c CollectionSchema, where []Where) (Explain, error) {
 	if len(c.PrimaryIndex().Fields) == 0 {
-		return Optimization{}, errors.New(errors.Internal, "zero configured indexes")
+		return Explain{}, errors.New(errors.Internal, "zero configured indexes")
 	}
 	indexes := c.Indexing()
 	if len(indexes) == 0 {
-		return Optimization{}, errors.New(errors.Internal, "zero configured indexes")
+		return Explain{}, errors.New(errors.Internal, "zero configured indexes")
 	}
 	if len(where) == 0 {
-		return defaultOptimization(c), nil
+		return defaultExplain(c), nil
 	}
 	if c.PrimaryIndex().Fields[0] == where[0].Field && where[0].Op == WhereOpEq {
-		return Optimization{
+		return Explain{
 			Index:         c.PrimaryIndex(),
 			MatchedFields: []string{c.PrimaryKey()},
 			MatchedValues: getMatchedFieldValues([]string{c.PrimaryKey()}, where),
 		}, nil
 	}
 	var (
-		opt = &Optimization{
+		opt = &Explain{
 			Collection: c.Collection(),
 		}
 	)
@@ -85,9 +85,9 @@ func (o defaultOptimizer) Optimize(c CollectionSchema, where []Where) (Optimizat
 		return *opt, nil
 	}
 	if c.RequireQueryIndex() {
-		return Optimization{}, errors.New(errors.Forbidden, "index is required for query in collection: %s", c.Collection())
+		return Explain{}, errors.New(errors.Forbidden, "index is required for query in collection: %s", c.Collection())
 	}
-	return defaultOptimization(c), nil
+	return defaultExplain(c), nil
 }
 
 func getMatchedFieldValues(fields []string, where []Where) map[string]any {

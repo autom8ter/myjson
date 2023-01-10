@@ -28,7 +28,9 @@ func TestGetAccountSchema(t *testing.T) {
 		assert.NoError(t, err)
 
 		account, err := client.GetAccountSchemaWithResponse(ctx)
+		assert.NoError(t, err)
 		assert.Equal(t, 200, account.StatusCode())
+		assert.NotEmpty(t, (*account.YAML200)["properties"])
 	}))
 }
 

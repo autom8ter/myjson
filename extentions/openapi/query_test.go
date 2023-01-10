@@ -2,7 +2,6 @@ package openapi
 
 import (
 	"context"
-	"io"
 	"net/http/httptest"
 	"testing"
 
@@ -25,19 +24,17 @@ func TestQuery(t *testing.T) {
 		assert.NoError(t, oapi.RegisterRoutes(ctx, db))
 		s := httptest.NewServer(oapi.router)
 		defer s.Close()
-		client, err := testdata.NewClient(s.URL)
+		client, err := testdata.NewClientWithResponses(s.URL)
 		assert.NoError(t, err)
-		results, err := client.QueryAccount(ctx, testdata.QueryAccountJSONRequestBody{
-			GroupBy: nil,
-			Limit:   lo.ToPtr(1),
-			OrderBy: nil,
-			Page:    nil,
-			Where:   nil,
+		results, err := client.QueryAccountWithResponse(ctx, &testdata.QueryAccountParams{Explain: lo.ToPtr(true)}, testdata.QueryAccountJSONRequestBody{
+			Select: &[]testdata.Select{
+				{
+					Field: "*",
+				},
+			},
+			Limit: lo.ToPtr(1),
 		})
-		assert.Equal(t, 200, results.StatusCode)
-		bits, _ := io.ReadAll(results.Body)
-		assert.NoError(t, err)
-		resp, _ := myjson.NewDocumentFromBytes(bits)
-		assert.Equal(t, "0", resp.Get("documents.0._id"))
+		assert.Equal(t, 200, results.StatusCode())
+		assert.Equal(t, "0", results.JSON200.Documents[0]["_id"])
 	}))
 }

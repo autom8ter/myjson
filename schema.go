@@ -229,7 +229,11 @@ func (c *collectionSchema) refreshSchema(jsonContent []byte) error {
 func (c *collectionSchema) MarshalYAML() ([]byte, error) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	return util.JSONToYAML([]byte(c.raw.Raw))
+	y, err := util.JSONToYAML([]byte(c.raw.Raw))
+	if err != nil {
+		return nil, errors.Wrap(err, 0, "failed to convert schema to yaml: %s", c.collection)
+	}
+	return y, nil
 }
 
 func (c *collectionSchema) UnmarshalYAML(bytes []byte) error {

@@ -127,12 +127,10 @@ func getSpec(ctx context.Context, config Config, db myjson.Database) ([]byte, er
 	}
 	buf := bytes.NewBuffer(nil)
 	err = t.Execute(buf, map[string]any{
-		"title":        config.Title,
-		"description":  config.Description,
-		"version":      config.Version,
-		"query_schema": myjson.QuerySchema(),
-		"page_schema":  myjson.PageSchema(),
-		"collections":  coll,
+		"title":       config.Title,
+		"description": config.Description,
+		"version":     config.Version,
+		"collections": coll,
 	})
 	if err != nil {
 		return nil, err
@@ -161,8 +159,8 @@ func (o *OpenAPIServer) RegisterRoutes(ctx context.Context, db myjson.Database) 
 	o.router.HandleFunc("/api/sdk", o.getSDKHandler(db)).Methods(http.MethodGet)
 	o.router.HandleFunc("/api/tx", o.txHandler(db))
 	o.router.HandleFunc("/api/schema", o.getSchemasHandler(db)).Methods(http.MethodGet)
-	o.router.HandleFunc("/api/schema/{collection}", o.getSchemaHandler(db)).Methods(http.MethodGet)
-	o.router.HandleFunc("/api/schema/{collection}", o.putSchemaHandler(db)).Methods(http.MethodPut)
+	o.router.HandleFunc("/api/collections/{collection}/schema", o.getSchemaHandler(db)).Methods(http.MethodGet)
+	o.router.HandleFunc("/api/collections/{collection}/schema", o.putSchemaHandler(db)).Methods(http.MethodPut)
 	o.router.HandleFunc("/api/collections/{collection}/docs", o.createDocHandler(db)).Methods(http.MethodPost)
 	o.router.HandleFunc("/api/collections/{collection}/docs/{docID}", o.setDocHandler(db)).Methods(http.MethodPut)
 	o.router.HandleFunc("/api/collections/{collection}/docs/{docID}", o.patchDocHandler(db)).Methods(http.MethodPatch)

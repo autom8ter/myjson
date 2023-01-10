@@ -66,7 +66,7 @@ type Database interface {
 	// ForEach scans the optimal index for a collection's documents passing its filters.
 	// results will not be ordered unless an index supporting the order by(s) was found by the optimizer
 	// Query should be used when order is more important than performance/resource-usage
-	ForEach(ctx context.Context, collection string, opts ForEachOpts, fn ForEachFunc) (Optimization, error)
+	ForEach(ctx context.Context, collection string, opts ForEachOpts, fn ForEachFunc) (Explain, error)
 	// Query queries a list of documents
 	Query(ctx context.Context, collection string, query Query) (Page, error)
 	// Get gets 1-many document by id(s)
@@ -90,7 +90,7 @@ type Database interface {
 // Optimizer selects the best index from a set of indexes based on where clauses
 type Optimizer interface {
 	// Optimize selects the optimal index to use based on the given where clauses
-	Optimize(c CollectionSchema, where []Where) (Optimization, error)
+	Optimize(c CollectionSchema, where []Where) (Explain, error)
 }
 
 // Stream broadcasts and subscribes to entities.
@@ -130,7 +130,7 @@ type Tx interface {
 	// ForEach scans the optimal index for a collection's documents passing its filters.
 	// results will not be ordered unless an index supporting the order by(s) was found by the optimizer
 	// Query should be used when order is more important than performance/resource-usage
-	ForEach(ctx context.Context, collection string, opts ForEachOpts, fn ForEachFunc) (Optimization, error)
+	ForEach(ctx context.Context, collection string, opts ForEachOpts, fn ForEachFunc) (Explain, error)
 	// CDC returns the change data capture array associated with the transaction.
 	// CDC's are persisted to the cdc collection when the transaction is commited.
 	CDC() []CDC

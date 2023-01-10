@@ -169,25 +169,6 @@ func (q Query) Validate(ctx context.Context) error {
 	return nil
 }
 
-// QuerySchema returns the JSON schema for the Query struct in YAML format
-func QuerySchema() string {
-	return `
-type: object
-description: Query is a query against a collection of documents
-required:
-  - select
-properties:
-
-
-
-  page:
-    type: integer
-    minimum: 0
-  limit:
-    type: integer
-    minimum: 0`
-}
-
 type ctxKey int
 
 const (
@@ -313,38 +294,16 @@ type Page struct {
 	Stats PageStats `json:"stats,omitempty"`
 }
 
-// PageSchema returns the JSON schema for the Page struct in YAML format
-func PageSchema() string {
-	return `
-type: object
-description: Page is a list of documents returned from a query
-required:
-  - documents
-  - next_page
-  - count
-properties:
-  documents:
-    type: array
-    items:
-      type: object
-  next_page:
-    type: integer
-    minimum: 0
-  count:
-    type: integer
-    minimum: 0`
-}
-
 // PageStats are statistics collected from a query returning a page
 type PageStats struct {
 	// ExecutionTime is the execution time to get the page
 	ExecutionTime time.Duration `json:"execution_time,omitempty"`
-	// Optimization is the optimizer's output for the query that returned a page
-	Optimization Optimization `json:"optimization,omitempty"`
+	// Explain is the optimizer's output for the query that returned a page
+	Explain Explain `json:"explain,omitempty"`
 }
 
-// Optimization
-type Optimization struct {
+// Explain
+type Explain struct {
 	// Collection
 	Collection string `json:"collection"`
 	// Index is the index the query optimizer chose
@@ -395,7 +354,7 @@ type Index struct {
 	// Unique indicates that it's a primary index
 	Primary bool `json:"primary"`
 	// ForeignKey indecates that it's an index for a foreign key
-	ForeignKey *ForeignKey `json:"foreignKey,omitempty"`
+	ForeignKey *ForeignKey `json:"foreign_key,omitempty"`
 }
 
 type EventType string

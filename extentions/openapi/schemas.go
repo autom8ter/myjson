@@ -28,7 +28,11 @@ func (o *OpenAPIServer) getSchemaHandler(db myjson.Database) http.HandlerFunc {
 			httpError.Error(w, errors.New(errors.Validation, "collection does not exist"))
 			return
 		}
-		schema, _ := db.GetSchema(r.Context(), collection).MarshalYAML()
+		schema, err := db.GetSchema(r.Context(), collection).MarshalYAML()
+		if err != nil {
+			httpError.Error(w, errors.Wrap(err, http.StatusInternalServerError, "failed to marshal schema"))
+			return
+		}
 		w.WriteHeader(http.StatusOK)
 		w.Write(schema)
 	})

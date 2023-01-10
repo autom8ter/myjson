@@ -28,6 +28,9 @@ func (o *OpenAPIServer) queryHandler(db myjson.Database) http.HandlerFunc {
 			httpError.Error(w, err)
 			return
 		}
+		if r.URL.Query().Get("explain") != "true" {
+			results.Stats.Explain = myjson.Explain{}
+		}
 		w.WriteHeader(http.StatusOK)
 		json.NewEncoder(w).Encode(&results)
 	})

@@ -12,9 +12,9 @@ const (
 )
 
 func isInternal(ctx context.Context) bool {
-	return ctx.Value(string(internalKey)) == true
+	return ctx.Value(internalKey) == true
 }
 
 func isIndexing(ctx context.Context) bool {
-	return ctx.Value(string(isIndexingKey)) == true
+	return ctx.Value(isIndexingKey) == true
 }

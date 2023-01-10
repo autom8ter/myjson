@@ -3,6 +3,7 @@ package openapi
 import (
 	"context"
 	"fmt"
+	"os"
 	"testing"
 
 	_ "embed"
@@ -29,10 +30,13 @@ func TestOpenAPI(t *testing.T) {
 			})
 			assert.NoError(t, err)
 			assert.NoError(t, oapi.RegisterRoutes(ctx, db))
-			//f, _ := os.Create("testdata/openapi.yaml")
-			//defer f.Close()
-			//f.Write(oapi.spec)
+			f, _ := os.Create("testdata/openapi.yaml")
+			defer f.Close()
+			f.Write(oapi.spec)
 			assert.YAMLEq(t, expectedSchema, string(oapi.spec))
+			sdk, _ := os.Create("testdata/sdk.go")
+			defer f.Close()
+			assert.NoError(t, oapi.GenerateSDK(db, "testdata", sdk))
 		}))
 	})
 	t.Run("walk router", func(t *testing.T) {

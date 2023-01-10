@@ -178,9 +178,9 @@ func (d *defaultDB) Query(ctx context.Context, collection string, query Query) (
 	return page, nil
 }
 
-func (d *defaultDB) ForEach(ctx context.Context, collection string, opts ForEachOpts, fn ForEachFunc) (Optimization, error) {
+func (d *defaultDB) ForEach(ctx context.Context, collection string, opts ForEachOpts, fn ForEachFunc) (Explain, error) {
 	var (
-		result Optimization
+		result Explain
 		err    error
 	)
 	if err := d.Tx(ctx, kv.TxOpts{IsReadOnly: true}, func(ctx context.Context, tx Tx) error {

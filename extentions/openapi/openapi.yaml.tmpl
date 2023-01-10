@@ -23,7 +23,7 @@ paths:
           content:
             application/x-yaml:
               schema:
-                type: string
+                type: object
   /openapi.json:
     get:
       summary: Get OpenAPI specification
@@ -87,7 +87,7 @@ paths:
           content:
             application/x-yaml:
               schema:
-                type: string
+                type: object
         '400':
           description: Invalid schema
         '500':
@@ -245,15 +245,15 @@ paths:
       summary: query {{ title .collection }} collection
       description: This operation queries documents in the {{ title .collection }} collection
       operationId: query{{ title .collection }}
+      parameters:
+        - $ref: "#/components/parameters/ExplainParam"
       responses:
         '200':
           description: OK
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/Page"
+                $ref: "#/components/schemas/Page"
         '400':
           description: Invalid {{ title .collection }} Query
         '500':
@@ -299,84 +299,91 @@ components:
       required: true
       schema:
         type: string
+    ExplainParam:
+      name: explain
+      description: explain the query
+      in: query
+      required: false
+      schema:
+        type: boolean
   schemas:
     Select:
-      type: array
-      items:
-        type: object
-        description: select is a list of fields to select from each record in the datbase(optional)
-        required:
-          - field
-        properties:
-          field:
-            type: string
-            description: the select's field
-          aggregate:
-            type: string
-            description: an aggregate function to apply against the field
-            enum:
-              - sum
-              - count
-              - max
-              - min
-          function:
-            type: string
-            description: a function to apply against the field
-            enum:
-              - toLower
-              - toUpper
-          as:
-            type: string
-            description: as is outputs the value of the field as an alias
+      type: object
+      description: select is a list of fields to select from each record in the datbase(optional)
+      required:
+        - field
+      properties:
+        field:
+          type: string
+          description: the select's field
+        aggregate:
+          type: string
+          description: an aggregate function to apply against the field
+          enum:
+            - sum
+            - count
+            - max
+            - min
+        function:
+          type: string
+          description: a function to apply against the field
+          enum:
+            - toLower
+            - toUpper
+        as:
+          type: string
+          description: as is outputs the value of the field as an alias
     Where:
-      type: array
-      items:
-        type: object
-        description: where is a list of conditions to filter records in the database(optional)
-        required:
-          - field
-          - op
-          - value
-        properties:
-          field:
-            type: string
-          op:
-            type: string
-            enum:
-              - eq
-              - neq
-              - gt
-              - gte
-              - lt
-              - lte
-              - in
-              - contains
-          value: { }
+      type: object
+      description: where is a list of conditions to filter records in the database(optional)
+      required:
+        - field
+        - op
+        - value
+      properties:
+        field:
+          type: string
+        op:
+          type: string
+          enum:
+            - eq
+            - neq
+            - gt
+            - gte
+            - lt
+            - lte
+            - in
+            - contains
+        value: { }
     OrderBy:
-      type: array
-      items:
-        type: object
-        description: orderBy orders results by a field and a direction
-        required:
-          - field
-          - direction
-        properties:
-          field:
-            type: string
-          direction:
-            type: string
-            enum:
-              - asc
-              - desc
+      type: object
+      description: orderBy orders results by a field and a direction
+      required:
+        - field
+        - direction
+      properties:
+        field:
+          type: string
+        direction:
+          type: string
+          enum:
+            - asc
+            - desc
     Query:
       type: object
       properties:
         select:
-          $ref: '#/components/schemas/Select'
+          type: array
+          items:
+            $ref: '#/components/schemas/Select'
         where:
-          $ref: '#/components/schemas/Where'
+          type: array
+          items:
+            $ref: '#/components/schemas/Where'
         orderBy:
-          $ref: '#/components/schemas/OrderBy'
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderBy'
         groupBy:
           type: array
           items:
@@ -387,7 +394,74 @@ components:
         limit:
           type: integer
           minimum: 0
-    Page: {{ .page_schema | nindent 6 }}
+    Explain:
+      type: object
+      properties:
+        collection:
+          type: string
+        matched_fields:
+          type: array
+          items:
+            type: string
+        matched_values:
+          type: object
+        seek_fields:
+          type: array
+          items:
+            type: string
+        seek_values:
+          type: object
+        reverse:
+          type: boolean
+        index:
+          type: object
+          description: index is the index the optimizer selected
+          properties:
+            name:
+              type: string
+            fields:
+              type: array
+              items:
+                type: string
+            unique:
+              type: boolean
+            primary:
+              type: boolean
+            foreign_key:
+              type: object
+              properties:
+                collection:
+                  type: string
+                cascade:
+                  type: boolean
+    PageStats:
+      type: object
+      description: PageStats is the execution stats of a query that returns a page
+      properties:
+        execution_time:
+          type: number
+        explain:
+          $ref: '#/components/schemas/Explain'
+    Page:
+      type: object
+      description: Page is a list of documents returned from a query
+      required:
+        - documents
+        - next_page
+        - count
+      properties:
+        documents:
+          type: array
+          items:
+            type: object
+        next_page:
+          type: integer
+          minimum: 0
+        count:
+          type: integer
+          minimum: 0
+        page_stats:
+          $ref: '#/components/schemas/PageStats'
 {{- range .collections }}
     {{ title .collection }}: {{ .schema | nindent 6 }}
     {{- if not .is_read_only }}
