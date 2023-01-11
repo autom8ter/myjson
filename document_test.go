@@ -102,6 +102,7 @@ func TestDocument(t *testing.T) {
 	t.Run("diff - none", func(t *testing.T) {
 		before := testutil.NewUserDoc()
 		diff := before.Diff(before)
+		assert.NotNil(t, diff)
 		fmt.Println(util.JSONString(&diff))
 	})
 	t.Run("diff - replace contact.email", func(t *testing.T) {

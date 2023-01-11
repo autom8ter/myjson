@@ -504,6 +504,9 @@ func (d *Document) Where(wheres []Where) (bool, error) {
 
 // Diff calculates a json diff between the document and the input document
 func (d *Document) Diff(before *Document) []JSONFieldOp {
+	if before != nil && before.String() == d.String() {
+		return []JSONFieldOp{}
+	}
 	var ops []JSONFieldOp
 	if before == nil {
 		before = NewDocument()
@@ -543,6 +546,9 @@ func (d *Document) Diff(before *Document) []JSONFieldOp {
 				BeforeValue: nil,
 			})
 		}
+	}
+	if ops == nil {
+		return []JSONFieldOp{}
 	}
 	return ops
 }
