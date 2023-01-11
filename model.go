@@ -335,8 +335,8 @@ const (
 	Delete = "delete"
 )
 
-// Command is a command executed against the database that causes a change in state
-type Command struct {
+// persistCommand is a command executed against the database that causes a change in state
+type persistCommand struct {
 	Collection string    `json:"collection" validate:"required"`
 	Action     Action    `json:"action" validate:"required,oneof='create' 'update' 'delete' 'set'"`
 	Document   *Document `json:"document" validate:"required"`
@@ -484,4 +484,86 @@ type Migration struct {
 	Dirty bool `json:"dirty"`
 	// An error message if one was encountered
 	Error string `json:"error"`
+}
+
+// TxCmd is a serializable transaction command
+type TxCmd struct {
+	// Create is a create command
+	Create *CreateCmd `json:"create,omitempty"`
+	// Get is a get command
+	Get *GetCmd `json:"get,omitempty"`
+	// Set is a set command
+	Set *SetCmd `json:"set,omitempty"`
+	// Update is an update command
+	Update *UpdateCmd `json:"update,omitempty"`
+	// Delete is a delete command
+	Delete *DeleteCmd `json:"delete,omitempty"`
+	// Query is a query command
+	Query *QueryCmd `json:"query,omitempty"`
+}
+
+// TxResponse is a serializable transaction response
+type TxResponse struct {
+	// Create is a create response - it returns the created document
+	Create *Document `json:"create,omitempty"`
+	// Get is a get response - it returns the document from the get request (if it exists)
+	Get *Document `json:"get,omitempty"`
+	// Set is a set response - it returns the document after the set was applied
+	Set *Document `json:"set,omitempty"`
+	// Update is an update response - it contains the document after the update was applied
+	Update *Document `json:"update,omitempty"`
+	// Delete is an empty delete response
+	Delete *struct{} `json:"delete,omitempty"`
+	// Query is a query response - it contains the documents returned from the query
+	Query Page `json:"page,omitempty"`
+}
+
+// DeleteCmd is a serializable delete command
+type DeleteCmd struct {
+	// Collection is the collection the document belongs to
+	Collection string `json:"collection" validate:"required"`
+	// ID is the unique id of the document
+	ID string `json:"id" validate:"required"`
+}
+
+// GetCmd is a serializable get command
+type GetCmd struct {
+	// Collection is the collection the document belongs to
+	Collection string `json:"collection" validate:"required"`
+	// ID is the unique id of the document
+	ID string `json:"id" validate:"required"`
+}
+
+// SetCmd is a serializable set command
+type SetCmd struct {
+	// Collection is the collection the document belongs to
+	Collection string `json:"collection" validate:"required"`
+	// Document is the document to set
+	Document *Document `json:"document" validate:"required"`
+}
+
+// CreateCmd is a serializable create command
+type CreateCmd struct {
+	// Collection is the collection the document belongs to
+	Collection string `json:"collection" validate:"required"`
+	// Document is the document to set
+	Document *Document `json:"document" validate:"required"`
+}
+
+// UpdateCmd is a serializable update command
+type UpdateCmd struct {
+	// Collection is the collection the document belongs to
+	Collection string `json:"collection" validate:"required"`
+	// ID is the unique id of the document
+	ID string `json:"id" validate:"required"`
+	// Update is the set of fields to set
+	Update map[string]any `json:"update,omitempty"`
+}
+
+// QueryCmd is a serializable query command
+type QueryCmd struct {
+	// Collection is the collection the document belongs to
+	Collection string `json:"collection" validate:"required"`
+	// Query is the query to execute
+	Query Query `json:"query,omitempty"`
 }

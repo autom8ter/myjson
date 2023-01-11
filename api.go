@@ -95,15 +95,6 @@ type Optimizer interface {
 	Optimize(c CollectionSchema, where []Where) (Explain, error)
 }
 
-// Stream broadcasts and subscribes to entities.
-// A Stream can be implemented in memory, or with message-queue services like sqs/pubsub/rabbitmq/nats/splunk/etc
-type Stream[T any] interface {
-	// Broadcast broadcasts the entity to the channel
-	Broadcast(ctx context.Context, channel string, msg T)
-	// Pull pulls entities off of the given channel as they are broadcast
-	Pull(ctx context.Context, channel string, fn func(T) (bool, error)) error
-}
-
 // Txn is a database transaction interface - it holds the methods used while using a transaction + commit,rollback,and close functionality
 type Txn interface {
 	// Commit commits the transaction to the database
@@ -115,8 +106,10 @@ type Txn interface {
 	Tx
 }
 
-// Tx is a database transaction interface - it holds the methods used while using a transaction
+// Tx is a database transaction interface - it holds the primary methods used while using a transaction
 type Tx interface {
+	// Cmd is a generic command that can be used to execute any command against the database
+	Cmd(ctx context.Context, cmd TxCmd) (TxResponse, error)
 	// Query executes a query against the database
 	Query(ctx context.Context, collection string, query Query) (Page, error)
 	// Get returns a document by id

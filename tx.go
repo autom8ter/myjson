@@ -56,7 +56,7 @@ func (t *transaction) Update(ctx context.Context, collection string, id string, 
 		return errors.Wrap(err, 0, "tx: failed to set primary key")
 	}
 	md, _ := GetMetadata(ctx)
-	if err := t.persistCommand(ctx, &Command{
+	if err := t.persistCommand(ctx, &persistCommand{
 		Collection: collection,
 		Action:     Update,
 		Document:   doc,
@@ -82,7 +82,7 @@ func (t *transaction) Create(ctx context.Context, collection string, document *D
 		}
 	}
 	md, _ := GetMetadata(ctx)
-	if err := t.persistCommand(ctx, &Command{
+	if err := t.persistCommand(ctx, &persistCommand{
 		Collection: collection,
 		Action:     Create,
 		Document:   document,
@@ -100,7 +100,7 @@ func (t *transaction) Set(ctx context.Context, collection string, document *Docu
 		return errors.New(errors.Validation, "tx: unsupported collection: %s", collection)
 	}
 	md, _ := GetMetadata(ctx)
-	if err := t.persistCommand(ctx, &Command{
+	if err := t.persistCommand(ctx, &persistCommand{
 		Collection: collection,
 		Action:     Set,
 		Document:   document,
@@ -121,7 +121,7 @@ func (t *transaction) Delete(ctx context.Context, collection string, id string) 
 	d, _ := NewDocumentFrom(map[string]any{
 		t.db.GetSchema(ctx, collection).PrimaryKey(): id,
 	})
-	if err := t.persistCommand(ctx, &Command{
+	if err := t.persistCommand(ctx, &persistCommand{
 		Collection: collection,
 		Action:     Delete,
 		Document:   d,
@@ -216,6 +216,64 @@ func (t *transaction) Get(ctx context.Context, collection string, id string) (*D
 		return nil, errors.New(errors.NotFound, "%s not found", id)
 	}
 	return doc, nil
+}
+
+func (t *transaction) Cmd(ctx context.Context, cmd TxCmd) (TxResponse, error) {
+	switch {
+	case cmd.Query != nil:
+		results, err := t.Query(ctx, cmd.Query.Collection, cmd.Query.Query)
+		if err != nil {
+			return TxResponse{}, err
+		}
+		return TxResponse{
+			Query: results,
+		}, nil
+	case cmd.Create != nil:
+		_, err := t.Create(ctx, cmd.Create.Collection, cmd.Create.Document)
+		if err != nil {
+			return TxResponse{}, err
+		}
+		return TxResponse{
+			Create: cmd.Create.Document,
+		}, nil
+	case cmd.Set != nil:
+		err := t.Set(ctx, cmd.Set.Collection, cmd.Set.Document)
+		if err != nil {
+			return TxResponse{}, err
+		}
+		return TxResponse{
+			Set: cmd.Set.Document,
+		}, nil
+	case cmd.Delete != nil:
+		err := t.Delete(ctx, cmd.Delete.Collection, cmd.Delete.ID)
+		if err != nil {
+			return TxResponse{}, err
+		}
+		return TxResponse{
+			Delete: &struct{}{},
+		}, nil
+	case cmd.Get != nil:
+		doc, err := t.Get(ctx, cmd.Get.Collection, cmd.Get.ID)
+		if err != nil {
+			return TxResponse{}, err
+		}
+		return TxResponse{
+			Get: doc,
+		}, nil
+	case cmd.Update != nil:
+		err := t.Update(ctx, cmd.Update.Collection, cmd.Update.ID, cmd.Update.Update)
+		if err != nil {
+			return TxResponse{}, err
+		}
+		doc, err := t.Get(ctx, cmd.Update.Collection, cmd.Update.ID)
+		if err != nil {
+			return TxResponse{}, err
+		}
+		return TxResponse{
+			Update: doc,
+		}, nil
+	}
+	return TxResponse{}, errors.New(errors.Validation, "tx: unsupported command")
 }
 
 // aggregate performs aggregations against the collection

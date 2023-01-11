@@ -17,7 +17,7 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-func (t *transaction) updateDocument(ctx context.Context, c CollectionSchema, docID string, before *Document, command *Command) error {
+func (t *transaction) updateDocument(ctx context.Context, c CollectionSchema, docID string, before *Document, command *persistCommand) error {
 	if before == nil {
 		return errors.New(errors.Internal, "tx: updateDocument - empty before value")
 	}
@@ -56,7 +56,7 @@ func (t *transaction) deleteDocument(ctx context.Context, c CollectionSchema, do
 	return nil
 }
 
-func (t *transaction) createDocument(ctx context.Context, c CollectionSchema, command *Command) error {
+func (t *transaction) createDocument(ctx context.Context, c CollectionSchema, command *persistCommand) error {
 	primaryIndex := c.PrimaryIndex()
 	docID := c.GetPrimaryKey(command.Document)
 	if err := c.SetPrimaryKey(command.Document, docID); err != nil {
@@ -73,7 +73,7 @@ func (t *transaction) createDocument(ctx context.Context, c CollectionSchema, co
 	return nil
 }
 
-func (t *transaction) setDocument(ctx context.Context, c CollectionSchema, docID string, command *Command) error {
+func (t *transaction) setDocument(ctx context.Context, c CollectionSchema, docID string, command *persistCommand) error {
 	if docID == "" {
 		return errors.New(errors.Validation, "tx: set command - empty document id")
 	}
@@ -89,7 +89,7 @@ func (t *transaction) setDocument(ctx context.Context, c CollectionSchema, docID
 	return nil
 }
 
-func (t *transaction) persistCommand(ctx context.Context, command *Command) error {
+func (t *transaction) persistCommand(ctx context.Context, command *persistCommand) error {
 
 	c := t.db.GetSchema(ctx, command.Collection)
 	if c == nil {
@@ -175,7 +175,7 @@ func (t *transaction) persistCommand(ctx context.Context, command *Command) erro
 
 		if t.db.persistCDC {
 			ctx = context.WithValue(ctx, internalKey, true)
-			if err := t.persistCommand(ctx, &Command{
+			if err := t.persistCommand(ctx, &persistCommand{
 				Collection: "cdc",
 				Action:     Create,
 				Document:   cdcDoc,
@@ -190,7 +190,7 @@ func (t *transaction) persistCommand(ctx context.Context, command *Command) erro
 	return nil
 }
 
-func (t *transaction) cascadeDelete(ctx context.Context, schema CollectionSchema, command *Command) error {
+func (t *transaction) cascadeDelete(ctx context.Context, schema CollectionSchema, command *persistCommand) error {
 	configs, err := t.db.getCollectionConfigs(ctx)
 	if err != nil {
 		return err
@@ -230,7 +230,7 @@ func (t *transaction) cascadeDelete(ctx context.Context, schema CollectionSchema
 	return nil
 }
 
-func (t *transaction) updateSecondaryIndex(ctx context.Context, schema CollectionSchema, idx Index, docID string, before *Document, command *Command) error {
+func (t *transaction) updateSecondaryIndex(ctx context.Context, schema CollectionSchema, idx Index, docID string, before *Document, command *persistCommand) error {
 	if idx.Primary {
 		return nil
 	}
@@ -442,7 +442,7 @@ func (t *transaction) queryScan(ctx context.Context, collection string, where []
 	return explain, nil
 }
 
-func (t *transaction) applyCommandTriggers(ctx context.Context, c CollectionSchema, command *Command) error {
+func (t *transaction) applyCommandTriggers(ctx context.Context, c CollectionSchema, command *persistCommand) error {
 	runTrigger := func(trigger Trigger) error {
 		if err := t.vm.Set("tx", t); err != nil {
 			return err

@@ -127,4 +127,94 @@ func TestTx(t *testing.T) {
 			}))
 		}))
 	})
+	t.Run("cmd - no cmds", func(t *testing.T) {
+		assert.Nil(t, testutil.TestDB(func(ctx context.Context, db myjson.Database) {
+			assert.Nil(t, db.Tx(ctx, kv.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx myjson.Tx) error {
+				_, err := tx.Cmd(ctx, myjson.TxCmd{
+					Create: nil,
+					Get:    nil,
+					Set:    nil,
+					Update: nil,
+					Delete: nil,
+					Query:  nil,
+				})
+				assert.Error(t, err)
+				return nil
+			}))
+		}))
+	})
+	t.Run("cmd - set then get", func(t *testing.T) {
+		assert.Nil(t, testutil.TestDB(func(ctx context.Context, db myjson.Database) {
+			assert.Nil(t, db.Tx(ctx, kv.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx myjson.Tx) error {
+				result, err := tx.Cmd(ctx, myjson.TxCmd{
+					Set: &myjson.SetCmd{Collection: "user", Document: testutil.NewUserDoc()},
+				})
+				assert.NoError(t, err)
+				result2, err := tx.Cmd(ctx, myjson.TxCmd{
+					Get: &myjson.GetCmd{Collection: "user", ID: result.Set.GetString("_id")},
+				})
+				assert.NoError(t, err)
+				assert.JSONEq(t, result.Set.String(), result2.Get.String())
+				return nil
+			}))
+		}))
+	})
+	t.Run("cmd - set then update then get", func(t *testing.T) {
+		assert.Nil(t, testutil.TestDB(func(ctx context.Context, db myjson.Database) {
+			assert.Nil(t, db.Tx(ctx, kv.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx myjson.Tx) error {
+				result, err := tx.Cmd(ctx, myjson.TxCmd{
+					Set: &myjson.SetCmd{Collection: "user", Document: testutil.NewUserDoc()},
+				})
+				assert.NoError(t, err)
+				id := result.Set.GetString("_id")
+				result2, err := tx.Cmd(ctx, myjson.TxCmd{
+					Update: &myjson.UpdateCmd{
+						Collection: "user",
+						ID:         id,
+						Update: map[string]any{
+							"age": 20,
+						},
+					},
+				})
+				assert.NoError(t, err)
+				result3, err := tx.Cmd(ctx, myjson.TxCmd{
+					Get: &myjson.GetCmd{Collection: "user", ID: id},
+				})
+				assert.NoError(t, err)
+				assert.JSONEq(t, result2.Update.String(), result3.Get.String())
+				return nil
+			}))
+		}))
+	})
+	t.Run("cmd - set then delete", func(t *testing.T) {
+		assert.Nil(t, testutil.TestDB(func(ctx context.Context, db myjson.Database) {
+			assert.Nil(t, db.Tx(ctx, kv.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx myjson.Tx) error {
+				result, err := tx.Cmd(ctx, myjson.TxCmd{
+					Set: &myjson.SetCmd{Collection: "user", Document: testutil.NewUserDoc()},
+				})
+				assert.NoError(t, err)
+				id := result.Set.GetString("_id")
+				_, err = tx.Cmd(ctx, myjson.TxCmd{
+					Delete: &myjson.DeleteCmd{
+						Collection: "user",
+						ID:         id,
+					},
+				})
+				assert.NoError(t, err)
+				return nil
+			}))
+		}))
+	})
+	t.Run("cmd - query accounts", func(t *testing.T) {
+		assert.Nil(t, testutil.TestDB(func(ctx context.Context, db myjson.Database) {
+			assert.Nil(t, db.Tx(ctx, kv.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx myjson.Tx) error {
+				results, err := tx.Cmd(ctx, myjson.TxCmd{
+					Query: &myjson.QueryCmd{Collection: "account", Query: myjson.Query{}},
+				})
+				assert.NoError(t, err)
+				assert.NotEqual(t, 0, len(results.Query.Documents))
+				return nil
+			}))
+		}))
+	})
 }
