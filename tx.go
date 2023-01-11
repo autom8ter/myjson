@@ -188,7 +188,7 @@ func (t *transaction) Query(ctx context.Context, collection string, query Query)
 		Count:     len(results),
 		Stats: PageStats{
 			ExecutionTime: time.Since(now),
-			Explain:       match,
+			Explain:       &match,
 		},
 	}, nil
 }
@@ -260,7 +260,7 @@ func (t *transaction) aggregate(ctx context.Context, collection string, query Qu
 		Count:     len(reduced),
 		Stats: PageStats{
 			ExecutionTime: time.Since(now),
-			Explain:       match,
+			Explain:       &match,
 		},
 	}, nil
 }

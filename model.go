@@ -300,7 +300,7 @@ type PageStats struct {
 	// ExecutionTime is the execution time to get the page
 	ExecutionTime time.Duration `json:"execution_time,omitempty"`
 	// Explain is the optimizer's output for the query that returned a page
-	Explain Explain `json:"explain,omitempty"`
+	Explain *Explain `json:"explain,omitempty"`
 }
 
 // Explain is the optimizer's output for a query

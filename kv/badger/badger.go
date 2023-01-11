@@ -61,9 +61,19 @@ func (b *badgerKV) Tx(opts kv.TxOpts, fn func(kv.Tx) error) error {
 
 func (b *badgerKV) NewTx(opts kv.TxOpts) (kv.Tx, error) {
 	if opts.IsBatch {
-		return &badgerTx{batch: b.db.NewWriteBatch(), db: b, machine: b.machine}, nil
+		return &badgerTx{
+			opts:    opts,
+			batch:   b.db.NewWriteBatch(),
+			db:      b,
+			machine: b.machine,
+		}, nil
 	}
-	return &badgerTx{txn: b.db.NewTransaction(!opts.IsReadOnly), db: b, machine: b.machine}, nil
+	return &badgerTx{
+		opts:    opts,
+		txn:     b.db.NewTransaction(!opts.IsReadOnly),
+		db:      b,
+		machine: b.machine,
+	}, nil
 }
 
 func (b *badgerKV) Close(ctx context.Context) error {
