@@ -37,10 +37,34 @@ func Test(t *testing.T) {
 			}))
 			u, err := db.Get(ctx, "user", id)
 			assert.NoError(t, err)
-			fmt.Println(u.Get("timestamp"))
+
 			assert.NotNil(t, u)
 			assert.Equal(t, id, u.GetString("_id"))
 		}))
+	})
+	t.Run("create then set", func(t *testing.T) {
+		assert.Nil(t, testutil.TestDB(func(ctx context.Context, db myjson.Database) {
+			var (
+				id  string
+				err error
+			)
+			assert.Nil(t, db.Tx(ctx, kv.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx myjson.Tx) error {
+				id, err = tx.Create(ctx, "account", myjson.D().Set(map[string]any{
+					"name": gofakeit.Company(),
+				}).Doc())
+				assert.NoError(t, err)
+				_, err := tx.Get(ctx, "account", id)
+				return err
+			}))
+			u, err := db.Get(ctx, "account", id)
+			assert.NoError(t, err)
+			assert.NotNil(t, u)
+			assert.Equal(t, id, u.GetString("_id"))
+			assert.Nil(t, db.Tx(ctx, kv.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx myjson.Tx) error {
+				err = tx.Set(ctx, "account", u)
+				return err
+			}))
+		}), myjson.WithPersistCDC(true))
 	})
 	t.Run("batch create", func(t *testing.T) {
 		assert.Nil(t, testutil.TestDB(func(ctx context.Context, db myjson.Database) {
@@ -55,7 +79,7 @@ func Test(t *testing.T) {
 			}))
 			u, err := db.Get(ctx, "user", id)
 			assert.NoError(t, err)
-			fmt.Println(u.Get("timestamp"))
+
 			assert.NotNil(t, u)
 			assert.Equal(t, id, u.GetString("_id"))
 		}))

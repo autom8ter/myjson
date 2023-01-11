@@ -5,7 +5,6 @@ required:
   - _id
   - collection
   - action
-  - diff
 properties:
   _id:
     type: string

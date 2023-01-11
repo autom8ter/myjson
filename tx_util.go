@@ -165,6 +165,9 @@ func (t *transaction) persistCommand(ctx context.Context, command *Command) erro
 			Metadata:   command.Metadata,
 			Diff:       command.Document.Diff(before),
 		}
+		if cdc.Diff == nil {
+			cdc.Diff = []JSONFieldOp{}
+		}
 		cdcDoc, err := NewDocumentFrom(&cdc)
 		if err != nil {
 			return errors.Wrap(err, errors.Internal, "failed to persist cdc")

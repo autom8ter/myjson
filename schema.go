@@ -273,11 +273,11 @@ func (c *collectionSchema) ValidateDocument(ctx context.Context, doc *Document) 
 	}
 
 	if kerrs != nil && len(kerrs.Errors()) > 0 {
-		errmsg := ""
+		var errmsgs []string
 		for _, kerr := range kerrs.Errors() {
-			errmsg += fmt.Sprintln(kerr)
+			errmsgs = append(errmsgs, fmt.Sprintf("%s: %s", kerr.Field(), kerr.Description()))
 		}
-		return errors.New(errors.Validation, "%v: document validation error - %s", c.collection, errmsg)
+		return errors.New(errors.Validation, "%v: document validation error - %s", c.collection, strings.Join(errmsgs, ", "))
 	}
 	if !kerrs.Valid() {
 		return errors.New(errors.Validation, "%v: invalid document: %s", c.collection, doc.String())

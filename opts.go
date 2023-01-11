@@ -17,7 +17,8 @@ func WithJavascriptOverrides(overrides map[string]any) DBOpt {
 	}
 }
 
-// WithPersistCDC configures the database to persist all change-data-capture entries so that features like time-travel are possible
+// WithPersistCDC configures the database to persist all change-data-capture entries so that features like time-travel and
+// change streaming are possible
 func WithPersistCDC(persist bool) DBOpt {
 	return func(d *defaultDB) {
 		d.persistCDC = persist

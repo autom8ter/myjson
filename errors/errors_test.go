@@ -37,7 +37,7 @@ func TestErrors(t *testing.T) {
 	t.Run("error json string", func(t *testing.T) {
 		err := errors.New(0, "not found")
 		err = errors.Wrap(err, errors.NotFound, "")
-		e := errors.Extract(err).RemoveError()
-		assert.JSONEq(t, `{ "code":404, "messages": ["not found"]}`, e.Error())
+		e := errors.Extract(err)
+		assert.JSONEq(t, `{ "code":404, "err": "not found"}`, e.Error())
 	})
 }

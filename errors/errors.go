@@ -20,7 +20,7 @@ const (
 // Error is a custom error
 type Error struct {
 	Code     Code     `json:"code"`
-	Messages []string `json:"messages"`
+	Messages []string `json:"messages,omitempty"`
 	Err      string   `json:"err,omitempty"`
 }
 
@@ -58,9 +58,7 @@ func Extract(err error) *Error {
 func New(code Code, msg string, args ...any) error {
 	e := &Error{
 		Code: code,
-	}
-	if msg != "" {
-		e.Messages = append(e.Messages, fmt.Sprintf(msg, args...))
+		Err:  fmt.Sprintf(msg, args...),
 	}
 	return e
 }
