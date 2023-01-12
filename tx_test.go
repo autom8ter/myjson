@@ -97,9 +97,8 @@ func TestTx(t *testing.T) {
 	t.Run("set 10 then check cdc", func(t *testing.T) {
 		assert.Nil(t, testutil.TestDB(func(ctx context.Context, db myjson.Database) {
 			assert.Nil(t, db.Tx(ctx, kv.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx myjson.Tx) error {
-				md := myjson.NewMetadata(map[string]any{
-					"testing": true,
-				})
+				md := myjson.NewMetadata()
+				md.Set("testing", true)
 				var usrs = map[string]*myjson.Document{}
 				for i := 0; i < 10; i++ {
 					doc := testutil.NewUserDoc()
@@ -111,7 +110,7 @@ func TestTx(t *testing.T) {
 					assert.EqualValues(t, doc.Get("_id"), tx.CDC()[i].DocumentID)
 					assert.NotEmpty(t, tx.CDC()[i].Metadata)
 					assert.NotEmpty(t, tx.CDC()[i].Diff)
-					v, _ := tx.CDC()[i].Metadata.Get("testing")
+					v := tx.CDC()[i].Metadata.Get("testing")
 					assert.Equal(t, true, v)
 				}
 				assert.Equal(t, 10, len(tx.CDC()))

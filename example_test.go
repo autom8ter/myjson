@@ -73,7 +73,7 @@ func ExampleQ() {
 
 func ExampleNewMetadata() {
 	var orgID = "123"
-	md := myjson.NewMetadata(map[string]any{})
+	md := myjson.NewMetadata()
 	md.SetNamespace(orgID)
 	bytes, _ := md.MarshalJSON()
 	fmt.Println(string(bytes))

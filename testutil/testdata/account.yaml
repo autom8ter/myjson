@@ -12,4 +12,7 @@ properties:
     type: string
     description: The accounts's name.
 x-auth:
-  
+  read:
+    matchers:
+      
+      doc.get('_id') == meta.get('account_id')
