@@ -33,6 +33,7 @@ type CollectionSchema interface {
 	Triggers() []Trigger
 	// IsReadOnly returns whether the collection is read only
 	IsReadOnly() bool
+	Policies() []string
 	// MarshalYAML returns the collection schema as yaml bytes
 	MarshalYAML() ([]byte, error)
 	// UnmarshalYAML refreshes the collection schema with the given json bytes

@@ -26,6 +26,7 @@ type collectionSchema struct {
 	triggers      []Trigger
 	readOnly      bool
 	mu            sync.RWMutex
+	policies      []string
 }
 
 type schemaPath string
@@ -40,6 +41,7 @@ const (
 	triggersPath     schemaPath = "x-triggers"
 	readOnlyPath     schemaPath = "x-read-only"
 	refPrefix                   = "common."
+	policiesPath     schemaPath = "x-policies"
 )
 
 func newCollectionSchema(yamlContent []byte) (CollectionSchema, error) {
@@ -99,6 +101,7 @@ func newCollectionSchema(yamlContent []byte) (CollectionSchema, error) {
 	if required := cast.ToStringSlice(s.raw.Get("required").Value()); !lo.Contains(required, s.PrimaryKey()) {
 		return nil, errors.New(errors.Validation, "primary key is required: %s %v %v", s.Collection(), required, s.PrimaryIndex())
 	}
+	s.policies = cast.ToStringSlice(s.raw.Get(string(policiesPath)).Value())
 	return s, nil
 }
 
@@ -217,6 +220,7 @@ func (c *collectionSchema) refreshSchema(jsonContent []byte) error {
 	c.propertyPaths = newSchema.propertyPaths
 	c.properties = newSchema.properties
 	c.readOnly = newSchema.readOnly
+	c.policies = newSchema.policies
 	return nil
 }
 
@@ -341,4 +345,10 @@ func (c *collectionSchema) IsReadOnly() bool {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	return c.readOnly
+}
+
+func (c *collectionSchema) Policies() []string {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.policies
 }
