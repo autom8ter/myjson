@@ -26,7 +26,7 @@ type collectionSchema struct {
 	triggers      []Trigger
 	readOnly      bool
 	mu            sync.RWMutex
-	policies      []string
+	authz         Authz
 }
 
 type schemaPath string
@@ -41,7 +41,7 @@ const (
 	triggersPath     schemaPath = "x-triggers"
 	readOnlyPath     schemaPath = "x-read-only"
 	refPrefix                   = "common."
-	policiesPath     schemaPath = "x-policies"
+	authzPath        schemaPath = "x-authz"
 )
 
 func newCollectionSchema(yamlContent []byte) (CollectionSchema, error) {
@@ -101,7 +101,14 @@ func newCollectionSchema(yamlContent []byte) (CollectionSchema, error) {
 	if required := cast.ToStringSlice(s.raw.Get("required").Value()); !lo.Contains(required, s.PrimaryKey()) {
 		return nil, errors.New(errors.Validation, "primary key is required: %s %v %v", s.Collection(), required, s.PrimaryIndex())
 	}
-	s.policies = cast.ToStringSlice(s.raw.Get(string(policiesPath)).Value())
+	if authz := s.raw.Get(string(authzPath)); authz.Exists() {
+		if err := util.Decode(authz.Value(), &s.authz); err != nil {
+			return nil, errors.Wrap(err, errors.Validation, "invalid x-authz")
+		}
+		if err := util.ValidateStruct(s.authz); err != nil {
+			return nil, errors.Wrap(err, errors.Validation, "invalid x-authz")
+		}
+	}
 	return s, nil
 }
 
@@ -220,7 +227,7 @@ func (c *collectionSchema) refreshSchema(jsonContent []byte) error {
 	c.propertyPaths = newSchema.propertyPaths
 	c.properties = newSchema.properties
 	c.readOnly = newSchema.readOnly
-	c.policies = newSchema.policies
+	c.authz = newSchema.authz
 	return nil
 }
 
@@ -347,8 +354,8 @@ func (c *collectionSchema) IsReadOnly() bool {
 	return c.readOnly
 }
 
-func (c *collectionSchema) Policies() []string {
+func (c *collectionSchema) Authz() Authz {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	return c.policies
+	return c.authz
 }

@@ -12,12 +12,40 @@ properties:
     type: string
     description: The accounts's name.
 x-authz:
-  read:
-    matchers:
-      doc.get('_id') == meta.get('account_id') || meta.get('is_super_user')
-  write:
-    matchers:
-      doc.get('_id') == meta.get('account_id') || meta.get('is_super_user')
-  query:
-    matchers:
-      query.where[0].field == '_id' && query.where[0].value == meta.get('account_id') || meta.get('is_super_user')
+  rules:
+    ## allow super users to do anything
+    - effect: allow
+      action:
+      - "*"
+      match: |
+        meta.get('is_super_user')
+
+      ## dont allow read-only users to create/update/delete/set accounts
+    - effect: deny
+      action:
+        - create
+        - update
+        - delete
+        - set
+      match: |
+        meta.get('role') == 'read-only'
+
+      ## only allow users to update their own account
+    - effect: allow
+      action:
+        - create
+        - update
+        - delete
+        - set
+
+      match: |
+        doc.get('_id') == meta.get('account_id')
+
+      ## only allow users to query their own account
+    - effect: allow
+      action:
+        - query
+        - forEach
+
+      match: |
+        query.where[0].field == '_id' && query.where[0].value == meta.get('account_id')
