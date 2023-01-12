@@ -432,6 +432,10 @@ type TxCmd struct {
 	Delete *DeleteCmd `json:"delete,omitempty"`
 	// Query is a query command
 	Query *QueryCmd `json:"query,omitempty"`
+	// Commit is a commit command - it ends the transaction
+	Commit *CommitCmd `json:"commit,omitempty"`
+	// Rollback is a rollback command - it ends the transaction
+	Rollback *RollbackCmd `json:"rollback,omitempty"`
 }
 
 // TxResponse is a serializable transaction response
@@ -447,7 +451,13 @@ type TxResponse struct {
 	// Delete is an empty delete response
 	Delete *struct{} `json:"delete,omitempty"`
 	// Query is a query response - it contains the documents returned from the query
-	Query Page `json:"page,omitempty"`
+	Query *Page `json:"page,omitempty"`
+	// Commit is an empty commit response
+	Commit *struct{} `json:"commit,omitempty"`
+	// Rollback is an empty rollback response
+	Rollback *struct{} `json:"rollback,omitempty"`
+	// Error is an error response if an error was encountered
+	Error *errors.Error `json:"error,omitempty"`
 }
 
 // DeleteCmd is a serializable delete command
@@ -499,3 +509,9 @@ type QueryCmd struct {
 	// Query is the query to execute
 	Query Query `json:"query,omitempty"`
 }
+
+// RollbackCmd is a serializable rollback command
+type RollbackCmd struct{}
+
+// CommitCmd is a serializable commit command
+type CommitCmd struct{}

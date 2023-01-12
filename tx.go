@@ -218,62 +218,72 @@ func (t *transaction) Get(ctx context.Context, collection string, id string) (*D
 	return doc, nil
 }
 
-func (t *transaction) Cmd(ctx context.Context, cmd TxCmd) (TxResponse, error) {
+func (t *transaction) Cmd(ctx context.Context, cmd TxCmd) TxResponse {
 	switch {
+	case cmd.Commit != nil:
+		if err := t.Commit(ctx); err != nil {
+			return TxResponse{Commit: &struct{}{}, Error: errors.Extract(err)}
+		}
+		return TxResponse{Commit: &struct{}{}}
+	case cmd.Rollback != nil:
+		if err := t.Rollback(ctx); err != nil {
+			return TxResponse{Rollback: &struct{}{}, Error: errors.Extract(err)}
+		}
+		return TxResponse{Rollback: &struct{}{}}
 	case cmd.Query != nil:
 		results, err := t.Query(ctx, cmd.Query.Collection, cmd.Query.Query)
 		if err != nil {
-			return TxResponse{}, err
+			return TxResponse{Error: errors.Extract(err)}
 		}
 		return TxResponse{
-			Query: results,
-		}, nil
+			Query: &results,
+		}
 	case cmd.Create != nil:
 		_, err := t.Create(ctx, cmd.Create.Collection, cmd.Create.Document)
 		if err != nil {
-			return TxResponse{}, err
+			return TxResponse{Error: errors.Extract(err)}
 		}
 		return TxResponse{
 			Create: cmd.Create.Document,
-		}, nil
+		}
 	case cmd.Set != nil:
 		err := t.Set(ctx, cmd.Set.Collection, cmd.Set.Document)
 		if err != nil {
-			return TxResponse{}, err
+			return TxResponse{Error: errors.Extract(err)}
 		}
 		return TxResponse{
 			Set: cmd.Set.Document,
-		}, nil
+		}
 	case cmd.Delete != nil:
 		err := t.Delete(ctx, cmd.Delete.Collection, cmd.Delete.ID)
 		if err != nil {
-			return TxResponse{}, err
+			return TxResponse{Error: errors.Extract(err)}
 		}
 		return TxResponse{
 			Delete: &struct{}{},
-		}, nil
+		}
 	case cmd.Get != nil:
 		doc, err := t.Get(ctx, cmd.Get.Collection, cmd.Get.ID)
 		if err != nil {
-			return TxResponse{}, err
+			return TxResponse{Error: errors.Extract(err)}
 		}
 		return TxResponse{
 			Get: doc,
-		}, nil
+		}
 	case cmd.Update != nil:
 		err := t.Update(ctx, cmd.Update.Collection, cmd.Update.ID, cmd.Update.Update)
 		if err != nil {
-			return TxResponse{}, err
+			return TxResponse{Error: errors.Extract(err)}
 		}
 		doc, err := t.Get(ctx, cmd.Update.Collection, cmd.Update.ID)
 		if err != nil {
-			return TxResponse{}, err
+			return TxResponse{Error: errors.Extract(err)}
 		}
 		return TxResponse{
 			Update: doc,
-		}, nil
+		}
 	}
-	return TxResponse{}, errors.New(errors.Validation, "tx: unsupported command")
+	return TxResponse{Error: errors.Extract(errors.New(errors.Validation, "tx: unsupported command"))}
 }
 
 // aggregate performs aggregations against the collection

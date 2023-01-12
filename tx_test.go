@@ -129,7 +129,7 @@ func TestTx(t *testing.T) {
 	t.Run("cmd - no cmds", func(t *testing.T) {
 		assert.Nil(t, testutil.TestDB(func(ctx context.Context, db myjson.Database) {
 			assert.Nil(t, db.Tx(ctx, kv.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx myjson.Tx) error {
-				_, err := tx.Cmd(ctx, myjson.TxCmd{
+				result := tx.Cmd(ctx, myjson.TxCmd{
 					Create: nil,
 					Get:    nil,
 					Set:    nil,
@@ -137,7 +137,7 @@ func TestTx(t *testing.T) {
 					Delete: nil,
 					Query:  nil,
 				})
-				assert.Error(t, err)
+				assert.Error(t, result.Error)
 				return nil
 			}))
 		}))
@@ -145,14 +145,14 @@ func TestTx(t *testing.T) {
 	t.Run("cmd - set then get", func(t *testing.T) {
 		assert.Nil(t, testutil.TestDB(func(ctx context.Context, db myjson.Database) {
 			assert.Nil(t, db.Tx(ctx, kv.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx myjson.Tx) error {
-				result, err := tx.Cmd(ctx, myjson.TxCmd{
+				result := tx.Cmd(ctx, myjson.TxCmd{
 					Set: &myjson.SetCmd{Collection: "user", Document: testutil.NewUserDoc()},
 				})
-				assert.NoError(t, err)
-				result2, err := tx.Cmd(ctx, myjson.TxCmd{
+				assert.Nil(t, result.Error)
+				result2 := tx.Cmd(ctx, myjson.TxCmd{
 					Get: &myjson.GetCmd{Collection: "user", ID: result.Set.GetString("_id")},
 				})
-				assert.NoError(t, err)
+				assert.Nil(t, result2.Error)
 				assert.JSONEq(t, result.Set.String(), result2.Get.String())
 				return nil
 			}))
@@ -161,12 +161,12 @@ func TestTx(t *testing.T) {
 	t.Run("cmd - set then update then get", func(t *testing.T) {
 		assert.Nil(t, testutil.TestDB(func(ctx context.Context, db myjson.Database) {
 			assert.Nil(t, db.Tx(ctx, kv.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx myjson.Tx) error {
-				result, err := tx.Cmd(ctx, myjson.TxCmd{
+				result := tx.Cmd(ctx, myjson.TxCmd{
 					Set: &myjson.SetCmd{Collection: "user", Document: testutil.NewUserDoc()},
 				})
-				assert.NoError(t, err)
+				assert.Nil(t, result.Error)
 				id := result.Set.GetString("_id")
-				result2, err := tx.Cmd(ctx, myjson.TxCmd{
+				result2 := tx.Cmd(ctx, myjson.TxCmd{
 					Update: &myjson.UpdateCmd{
 						Collection: "user",
 						ID:         id,
@@ -175,11 +175,11 @@ func TestTx(t *testing.T) {
 						},
 					},
 				})
-				assert.NoError(t, err)
-				result3, err := tx.Cmd(ctx, myjson.TxCmd{
+				assert.Nil(t, result2.Error)
+				result3 := tx.Cmd(ctx, myjson.TxCmd{
 					Get: &myjson.GetCmd{Collection: "user", ID: id},
 				})
-				assert.NoError(t, err)
+				assert.Nil(t, result3.Error)
 				assert.JSONEq(t, result2.Update.String(), result3.Get.String())
 				return nil
 			}))
@@ -188,18 +188,18 @@ func TestTx(t *testing.T) {
 	t.Run("cmd - set then delete", func(t *testing.T) {
 		assert.Nil(t, testutil.TestDB(func(ctx context.Context, db myjson.Database) {
 			assert.Nil(t, db.Tx(ctx, kv.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx myjson.Tx) error {
-				result, err := tx.Cmd(ctx, myjson.TxCmd{
+				result := tx.Cmd(ctx, myjson.TxCmd{
 					Set: &myjson.SetCmd{Collection: "user", Document: testutil.NewUserDoc()},
 				})
-				assert.NoError(t, err)
+				assert.Nil(t, result.Error)
 				id := result.Set.GetString("_id")
-				_, err = tx.Cmd(ctx, myjson.TxCmd{
+				result = tx.Cmd(ctx, myjson.TxCmd{
 					Delete: &myjson.DeleteCmd{
 						Collection: "user",
 						ID:         id,
 					},
 				})
-				assert.NoError(t, err)
+				assert.Nil(t, result.Error)
 				return nil
 			}))
 		}))
@@ -207,11 +207,11 @@ func TestTx(t *testing.T) {
 	t.Run("cmd - query accounts", func(t *testing.T) {
 		assert.Nil(t, testutil.TestDB(func(ctx context.Context, db myjson.Database) {
 			assert.Nil(t, db.Tx(ctx, kv.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx myjson.Tx) error {
-				results, err := tx.Cmd(ctx, myjson.TxCmd{
+				result := tx.Cmd(ctx, myjson.TxCmd{
 					Query: &myjson.QueryCmd{Collection: "account", Query: myjson.Query{}},
 				})
-				assert.NoError(t, err)
-				assert.NotEqual(t, 0, len(results.Query.Documents))
+				assert.Nil(t, result.Error)
+				assert.NotEqual(t, 0, len(result.Query.Documents))
 				return nil
 			}))
 		}))

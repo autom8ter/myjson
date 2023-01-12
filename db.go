@@ -66,7 +66,7 @@ func Open(ctx context.Context, provider string, providerParams map[string]any, o
 	go func() {
 		ctx, cancel := context.WithCancel(ctx)
 		defer cancel()
-		ticker := time.NewTicker(5 * time.Second)
+		ticker := time.NewTicker(3 * time.Second)
 		defer ticker.Stop()
 		for {
 			select {

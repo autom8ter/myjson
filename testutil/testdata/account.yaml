@@ -11,8 +11,13 @@ properties:
   name:
     type: string
     description: The accounts's name.
-x-auth:
+x-authz:
   read:
     matchers:
-      
-      doc.get('_id') == meta.get('account_id')
+      doc.get('_id') == meta.get('account_id') || meta.get('is_super_user')
+  write:
+    matchers:
+      doc.get('_id') == meta.get('account_id') || meta.get('is_super_user')
+  query:
+    matchers:
+      query.where[0].field == '_id' && query.where[0].value == meta.get('account_id') || meta.get('is_super_user')
