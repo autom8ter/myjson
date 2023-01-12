@@ -11,3 +11,5 @@ properties:
   name:
     type: string
     description: The accounts's name.
+x-auth:
+  
