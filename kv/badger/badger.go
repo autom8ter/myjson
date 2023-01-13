@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/autom8ter/machine/v4"
+	"github.com/autom8ter/myjson/errors"
 	"github.com/autom8ter/myjson/kv"
 	"github.com/autom8ter/myjson/kv/registry"
 	"github.com/dgraph-io/badger/v3"
@@ -77,6 +78,7 @@ func (b *badgerKV) NewTx(opts kv.TxOpts) (kv.Tx, error) {
 }
 
 func (b *badgerKV) Close(ctx context.Context) error {
+	b.machine.Close()
 	if err := b.db.Sync(); err != nil {
 		return err
 	}
@@ -100,9 +102,12 @@ func (b *badgerKV) NewLocker(key []byte, leaseInterval time.Duration) (kv.Locker
 
 func (b *badgerKV) ChangeStream(ctx context.Context, prefix []byte, fn kv.ChangeStreamHandler) error {
 	return b.machine.Subscribe(ctx, "*", func(ctx context.Context, msg machine.Message) (bool, error) {
-		cdc := msg.Body.(kv.CDC)
+		cdc, ok := msg.Body.(kv.CDC)
+		if !ok {
+			return false, errors.New(errors.Internal, "invalid cdc")
+		}
 		if bytes.HasPrefix(cdc.Key, prefix) {
-			return fn(msg.Body.(kv.CDC))
+			return fn(cdc)
 		}
 		return true, nil
 	})

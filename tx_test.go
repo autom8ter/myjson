@@ -97,12 +97,11 @@ func TestTx(t *testing.T) {
 	t.Run("set 10 then check cdc", func(t *testing.T) {
 		assert.Nil(t, testutil.TestDB(func(ctx context.Context, db myjson.Database) {
 			assert.Nil(t, db.Tx(ctx, kv.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx myjson.Tx) error {
-				md := myjson.NewMetadata()
-				md.Set("testing", true)
+				ctx = myjson.SetMetadataValues(ctx, map[string]any{"testing": true})
 				var usrs = map[string]*myjson.Document{}
 				for i := 0; i < 10; i++ {
 					doc := testutil.NewUserDoc()
-					err := tx.Set(md.ToContext(ctx), "user", doc)
+					err := tx.Set(ctx, "user", doc)
 					assert.NoError(t, err)
 					usrs[doc.GetString("_id")] = doc
 					assert.Equal(t, "user", tx.CDC()[i].Collection)

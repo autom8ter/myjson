@@ -10,8 +10,6 @@ import (
 	// import embed package
 	_ "embed"
 
-	_ "embed"
-
 	"github.com/brianvoe/gofakeit/v6"
 	"github.com/stretchr/testify/assert"
 )
@@ -211,7 +209,6 @@ func TestUtil(t *testing.T) {
 				Direction: OrderByDirectionDesc,
 			},
 		})
-		fmt.Println(util.PrettyJSONString(docs))
 		docs.ForEach(func(next *Document, i int) {
 			if len(docs) > i+1 {
 				assert.LessOrEqual(t, next.GetFloat("account_id"), docs[i+1].GetFloat("account_id"), i)
@@ -238,7 +235,6 @@ func TestUtil(t *testing.T) {
 				Direction: OrderByDirectionDesc,
 			},
 		})
-		fmt.Println(util.PrettyJSONString(docs))
 		docs.ForEach(func(next *Document, i int) {
 			if len(docs) > i+1 {
 				assert.LessOrEqual(t, next.GetFloat("account_id"), docs[i+1].GetFloat("account_id"), i)

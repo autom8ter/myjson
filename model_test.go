@@ -142,16 +142,13 @@ func TestQuery(t *testing.T) {
 
 func TestMetadataContext(t *testing.T) {
 	ctx := context.Background()
-	c, ok := GetMetadata(ctx)
-	assert.False(t, ok)
+	assert.Equal(t, "default", GetMetadataValue(ctx, "namespace"))
+	c := ExtractMetadata(ctx)
 	assert.NotNil(t, c)
-	c = NewMetadata()
+	assert.Equal(t, "default", c.GetString("namespace"))
 	c.Set("testing", true)
-	ctx = c.ToContext(ctx)
-	c, ok = GetMetadata(ctx)
-	assert.True(t, ok)
 	assert.NotNil(t, c)
 
-	c.SetNamespace("acme.com")
-	assert.Equal(t, "acme.com", c.GetNamespace())
+	c.Set("namespace", "acme.com")
+	assert.Equal(t, "acme.com", c.GetString("namespace"))
 }

@@ -173,46 +173,42 @@ const (
 	metadataKey ctxKey = 0
 )
 
-// Metadata holds a json document associated with a go Context
-type Metadata struct {
-	*Document
-}
-
-// SetNamespace sets the namespace on the context metadata
-// Data belonging to different namespaces are stored/indexed separately, though collections exist across namespaces
-func (m *Metadata) SetNamespace(value string) {
-	m.SetAll(map[string]any{
-		"namespace": value,
-	})
-}
-
-// GetNamespace gets the namespace from the metadata, or 'default' if it does not exist
-// Data belonging to different namespaces are stored/indexed separately, though collections exist across namespaces
-func (m *Metadata) GetNamespace() string {
-	val := m.GetString("namespace")
-	if val == "" {
+// GetMetadataValue gets a metadata value from the context if it exists
+func GetMetadataValue(ctx context.Context, key string) any {
+	m, ok := ctx.Value(metadataKey).(*Document)
+	if ok {
+		val := m.Get(key)
+		if val == nil && key == "namespace" {
+			return "default"
+		}
+		return val
+	}
+	if key == "namespace" {
 		return "default"
 	}
-	return val
+	return nil
 }
 
-// ToContext adds the metadata to the input go context
-func (m *Metadata) ToContext(ctx context.Context) context.Context {
+// SetMetadataValues sets metadata key value pairs in the context
+func SetMetadataValues(ctx context.Context, data map[string]any) context.Context {
+	m, ok := ctx.Value(metadataKey).(*Document)
+	if !ok {
+		m = NewDocument()
+		m.Set("namespace", "default")
+	}
+	m.SetAll(data)
 	return context.WithValue(ctx, metadataKey, m)
 }
 
-// NewMetadata creates a new metadata instance
-func NewMetadata() *Metadata {
-	return &Metadata{Document: NewDocument()}
-}
-
-// GetMetadata gets metadata from the context if it exists
-func GetMetadata(ctx context.Context) (*Metadata, bool) {
-	m, ok := ctx.Value(metadataKey).(*Metadata)
+// ExtractMetadata extracts metadata from the context and returns it
+func ExtractMetadata(ctx context.Context) *Document {
+	m, ok := ctx.Value(metadataKey).(*Document)
 	if ok {
-		return m, true
+		return m
 	}
-	return &Metadata{Document: NewDocument()}, false
+	m = NewDocument()
+	m.Set("namespace", "default")
+	return m
 }
 
 // Page is a page of documents
@@ -277,7 +273,7 @@ type persistCommand struct {
 	Action     Action    `json:"action" validate:"required,oneof='create' 'update' 'delete' 'set'"`
 	Document   *Document `json:"document" validate:"required"`
 	Timestamp  int64     `json:"timestamp" validate:"required"`
-	Metadata   *Metadata `json:"metadata" validate:"required"`
+	Metadata   *Document `json:"metadata" validate:"required"`
 }
 
 // Index is a database index used to optimize queries against a collection
@@ -359,7 +355,7 @@ type CDC struct {
 	// Timestamp is the nanosecond timestamp the cdc was created at
 	Timestamp int64 `json:"timestamp" validate:"required"`
 	// Metadata is the context metadata when the change was made
-	Metadata *Metadata `json:"metadata" validate:"required"`
+	Metadata *Document `json:"metadata" validate:"required"`
 }
 
 // ForeignKey is a reference/relationship to another collection by primary key

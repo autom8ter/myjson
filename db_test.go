@@ -64,7 +64,7 @@ func Test(t *testing.T) {
 				err = tx.Set(ctx, "account", u)
 				return err
 			}))
-		}), myjson.WithPersistCDC(true))
+		}))
 	})
 	t.Run("batch create", func(t *testing.T) {
 		assert.Nil(t, testutil.TestDB(func(ctx context.Context, db myjson.Database) {
@@ -115,7 +115,7 @@ func Test(t *testing.T) {
 			assert.NotNil(t, u)
 			assert.Equal(t, id, u.GetString("_id"))
 			<-received
-		}, myjson.WithPersistCDC(true)))
+		}))
 	})
 	t.Run("set", func(t *testing.T) {
 		assert.Nil(t, testutil.TestDB(func(ctx context.Context, db myjson.Database) {
@@ -607,7 +607,7 @@ func TestIndexing1(t *testing.T) {
 				assert.False(t, o.Reverse)
 				assert.Equal(t, "timestamp", o.SeekFields[0])
 				assert.NotEqual(t, 0, count)
-			}, myjson.WithPersistCDC(true)))
+			}))
 		})
 		t.Run("all results (<)", func(t *testing.T) {
 			assert.Nil(t, testutil.TestDB(func(ctx context.Context, db myjson.Database) {
@@ -641,7 +641,7 @@ func TestIndexing1(t *testing.T) {
 				assert.True(t, o.Reverse)
 				assert.Equal(t, "timestamp", o.SeekFields[0])
 				assert.NotEqual(t, 0, count)
-			}, myjson.WithPersistCDC(true)))
+			}))
 		})
 		t.Run("some results (<=)", func(t *testing.T) {
 			assert.Nil(t, testutil.TestDB(func(ctx context.Context, db myjson.Database) {
@@ -675,7 +675,7 @@ func TestIndexing1(t *testing.T) {
 				assert.True(t, o.Reverse)
 				assert.Equal(t, "timestamp", o.SeekFields[0])
 				assert.NotEqual(t, 0, count)
-			}, myjson.WithPersistCDC(true)))
+			}))
 		})
 		t.Run("no results (>)", func(t *testing.T) {
 			assert.Nil(t, testutil.TestDB(func(ctx context.Context, db myjson.Database) {
@@ -709,7 +709,7 @@ func TestIndexing1(t *testing.T) {
 				assert.False(t, o.Reverse)
 				assert.Equal(t, "timestamp", o.SeekFields[0])
 				assert.Equal(t, 0, count)
-			}, myjson.WithPersistCDC(true)))
+			}))
 		})
 		t.Run("no results (<)", func(t *testing.T) {
 			assert.Nil(t, testutil.TestDB(func(ctx context.Context, db myjson.Database) {
@@ -743,7 +743,7 @@ func TestIndexing1(t *testing.T) {
 				assert.True(t, o.Reverse)
 				assert.Equal(t, "timestamp", o.SeekFields[0])
 				assert.Equal(t, 0, count)
-			}, myjson.WithPersistCDC(true)))
+			}))
 		})
 	})
 

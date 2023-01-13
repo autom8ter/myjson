@@ -104,8 +104,7 @@ func (t *transaction) persistCommand(ctx context.Context, command *persistComman
 		command.Timestamp = time.Now().UnixNano()
 	}
 	if command.Metadata == nil {
-		md, _ := GetMetadata(ctx)
-		command.Metadata = md
+		command.Metadata = ExtractMetadata(ctx)
 	}
 	if err := util.ValidateStruct(c); err != nil {
 		return err
@@ -175,17 +174,15 @@ func (t *transaction) persistCommand(ctx context.Context, command *persistComman
 			return errors.Wrap(err, errors.Internal, "failed to persist cdc")
 		}
 
-		if t.db.persistCDC {
-			ctx = context.WithValue(ctx, internalKey, true)
-			if err := t.persistCommand(ctx, &persistCommand{
-				Collection: "cdc",
-				Action:     CreateAction,
-				Document:   cdcDoc,
-				Timestamp:  cdc.Timestamp,
-				Metadata:   cdc.Metadata,
-			}); err != nil {
-				return errors.Wrap(err, errors.Internal, "failed to persist cdc")
-			}
+		ctx = context.WithValue(ctx, internalKey, true)
+		if err := t.persistCommand(ctx, &persistCommand{
+			Collection: "cdc",
+			Action:     CreateAction,
+			Document:   cdcDoc,
+			Timestamp:  cdc.Timestamp,
+			Metadata:   cdc.Metadata,
+		}); err != nil {
+			return errors.Wrap(err, errors.Internal, "failed to persist cdc")
 		}
 		t.cdc = append(t.cdc, cdc)
 	}

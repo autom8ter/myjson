@@ -55,13 +55,12 @@ func (t *transaction) Update(ctx context.Context, collection string, id string, 
 	if err := schema.SetPrimaryKey(doc, id); err != nil {
 		return errors.Wrap(err, 0, "tx: failed to set primary key")
 	}
-	md, _ := GetMetadata(ctx)
 	if err := t.persistCommand(ctx, &persistCommand{
 		Collection: collection,
 		Action:     UpdateAction,
 		Document:   doc,
 		Timestamp:  time.Now().UnixNano(),
-		Metadata:   md,
+		Metadata:   ExtractMetadata(ctx),
 	}); err != nil {
 		return errors.Wrap(err, 0, "tx: failed to commit update")
 	}
@@ -81,13 +80,12 @@ func (t *transaction) Create(ctx context.Context, collection string, document *D
 			return "", err
 		}
 	}
-	md, _ := GetMetadata(ctx)
 	if err := t.persistCommand(ctx, &persistCommand{
 		Collection: collection,
 		Action:     CreateAction,
 		Document:   document,
 		Timestamp:  time.Now().UnixNano(),
-		Metadata:   md,
+		Metadata:   ExtractMetadata(ctx),
 	}); err != nil {
 		return "", errors.Wrap(err, 0, "tx: failed to commit create")
 	}
@@ -99,13 +97,12 @@ func (t *transaction) Set(ctx context.Context, collection string, document *Docu
 	if schema == nil {
 		return errors.New(errors.Validation, "tx: unsupported collection: %s", collection)
 	}
-	md, _ := GetMetadata(ctx)
 	if err := t.persistCommand(ctx, &persistCommand{
 		Collection: collection,
 		Action:     SetAction,
 		Document:   document,
 		Timestamp:  time.Now().UnixNano(),
-		Metadata:   md,
+		Metadata:   ExtractMetadata(ctx),
 	}); err != nil {
 		return errors.Wrap(err, 0, "tx: failed to commit set")
 	}
@@ -117,7 +114,6 @@ func (t *transaction) Delete(ctx context.Context, collection string, id string) 
 	if schema == nil {
 		return errors.New(errors.Validation, "tx: unsupported collection: %s", collection)
 	}
-	md, _ := GetMetadata(ctx)
 	d, _ := NewDocumentFrom(map[string]any{
 		t.db.GetSchema(ctx, collection).PrimaryKey(): id,
 	})
@@ -126,7 +122,7 @@ func (t *transaction) Delete(ctx context.Context, collection string, id string) 
 		Action:     DeleteAction,
 		Document:   d,
 		Timestamp:  time.Now().UnixNano(),
-		Metadata:   md,
+		Metadata:   ExtractMetadata(ctx),
 	}); err != nil {
 		return errors.Wrap(err, 0, "tx: failed to commit delete")
 	}
