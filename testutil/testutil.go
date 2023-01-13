@@ -70,6 +70,11 @@ func TestDB(fn func(ctx context.Context, db myjson.Database), opts ...myjson.DBO
 	defer os.RemoveAll(dir)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
+	md, _ := myjson.GetMetadata(ctx)
+	if err := md.Set("is_super_user", true); err != nil {
+		return err
+	}
+	ctx = md.ToContext(ctx)
 	db, err := myjson.Open(ctx, "badger", map[string]any{
 		"storage_path": dir,
 	}, opts...)

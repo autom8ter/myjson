@@ -5,7 +5,6 @@ go 1.18
 require (
 	github.com/autom8ter/machine/v4 v4.0.0-20221003043928-593fc3a020bb
 	github.com/brianvoe/gofakeit/v6 v6.19.0
-	github.com/casbin/casbin/v2 v2.60.0
 	github.com/dgraph-io/badger/v3 v3.2103.2
 	github.com/dop251/goja v0.0.0-20221224150820-cc4634e76e9a
 	github.com/ghodss/yaml v1.0.0
@@ -26,7 +25,6 @@ require (
 )
 
 require (
-	github.com/Knetic/govaluate v3.0.1-0.20171022003610-9aa49832a739+incompatible // indirect
 	github.com/benbjohnson/clock v1.3.0 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cespare/xxhash v1.1.0 // indirect

@@ -257,14 +257,18 @@ type Explain struct {
 type Action string
 
 const (
-	// Create creates a document
-	Create = "create"
-	// Set sets a document's values in place
-	Set = "set"
-	// Update updates a set of fields on a document
-	Update = "update"
-	// Delete deletes a document
-	Delete = "delete"
+	// CreateAction creates a document
+	CreateAction Action = "create"
+	// SetAction sets a document's values in place
+	SetAction Action = "set"
+	// UpdateAction updates a set of fields on a document
+	UpdateAction Action = "update"
+	// DeleteAction deletes a document
+	DeleteAction Action = "delete"
+	// QueryAction queries documents
+	QueryAction Action = "query"
+	// ForEach iterates through documents
+	ForEach Action = "for_each"
 )
 
 // persistCommand is a command executed against the database that causes a change in state
@@ -518,7 +522,7 @@ type CommitCmd struct{}
 
 // Authz is a serializable authz object which represents the x-authz section of a collection schema
 type Authz struct {
-	Rules []AuthzRule `json:"rules" validate:"required"`
+	Rules []AuthzRule `json:"rules" validate:"min=1,required"`
 }
 
 // AuthzEffect is an effect of an authz rule
@@ -532,6 +536,6 @@ const (
 // AuthzRule
 type AuthzRule struct {
 	Effect AuthzEffect `json:"effect" validate:"required"`
-	Action []string    `json:"action" validate:"required"`
+	Action []Action    `json:"action" validate:"min=1,required"`
 	Match  string      `json:"match" validate:"required"`
 }

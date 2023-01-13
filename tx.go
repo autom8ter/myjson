@@ -58,7 +58,7 @@ func (t *transaction) Update(ctx context.Context, collection string, id string, 
 	md, _ := GetMetadata(ctx)
 	if err := t.persistCommand(ctx, &persistCommand{
 		Collection: collection,
-		Action:     Update,
+		Action:     UpdateAction,
 		Document:   doc,
 		Timestamp:  time.Now().UnixNano(),
 		Metadata:   md,
@@ -84,7 +84,7 @@ func (t *transaction) Create(ctx context.Context, collection string, document *D
 	md, _ := GetMetadata(ctx)
 	if err := t.persistCommand(ctx, &persistCommand{
 		Collection: collection,
-		Action:     Create,
+		Action:     CreateAction,
 		Document:   document,
 		Timestamp:  time.Now().UnixNano(),
 		Metadata:   md,
@@ -102,7 +102,7 @@ func (t *transaction) Set(ctx context.Context, collection string, document *Docu
 	md, _ := GetMetadata(ctx)
 	if err := t.persistCommand(ctx, &persistCommand{
 		Collection: collection,
-		Action:     Set,
+		Action:     SetAction,
 		Document:   document,
 		Timestamp:  time.Now().UnixNano(),
 		Metadata:   md,
@@ -123,7 +123,7 @@ func (t *transaction) Delete(ctx context.Context, collection string, id string) 
 	})
 	if err := t.persistCommand(ctx, &persistCommand{
 		Collection: collection,
-		Action:     Delete,
+		Action:     DeleteAction,
 		Document:   d,
 		Timestamp:  time.Now().UnixNano(),
 		Metadata:   md,

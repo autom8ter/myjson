@@ -125,30 +125,32 @@ func (t *transaction) persistCommand(ctx context.Context, command *persistComman
 	if t.db.collectionIsLocked(ctx, command.Collection) {
 		return errors.New(errors.Forbidden, "collection %s is locked", command.Collection)
 	}
-	if err := t.applyCommandTriggers(ctx, c, command); err != nil {
+	if err := t.evaluate(ctx, c, command); err != nil {
 		return err
 	}
 
 	switch command.Action {
-	case Update:
+	case UpdateAction:
 		if err := t.updateDocument(ctx, c, docID, before, command); err != nil {
 			return err
 		}
-	case Create:
+	case CreateAction:
 		if err := t.createDocument(ctx, c, command); err != nil {
 			return err
 		}
-	case Delete:
+	case DeleteAction:
 		if err := t.deleteDocument(ctx, c, docID); err != nil {
 			return err
 		}
 		if err := t.cascadeDelete(ctx, c, command); err != nil {
 			return err
 		}
-	case Set:
+	case SetAction:
 		if err := t.setDocument(ctx, c, docID, command); err != nil {
 			return err
 		}
+	default:
+		return fmt.Errorf("tx: unsupported action: %s", command.Action)
 	}
 	for _, i := range t.db.GetSchema(ctx, command.Collection).Indexing() {
 		if err := t.updateSecondaryIndex(ctx, c, i, docID, before, command); err != nil {
@@ -177,7 +179,7 @@ func (t *transaction) persistCommand(ctx context.Context, command *persistComman
 			ctx = context.WithValue(ctx, internalKey, true)
 			if err := t.persistCommand(ctx, &persistCommand{
 				Collection: "cdc",
-				Action:     Create,
+				Action:     CreateAction,
 				Document:   cdcDoc,
 				Timestamp:  cdc.Timestamp,
 				Metadata:   cdc.Metadata,
@@ -235,7 +237,7 @@ func (t *transaction) updateSecondaryIndex(ctx context.Context, schema Collectio
 		return nil
 	}
 	switch command.Action {
-	case Delete:
+	case DeleteAction:
 		if err := t.tx.Delete(ctx, seekPrefix(ctx, command.Collection, idx, before.Value()).Seek(docID).Path()); err != nil {
 			return errors.Wrap(
 				err,
@@ -245,7 +247,7 @@ func (t *transaction) updateSecondaryIndex(ctx context.Context, schema Collectio
 				docID,
 			)
 		}
-	case Set, Update, Create:
+	case SetAction, UpdateAction, CreateAction:
 		if before != nil {
 			if err := t.tx.Delete(ctx, seekPrefix(ctx, command.Collection, idx, before.Value()).Seek(docID).Path()); err != nil {
 				return errors.Wrap(
@@ -442,44 +444,82 @@ func (t *transaction) queryScan(ctx context.Context, collection string, where []
 	return explain, nil
 }
 
-func (t *transaction) applyCommandTriggers(ctx context.Context, c CollectionSchema, command *persistCommand) error {
-	runTrigger := func(trigger Trigger) error {
-		if err := t.vm.Set("tx", t); err != nil {
-			return err
-		}
-		if err := t.vm.Set("ctx", ctx); err != nil {
-			return err
-		}
-		if err := t.vm.Set("doc", command.Document); err != nil {
-			return err
-		}
-		if err := t.vm.Set("metadata", command.Metadata); err != nil {
-			return err
-		}
-		if _, err := t.vm.RunString(trigger.Script); err != nil {
-			return err
-		}
-		return nil
+func (t *transaction) evaluate(ctx context.Context, c CollectionSchema, command *persistCommand) error {
+	if err := t.vm.Set("ctx", ctx); err != nil {
+		return err
+	}
+	if err := t.vm.Set("doc", command.Document); err != nil {
+		return err
+	}
+	if err := t.vm.Set("meta", command.Metadata); err != nil {
+		return err
 	}
 	for _, trigger := range c.Triggers() {
 		switch {
-		case command.Action == Delete && lo.Contains(trigger.Events, OnDelete):
-			if err := runTrigger(trigger); err != nil {
+		case command.Action == DeleteAction && lo.Contains(trigger.Events, OnDelete):
+			if _, err := t.vm.RunString(trigger.Script); err != nil {
 				return err
 			}
-		case command.Action == Set && lo.Contains(trigger.Events, OnSet):
-			if err := runTrigger(trigger); err != nil {
+		case command.Action == SetAction && lo.Contains(trigger.Events, OnSet):
+			if _, err := t.vm.RunString(trigger.Script); err != nil {
 				return err
 			}
-		case command.Action == Create && lo.Contains(trigger.Events, OnCreate):
-			if err := runTrigger(trigger); err != nil {
+		case command.Action == CreateAction && lo.Contains(trigger.Events, OnCreate):
+			if _, err := t.vm.RunString(trigger.Script); err != nil {
 				return err
 			}
-		case command.Action == Update && lo.Contains(trigger.Events, OnUpdate):
-			if err := runTrigger(trigger); err != nil {
+		case command.Action == UpdateAction && lo.Contains(trigger.Events, OnUpdate):
+			if _, err := t.vm.RunString(trigger.Script); err != nil {
 				return err
 			}
 		}
 	}
+	pass, err := t.authorize(c, command)
+	if err != nil {
+		return err
+	}
+	if !pass {
+		return errors.New(errors.Forbidden, "not authorized")
+	}
 	return nil
+}
+
+func (t *transaction) authorize(schema CollectionSchema, command *persistCommand) (bool, error) {
+	if len(schema.Authz().Rules) == 0 {
+		return true, nil
+	}
+	deny := lo.Filter(schema.Authz().Rules, func(a AuthzRule, i int) bool {
+		if a.Action[0] == "*" && a.Effect == Deny {
+			return true
+		}
+		return lo.Contains(a.Action, command.Action) && a.Effect == Deny
+	})
+	if len(deny) > 0 {
+		for _, d := range deny {
+			result, err := t.vm.RunString(d.Match)
+			if err != nil {
+				return false, errors.Wrap(err, 0, "failed to run authz match script")
+			}
+			if result.ToBoolean() {
+				return false, nil
+			}
+		}
+	}
+	allow := lo.Filter(schema.Authz().Rules, func(a AuthzRule, i int) bool {
+		if a.Action[0] == "*" && a.Effect == Allow {
+			return true
+		}
+		return lo.Contains(a.Action, command.Action) && a.Effect == Allow
+	})
+
+	for _, d := range allow {
+		result, err := t.vm.RunString(d.Match)
+		if err != nil {
+			return false, errors.Wrap(err, 0, "failed to run authz match script")
+		}
+		if result.ToBoolean() {
+			return true, nil
+		}
+	}
+	return false, nil
 }

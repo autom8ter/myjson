@@ -100,6 +100,9 @@ func (d *defaultDB) NewTx(opts kv.TxOpts) (Txn, error) {
 	if err != nil {
 		return nil, err
 	}
+	if err := vm.Set("tx", tx); err != nil {
+		return nil, err
+	}
 	return &transaction{
 		db:      d,
 		tx:      tx,

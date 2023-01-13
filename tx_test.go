@@ -106,7 +106,7 @@ func TestTx(t *testing.T) {
 					assert.NoError(t, err)
 					usrs[doc.GetString("_id")] = doc
 					assert.Equal(t, "user", tx.CDC()[i].Collection)
-					assert.EqualValues(t, myjson.Set, tx.CDC()[i].Action)
+					assert.EqualValues(t, myjson.SetAction, tx.CDC()[i].Action)
 					assert.EqualValues(t, doc.Get("_id"), tx.CDC()[i].DocumentID)
 					assert.NotEmpty(t, tx.CDC()[i].Metadata)
 					assert.NotEmpty(t, tx.CDC()[i].Diff)
