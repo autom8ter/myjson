@@ -133,13 +133,19 @@ func (t *transaction) Query(ctx context.Context, collection string, query Query)
 	if len(query.Select) == 0 {
 		query.Select = append(query.Select, Select{Field: "*"})
 	}
-
 	if err := query.Validate(ctx); err != nil {
 		return Page{}, err
 	}
 	schema, ctx := t.db.getSchema(ctx, collection)
 	if schema == nil {
 		return Page{}, errors.New(errors.Validation, "tx: unsupported collection: %s", collection)
+	}
+	allow, err := t.authorizeQuery(ctx, schema, &query)
+	if err != nil {
+		return Page{}, err
+	}
+	if !allow {
+		return Page{}, errors.New(errors.Forbidden, "not authorized")
 	}
 	if isAggregateQuery(query) {
 		return t.aggregate(ctx, collection, query)
@@ -195,6 +201,7 @@ func (t *transaction) Get(ctx context.Context, collection string, id string) (*D
 	if c == nil {
 		return nil, errors.New(errors.Validation, "tx: unsupported collection: %s", collection)
 	}
+
 	primaryIndex := c.PrimaryIndex()
 	val, err := t.tx.Get(ctx, seekPrefix(ctx, collection, primaryIndex, map[string]any{
 		c.PrimaryKey(): id,
@@ -208,6 +215,13 @@ func (t *transaction) Get(ctx context.Context, collection string, id string) (*D
 	doc, err := NewDocumentFromBytes(val)
 	if err != nil {
 		return nil, err
+	}
+	pass, err := t.authorizeRead(ctx, c, doc)
+	if err != nil {
+		return nil, err
+	}
+	if !pass {
+		return nil, errors.New(errors.Forbidden, "not authorized")
 	}
 	if doc == nil {
 		return nil, errors.New(errors.NotFound, "%s not found", id)
@@ -346,6 +360,13 @@ func docsHaving(where []Where, results Documents) (Documents, error) {
 }
 
 func (t *transaction) ForEach(ctx context.Context, collection string, opts ForEachOpts, fn ForEachFunc) (Explain, error) {
+	pass, err := t.authorizeForEach(ctx, t.db.GetSchema(ctx, collection), &opts)
+	if err != nil {
+		return Explain{}, err
+	}
+	if !pass {
+		return Explain{}, errors.New(errors.Forbidden, "not authorized")
+	}
 	return t.queryScan(ctx, collection, opts.Where, opts.Join, fn)
 }
 

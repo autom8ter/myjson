@@ -472,7 +472,7 @@ func (t *transaction) evaluate(ctx context.Context, c CollectionSchema, command 
 		}
 	}
 	if !isInternal(ctx) {
-		pass, err := t.authorize(c, command)
+		pass, err := t.authorizeCommand(ctx, c, command)
 		if err != nil {
 			return err
 		}
@@ -484,7 +484,10 @@ func (t *transaction) evaluate(ctx context.Context, c CollectionSchema, command 
 	return nil
 }
 
-func (t *transaction) authorize(schema CollectionSchema, command *persistCommand) (bool, error) {
+func (t *transaction) authorizeCommand(ctx context.Context, schema CollectionSchema, command *persistCommand) (bool, error) {
+	if isInternal(ctx) {
+		return true, nil
+	}
 	if len(schema.Authz().Rules) == 0 {
 		return true, nil
 	}
@@ -510,6 +513,162 @@ func (t *transaction) authorize(schema CollectionSchema, command *persistCommand
 			return true
 		}
 		return lo.Contains(a.Action, command.Action) && a.Effect == Allow
+	})
+
+	for _, d := range allow {
+		result, err := t.vm.RunString(d.Match)
+		if err != nil {
+			return false, errors.Wrap(err, 0, "failed to run authz match script")
+		}
+		if result.ToBoolean() {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+func (t *transaction) authorizeQuery(ctx context.Context, schema CollectionSchema, query *Query) (bool, error) {
+	if isInternal(ctx) {
+		return true, nil
+	}
+	if len(schema.Authz().Rules) == 0 {
+		return true, nil
+	}
+	if err := t.vm.Set("ctx", ctx); err != nil {
+		return false, err
+	}
+	if err := t.vm.Set("query", query); err != nil {
+		return false, err
+	}
+	if err := t.vm.Set("meta", ExtractMetadata(ctx)); err != nil {
+		return false, err
+	}
+	deny := lo.Filter(schema.Authz().Rules, func(a AuthzRule, i int) bool {
+		if a.Action[0] == "*" && a.Effect == Deny {
+			return true
+		}
+		return lo.Contains(a.Action, QueryAction) && a.Effect == Deny
+	})
+	if len(deny) > 0 {
+		for _, d := range deny {
+			result, err := t.vm.RunString(d.Match)
+			if err != nil {
+				return false, errors.Wrap(err, 0, "failed to run authz match script")
+			}
+			if result.ToBoolean() {
+				return false, nil
+			}
+		}
+	}
+	allow := lo.Filter(schema.Authz().Rules, func(a AuthzRule, i int) bool {
+		if a.Action[0] == "*" && a.Effect == Allow {
+			return true
+		}
+		return lo.Contains(a.Action, QueryAction) && a.Effect == Allow
+	})
+
+	for _, d := range allow {
+		result, err := t.vm.RunString(d.Match)
+		if err != nil {
+			return false, errors.Wrap(err, 0, "failed to run authz match script")
+		}
+		if result.ToBoolean() {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+func (t *transaction) authorizeRead(ctx context.Context, schema CollectionSchema, document *Document) (bool, error) {
+	if isInternal(ctx) {
+		return true, nil
+	}
+	if len(schema.Authz().Rules) == 0 {
+		return true, nil
+	}
+	if err := t.vm.Set("ctx", ctx); err != nil {
+		return false, err
+	}
+	if err := t.vm.Set("doc", document); err != nil {
+		return false, err
+	}
+	if err := t.vm.Set("meta", ExtractMetadata(ctx)); err != nil {
+		return false, err
+	}
+	deny := lo.Filter(schema.Authz().Rules, func(a AuthzRule, i int) bool {
+		if a.Action[0] == "*" && a.Effect == Deny {
+			return true
+		}
+		return lo.Contains(a.Action, GetAction) && a.Effect == Deny
+	})
+	if len(deny) > 0 {
+		for _, d := range deny {
+			result, err := t.vm.RunString(d.Match)
+			if err != nil {
+				return false, errors.Wrap(err, 0, "failed to run authz match script")
+			}
+			if result.ToBoolean() {
+				return false, nil
+			}
+		}
+	}
+	allow := lo.Filter(schema.Authz().Rules, func(a AuthzRule, i int) bool {
+		if a.Action[0] == "*" && a.Effect == Allow {
+			return true
+		}
+		return lo.Contains(a.Action, GetAction) && a.Effect == Allow
+	})
+
+	for _, d := range allow {
+		result, err := t.vm.RunString(d.Match)
+		if err != nil {
+			return false, errors.Wrap(err, 0, "failed to run authz match script")
+		}
+		if result.ToBoolean() {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+func (t *transaction) authorizeForEach(ctx context.Context, schema CollectionSchema, opts *ForEachOpts) (bool, error) {
+	if isInternal(ctx) {
+		return true, nil
+	}
+	if len(schema.Authz().Rules) == 0 {
+		return true, nil
+	}
+	if err := t.vm.Set("ctx", ctx); err != nil {
+		return false, err
+	}
+	if err := t.vm.Set("forEach", opts); err != nil {
+		return false, err
+	}
+	if err := t.vm.Set("meta", ExtractMetadata(ctx)); err != nil {
+		return false, err
+	}
+	deny := lo.Filter(schema.Authz().Rules, func(a AuthzRule, i int) bool {
+		if a.Action[0] == "*" && a.Effect == Deny {
+			return true
+		}
+		return lo.Contains(a.Action, ForEachAction) && a.Effect == Deny
+	})
+	if len(deny) > 0 {
+		for _, d := range deny {
+			result, err := t.vm.RunString(d.Match)
+			if err != nil {
+				return false, errors.Wrap(err, 0, "failed to run authz match script")
+			}
+			if result.ToBoolean() {
+				return false, nil
+			}
+		}
+	}
+	allow := lo.Filter(schema.Authz().Rules, func(a AuthzRule, i int) bool {
+		if a.Action[0] == "*" && a.Effect == Allow {
+			return true
+		}
+		return lo.Contains(a.Action, ForEachAction) && a.Effect == Allow
 	})
 
 	for _, d := range allow {
