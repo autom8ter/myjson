@@ -211,6 +211,11 @@ func (d *defaultDB) ForEach(ctx context.Context, collection string, opts ForEach
 }
 
 func (d *defaultDB) DropCollection(ctx context.Context, collection string) error {
+	unlock, err := d.lockCollection(ctx, collection)
+	if err != nil {
+		return err
+	}
+	defer unlock()
 	if err := d.kv.DropPrefix(ctx, collectionPrefix(ctx, collection)); err != nil {
 		return errors.Wrap(err, errors.Internal, "failed to remove collection %s", collection)
 	}
@@ -280,10 +285,10 @@ func (d *defaultDB) ConfigureCollection(ctx context.Context, collectionSchemaByt
 
 func (d *defaultDB) Collections(ctx context.Context) []string {
 	var names []string
-	cfgs, _ := d.getCollectionConfigs(ctx)
-	for _, c := range cfgs {
-		names = append(names, c.Collection())
-	}
+	d.collections.Range(func(key, value any) bool {
+		names = append(names, key.(string))
+		return true
+	})
 	return names
 }
 

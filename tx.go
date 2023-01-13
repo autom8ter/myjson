@@ -133,6 +133,7 @@ func (t *transaction) Query(ctx context.Context, collection string, query Query)
 	if len(query.Select) == 0 {
 		query.Select = append(query.Select, Select{Field: "*"})
 	}
+
 	if err := query.Validate(ctx); err != nil {
 		return Page{}, err
 	}

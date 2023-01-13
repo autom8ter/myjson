@@ -1324,3 +1324,10 @@ func TestTriggers(t *testing.T) {
 		}))
 	})
 }
+
+func TestDropCollection(t *testing.T) {
+	assert.NoError(t, testutil.TestDB(func(ctx context.Context, db myjson.Database) {
+		assert.Nil(t, db.DropCollection(ctx, "task"))
+		assert.False(t, db.HasCollection(ctx, "task"))
+	}))
+}
