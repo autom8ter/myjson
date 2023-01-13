@@ -474,13 +474,16 @@ func (t *transaction) evaluate(ctx context.Context, c CollectionSchema, command 
 			}
 		}
 	}
-	pass, err := t.authorize(c, command)
-	if err != nil {
-		return err
+	if !isInternal(ctx) {
+		pass, err := t.authorize(c, command)
+		if err != nil {
+			return err
+		}
+		if !pass {
+			return errors.New(errors.Forbidden, "not authorized")
+		}
 	}
-	if !pass {
-		return errors.New(errors.Forbidden, "not authorized")
-	}
+
 	return nil
 }
 
