@@ -20,7 +20,7 @@ x-authorization:
       - "*"
       ## context metadata must have is_super_user set to true
       match: |
-        meta.get("is_super_user")
+        contains(meta.Get('roles'), 'super_user')
 
       ## dont allow read-only users to create/update/delete/set accounts
     - effect: deny
@@ -32,7 +32,7 @@ x-authorization:
         - set
         ## context metadata must have is_read_only set to true
       match: |
-        meta.get('role') == 'read_only'
+        contains(meta.Get('roles'), 'read_only')
 
       ## only allow users to update their own account
     - effect: allow
@@ -44,13 +44,13 @@ x-authorization:
         - set
         ## the account's _id must match the user's account_id
       match: |
-        doc.get('_id') == meta.get('account_id')
+        doc.Get('_id') == meta.Get('account_id')
 
       ## only allow users to query their own account
     - effect: allow
         ## match on document queries (includes ForEach and other Query based methods)
       action:
         - query
-        ## the first where clause must match the user's account_id
+        ## user must have a group matching the account's _id
       match: |
-        query.where[0].field == '_id' && query.where[0].op == 'eq' && query.where[0].value == meta.get('account_id')
+        query.where?.length > 0 && query.where[0].field == '_id' && query.where[0].op == 'eq' && contains(meta.Get('groups'), query.where[0].value) 

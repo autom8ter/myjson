@@ -167,57 +167,12 @@ func (q Query) Validate(ctx context.Context) error {
 	return nil
 }
 
-type ctxKey int
-
-const (
-	metadataKey ctxKey = 0
-)
-
-// GetMetadataValue gets a metadata value from the context if it exists
-func GetMetadataValue(ctx context.Context, key string) any {
-	m, ok := ctx.Value(metadataKey).(*Document)
-	if ok {
-		val := m.Get(key)
-		if val == nil && key == "namespace" {
-			return "default"
-		}
-		return val
-	}
-	if key == "namespace" {
-		return "default"
-	}
-	return nil
-}
-
-// SetMetadataValues sets metadata key value pairs in the context
-func SetMetadataValues(ctx context.Context, data map[string]any) context.Context {
-	m, ok := ctx.Value(metadataKey).(*Document)
-	if !ok {
-		m = NewDocument()
-		_ = m.Set("namespace", "default")
-	}
-	_ = m.SetAll(data)
-	return context.WithValue(ctx, metadataKey, m)
-}
-
-// ExtractMetadata extracts metadata from the context and returns it
-func ExtractMetadata(ctx context.Context) *Document {
-	m, ok := ctx.Value(metadataKey).(*Document)
-	if ok {
-		return m
-	}
-	m = NewDocument()
-
-	_ = m.Set("namespace", "default")
-	return m
-}
-
 // Page is a page of documents
 type Page struct {
 	// Documents are the documents that make up the page
 	Documents Documents `json:"documents"`
 	// Next page
-	NextPage int `json:"next_page"`
+	NextPage int `json:"nextPage"`
 	// Document count
 	Count int `json:"count"`
 	// Stats are statistics collected from a document aggregation query
@@ -227,7 +182,7 @@ type Page struct {
 // PageStats are statistics collected from a query returning a page
 type PageStats struct {
 	// ExecutionTime is the execution time to get the page
-	ExecutionTime time.Duration `json:"execution_time,omitempty"`
+	ExecutionTime time.Duration `json:"executionTime,omitempty"`
 	// Explain is the optimizer's output for the query that returned a page
 	Explain *Explain `json:"explain,omitempty"`
 }
@@ -239,13 +194,13 @@ type Explain struct {
 	// Index is the index the query optimizer chose
 	Index Index `json:"index"`
 	// MatchedFields are the fields that matched the index
-	MatchedFields []string `json:"matched_fields"`
+	MatchedFields []string `json:"matchedFields"`
 	// MatchedValues are the values that were matched to the index
-	MatchedValues map[string]any `json:"matched_values,omitempty"`
+	MatchedValues map[string]any `json:"matchedValues,omitempty"`
 	// SeekFields indicates that the given fields will be seeked
 	SeekFields []string `json:"seek,omitempty"`
 	// SeekValues are the values to seek
-	SeekValues map[string]any `json:"seek_values,omitempty"`
+	SeekValues map[string]any `json:"seekValues,omitempty"`
 	// Reverse indicates that the index should be scanned in reverse
 	Reverse bool `json:"reverse,omitempty"`
 }
@@ -270,6 +225,15 @@ const (
 	ChangeStreamAction Action = "changeStream"
 )
 
+type EventType string
+
+const (
+	OnSet    EventType = "onSet"
+	OnDelete EventType = "onDelete"
+	OnUpdate EventType = "onUpdate"
+	OnCreate EventType = "onCreate"
+)
+
 // persistCommand is a command executed against the database that causes a change in state
 type persistCommand struct {
 	Collection string    `json:"collection" validate:"required"`
@@ -292,16 +256,6 @@ type Index struct {
 	// ForeignKey indecates that it's an index for a foreign key
 	ForeignKey *ForeignKey `json:"foreign_key,omitempty"`
 }
-
-type EventType string
-
-const (
-	OnSet    EventType = "on_set"
-	OnDelete EventType = "on_delete"
-	OnUpdate EventType = "on_update"
-	OnCreate EventType = "on_create"
-	OnQuery  EventType = "on_query"
-)
 
 // Trigger is a javasript function executed after a database event occurs
 type Trigger struct {
@@ -399,8 +353,10 @@ type PropertyIndex struct {
 
 // ForEachOpts are options when executing db.ForEach against a collection
 type ForEachOpts struct {
+	// Where are the query conditions
 	Where []Where `json:"where,omitempty"`
-	Join  []Join  `json:"join,omitempty"`
+	// Join are the join conditions
+	Join []Join `json:"join,omitempty"`
 }
 
 // TxCmd is a serializable transaction command
@@ -502,6 +458,10 @@ type RollbackCmd struct{}
 type CommitCmd struct{}
 
 // Authz is a serializable authz object which represents the x-authorization section of a collection schema
+// It is used to define the authorization rules for a collection
+// When any rule matches that has the effect "deny" the request is denied
+// When no rules match the request is denied
+// When any rule matches that has the effect "allow" the request is allowed (as long as no deny rules match)
 type Authz struct {
 	Rules []AuthzRule `json:"rules" validate:"min=1,required"`
 }
@@ -510,13 +470,18 @@ type Authz struct {
 type AuthzEffect string
 
 const (
+	// Allow is the allow effect
 	Allow AuthzEffect = "allow"
-	Deny  AuthzEffect = "deny"
+	// Deny is the deny effect
+	Deny AuthzEffect = "deny"
 )
 
 // AuthzRule
 type AuthzRule struct {
+	// Effect is the effect of the rule - allow or deny
 	Effect AuthzEffect `json:"effect" validate:"required"`
-	Action []Action    `json:"action" validate:"min=1,required"`
-	Match  string      `json:"match" validate:"required"`
+	// Action is the action to apply the rule to - create, read, update, delete, query, configure, changeStream
+	Action []Action `json:"action" validate:"min=1,required"`
+	// Match is a javscript boolean expression to match the rule against
+	Match string `json:"match" validate:"required"`
 }

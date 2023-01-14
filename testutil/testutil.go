@@ -24,7 +24,11 @@ var (
 	UserSchema string
 	//go:embed testdata/account.yaml
 	AccountSchema  string
-	AllCollections = [][]byte{[]byte(UserSchema), []byte(TaskSchema), []byte(AccountSchema)}
+	AllCollections = map[string]string{
+		"task":    TaskSchema,
+		"user":    UserSchema,
+		"account": AccountSchema,
+	}
 )
 
 func NewUserDoc() *myjson.Document {
@@ -70,21 +74,16 @@ func TestDB(fn func(ctx context.Context, db myjson.Database), opts ...myjson.DBO
 	defer os.RemoveAll(dir)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	ctx = myjson.SetMetadataValues(ctx, map[string]interface{}{
-		"is_super_user": true,
-	})
+	ctx = myjson.SetMetadataRoles(ctx, []string{"super_user"})
 	db, err := myjson.Open(ctx, "badger", map[string]any{
 		"storage_path": dir,
 	}, opts...)
 	if err != nil {
 		return err
 	}
-	for _, c := range AllCollections {
-		if err := db.Configure(ctx, c); err != nil {
-			return err
-		}
+	if err := db.Configure(ctx, AllCollections); err != nil {
+		return err
 	}
-
 	if err := db.Tx(ctx, kv.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx myjson.Tx) error {
 		for i := 0; i <= 100; i++ {
 			d, _ := myjson.NewDocumentFrom(map[string]any{

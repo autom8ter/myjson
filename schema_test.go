@@ -41,6 +41,11 @@ func TestSchema(t *testing.T) {
 		assert.NoError(t, err)
 		assert.NotNil(t, schema.Indexing())
 	})
+	t.Run("authz not nil", func(t *testing.T) {
+		schema, err := newCollectionSchema([]byte(accountSchema))
+		assert.NoError(t, err)
+		assert.NotNil(t, schema.Authz())
+	})
 	t.Run("MarshalJSON/UnmarshalJSON", func(t *testing.T) {
 		schema, err := newCollectionSchema([]byte(userSchema))
 		assert.NoError(t, err)

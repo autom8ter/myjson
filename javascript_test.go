@@ -20,7 +20,7 @@ func TestJavascript(t *testing.T) {
 		doc := NewDocument()
 		assert.NoError(t, doc.Set("age", 10))
 		assert.NoError(t, vm.Set("doc", doc))
-		v, err := vm.RunString(`doc.get("age") > 5`)
+		v, err := vm.RunString(`doc.Get("age") > 5`)
 		assert.NoError(t, err)
 		res := v.Export().(bool)
 

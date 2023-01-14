@@ -95,7 +95,7 @@ func Test(t *testing.T) {
 				defer wg.Done()
 				ctx, cancel := context.WithCancel(ctx)
 				defer cancel()
-				err := db.ChangeStream(ctx, "user", func(cdc myjson.CDC) (bool, error) {
+				err := db.ChangeStream(ctx, "user", nil, func(ctx context.Context, cdc myjson.CDC) (bool, error) {
 					received <- struct{}{}
 					return true, nil
 				})
@@ -885,8 +885,8 @@ func TestScript(t *testing.T) {
 		assert.NoError(t, testutil.TestDB(func(ctx context.Context, db myjson.Database) {
 			getAccountScript := `
 function getAccount(ctx, db, params) {
-	let res = db.get(ctx, 'account', params.id)
-	return res.get('_id')
+	let res = db.Get(ctx, 'account', params.id)
+	return res.Get('_id')
 }
  `
 			results, err := db.RunScript(ctx, "getAccount", getAccountScript, map[string]any{
@@ -900,7 +900,7 @@ function getAccount(ctx, db, params) {
 		assert.NoError(t, testutil.TestDB(func(ctx context.Context, db myjson.Database) {
 			getAccountScript := `
 function getAccounts(ctx, db, params) {
-	let res = db.query(ctx, 'account', {select: [{field: '*'}]})
+	let res = db.Query(ctx, 'account', {Select: [{Field: '*'}]})
 	return res.documents
 }
  `
@@ -913,8 +913,8 @@ function getAccounts(ctx, db, params) {
 		assert.NoError(t, testutil.TestDB(func(ctx context.Context, db myjson.Database) {
 			getAccountScript := `
 function setAccount(ctx, db, params) {
-	db.tx(ctx, {isReadOnly: false}, (ctx, tx) => {
-		tx.set(ctx, "account", params.doc)
+	db.Tx(ctx, {IsReadOnly: false}, (ctx, tx) => {
+		tx.Set(ctx, "account", params.doc)
 	})
 }
  `
@@ -936,7 +936,7 @@ function setAccount(ctx, db, params) {
 		assert.NoError(t, testutil.TestDB(func(ctx context.Context, db myjson.Database) {
 			getAccountScript := `
 function forEachAccount(ctx, db, params) {
-	db.forEach(ctx, 'account', undefined, params.fn)
+	db.ForEach(ctx, 'account', undefined, params.fn)
 }
  `
 			count := 0

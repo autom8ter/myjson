@@ -149,9 +149,9 @@ x-authorization:
       ## match on any action
       action:
       - "*"
-      ## context metadata must have is_super_user set to true
+      ## context metadata must have role super_user set to true
       match: |
-        meta.get("is_super_user")
+        contains(meta.Get('roles'), 'super_user')
 
       ## dont allow read-only users to create/update/delete/set accounts
     - effect: deny
@@ -161,9 +161,9 @@ x-authorization:
         - update
         - delete
         - set
-        ## context metadata must have is_read_only set to true
+        ## context metadata must have a read_only role set to true
       match: |
-        meta.get('role') == 'read_only'
+        contains(meta.Get('roles'), 'read_only')
 
       ## only allow users to update their own account
     - effect: allow
@@ -175,16 +175,16 @@ x-authorization:
         - set
         ## the account's _id must match the user's account_id
       match: |
-        doc.get('_id') == meta.get('account_id')
+        doc.Get('_id') == meta.Get('account_id')
 
       ## only allow users to query their own account
     - effect: allow
         ## match on document queries (includes ForEach and other Query based methods)
       action:
         - query
-        ## the first where clause must match the user's account_id
+        ## user must have a group matching the account's _id
       match: |
-        query.where[0].field == '_id' && query.where[0].op == 'eq' && query.where[0].value == meta.get('account_id')
+        query.where?.length > 0 && query.where[0].field == '_id' && query.where[0].op == 'eq' && contains(meta.Get('groups'), query.where[0].value)
 
 ```
 
@@ -263,7 +263,7 @@ x-triggers:
       - on_set
     # script is the javascript to execute
     script: |
-      doc.set('timestamp', new Date().toISOString())
+      doc.Set('timestamp', new Date().toISOString())
 
 ```
 task.yaml
@@ -341,15 +341,13 @@ var (
     taskSchema string
 )
 
-if err := db.Configure(ctx, []byte(accountSchema)); err != nil {
-	panic(err)
-}
-if err := db.Configure(ctx, []byte(userSchema)); err != nil {
-	panic(err)
-}
-if err := db.Configure(ctx, []byte(taskSchema)); err != nil {
-	panic(err)
-}
+if err := db.Configure(ctx, map[string]any{
+	"account": accountSchema,
+    "user": userSchema,
+    "task": taskSchema,
+}); err != nil {
+    panic(err)
+})
 ```
 
 ### Working with JSON documents
@@ -535,12 +533,12 @@ triggers:
       - on_update
       - on_set
     script: |
-      doc.set('timestamp', new Date().toISOString())
+      doc.Set('timestamp', new Date().toISOString())
 ```
 
 javascript variables are injected at runtime:
 - `doc` - the JSON document that is being changed
-- `db` - the global database instance(all methods are available lowercased)
+- `db` - the global database instance(all methods are available)
 - `ctx` - the context when the trigger was called
 - `metadata` - the context metadata when the script is called
 - `tx` - the current transaction instance

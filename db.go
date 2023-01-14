@@ -4,7 +4,6 @@ import (
 	"context"
 	// import embed package
 	_ "embed"
-	"encoding/json"
 	"sync"
 	"time"
 
@@ -14,6 +13,8 @@ import (
 	"github.com/autom8ter/myjson/kv/registry"
 	"github.com/autom8ter/myjson/util"
 	"github.com/dop251/goja"
+	"github.com/samber/lo"
+	"golang.org/x/sync/errgroup"
 )
 
 // defaultDB is an embedded, durable NoSQL database with support for schemas, indexing, and aggregation
@@ -51,8 +52,11 @@ func Open(ctx context.Context, provider string, providerParams map[string]any, o
 	for _, o := range opts {
 		o(d)
 	}
-	if !d.HasCollection(ctx, cdcCollectionName) {
-		if err := d.Configure(context.WithValue(ctx, internalKey, true), []byte(cdcSchema)); err != nil {
+
+	if len(d.Collections(ctx)) == 0 {
+		if err := d.Configure(context.WithValue(ctx, internalKey, true), map[string]string{
+			cdcCollectionName: cdcSchema,
+		}); err != nil {
 			return nil, errors.Wrap(err, errors.Internal, "failed to configure cdc collection")
 		}
 	}
@@ -112,7 +116,7 @@ func (d *defaultDB) NewTx(opts kv.TxOpts) (Txn, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := vm.Set("tx", tx); err != nil {
+	if err := vm.Set(string(JavascriptGlobalTx), tx); err != nil {
 		return nil, err
 	}
 	return &transaction{
@@ -208,41 +212,84 @@ func (d *defaultDB) ForEach(ctx context.Context, collection string, opts ForEach
 	return result, nil
 }
 
-func (d *defaultDB) DropCollection(ctx context.Context, collection string) error {
-	unlock, err := d.lockCollection(ctx, collection)
+func (d *defaultDB) dropCollection(ctx context.Context, collection CollectionSchema) error {
+	unlock, err := d.lockCollection(ctx, collection.Collection())
 	if err != nil {
 		return err
 	}
 	defer unlock()
-	if err := d.kv.DropPrefix(ctx, collectionPrefix(ctx, collection)); err != nil {
+	if err := d.Tx(ctx, kv.TxOpts{IsBatch: true}, func(ctx context.Context, tx Tx) error {
+		_, err := tx.ForEach(ctx, collection.Collection(), ForEachOpts{}, func(d *Document) (bool, error) {
+			if err := tx.Delete(ctx, collection.Collection(), collection.GetPrimaryKey(d)); err != nil {
+				return false, err
+			}
+			return true, nil
+		})
+		if err != nil {
+			return err
+		}
+		return nil
+	}); err != nil {
+		return err
+	}
+	if err := d.kv.DropPrefix(ctx, collectionPrefix(ctx, collection.Collection())); err != nil {
 		return errors.Wrap(err, errors.Internal, "failed to remove collection %s", collection)
 	}
-	if err := d.deleteCollectionConfig(ctx, collection); err != nil {
+	if err := d.deleteCollectionConfig(ctx, collection.Collection()); err != nil {
 		return errors.Wrap(err, errors.Internal, "failed to remove collection %s", collection)
 	}
 	return nil
 }
 
-func (d *defaultDB) Configure(ctx context.Context, collectionSchemaBytes []byte) error {
-	jsonBytes, err := util.YAMLToJSON(collectionSchemaBytes)
-	if err != nil {
-		return err
-	}
-	collection, err := newCollectionSchema(jsonBytes)
-	if err != nil {
-		return err
-	}
-
-	before := d.GetSchema(ctx, collection.Collection())
-	if before != nil {
-		pass, err := d.authorizeConfigure(ctx, before)
+func (d *defaultDB) Configure(ctx context.Context, config CollectionConfiguration) error {
+	egp, ctx := errgroup.WithContext(ctx)
+	removed := d.removedCollections(ctx, config)
+	for _, r := range removed {
+		r := r
+		pass, err := d.authorizeConfigure(ctx, r)
 		if err != nil {
 			return err
 		}
 		if !pass {
 			return errors.New(errors.Forbidden, "not authorized: %s", ConfigureAction)
 		}
+		egp.Go(func() error {
+			return d.dropCollection(ctx, r)
+		})
 	}
+
+	for name, collectionSchemaBytes := range config {
+		name := name
+		collectionSchemaBytes := collectionSchemaBytes
+		before := d.GetSchema(ctx, name)
+		if before != nil {
+			if bits, _ := before.MarshalYAML(); string(bits) == collectionSchemaBytes {
+				continue
+			}
+			pass, err := d.authorizeConfigure(ctx, before)
+			if err != nil {
+				return err
+			}
+			if !pass {
+				return errors.New(errors.Forbidden, "not authorized: %s", ConfigureAction)
+			}
+		}
+		jsonBytes, err := util.YAMLToJSON([]byte(collectionSchemaBytes))
+		if err != nil {
+			return err
+		}
+		collection, err := newCollectionSchema(jsonBytes)
+		if err != nil {
+			return err
+		}
+		egp.Go(func() error {
+			return d.configureCollection(ctx, collection)
+		})
+	}
+	return egp.Wait()
+}
+
+func (d *defaultDB) configureCollection(ctx context.Context, collection CollectionSchema) error {
 	ctx = context.WithValue(ctx, isIndexingKey, true)
 	ctx = context.WithValue(ctx, internalKey, true)
 	unlock, err := d.lockCollection(ctx, collection.Collection())
@@ -292,6 +339,21 @@ func (d *defaultDB) Configure(ctx context.Context, collectionSchemaBytes []byte)
 	return nil
 }
 
+func (d *defaultDB) removedCollections(ctx context.Context, config CollectionConfiguration) []CollectionSchema {
+	var removed []CollectionSchema
+	existing := d.Collections(ctx)
+	keys := lo.Keys(config)
+	for _, key := range existing {
+		if key == cdcCollectionName {
+			continue
+		}
+		if !lo.Contains(keys, key) {
+			removed = append(removed, d.GetSchema(ctx, key))
+		}
+	}
+	return removed
+}
+
 func (d *defaultDB) Collections(ctx context.Context) []string {
 	var names []string
 	d.collections.Range(func(key, value any) bool {
@@ -311,7 +373,7 @@ func (d *defaultDB) GetSchema(ctx context.Context, collection string) Collection
 	return s
 }
 
-func (d *defaultDB) ChangeStream(ctx context.Context, collection string, fn func(cdc CDC) (bool, error)) error {
+func (d *defaultDB) ChangeStream(ctx context.Context, collection string, filter []Where, fn ChangeStreamHandler) error {
 	if collection != "*" && !d.HasCollection(ctx, collection) {
 		return errors.New(errors.Validation, "collection does not exist: %s", collection)
 	}
@@ -319,7 +381,7 @@ func (d *defaultDB) ChangeStream(ctx context.Context, collection string, fn func
 		if !d.HasCollection(ctx, collection) {
 			return errors.New(errors.Validation, "collection does not exist: %s", collection)
 		}
-		pass, err := d.authorizeChangeStream(ctx, d.GetSchema(ctx, collection))
+		pass, err := d.authorizeChangeStream(ctx, d.GetSchema(ctx, collection), filter)
 		if err != nil {
 			return err
 		}
@@ -330,12 +392,19 @@ func (d *defaultDB) ChangeStream(ctx context.Context, collection string, fn func
 
 	pfx := indexPrefix(ctx, "cdc", "_id.primaryidx")
 	return d.kv.ChangeStream(ctx, pfx, func(cdc kv.CDC) (bool, error) {
-		var c CDC
-		if err := json.Unmarshal(cdc.Value, &c); err != nil {
-			return false, errors.Wrap(err, errors.Internal, "failed to unmarshal cdc")
+		doc, _ := NewDocumentFromBytes(cdc.Value)
+		pass, err := doc.Where(filter)
+		if err != nil {
+			return false, err
 		}
-		if c.Collection == collection || collection == "*" {
-			return fn(c)
+		if pass {
+			var c CDC
+			if err := doc.Scan(&c); err != nil {
+				return false, errors.Wrap(err, errors.Internal, "failed to unmarshal cdc")
+			}
+			if c.Collection == collection || collection == "*" {
+				return fn(ctx, c)
+			}
 		}
 		return true, nil
 	})

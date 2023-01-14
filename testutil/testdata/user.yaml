@@ -60,14 +60,14 @@ properties:
 # x-triggers are javascript functions that execute based on certain events
 x-triggers:
   # name of the trigger
-  set_timestamp:
+  setTimestamp:
     # order determines the order in which the functions are executed - lower ordered triggers are executed first
     order: 1
     # events configures the trigger to execute on certain events
     events:
-      - on_create
-      - on_update
-      - on_set
+      - onCreate
+      - onUpdate
+      - onSet
     # script is the javascript to execute
     script: |
-      doc.set('timestamp', new Date().toISOString())
+      doc.Set('timestamp', new Date().toISOString())

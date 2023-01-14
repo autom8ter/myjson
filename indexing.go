@@ -21,7 +21,7 @@ func seekPrefix(ctx context.Context, collection string, i Index, fields map[stri
 	fields, _ = flat.Flatten(fields, nil)
 	var prefix = indexPathPrefix{
 		prefix: [][]byte{
-			[]byte(cast.ToString(GetMetadataValue(ctx, "namespace"))),
+			[]byte(cast.ToString(GetMetadataValue(ctx, MetadataKeyNamespace))),
 			[]byte("index"),
 			[]byte(collection),
 			[]byte(i.Name),
@@ -85,7 +85,7 @@ func (i indexPathPrefix) Fields() []indexFieldValue {
 
 func indexPrefix(ctx context.Context, collection, index string) []byte {
 	path := [][]byte{
-		[]byte(cast.ToString(GetMetadataValue(ctx, "namespace"))),
+		[]byte(cast.ToString(GetMetadataValue(ctx, MetadataKeyNamespace))),
 		[]byte("index"),
 		[]byte(collection),
 		[]byte(index),
@@ -95,7 +95,7 @@ func indexPrefix(ctx context.Context, collection, index string) []byte {
 
 func collectionPrefix(ctx context.Context, collection string) []byte {
 	path := [][]byte{
-		[]byte(cast.ToString(GetMetadataValue(ctx, "namespace"))),
+		[]byte(cast.ToString(GetMetadataValue(ctx, MetadataKeyNamespace))),
 		[]byte("index"),
 		[]byte(collection),
 	}

@@ -59,14 +59,17 @@ func (t *transaction) authorizeQuery(ctx context.Context, schema CollectionSchem
 	if len(schema.Authz().Rules) == 0 {
 		return true, nil
 	}
-	if err := t.vm.Set("ctx", ctx); err != nil {
+	if err := t.vm.Set(string(JavascriptGlobalCtx), ctx); err != nil {
 		return false, err
 	}
-	if err := t.vm.Set("query", query); err != nil {
+	if err := t.vm.Set(string(JavascriptGlobalSchema), schema); err != nil {
+		return false, err
+	}
+	if err := t.vm.Set(string(JavascriptGlobalQuery), *query); err != nil {
 		return false, err
 	}
 	meta := ExtractMetadata(ctx)
-	if err := t.vm.Set("meta", meta); err != nil {
+	if err := t.vm.Set(string(JavascriptGlobalMeta), meta); err != nil {
 		return false, err
 	}
 
@@ -116,11 +119,14 @@ func (t *defaultDB) authorizeConfigure(ctx context.Context, schema CollectionSch
 		return true, nil
 	}
 	vm := <-t.vmPool
-	if err := vm.Set("ctx", ctx); err != nil {
+	if err := vm.Set(string(JavascriptGlobalCtx), ctx); err != nil {
+		return false, err
+	}
+	if err := vm.Set(string(JavascriptGlobalSchema), schema); err != nil {
 		return false, err
 	}
 	meta := ExtractMetadata(ctx)
-	if err := vm.Set("meta", meta); err != nil {
+	if err := vm.Set(string(JavascriptGlobalMeta), meta); err != nil {
 		return false, err
 	}
 
@@ -162,7 +168,7 @@ func (t *defaultDB) authorizeConfigure(ctx context.Context, schema CollectionSch
 	return false, nil
 }
 
-func (t *defaultDB) authorizeChangeStream(ctx context.Context, schema CollectionSchema) (bool, error) {
+func (t *defaultDB) authorizeChangeStream(ctx context.Context, schema CollectionSchema, filter []Where) (bool, error) {
 	if isInternal(ctx) || isIndexing(ctx) {
 		return true, nil
 	}
@@ -170,14 +176,17 @@ func (t *defaultDB) authorizeChangeStream(ctx context.Context, schema Collection
 		return true, nil
 	}
 	vm := <-t.vmPool
-	if err := vm.Set("ctx", ctx); err != nil {
+	if err := vm.Set(string(JavascriptGlobalCtx), ctx); err != nil {
 		return false, err
 	}
-	if err := vm.Set("schema", schema); err != nil {
+	if err := vm.Set(string(JavascriptGlobalSchema), schema); err != nil {
+		return false, err
+	}
+	if err := vm.Set(string(JavascriptGlobalFilter), filter); err != nil {
 		return false, err
 	}
 	meta := ExtractMetadata(ctx)
-	if err := vm.Set("meta", meta); err != nil {
+	if err := vm.Set(string(JavascriptGlobalMeta), meta); err != nil {
 		return false, err
 	}
 

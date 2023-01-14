@@ -34,7 +34,9 @@ properties:
     type: string
     description: The accounts's name.
 `
-	if err := db.Configure(ctx, []byte(accountSchema)); err != nil {
+	if err := db.Configure(ctx, map[string]string{
+		"account": accountSchema,
+	}); err != nil {
 		panic(err)
 	}
 	if err := db.Tx(ctx, kv.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx myjson.Tx) error {

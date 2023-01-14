@@ -43,17 +43,23 @@ type CollectionSchema interface {
 	json.Unmarshaler
 }
 
+// ChangeStreamHandler handles changes to documents which are emitted as a change data capture stream
+type ChangeStreamHandler func(ctx context.Context, cdc CDC) (bool, error)
+
+// CollectionConfiguration is a map of collection names to collection schemas - it declarative represents the database collection configuration
+type CollectionConfiguration map[string]string
+
 // Database is a NoSQL database built on top of key value storage
 type Database interface {
-	// Collections returns a list of collection names that are registered in the collection
+	// Collections returns a list of collection names that are registered in the database
 	Collections(ctx context.Context) []string
-	// Configure overwrites a single database collection configuration. It will create the collection if it does not exist
-	// and will update the collection if it does exist. The collection will be created/updated with the given schema and indexing.
-	Configure(ctx context.Context, collectionSchemaBytes []byte) error
 	// GetSchema gets a collection schema by name (if it exists)
 	GetSchema(ctx context.Context, collection string) CollectionSchema
 	// HasCollection reports whether a collection exists in the database
 	HasCollection(ctx context.Context, collection string) bool
+	// Configure sets the database collection configurations. It will create/update/delete the necessary collections and indexes to
+	// match the given configuration
+	Configure(ctx context.Context, config CollectionConfiguration) error
 	// Tx executes the given function against a new transaction.
 	// if the function returns an error, all changes will be rolled back.
 	// otherwise, the changes will be commited to the database
@@ -61,7 +67,7 @@ type Database interface {
 	// NewTx returns a new transaction. a transaction must call Commit method in order to persist changes
 	NewTx(opts kv.TxOpts) (Txn, error)
 	// ChangeStream streams changes to documents in the given collection. CDC Persistence must be enabled to use this method.
-	ChangeStream(ctx context.Context, collection string, fn func(cdc CDC) (bool, error)) error
+	ChangeStream(ctx context.Context, collection string, filter []Where, fn ChangeStreamHandler) error
 	// Get gets a single document by id
 	Get(ctx context.Context, collection, id string) (*Document, error)
 	// ForEach scans the optimal index for a collection's documents passing its filters.
@@ -70,8 +76,6 @@ type Database interface {
 	ForEach(ctx context.Context, collection string, opts ForEachOpts, fn ForEachFunc) (Explain, error)
 	// Query queries a list of documents
 	Query(ctx context.Context, collection string, query Query) (Page, error)
-	// Get gets 1-many document by id(s)
-	BatchGet(ctx context.Context, collection string, ids []string) (Documents, error)
 	// RunScript executes a javascript function within the script
 	// The following global variables will be injected: 'db' - a database instance, 'ctx' - the context passed to RunScript, and 'params' - the params passed to RunScript
 	RunScript(ctx context.Context, function string, script string, params map[string]any) (any, error)

@@ -442,15 +442,19 @@ func (t *transaction) queryScan(ctx context.Context, collection string, where []
 }
 
 func (t *transaction) evaluate(ctx context.Context, c CollectionSchema, command *persistCommand) error {
-	if err := t.vm.Set("ctx", ctx); err != nil {
+	if err := t.vm.Set(string(JavascriptGlobalCtx), ctx); err != nil {
 		return err
 	}
-	if err := t.vm.Set("doc", command.Document); err != nil {
+	if err := t.vm.Set(string(JavascriptGlobalDoc), command.Document); err != nil {
 		return err
 	}
-	if err := t.vm.Set("meta", command.Metadata); err != nil {
+	if err := t.vm.Set(string(JavascriptGlobalMeta), command.Metadata); err != nil {
 		return err
 	}
+	if err := t.vm.Set(string(JavascriptGlobalSchema), c); err != nil {
+		return err
+	}
+
 	for _, trigger := range c.Triggers() {
 		switch {
 		case command.Action == DeleteAction && lo.Contains(trigger.Events, OnDelete):
