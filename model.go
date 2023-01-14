@@ -194,9 +194,9 @@ func SetMetadataValues(ctx context.Context, data map[string]any) context.Context
 	m, ok := ctx.Value(metadataKey).(*Document)
 	if !ok {
 		m = NewDocument()
-		m.Set("namespace", "default")
+		_ = m.Set("namespace", "default")
 	}
-	m.SetAll(data)
+	_ = m.SetAll(data)
 	return context.WithValue(ctx, metadataKey, m)
 }
 
@@ -207,7 +207,8 @@ func ExtractMetadata(ctx context.Context) *Document {
 		return m
 	}
 	m = NewDocument()
-	m.Set("namespace", "default")
+
+	_ = m.Set("namespace", "default")
 	return m
 }
 
