@@ -86,15 +86,14 @@ func Test(t *testing.T) {
 	})
 	t.Run("create & stream", func(t *testing.T) {
 		assert.Nil(t, testutil.TestDB(func(ctx context.Context, db myjson.Database) {
-			fmt.Println(myjson.GetMetadataValue(ctx, "is_super_user"))
-			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+			ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
 			defer cancel()
 			wg := sync.WaitGroup{}
 			wg.Add(1)
 			var received = make(chan struct{}, 1)
 			go func() {
 				defer wg.Done()
-				ctx, cancel := context.WithCancel(context.Background())
+				ctx, cancel := context.WithCancel(ctx)
 				defer cancel()
 				err := db.ChangeStream(ctx, "user", func(cdc myjson.CDC) (bool, error) {
 					received <- struct{}{}

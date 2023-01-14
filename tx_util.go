@@ -542,9 +542,11 @@ func (t *transaction) authorizeQuery(ctx context.Context, schema CollectionSchem
 	if err := t.vm.Set("query", query); err != nil {
 		return false, err
 	}
-	if err := t.vm.Set("meta", ExtractMetadata(ctx)); err != nil {
+	meta := ExtractMetadata(ctx)
+	if err := t.vm.Set("meta", meta); err != nil {
 		return false, err
 	}
+
 	deny := lo.Filter(schema.Authz().Rules, func(a AuthzRule, i int) bool {
 		if a.Action[0] == "*" && a.Effect == Deny {
 			return true
