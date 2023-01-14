@@ -55,13 +55,12 @@ func (t *transaction) Update(ctx context.Context, collection string, id string, 
 	if err := schema.SetPrimaryKey(doc, id); err != nil {
 		return errors.Wrap(err, 0, "tx: failed to set primary key")
 	}
-	md, _ := GetMetadata(ctx)
 	if err := t.persistCommand(ctx, &persistCommand{
 		Collection: collection,
-		Action:     Update,
+		Action:     UpdateAction,
 		Document:   doc,
 		Timestamp:  time.Now().UnixNano(),
-		Metadata:   md,
+		Metadata:   ExtractMetadata(ctx),
 	}); err != nil {
 		return errors.Wrap(err, 0, "tx: failed to commit update")
 	}
@@ -81,13 +80,12 @@ func (t *transaction) Create(ctx context.Context, collection string, document *D
 			return "", err
 		}
 	}
-	md, _ := GetMetadata(ctx)
 	if err := t.persistCommand(ctx, &persistCommand{
 		Collection: collection,
-		Action:     Create,
+		Action:     CreateAction,
 		Document:   document,
 		Timestamp:  time.Now().UnixNano(),
-		Metadata:   md,
+		Metadata:   ExtractMetadata(ctx),
 	}); err != nil {
 		return "", errors.Wrap(err, 0, "tx: failed to commit create")
 	}
@@ -99,13 +97,12 @@ func (t *transaction) Set(ctx context.Context, collection string, document *Docu
 	if schema == nil {
 		return errors.New(errors.Validation, "tx: unsupported collection: %s", collection)
 	}
-	md, _ := GetMetadata(ctx)
 	if err := t.persistCommand(ctx, &persistCommand{
 		Collection: collection,
-		Action:     Set,
+		Action:     SetAction,
 		Document:   document,
 		Timestamp:  time.Now().UnixNano(),
-		Metadata:   md,
+		Metadata:   ExtractMetadata(ctx),
 	}); err != nil {
 		return errors.Wrap(err, 0, "tx: failed to commit set")
 	}
@@ -117,16 +114,15 @@ func (t *transaction) Delete(ctx context.Context, collection string, id string) 
 	if schema == nil {
 		return errors.New(errors.Validation, "tx: unsupported collection: %s", collection)
 	}
-	md, _ := GetMetadata(ctx)
 	d, _ := NewDocumentFrom(map[string]any{
 		t.db.GetSchema(ctx, collection).PrimaryKey(): id,
 	})
 	if err := t.persistCommand(ctx, &persistCommand{
 		Collection: collection,
-		Action:     Delete,
+		Action:     DeleteAction,
 		Document:   d,
 		Timestamp:  time.Now().UnixNano(),
-		Metadata:   md,
+		Metadata:   ExtractMetadata(ctx),
 	}); err != nil {
 		return errors.Wrap(err, 0, "tx: failed to commit delete")
 	}
@@ -143,6 +139,13 @@ func (t *transaction) Query(ctx context.Context, collection string, query Query)
 	schema, ctx := t.db.getSchema(ctx, collection)
 	if schema == nil {
 		return Page{}, errors.New(errors.Validation, "tx: unsupported collection: %s", collection)
+	}
+	allow, err := t.authorizeQuery(ctx, schema, &query)
+	if err != nil {
+		return Page{}, err
+	}
+	if !allow {
+		return Page{}, errors.New(errors.Forbidden, "not authorized: %s/%s", collection, QueryAction)
 	}
 	if isAggregateQuery(query) {
 		return t.aggregate(ctx, collection, query)
@@ -198,82 +201,82 @@ func (t *transaction) Get(ctx context.Context, collection string, id string) (*D
 	if c == nil {
 		return nil, errors.New(errors.Validation, "tx: unsupported collection: %s", collection)
 	}
-	primaryIndex := c.PrimaryIndex()
-	val, err := t.tx.Get(ctx, seekPrefix(ctx, collection, primaryIndex, map[string]any{
-		c.PrimaryKey(): id,
-	}).Seek(id).Path())
+	results, err := t.Query(ctx, collection, Query{Where: []Where{{Field: c.PrimaryKey(), Op: WhereOpEq, Value: id}}, Limit: 1})
 	if err != nil {
 		return nil, errors.Wrap(err, errors.NotFound, "%s not found", id)
 	}
-	if val == nil {
+	if results.Count == 0 {
 		return nil, errors.New(errors.NotFound, "%s not found", id)
 	}
-	doc, err := NewDocumentFromBytes(val)
-	if err != nil {
-		return nil, err
-	}
-	if doc == nil {
-		return nil, errors.New(errors.NotFound, "%s not found", id)
-	}
-	return doc, nil
+	return results.Documents[0], nil
 }
 
-func (t *transaction) Cmd(ctx context.Context, cmd TxCmd) (TxResponse, error) {
+func (t *transaction) Cmd(ctx context.Context, cmd TxCmd) TxResponse {
 	switch {
+	case cmd.Commit != nil:
+		if err := t.Commit(ctx); err != nil {
+			return TxResponse{Commit: &struct{}{}, Error: errors.Extract(err)}
+		}
+		return TxResponse{Commit: &struct{}{}}
+	case cmd.Rollback != nil:
+		if err := t.Rollback(ctx); err != nil {
+			return TxResponse{Rollback: &struct{}{}, Error: errors.Extract(err)}
+		}
+		return TxResponse{Rollback: &struct{}{}}
 	case cmd.Query != nil:
 		results, err := t.Query(ctx, cmd.Query.Collection, cmd.Query.Query)
 		if err != nil {
-			return TxResponse{}, err
+			return TxResponse{Error: errors.Extract(err)}
 		}
 		return TxResponse{
-			Query: results,
-		}, nil
+			Query: &results,
+		}
 	case cmd.Create != nil:
 		_, err := t.Create(ctx, cmd.Create.Collection, cmd.Create.Document)
 		if err != nil {
-			return TxResponse{}, err
+			return TxResponse{Error: errors.Extract(err)}
 		}
 		return TxResponse{
 			Create: cmd.Create.Document,
-		}, nil
+		}
 	case cmd.Set != nil:
 		err := t.Set(ctx, cmd.Set.Collection, cmd.Set.Document)
 		if err != nil {
-			return TxResponse{}, err
+			return TxResponse{Error: errors.Extract(err)}
 		}
 		return TxResponse{
 			Set: cmd.Set.Document,
-		}, nil
+		}
 	case cmd.Delete != nil:
 		err := t.Delete(ctx, cmd.Delete.Collection, cmd.Delete.ID)
 		if err != nil {
-			return TxResponse{}, err
+			return TxResponse{Error: errors.Extract(err)}
 		}
 		return TxResponse{
 			Delete: &struct{}{},
-		}, nil
+		}
 	case cmd.Get != nil:
 		doc, err := t.Get(ctx, cmd.Get.Collection, cmd.Get.ID)
 		if err != nil {
-			return TxResponse{}, err
+			return TxResponse{Error: errors.Extract(err)}
 		}
 		return TxResponse{
 			Get: doc,
-		}, nil
+		}
 	case cmd.Update != nil:
 		err := t.Update(ctx, cmd.Update.Collection, cmd.Update.ID, cmd.Update.Update)
 		if err != nil {
-			return TxResponse{}, err
+			return TxResponse{Error: errors.Extract(err)}
 		}
 		doc, err := t.Get(ctx, cmd.Update.Collection, cmd.Update.ID)
 		if err != nil {
-			return TxResponse{}, err
+			return TxResponse{Error: errors.Extract(err)}
 		}
 		return TxResponse{
 			Update: doc,
-		}, nil
+		}
 	}
-	return TxResponse{}, errors.New(errors.Validation, "tx: unsupported command")
+	return TxResponse{Error: errors.Extract(errors.New(errors.Validation, "tx: unsupported command"))}
 }
 
 // aggregate performs aggregations against the collection
@@ -339,6 +342,16 @@ func docsHaving(where []Where, results Documents) (Documents, error) {
 }
 
 func (t *transaction) ForEach(ctx context.Context, collection string, opts ForEachOpts, fn ForEachFunc) (Explain, error) {
+	pass, err := t.authorizeQuery(ctx, t.db.GetSchema(ctx, collection), &Query{
+		Where: opts.Where,
+		Join:  opts.Join,
+	})
+	if err != nil {
+		return Explain{}, err
+	}
+	if !pass {
+		return Explain{}, errors.New(errors.Forbidden, "not authorized: %s", QueryAction)
+	}
 	return t.queryScan(ctx, collection, opts.Where, opts.Join, fn)
 }
 

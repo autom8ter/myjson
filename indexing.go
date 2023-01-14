@@ -6,6 +6,7 @@ import (
 
 	"github.com/autom8ter/myjson/util"
 	"github.com/nqd/flat"
+	"github.com/spf13/cast"
 )
 
 var nullByte = []byte("\x00")
@@ -17,11 +18,10 @@ type indexFieldValue struct {
 }
 
 func seekPrefix(ctx context.Context, collection string, i Index, fields map[string]any) indexPathPrefix {
-	md, _ := GetMetadata(ctx)
 	fields, _ = flat.Flatten(fields, nil)
 	var prefix = indexPathPrefix{
 		prefix: [][]byte{
-			[]byte(md.GetNamespace()),
+			[]byte(cast.ToString(GetMetadataValue(ctx, "namespace"))),
 			[]byte("index"),
 			[]byte(collection),
 			[]byte(i.Name),
@@ -84,9 +84,8 @@ func (i indexPathPrefix) Fields() []indexFieldValue {
 }
 
 func indexPrefix(ctx context.Context, collection, index string) []byte {
-	md, _ := GetMetadata(ctx)
 	path := [][]byte{
-		[]byte(md.GetNamespace()),
+		[]byte(cast.ToString(GetMetadataValue(ctx, "namespace"))),
 		[]byte("index"),
 		[]byte(collection),
 		[]byte(index),
@@ -95,9 +94,8 @@ func indexPrefix(ctx context.Context, collection, index string) []byte {
 }
 
 func collectionPrefix(ctx context.Context, collection string) []byte {
-	md, _ := GetMetadata(ctx)
 	path := [][]byte{
-		[]byte(md.GetNamespace()),
+		[]byte(cast.ToString(GetMetadataValue(ctx, "namespace"))),
 		[]byte("index"),
 		[]byte(collection),
 	}

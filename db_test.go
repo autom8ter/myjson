@@ -64,7 +64,7 @@ func Test(t *testing.T) {
 				err = tx.Set(ctx, "account", u)
 				return err
 			}))
-		}), myjson.WithPersistCDC(true))
+		}))
 	})
 	t.Run("batch create", func(t *testing.T) {
 		assert.Nil(t, testutil.TestDB(func(ctx context.Context, db myjson.Database) {
@@ -86,14 +86,14 @@ func Test(t *testing.T) {
 	})
 	t.Run("create & stream", func(t *testing.T) {
 		assert.Nil(t, testutil.TestDB(func(ctx context.Context, db myjson.Database) {
-			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+			ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
 			defer cancel()
 			wg := sync.WaitGroup{}
 			wg.Add(1)
 			var received = make(chan struct{}, 1)
 			go func() {
 				defer wg.Done()
-				ctx, cancel := context.WithCancel(context.Background())
+				ctx, cancel := context.WithCancel(ctx)
 				defer cancel()
 				err := db.ChangeStream(ctx, "user", func(cdc myjson.CDC) (bool, error) {
 					received <- struct{}{}
@@ -107,7 +107,9 @@ func Test(t *testing.T) {
 			)
 			assert.Nil(t, db.Tx(ctx, kv.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx myjson.Tx) error {
 				id, err = tx.Create(ctx, "user", testutil.NewUserDoc())
+				assert.NoError(t, err)
 				_, err := tx.Get(ctx, "user", id)
+				assert.NoError(t, err)
 				return err
 			}))
 			u, err := db.Get(ctx, "user", id)
@@ -115,7 +117,7 @@ func Test(t *testing.T) {
 			assert.NotNil(t, u)
 			assert.Equal(t, id, u.GetString("_id"))
 			<-received
-		}, myjson.WithPersistCDC(true)))
+		}))
 	})
 	t.Run("set", func(t *testing.T) {
 		assert.Nil(t, testutil.TestDB(func(ctx context.Context, db myjson.Database) {
@@ -607,7 +609,7 @@ func TestIndexing1(t *testing.T) {
 				assert.False(t, o.Reverse)
 				assert.Equal(t, "timestamp", o.SeekFields[0])
 				assert.NotEqual(t, 0, count)
-			}, myjson.WithPersistCDC(true)))
+			}))
 		})
 		t.Run("all results (<)", func(t *testing.T) {
 			assert.Nil(t, testutil.TestDB(func(ctx context.Context, db myjson.Database) {
@@ -641,7 +643,7 @@ func TestIndexing1(t *testing.T) {
 				assert.True(t, o.Reverse)
 				assert.Equal(t, "timestamp", o.SeekFields[0])
 				assert.NotEqual(t, 0, count)
-			}, myjson.WithPersistCDC(true)))
+			}))
 		})
 		t.Run("some results (<=)", func(t *testing.T) {
 			assert.Nil(t, testutil.TestDB(func(ctx context.Context, db myjson.Database) {
@@ -675,7 +677,7 @@ func TestIndexing1(t *testing.T) {
 				assert.True(t, o.Reverse)
 				assert.Equal(t, "timestamp", o.SeekFields[0])
 				assert.NotEqual(t, 0, count)
-			}, myjson.WithPersistCDC(true)))
+			}))
 		})
 		t.Run("no results (>)", func(t *testing.T) {
 			assert.Nil(t, testutil.TestDB(func(ctx context.Context, db myjson.Database) {
@@ -709,7 +711,7 @@ func TestIndexing1(t *testing.T) {
 				assert.False(t, o.Reverse)
 				assert.Equal(t, "timestamp", o.SeekFields[0])
 				assert.Equal(t, 0, count)
-			}, myjson.WithPersistCDC(true)))
+			}))
 		})
 		t.Run("no results (<)", func(t *testing.T) {
 			assert.Nil(t, testutil.TestDB(func(ctx context.Context, db myjson.Database) {
@@ -743,7 +745,7 @@ func TestIndexing1(t *testing.T) {
 				assert.True(t, o.Reverse)
 				assert.Equal(t, "timestamp", o.SeekFields[0])
 				assert.Equal(t, 0, count)
-			}, myjson.WithPersistCDC(true)))
+			}))
 		})
 	})
 
@@ -1323,4 +1325,11 @@ func TestTriggers(t *testing.T) {
 			}))
 		}))
 	})
+}
+
+func TestDropCollection(t *testing.T) {
+	assert.NoError(t, testutil.TestDB(func(ctx context.Context, db myjson.Database) {
+		assert.Nil(t, db.DropCollection(ctx, "task"))
+		assert.False(t, db.HasCollection(ctx, "task"))
+	}))
 }

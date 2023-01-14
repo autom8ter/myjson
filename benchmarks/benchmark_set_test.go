@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// BenchmarkSet-12    	    1648	    651361 ns/op	  366783 B/op	    4600 allocs/op
+// BenchmarkSet-12    	    1118	   1081728 ns/op	  464895 B/op	    5772 allocs/op
 func BenchmarkSet(b *testing.B) {
 	doc := testutil.NewUserDoc()
 	assert.Nil(b, testutil.TestDB(func(ctx context.Context, db myjson.Database) {
@@ -24,7 +24,7 @@ func BenchmarkSet(b *testing.B) {
 	}))
 }
 
-// BenchmarkSet1000-12    	       3	 348299819 ns/op	188733965 B/op	 2011669 allocs/op
+// BenchmarkSet1000-12    	       2	 698652474 ns/op	243967400 B/op	 2734921 allocs/op
 func BenchmarkSet1000(b *testing.B) {
 	doc := testutil.NewUserDoc()
 	b.ReportAllocs()

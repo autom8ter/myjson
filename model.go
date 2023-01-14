@@ -2,8 +2,6 @@ package myjson
 
 import (
 	"context"
-	"encoding/json"
-	"sync"
 	"time"
 
 	// import embed package
@@ -12,7 +10,6 @@ import (
 	"github.com/autom8ter/myjson/errors"
 	"github.com/autom8ter/myjson/util"
 	"github.com/samber/lo"
-	"github.com/spf13/cast"
 )
 
 // WhereOp is an operation belonging to a where clause
@@ -176,111 +173,43 @@ const (
 	metadataKey ctxKey = 0
 )
 
-// Metadata holds key value pairs associated with a go Context
-type Metadata struct {
-	tags sync.Map
-}
-
-// NewMetadata creates a Metadata with the given tags
-func NewMetadata(tags map[string]any) *Metadata {
-	m := &Metadata{}
-	if tags != nil {
-		m.SetAll(tags)
+// GetMetadataValue gets a metadata value from the context if it exists
+func GetMetadataValue(ctx context.Context, key string) any {
+	m, ok := ctx.Value(metadataKey).(*Document)
+	if ok {
+		val := m.Get(key)
+		if val == nil && key == "namespace" {
+			return "default"
+		}
+		return val
 	}
-	return m
-}
-
-// String return a json string of the context
-func (m *Metadata) String() string {
-	bits, _ := m.MarshalJSON()
-	return string(bits)
-}
-
-// MarshalJSON returns the metadata values as json bytes
-func (m *Metadata) MarshalJSON() ([]byte, error) {
-	return json.Marshal(m.Map())
-}
-
-// UnmarshalJSON decodes the metadata from json bytes
-func (m *Metadata) UnmarshalJSON(bytes []byte) error {
-	data := map[string]any{}
-	if err := json.Unmarshal(bytes, &data); err != nil {
-		return err
+	if key == "namespace" {
+		return "default"
 	}
-	m.SetAll(data)
 	return nil
 }
 
-// SetAll sets the key value fields on the metadata
-func (m *Metadata) SetAll(data map[string]any) {
-	for k, v := range data {
-		m.tags.Store(k, v)
-	}
-}
-
-// Set sets a key value pair on the metadata
-func (m *Metadata) Set(key string, value any) {
-	m.SetAll(map[string]any{
-		key: value,
-	})
-}
-
-// SetNamespace sets the namespace on the context metadata
-// Data belonging to different namespaces are stored/indexed separately, though collections exist across namespaces
-func (m *Metadata) SetNamespace(value string) {
-	m.SetAll(map[string]any{
-		"namespace": value,
-	})
-}
-
-// GetNamespace gets the namespace from the metadata, or 'default' if it does not exist
-// Data belonging to different namespaces are stored/indexed separately, though collections exist across namespaces
-func (m *Metadata) GetNamespace() string {
-	val, ok := m.tags.Load("namespace")
+// SetMetadataValues sets metadata key value pairs in the context
+func SetMetadataValues(ctx context.Context, data map[string]any) context.Context {
+	m, ok := ctx.Value(metadataKey).(*Document)
 	if !ok {
-		return "default"
+		m = NewDocument()
+		_ = m.Set("namespace", "default")
 	}
-	return cast.ToString(val)
-}
-
-// Del deletes a key from the metadata
-func (m *Metadata) Del(key string) {
-	m.tags.Delete(key)
-}
-
-// Get gets a key from the metadata if it exists
-func (m *Metadata) Get(key string) (any, bool) {
-	return m.tags.Load(key)
-}
-
-// Exists returns true if the key exists in the metadata
-func (m *Metadata) Exists(key string) bool {
-	_, ok := m.tags.Load(key)
-	return ok
-}
-
-// Map returns the metadata keyvalues as a map
-func (m *Metadata) Map() map[string]any {
-	data := map[string]any{}
-	m.tags.Range(func(key, value any) bool {
-		data[key.(string)] = value
-		return true
-	})
-	return data
-}
-
-// ToContext adds the metadata to the input go context
-func (m *Metadata) ToContext(ctx context.Context) context.Context {
+	_ = m.SetAll(data)
 	return context.WithValue(ctx, metadataKey, m)
 }
 
-// GetMetadata gets metadata from the context if it exists
-func GetMetadata(ctx context.Context) (*Metadata, bool) {
-	m, ok := ctx.Value(metadataKey).(*Metadata)
+// ExtractMetadata extracts metadata from the context and returns it
+func ExtractMetadata(ctx context.Context) *Document {
+	m, ok := ctx.Value(metadataKey).(*Document)
 	if ok {
-		return m, true
+		return m
 	}
-	return &Metadata{}, false
+	m = NewDocument()
+
+	_ = m.Set("namespace", "default")
+	return m
 }
 
 // Page is a page of documents
@@ -325,14 +254,16 @@ type Explain struct {
 type Action string
 
 const (
-	// Create creates a document
-	Create = "create"
-	// Set sets a document's values in place
-	Set = "set"
-	// Update updates a set of fields on a document
-	Update = "update"
-	// Delete deletes a document
-	Delete = "delete"
+	// CreateAction creates a document
+	CreateAction Action = "create"
+	// SetAction sets a document's values in place
+	SetAction Action = "set"
+	// UpdateAction updates a set of fields on a document
+	UpdateAction Action = "update"
+	// DeleteAction deletes a document
+	DeleteAction Action = "delete"
+	// QueryAction queries documents
+	QueryAction Action = "query"
 )
 
 // persistCommand is a command executed against the database that causes a change in state
@@ -341,7 +272,7 @@ type persistCommand struct {
 	Action     Action    `json:"action" validate:"required,oneof='create' 'update' 'delete' 'set'"`
 	Document   *Document `json:"document" validate:"required"`
 	Timestamp  int64     `json:"timestamp" validate:"required"`
-	Metadata   *Metadata `json:"metadata" validate:"required"`
+	Metadata   *Document `json:"metadata" validate:"required"`
 }
 
 // Index is a database index used to optimize queries against a collection
@@ -423,7 +354,7 @@ type CDC struct {
 	// Timestamp is the nanosecond timestamp the cdc was created at
 	Timestamp int64 `json:"timestamp" validate:"required"`
 	// Metadata is the context metadata when the change was made
-	Metadata *Metadata `json:"metadata" validate:"required"`
+	Metadata *Document `json:"metadata" validate:"required"`
 }
 
 // ForeignKey is a reference/relationship to another collection by primary key
@@ -500,6 +431,10 @@ type TxCmd struct {
 	Delete *DeleteCmd `json:"delete,omitempty"`
 	// Query is a query command
 	Query *QueryCmd `json:"query,omitempty"`
+	// Commit is a commit command - it ends the transaction
+	Commit *CommitCmd `json:"commit,omitempty"`
+	// Rollback is a rollback command - it ends the transaction
+	Rollback *RollbackCmd `json:"rollback,omitempty"`
 }
 
 // TxResponse is a serializable transaction response
@@ -515,7 +450,13 @@ type TxResponse struct {
 	// Delete is an empty delete response
 	Delete *struct{} `json:"delete,omitempty"`
 	// Query is a query response - it contains the documents returned from the query
-	Query Page `json:"page,omitempty"`
+	Query *Page `json:"page,omitempty"`
+	// Commit is an empty commit response
+	Commit *struct{} `json:"commit,omitempty"`
+	// Rollback is an empty rollback response
+	Rollback *struct{} `json:"rollback,omitempty"`
+	// Error is an error response if an error was encountered
+	Error *errors.Error `json:"error,omitempty"`
 }
 
 // DeleteCmd is a serializable delete command
@@ -566,4 +507,30 @@ type QueryCmd struct {
 	Collection string `json:"collection" validate:"required"`
 	// Query is the query to execute
 	Query Query `json:"query,omitempty"`
+}
+
+// RollbackCmd is a serializable rollback command
+type RollbackCmd struct{}
+
+// CommitCmd is a serializable commit command
+type CommitCmd struct{}
+
+// Authz is a serializable authz object which represents the x-authorization section of a collection schema
+type Authz struct {
+	Rules []AuthzRule `json:"rules" validate:"min=1,required"`
+}
+
+// AuthzEffect is an effect of an authz rule
+type AuthzEffect string
+
+const (
+	Allow AuthzEffect = "allow"
+	Deny  AuthzEffect = "deny"
+)
+
+// AuthzRule
+type AuthzRule struct {
+	Effect AuthzEffect `json:"effect" validate:"required"`
+	Action []Action    `json:"action" validate:"min=1,required"`
+	Match  string      `json:"match" validate:"required"`
 }

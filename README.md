@@ -20,6 +20,10 @@ MyJSON is an embedded relational document store built on top of pluggable key va
   * [Database](#database)
   * [Storage Providers](#storage-providers)
 - [Getting Started](#getting-started)
+  * [Collection Schemas](#collection-schemas)
+    + [Custom Root Level Properties](#custom-root-level-properties)
+    + [Custom Field Level Properties](#custom-field-level-properties)
+    + [Example Schema](#example-schema)
   * [Opening a database instance](#opening-a-database-instance)
     + [Single Node in Memory (badger)](#single-node-in-memory--badger-)
     + [Single Node w/ Persistance (badger)](#single-node-w--persistance--badger-)
@@ -42,10 +46,8 @@ MyJSON is an embedded relational document store built on top of pluggable key va
   * [Aggregation](#aggregation)
   * [Triggers](#triggers)
   * [Scripts](#scripts)
-  * [Example JSON Schema](#example-json-schema)
 - [Tikv Setup Guide (full scale)](#tikv-setup-guide--full-scale-)
 - [Contributing](#contributing)
-
 
 ## Use Case
 
@@ -94,6 +96,201 @@ Build powerful applications on top of simple key value storage.
     go get -u github.com/autom8ter/myjson
 
 Before getting started, take a look at the [examples](./examples) and [Godoc](https://godoc.org/github.com/autom8ter/myjson)
+
+### Collection Schemas
+
+Collection schemas are custom [JSON Schema](https://json-schema.org/) documents that declaratively configure a collection of documents. The
+schema defines the structure of the JSON documents in the collection and the constraints that
+should be enforced on the documents. The schema is used to validate the documents in the collection
+and to enforce the constraints on the documents. The schema is also used to define secondary indexes,
+foreign keys, authorization, and triggers.
+
+#### Custom Root Level Properties
+
+| Property        | Description                                                                                                      | Required |
+|-----------------|------------------------------------------------------------------------------------------------------------------|----------|
+| x-collection    | x-collection configures the unique name of the collection                                                        | [x]      |
+| x-authorization | x-authorization is a set of javascript authorization rules to enforce against actions taken against the database | [ ]      |
+| x-triggers      | x-triggers are a set of javascript triggers that execute when certain actions are taken against the database     | [ ]      |
+| x-read-only     | x-readonly indicates that the collection is updated internally and may only be read                              | [ ]      |
+
+#### Custom Field Level Properties
+
+
+| Property  | Description                                                                             |
+|-----------|-----------------------------------------------------------------------------------------|
+| x-primary | x-primary configures the documents primary key (exactly 1 field must specify x-primary) |
+| x-foreign | x-foreign configures a foreign key relationship                                         |
+| x-unique  | x-unique configures a unique field for the document                                     |
+| x-index   | x-index configures a secondary index                                                    |
+
+
+#### Example Schema
+
+account.yaml
+```yaml
+type: object
+x-collection: account
+required:
+  - _id
+  - name
+properties:
+  _id:
+    type: string
+    description: The account's id.
+    x-primary: true
+  name:
+    type: string
+    description: The accounts's name.
+x-authorization:
+  rules:
+    ## allow super users to do anything
+    - effect: allow
+      ## match on any action
+      action:
+      - "*"
+      ## context metadata must have is_super_user set to true
+      match: |
+        meta.get("is_super_user")
+
+      ## dont allow read-only users to create/update/delete/set accounts
+    - effect: deny
+      ## match on document mutations
+      action:
+        - create
+        - update
+        - delete
+        - set
+        ## context metadata must have is_read_only set to true
+      match: |
+        meta.get('role') == 'read_only'
+
+      ## only allow users to update their own account
+    - effect: allow
+        ## match on document mutations
+      action:
+        - create
+        - update
+        - delete
+        - set
+        ## the account's _id must match the user's account_id
+      match: |
+        doc.get('_id') == meta.get('account_id')
+
+      ## only allow users to query their own account
+    - effect: allow
+        ## match on document queries (includes ForEach and other Query based methods)
+      action:
+        - query
+        ## the first where clause must match the user's account_id
+      match: |
+        query.where[0].field == '_id' && query.where[0].op == 'eq' && query.where[0].value == meta.get('account_id')
+
+```
+
+user.yaml
+
+```yaml
+type: object
+# x-collection specifies the name of the collection the object will be stored in
+x-collection: user
+# required specifies the required attributes
+required:
+  - _id
+  - name
+  - age
+  - contact
+  - gender
+  - account_id
+properties:
+  _id:
+    type: string
+    description: The user's id.
+    # x-primary indicates that the property is the primary key for the object - only one primary key may be specified
+    x-primary: true
+  name:
+    type: string
+    description: The user's name.
+  contact:
+    type: object
+    properties:
+      email:
+        type: string
+        description: The user's email.
+        x-unique: true
+  age:
+    description: Age in years which must be equal to or greater than zero.
+    type: integer
+    minimum: 0
+  account_id:
+    type: string
+    # x-foreign indicates that the property is a foreign key - foreign keys are automatically indexed
+    x-foreign:
+      collection: account
+      field: _id
+      cascade: true
+    # x-index specifies a secondary index which can have 1-many fields
+    x-index:
+      account_email_idx:
+        additional_fields:
+          - contact.email
+  language:
+    type: string
+    description: The user's first language.
+    x-index:
+      language_idx: { }
+  gender:
+    type: string
+    description: The user's gender.
+    enum:
+      - male
+      - female
+  timestamp:
+    type: string
+  annotations:
+    type: object
+
+# x-triggers are javascript functions that execute based on certain events
+x-triggers:
+  # name of the trigger
+  set_timestamp:
+    # order determines the order in which the functions are executed - lower ordered triggers are executed first
+    order: 1
+    # events configures the trigger to execute on certain events
+    events:
+      - on_create
+      - on_update
+      - on_set
+    # script is the javascript to execute
+    script: |
+      doc.set('timestamp', new Date().toISOString())
+
+```
+task.yaml
+
+```yaml
+type: object
+x-collection: task
+required:
+  - _id
+  - user
+  - content
+properties:
+  _id:
+    type: string
+    description: The user's id.
+    x-primary: true
+  user:
+    type: string
+    description: The id of the user who owns the task
+    x-foreign:
+      collection: user
+      field: _id
+      cascade: true
+  content:
+    type: string
+    description: The content of the task
+```
 
 ### Opening a database instance
 
@@ -202,7 +399,6 @@ additional GJSON modifiers are available:
 - @dateTrunc - truncate a date to day, month, or year ex: `doc.GetString("timestamp|@dateTrunc:month")`,  `doc.GetString("timestamp|@dateTrunc:year")`,  `doc.GetString("timestamp|@dateTrunc:day")`
 
 ### Transactions
-
 
 Most database functionality is made available via the Tx interface which has read/write methods
 across 1-many collections.
@@ -375,98 +571,6 @@ javascript variables are injected at runtime:
 - `metadata` - the context metadata when the script is called
 - `newDocument` - function to intialize a new JSON document
 - `newDocumentFrom` - function to initialize a new JSON document from a javascript object
-
-### Example JSON Schema
-
-MyJSON JSON schemas are a modification of the [JSON Schema](https://json-schema.org/) specification
-
-custom attributes include:
-- x-collection: a root level field for specifying the name of the collection(required)
-- x-foreign: a property level block for specifying a relationship to another collection
-  - foreign keys are automatically indexed
-- x-primary: a property level field for specifying the primary key(required)
-  - primary key is automatically indexed
-- x-index: a property level block for specifying multi-field secondary indexes
-- x-triggers: a root level block for specifying triggers on document changes
-
-```yaml
-type: object
-# x-collection specifies the name of the collection the object will be stored in
-x-collection: user
-# required specifies the required attributes
-required:
-  - _id
-  - name
-  - age
-  - contact
-  - gender
-  - account_id
-properties:
-  _id:
-    type: string
-    description: The user's id.
-    # x-primary indicates that the property is the primary key for the object - only one primary key may be specified
-    x-primary: true
-  name:
-    type: string
-    description: The user's name.
-  contact:
-    type: object
-    properties:
-      email:
-        type: string
-        description: The user's email.
-        x-unique: true
-  age:
-    description: Age in years which must be equal to or greater than zero.
-    type: integer
-    minimum: 0
-  account_id:
-    type: string
-    # x-foreign indicates that the property is a foreign key - foreign keys are automatically indexed
-    x-foreign:
-      # foreign key collection
-      collection: account
-      # foreign key field(must be primary key)
-      field: _id
-      # automatically delete records when foreign key is deleted
-      cascade: true
-    # x-index specifies a secondary index which can have 1-many fields
-    x-index:
-      account_email_idx:
-        additional_fields:
-          - contact.email
-  language:
-    type: string
-    description: The user's first language.
-    x-index:
-      language_idx: { }
-  gender:
-    type: string
-    description: The user's gender.
-    enum:
-      - male
-      - female
-  timestamp:
-    type: string
-  annotations:
-    type: object
-
-# triggers are javascript functions that execute based on certain events
-x-triggers:
-  # name of the trigger
-  set_timestamp:
-    # order determines the order in which the functions are executed - lower ordered triggers are executed first
-    order: 1
-    # events configures the trigger to execute on certain events
-    events:
-      - on_create
-      - on_update
-      - on_set
-    # script is the javascript to execute
-    script: |
-      doc.set('timestamp', new Date().toISOString())
-```
 
 ## Tikv Setup Guide (full scale)
 

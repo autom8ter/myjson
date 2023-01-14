@@ -33,6 +33,8 @@ type CollectionSchema interface {
 	Triggers() []Trigger
 	// IsReadOnly returns whether the collection is read only
 	IsReadOnly() bool
+	// Authz returns the collection's authz if it exists
+	Authz() Authz
 	// MarshalYAML returns the collection schema as yaml bytes
 	MarshalYAML() ([]byte, error)
 	// UnmarshalYAML refreshes the collection schema with the given json bytes
@@ -109,7 +111,7 @@ type Txn interface {
 // Tx is a database transaction interface - it holds the primary methods used while using a transaction
 type Tx interface {
 	// Cmd is a generic command that can be used to execute any command against the database
-	Cmd(ctx context.Context, cmd TxCmd) (TxResponse, error)
+	Cmd(ctx context.Context, cmd TxCmd) TxResponse
 	// Query executes a query against the database
 	Query(ctx context.Context, collection string, query Query) (Page, error)
 	// Get returns a document by id

@@ -3,7 +3,6 @@ package util_test
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"testing"
 
 	"github.com/autom8ter/myjson"
@@ -83,7 +82,6 @@ func TestUtil(t *testing.T) {
 	t.Run("remove element", func(t *testing.T) {
 		var index = []int{1, 2, 3, 4, 5}
 		index = util.RemoveElement(1, index)
-		fmt.Println(util.JSONString(index))
 		assert.Equal(t, 4, len(index))
 	})
 }

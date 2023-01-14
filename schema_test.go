@@ -4,10 +4,8 @@ import (
 	"context"
 	// import embed package
 	_ "embed"
-	"fmt"
 	"testing"
 
-	"github.com/autom8ter/myjson/util"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -15,7 +13,6 @@ func TestSchema(t *testing.T) {
 	t.Run("basic", func(t *testing.T) {
 		schema, err := newCollectionSchema([]byte(userSchema))
 		assert.NoError(t, err)
-		fmt.Println(util.JSONString(schema.Indexing()))
 		assert.NotNil(t, schema.Indexing())
 		assert.NotEmpty(t, schema.Indexing()["_id.primaryidx"])
 		assert.NotEmpty(t, schema.Indexing()["account_id.foreignidx"])

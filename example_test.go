@@ -71,16 +71,6 @@ func ExampleQ() {
 	// {"select":[{"field":"*"}],"where":[{"field":"description","op":"contains","value":"testing"}],"page":0}
 }
 
-func ExampleNewMetadata() {
-	var orgID = "123"
-	md := myjson.NewMetadata(map[string]any{})
-	md.SetNamespace(orgID)
-	bytes, _ := md.MarshalJSON()
-	fmt.Println(string(bytes))
-	// Output:
-	// {"namespace":"123"}
-}
-
 func ExampleNewDocumentFrom() {
 	doc, _ := myjson.NewDocumentFrom(map[string]any{
 		"name": "autom8ter",

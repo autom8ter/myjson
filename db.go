@@ -18,7 +18,9 @@ import (
 
 // defaultDB is an embedded, durable NoSQL database with support for schemas, indexing, and aggregation
 type defaultDB struct {
-	persistCDC  bool
+	ctx         context.Context
+	cancel      context.CancelFunc
+	wg          sync.WaitGroup
 	kv          kv.DB
 	machine     machine.Machine
 	optimizer   Optimizer
@@ -33,12 +35,14 @@ func Open(ctx context.Context, provider string, providerParams map[string]any, o
 	if err != nil {
 		return nil, errors.Wrap(err, errors.Internal, "failed to open kv database")
 	}
+	ctx, cancel := context.WithCancel(ctx)
 	d := &defaultDB{
-		kv:         db,
-		machine:    machine.New(),
-		optimizer:  defaultOptimizer{},
-		vmPool:     make(chan *goja.Runtime, 20),
-		persistCDC: false,
+		ctx:       ctx,
+		cancel:    cancel,
+		kv:        db,
+		machine:   machine.New(),
+		optimizer: defaultOptimizer{},
+		vmPool:    make(chan *goja.Runtime, 20),
 	}
 
 	for _, o := range opts {
@@ -63,10 +67,10 @@ func Open(ctx context.Context, provider string, providerParams map[string]any, o
 			d.collections.Store(c, coll)
 		}
 	}
+	d.wg.Add(1)
 	go func() {
-		ctx, cancel := context.WithCancel(ctx)
-		defer cancel()
-		ticker := time.NewTicker(5 * time.Second)
+		defer d.wg.Done()
+		ticker := time.NewTicker(3 * time.Second)
 		defer ticker.Stop()
 		for {
 			select {
@@ -79,6 +83,16 @@ func Open(ctx context.Context, provider string, providerParams map[string]any, o
 						d.collections.Store(c, coll)
 					}
 				}
+			}
+		}
+	}()
+	d.wg.Add(1)
+	go func() {
+		defer d.wg.Done()
+		for {
+			select {
+			case <-ctx.Done():
+				return
 			default:
 				vm, _ := getJavascriptVM(ctx, d, d.jsOverrides)
 				if vm != nil {
@@ -98,6 +112,9 @@ func (d *defaultDB) NewTx(opts kv.TxOpts) (Txn, error) {
 	vm := <-d.vmPool
 	tx, err := d.kv.NewTx(opts)
 	if err != nil {
+		return nil, err
+	}
+	if err := vm.Set("tx", tx); err != nil {
 		return nil, err
 	}
 	return &transaction{
@@ -194,6 +211,11 @@ func (d *defaultDB) ForEach(ctx context.Context, collection string, opts ForEach
 }
 
 func (d *defaultDB) DropCollection(ctx context.Context, collection string) error {
+	unlock, err := d.lockCollection(ctx, collection)
+	if err != nil {
+		return err
+	}
+	defer unlock()
 	if err := d.kv.DropPrefix(ctx, collectionPrefix(ctx, collection)); err != nil {
 		return errors.Wrap(err, errors.Internal, "failed to remove collection %s", collection)
 	}
@@ -263,10 +285,10 @@ func (d *defaultDB) ConfigureCollection(ctx context.Context, collectionSchemaByt
 
 func (d *defaultDB) Collections(ctx context.Context) []string {
 	var names []string
-	cfgs, _ := d.getCollectionConfigs(ctx)
-	for _, c := range cfgs {
-		names = append(names, c.Collection())
-	}
+	d.collections.Range(func(key, value any) bool {
+		names = append(names, key.(string))
+		return true
+	})
 	return names
 }
 
@@ -281,17 +303,15 @@ func (d *defaultDB) GetSchema(ctx context.Context, collection string) Collection
 }
 
 func (d *defaultDB) ChangeStream(ctx context.Context, collection string, fn func(cdc CDC) (bool, error)) error {
-	if !d.persistCDC {
-		return errors.New(errors.Forbidden, "cdc persistance is disabled")
-	}
 	if collection != "*" && !d.HasCollection(ctx, collection) {
 		return errors.New(errors.Validation, "collection does not exist: %s", collection)
 	}
 	pfx := indexPrefix(ctx, "cdc", "_id.primaryidx")
 	return d.kv.ChangeStream(ctx, pfx, func(cdc kv.CDC) (bool, error) {
 		var c CDC
-		//nolint:errcheck
-		json.Unmarshal(cdc.Value, &c)
+		if err := json.Unmarshal(cdc.Value, &c); err != nil {
+			return false, errors.Wrap(err, errors.Internal, "failed to unmarshal cdc")
+		}
 		if c.Collection == collection || collection == "*" {
 			return fn(c)
 		}
@@ -372,6 +392,10 @@ func (d *defaultDB) runMigration(ctx context.Context, m Migration) (bool, error)
 }
 
 func (d *defaultDB) Close(ctx context.Context) error {
+	d.cancel()
+	<-d.vmPool
+	d.machine.Close()
+	d.wg.Wait()
 	return errors.Wrap(d.kv.Close(ctx), 0, "")
 }
 
