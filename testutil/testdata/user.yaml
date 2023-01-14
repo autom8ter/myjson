@@ -71,6 +71,3 @@ x-triggers:
     # script is the javascript to execute
     script: |
       doc.set('timestamp', new Date().toISOString())
-
-
-  

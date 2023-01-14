@@ -518,7 +518,7 @@ type RollbackCmd struct{}
 // CommitCmd is a serializable commit command
 type CommitCmd struct{}
 
-// Authz is a serializable authz object which represents the x-authz section of a collection schema
+// Authz is a serializable authz object which represents the x-authorization section of a collection schema
 type Authz struct {
 	Rules []AuthzRule `json:"rules" validate:"min=1,required"`
 }

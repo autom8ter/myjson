@@ -41,7 +41,7 @@ const (
 	triggersPath     schemaPath = "x-triggers"
 	readOnlyPath     schemaPath = "x-read-only"
 	refPrefix                   = "common."
-	authzPath        schemaPath = "x-authz"
+	authzPath        schemaPath = "x-authorization"
 )
 
 func newCollectionSchema(yamlContent []byte) (CollectionSchema, error) {
@@ -103,10 +103,10 @@ func newCollectionSchema(yamlContent []byte) (CollectionSchema, error) {
 	}
 	if authz := s.raw.Get(string(authzPath)); authz.Exists() {
 		if err := util.Decode(authz.Value(), &s.authz); err != nil {
-			return nil, errors.Wrap(err, errors.Validation, "invalid x-authz")
+			return nil, errors.Wrap(err, errors.Validation, "invalid x-authorization")
 		}
 		if err := util.ValidateStruct(s.authz); err != nil {
-			return nil, errors.Wrap(err, errors.Validation, "invalid x-authz")
+			return nil, errors.Wrap(err, errors.Validation, "invalid x-authorization")
 		}
 	}
 	return s, nil
