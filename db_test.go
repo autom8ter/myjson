@@ -645,40 +645,7 @@ func TestIndexing1(t *testing.T) {
 				assert.NotEqual(t, 0, count)
 			}))
 		})
-		t.Run("some results (<=)", func(t *testing.T) {
-			assert.Nil(t, testutil.TestDB(func(ctx context.Context, db myjson.Database) {
-				var docs myjson.Documents
-				var ts time.Time
-				assert.Nil(t, db.Tx(ctx, kv.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx myjson.Tx) error {
-					for i := 0; i < 5; i++ {
-						usr := testutil.NewUserDoc()
-						docs = append(docs, usr)
-						if err := tx.Set(ctx, "user", usr); err != nil {
-							return err
-						}
-					}
-					ts = time.Unix(0, tx.CDC()[0].Timestamp)
-					return nil
-				}))
-				count := 0
-				o, err := db.ForEach(ctx, "cdc", myjson.ForEachOpts{
-					Where: []myjson.Where{{
-						Field: "timestamp",
-						Op:    myjson.WhereOpLte,
-						Value: ts.UnixNano(),
-					}},
-				}, func(d *myjson.Document) (bool, error) {
-					assert.LessOrEqual(t, d.GetFloat("timestamp"), float64(ts.UnixNano()))
-					count++
-					return true, nil
-				})
-				assert.NoError(t, err)
-				assert.Equal(t, false, o.Index.Primary)
-				assert.True(t, o.Reverse)
-				assert.Equal(t, "timestamp", o.SeekFields[0])
-				assert.NotEqual(t, 0, count)
-			}))
-		})
+
 		t.Run("no results (>)", func(t *testing.T) {
 			assert.Nil(t, testutil.TestDB(func(ctx context.Context, db myjson.Database) {
 				var docs myjson.Documents
@@ -1212,97 +1179,6 @@ func TestJoin(t *testing.T) {
 	})
 }
 
-func TestMigrations(t *testing.T) {
-	t.Run("basic", func(t *testing.T) {
-		assert.NoError(t, testutil.TestDB(func(ctx context.Context, db myjson.Database) {
-			script := `
-	db.tx(ctx, {isReadOnly: false}, (ctx, tx) => {
-		for (let i = 100; i < 200; i++) {
-			tx.create(ctx, "account", newDocumentFrom({ name: "autom8ter"+String(i)}))
-		}
-	})
-`
-			migration := myjson.Migration{
-				ID:     "seedAccounts",
-				Script: script,
-			}
-
-			assert.NoError(t, db.RunMigrations(ctx, migration))
-			assert.NoError(t, db.RunMigrations(ctx, migration))
-			assert.NoError(t, db.RunMigrations(ctx, migration))
-			val, err := db.Get(ctx, "migration", "seedAccounts")
-			assert.NoError(t, err)
-			assert.Equal(t, false, val.GetBool("dirty"))
-			count := 0
-			_, err = db.ForEach(ctx, "account", myjson.ForEachOpts{
-				Where: []myjson.Where{{Field: "name", Op: myjson.WhereOpContains, Value: "autom8ter"}},
-				Join:  nil,
-			}, func(d *myjson.Document) (bool, error) {
-				count++
-				return true, nil
-			})
-			assert.NoError(t, err)
-			assert.Equal(t, count, 100)
-		}))
-	})
-	t.Run("dirty then fix", func(t *testing.T) {
-		assert.NoError(t, testutil.TestDB(func(ctx context.Context, db myjson.Database) {
-			{
-				script := `
-				db.tx(ctx, {isReadOnly: false}, (ctx, tx) => {
-					for (let i = 100; i < 200; i++) {
-						tx.creat(ctx, "account", newDocumentFrom({ name: "autom8ter"+String(i)}))
-					}
-				})
-`
-				migration := myjson.Migration{
-					ID:     "seedAccounts",
-					Script: script,
-				}
-
-				assert.Error(t, db.RunMigrations(ctx, migration))
-				assert.Error(t, db.RunMigrations(ctx, migration))
-				assert.Error(t, db.RunMigrations(ctx, migration))
-				val, err := db.Get(ctx, "migration", "seedAccounts")
-				assert.NoError(t, err)
-				assert.Equal(t, true, val.GetBool("dirty"))
-			}
-			{
-				script := `
-				db.tx(ctx, {isReadOnly: false}, (ctx, tx) => {
-					for (let i = 100; i < 200; i++) {
-						tx.create(ctx, "account", newDocumentFrom({ name: "autom8ter"+String(i)}))
-					}
-				})
-`
-				migration := myjson.Migration{
-					ID:     "seedAccounts",
-					Script: script,
-				}
-
-				assert.NoError(t, db.RunMigrations(ctx, migration))
-				assert.NoError(t, db.RunMigrations(ctx, migration))
-				assert.NoError(t, db.RunMigrations(ctx, migration))
-				val, err := db.Get(ctx, "migration", "seedAccounts")
-				assert.NoError(t, err)
-				assert.Equal(t, false, val.GetBool("dirty"))
-				assert.Equal(t, script, val.GetString("script"))
-				assert.NotEmpty(t, val.GetString("timestamp"))
-			}
-			count := 0
-			_, err := db.ForEach(ctx, "account", myjson.ForEachOpts{
-				Where: []myjson.Where{{Field: "name", Op: myjson.WhereOpContains, Value: "autom8ter"}},
-				Join:  nil,
-			}, func(d *myjson.Document) (bool, error) {
-				count++
-				return true, nil
-			})
-			assert.NoError(t, err)
-			assert.Equal(t, count, 100)
-		}))
-	})
-}
-
 func TestTriggers(t *testing.T) {
 	t.Run("test set_timestamp trigger", func(t *testing.T) {
 		assert.NoError(t, testutil.TestDB(func(ctx context.Context, db myjson.Database) {
@@ -1325,11 +1201,4 @@ func TestTriggers(t *testing.T) {
 			}))
 		}))
 	})
-}
-
-func TestDropCollection(t *testing.T) {
-	assert.NoError(t, testutil.TestDB(func(ctx context.Context, db myjson.Database) {
-		assert.Nil(t, db.DropCollection(ctx, "task"))
-		assert.False(t, db.HasCollection(ctx, "task"))
-	}))
 }

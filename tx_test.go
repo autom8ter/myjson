@@ -94,29 +94,7 @@ func TestTx(t *testing.T) {
 			}))
 		}))
 	})
-	t.Run("set 10 then check cdc", func(t *testing.T) {
-		assert.Nil(t, testutil.TestDB(func(ctx context.Context, db myjson.Database) {
-			assert.Nil(t, db.Tx(ctx, kv.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx myjson.Tx) error {
-				ctx = myjson.SetMetadataValues(ctx, map[string]any{"testing": true})
-				var usrs = map[string]*myjson.Document{}
-				for i := 0; i < 10; i++ {
-					doc := testutil.NewUserDoc()
-					err := tx.Set(ctx, "user", doc)
-					assert.NoError(t, err)
-					usrs[doc.GetString("_id")] = doc
-					assert.Equal(t, "user", tx.CDC()[i].Collection)
-					assert.EqualValues(t, myjson.SetAction, tx.CDC()[i].Action)
-					assert.EqualValues(t, doc.Get("_id"), tx.CDC()[i].DocumentID)
-					assert.NotEmpty(t, tx.CDC()[i].Metadata)
-					assert.NotEmpty(t, tx.CDC()[i].Diff)
-					v := tx.CDC()[i].Metadata.Get("testing")
-					assert.Equal(t, true, v)
-				}
-				assert.Equal(t, 10, len(tx.CDC()))
-				return nil
-			}))
-		}))
-	})
+
 	t.Run("DB() not nil", func(t *testing.T) {
 		assert.Nil(t, testutil.TestDB(func(ctx context.Context, db myjson.Database) {
 			assert.Nil(t, db.Tx(ctx, kv.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx myjson.Tx) error {

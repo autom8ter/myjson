@@ -264,6 +264,10 @@ const (
 	DeleteAction Action = "delete"
 	// QueryAction queries documents
 	QueryAction Action = "query"
+	// ConfigureAction configures a collection of documents
+	ConfigureAction Action = "configure"
+	// ChangeStreamAction creates a change stream
+	ChangeStreamAction Action = "changeStream"
 )
 
 // persistCommand is a command executed against the database that causes a change in state
@@ -296,6 +300,7 @@ const (
 	OnDelete EventType = "on_delete"
 	OnUpdate EventType = "on_update"
 	OnCreate EventType = "on_create"
+	OnQuery  EventType = "on_query"
 )
 
 // Trigger is a javasript function executed after a database event occurs
@@ -396,25 +401,6 @@ type PropertyIndex struct {
 type ForEachOpts struct {
 	Where []Where `json:"where,omitempty"`
 	Join  []Join  `json:"join,omitempty"`
-}
-
-//go:embed migration.yaml
-var migrationSchema string
-
-const migrationCollectionName = "migration"
-
-// Migration is an atomic database migration
-type Migration struct {
-	// ID is the unique id of the cdc
-	ID string `json:"_id" validate:"required"`
-	// Timestamp is the nanosecond timestamp the cdc was created at
-	Timestamp int64 `json:"timestamp"`
-	// Script is the script's content
-	Script string `json:"script" validate:"required"`
-	// Dirty indicates whether the migration failed or not
-	Dirty bool `json:"dirty"`
-	// An error message if one was encountered
-	Error string `json:"error"`
 }
 
 // TxCmd is a serializable transaction command

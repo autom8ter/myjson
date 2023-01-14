@@ -47,14 +47,13 @@ type CollectionSchema interface {
 type Database interface {
 	// Collections returns a list of collection names that are registered in the collection
 	Collections(ctx context.Context) []string
-	// ConfigureCollection overwrites a single database collection configuration
-	ConfigureCollection(ctx context.Context, collectionSchemaBytes []byte) error
+	// Configure overwrites a single database collection configuration. It will create the collection if it does not exist
+	// and will update the collection if it does exist. The collection will be created/updated with the given schema and indexing.
+	Configure(ctx context.Context, collectionSchemaBytes []byte) error
 	// GetSchema gets a collection schema by name (if it exists)
 	GetSchema(ctx context.Context, collection string) CollectionSchema
 	// HasCollection reports whether a collection exists in the database
 	HasCollection(ctx context.Context, collection string) bool
-	// DropCollection drops the collection and it's indexes from the database
-	DropCollection(ctx context.Context, collection string) error
 	// Tx executes the given function against a new transaction.
 	// if the function returns an error, all changes will be rolled back.
 	// otherwise, the changes will be commited to the database
@@ -76,11 +75,6 @@ type Database interface {
 	// RunScript executes a javascript function within the script
 	// The following global variables will be injected: 'db' - a database instance, 'ctx' - the context passed to RunScript, and 'params' - the params passed to RunScript
 	RunScript(ctx context.Context, function string, script string, params map[string]any) (any, error)
-	// RunMigrations runs migration scripts against the database. If a migration(id) has already successfully run, it will do nothing.
-	// Migrations are run sequentially in the order they are provided
-	// Migration executions will if an error is encountered
-	// The following global variables will be injected into the script: 'db' - a Database instance, 'ctx' - the context passed to RunMigrations
-	RunMigrations(ctx context.Context, migrations ...Migration) error
 	// RawKV returns the database key value provider - it should be used with caution and only when standard database functionality is insufficient.
 	RawKV() kv.DB
 	// Serve serves the database over the given transport
@@ -128,9 +122,6 @@ type Tx interface {
 	// results will not be ordered unless an index supporting the order by(s) was found by the optimizer
 	// Query should be used when order is more important than performance/resource-usage
 	ForEach(ctx context.Context, collection string, opts ForEachOpts, fn ForEachFunc) (Explain, error)
-	// CDC returns the change data capture array associated with the transaction.
-	// CDC's are persisted to the cdc collection when the transaction is commited.
-	CDC() []CDC
 	// DB returns the transactions underlying database
 	DB() Database
 }

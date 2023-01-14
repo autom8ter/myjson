@@ -292,6 +292,11 @@ properties:
     description: The content of the task
 ```
 
+
+#### Authorization 
+
+TODO
+
 ### Opening a database instance
 
 
@@ -323,7 +328,7 @@ db, err := myjson.Open(context.Background(), "tikv", map[string]any{
 ### Configuring a database instance
 
 Collection schemas can be configured at runtime or at startup. Collection schemas are declarative - 
-any changes to indexing or validation happen within the database when ConfigureCollection is called
+any changes to indexing or validation happen within the database when Configure is called
 
 ```go
 
@@ -336,13 +341,13 @@ var (
     taskSchema string
 )
 
-if err := db.ConfigureCollection(ctx, []byte(accountSchema)); err != nil {
+if err := db.Configure(ctx, []byte(accountSchema)); err != nil {
 	panic(err)
 }
-if err := db.ConfigureCollection(ctx, []byte(userSchema)); err != nil {
+if err := db.Configure(ctx, []byte(userSchema)); err != nil {
 	panic(err)
 }
-if err := db.ConfigureCollection(ctx, []byte(taskSchema)); err != nil {
+if err := db.Configure(ctx, []byte(taskSchema)); err != nil {
 	panic(err)
 }
 ```

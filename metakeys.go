@@ -18,3 +18,8 @@ func isInternal(ctx context.Context) bool {
 func isIndexing(ctx context.Context) bool {
 	return ctx.Value(isIndexingKey) == true
 }
+
+// SetIsInternal sets a context value to indicate that the request is internal (it should only be used to bypass things like authorization, validation, etc)
+func SetIsInternal(ctx context.Context) context.Context {
+	return context.WithValue(ctx, internalKey, true)
+}

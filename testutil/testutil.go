@@ -80,7 +80,7 @@ func TestDB(fn func(ctx context.Context, db myjson.Database), opts ...myjson.DBO
 		return err
 	}
 	for _, c := range AllCollections {
-		if err := db.ConfigureCollection(ctx, c); err != nil {
+		if err := db.Configure(ctx, c); err != nil {
 			return err
 		}
 	}

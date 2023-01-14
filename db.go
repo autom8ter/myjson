@@ -37,29 +37,27 @@ func Open(ctx context.Context, provider string, providerParams map[string]any, o
 	}
 	ctx, cancel := context.WithCancel(ctx)
 	d := &defaultDB{
-		ctx:       ctx,
-		cancel:    cancel,
-		kv:        db,
-		machine:   machine.New(),
-		optimizer: defaultOptimizer{},
-		vmPool:    make(chan *goja.Runtime, 20),
+		ctx:         ctx,
+		cancel:      cancel,
+		wg:          sync.WaitGroup{},
+		kv:          db,
+		machine:     machine.New(),
+		optimizer:   defaultOptimizer{},
+		jsOverrides: map[string]any{},
+		vmPool:      make(chan *goja.Runtime, 20),
+		collections: sync.Map{},
 	}
 
 	for _, o := range opts {
 		o(d)
 	}
-	if !d.HasCollection(ctx, "cdc") {
-		if err := d.ConfigureCollection(ctx, []byte(cdcSchema)); err != nil {
+	if !d.HasCollection(ctx, cdcCollectionName) {
+		if err := d.Configure(context.WithValue(ctx, internalKey, true), []byte(cdcSchema)); err != nil {
 			return nil, errors.Wrap(err, errors.Internal, "failed to configure cdc collection")
 		}
 	}
-	if !d.HasCollection(ctx, "migration") {
-		if err := d.ConfigureCollection(ctx, []byte(migrationSchema)); err != nil {
-			return nil, errors.Wrap(err, errors.Internal, "failed to configure migration collection")
-		}
-	}
-	for _, c := range d.Collections(ctx) {
-		coll, err := d.getPersistedCollection(ctx, c)
+	for _, c := range d.Collections(context.WithValue(ctx, internalKey, true)) {
+		coll, err := d.getPersistedCollection(context.WithValue(ctx, internalKey, true), c)
 		if err != nil {
 			return nil, err
 		}
@@ -77,8 +75,8 @@ func Open(ctx context.Context, provider string, providerParams map[string]any, o
 			case <-ctx.Done():
 				return
 			case <-ticker.C:
-				for _, c := range d.Collections(ctx) {
-					coll, _ := d.getPersistedCollection(ctx, c)
+				for _, c := range d.Collections(context.WithValue(ctx, internalKey, true)) {
+					coll, _ := d.getPersistedCollection(context.WithValue(ctx, internalKey, true), c)
 					if coll != nil {
 						d.collections.Store(c, coll)
 					}
@@ -225,17 +223,28 @@ func (d *defaultDB) DropCollection(ctx context.Context, collection string) error
 	return nil
 }
 
-func (d *defaultDB) ConfigureCollection(ctx context.Context, collectionSchemaBytes []byte) error {
+func (d *defaultDB) Configure(ctx context.Context, collectionSchemaBytes []byte) error {
 	jsonBytes, err := util.YAMLToJSON(collectionSchemaBytes)
 	if err != nil {
 		return err
 	}
-	ctx = context.WithValue(ctx, isIndexingKey, true)
-	ctx = context.WithValue(ctx, internalKey, true)
 	collection, err := newCollectionSchema(jsonBytes)
 	if err != nil {
 		return err
 	}
+
+	before := d.GetSchema(ctx, collection.Collection())
+	if before != nil {
+		pass, err := d.authorizeConfigure(ctx, before)
+		if err != nil {
+			return err
+		}
+		if !pass {
+			return errors.New(errors.Forbidden, "not authorized: %s", ConfigureAction)
+		}
+	}
+	ctx = context.WithValue(ctx, isIndexingKey, true)
+	ctx = context.WithValue(ctx, internalKey, true)
 	unlock, err := d.lockCollection(ctx, collection.Collection())
 	if err != nil {
 		return err
@@ -306,6 +315,19 @@ func (d *defaultDB) ChangeStream(ctx context.Context, collection string, fn func
 	if collection != "*" && !d.HasCollection(ctx, collection) {
 		return errors.New(errors.Validation, "collection does not exist: %s", collection)
 	}
+	if !(collection == "*" && isInternal(ctx)) {
+		if !d.HasCollection(ctx, collection) {
+			return errors.New(errors.Validation, "collection does not exist: %s", collection)
+		}
+		pass, err := d.authorizeChangeStream(ctx, d.GetSchema(ctx, collection))
+		if err != nil {
+			return err
+		}
+		if !pass {
+			return errors.New(errors.Forbidden, "not authorized: %s", ChangeStreamAction)
+		}
+	}
+
 	pfx := indexPrefix(ctx, "cdc", "_id.primaryidx")
 	return d.kv.ChangeStream(ctx, pfx, func(cdc kv.CDC) (bool, error) {
 		var c CDC
@@ -337,58 +359,6 @@ func (d *defaultDB) RunScript(ctx context.Context, function string, script strin
 		return nil, errors.Wrap(err, errors.Validation, "failed to export")
 	}
 	return fn(ctx, d, params)
-}
-
-func (d *defaultDB) RunMigrations(ctx context.Context, migrations ...Migration) error {
-	var (
-		err     error
-		skipped bool
-	)
-	ctx = context.WithValue(ctx, internalKey, true)
-	for _, m := range migrations {
-		m.Dirty = false
-		m.Timestamp = time.Now().Unix()
-		m.Error = ""
-		skipped, err = d.runMigration(ctx, m)
-		if skipped {
-			continue
-		}
-		if err != nil {
-			m.Error = err.Error()
-			m.Dirty = true
-		}
-		doc, err := NewDocumentFrom(m)
-		if err != nil {
-			return err
-		}
-		if err := d.Tx(ctx, kv.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx Tx) error {
-			if err := tx.Set(ctx, migrationCollectionName, doc); err != nil {
-				return err
-			}
-			return nil
-		}); err != nil {
-			return err
-		}
-	}
-	return err
-}
-
-func (d *defaultDB) runMigration(ctx context.Context, m Migration) (bool, error) {
-	if val, _ := d.Get(ctx, migrationCollectionName, m.ID); val != nil && !val.GetBool("dirty") {
-		return true, nil
-	}
-	if err := util.ValidateStruct(m); err != nil {
-		return false, errors.Wrap(err, 0, "migration is not valid")
-	}
-	vm, err := getJavascriptVM(ctx, d, d.jsOverrides)
-	if err != nil {
-		return false, err
-	}
-	_, err = vm.RunString(m.Script)
-	if err != nil {
-		return false, err
-	}
-	return false, nil
 }
 
 func (d *defaultDB) Close(ctx context.Context) error {
