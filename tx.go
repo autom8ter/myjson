@@ -201,32 +201,14 @@ func (t *transaction) Get(ctx context.Context, collection string, id string) (*D
 	if c == nil {
 		return nil, errors.New(errors.Validation, "tx: unsupported collection: %s", collection)
 	}
-
-	primaryIndex := c.PrimaryIndex()
-	val, err := t.tx.Get(ctx, seekPrefix(ctx, collection, primaryIndex, map[string]any{
-		c.PrimaryKey(): id,
-	}).Seek(id).Path())
+	results, err := t.Query(ctx, collection, Query{Where: []Where{{Field: c.PrimaryKey(), Op: WhereOpEq, Value: id}}, Limit: 1})
 	if err != nil {
 		return nil, errors.Wrap(err, errors.NotFound, "%s not found", id)
 	}
-	if val == nil {
+	if results.Count == 0 {
 		return nil, errors.New(errors.NotFound, "%s not found", id)
 	}
-	doc, err := NewDocumentFromBytes(val)
-	if err != nil {
-		return nil, err
-	}
-	pass, err := t.authorizeRead(ctx, c, doc)
-	if err != nil {
-		return nil, err
-	}
-	if !pass {
-		return nil, errors.New(errors.Forbidden, "not authorized")
-	}
-	if doc == nil {
-		return nil, errors.New(errors.NotFound, "%s not found", id)
-	}
-	return doc, nil
+	return results.Documents[0], nil
 }
 
 func (t *transaction) Cmd(ctx context.Context, cmd TxCmd) TxResponse {
@@ -360,12 +342,15 @@ func docsHaving(where []Where, results Documents) (Documents, error) {
 }
 
 func (t *transaction) ForEach(ctx context.Context, collection string, opts ForEachOpts, fn ForEachFunc) (Explain, error) {
-	pass, err := t.authorizeForEach(ctx, t.db.GetSchema(ctx, collection), &opts)
+	pass, err := t.authorizeQuery(ctx, t.db.GetSchema(ctx, collection), &Query{
+		Where: opts.Where,
+		Join:  opts.Join,
+	})
 	if err != nil {
 		return Explain{}, err
 	}
 	if !pass {
-		return Explain{}, errors.New(errors.Forbidden, "not authorized: %s", ForEachAction)
+		return Explain{}, errors.New(errors.Forbidden, "not authorized: %s", QueryAction)
 	}
 	return t.queryScan(ctx, collection, opts.Where, opts.Join, fn)
 }

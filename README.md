@@ -20,6 +20,10 @@ MyJSON is an embedded relational document store built on top of pluggable key va
   * [Database](#database)
   * [Storage Providers](#storage-providers)
 - [Getting Started](#getting-started)
+  * [Collection Schemas](#collection-schemas)
+    + [Custom Root Level Properties](#custom-root-level-properties)
+    + [Custom Field Level Properties](#custom-field-level-properties)
+    + [Example Schema](#example-schema)
   * [Opening a database instance](#opening-a-database-instance)
     + [Single Node in Memory (badger)](#single-node-in-memory--badger-)
     + [Single Node w/ Persistance (badger)](#single-node-w--persistance--badger-)
@@ -42,10 +46,8 @@ MyJSON is an embedded relational document store built on top of pluggable key va
   * [Aggregation](#aggregation)
   * [Triggers](#triggers)
   * [Scripts](#scripts)
-  * [Example JSON Schema](#example-json-schema)
 - [Tikv Setup Guide (full scale)](#tikv-setup-guide--full-scale-)
 - [Contributing](#contributing)
-
 
 ## Use Case
 

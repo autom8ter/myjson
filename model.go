@@ -264,10 +264,6 @@ const (
 	DeleteAction Action = "delete"
 	// QueryAction queries documents
 	QueryAction Action = "query"
-	// ForEachAction iterates through documents
-	ForEachAction Action = "for_each"
-	// GetAction gets a document
-	GetAction Action = "get"
 )
 
 // persistCommand is a command executed against the database that causes a change in state
