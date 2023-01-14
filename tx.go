@@ -145,7 +145,7 @@ func (t *transaction) Query(ctx context.Context, collection string, query Query)
 		return Page{}, err
 	}
 	if !allow {
-		return Page{}, errors.New(errors.Forbidden, "not authorized")
+		return Page{}, errors.New(errors.Forbidden, "not authorized: %s/%s", collection, QueryAction)
 	}
 	if isAggregateQuery(query) {
 		return t.aggregate(ctx, collection, query)
@@ -365,7 +365,7 @@ func (t *transaction) ForEach(ctx context.Context, collection string, opts ForEa
 		return Explain{}, err
 	}
 	if !pass {
-		return Explain{}, errors.New(errors.Forbidden, "not authorized")
+		return Explain{}, errors.New(errors.Forbidden, "not authorized: %s", ForEachAction)
 	}
 	return t.queryScan(ctx, collection, opts.Where, opts.Join, fn)
 }

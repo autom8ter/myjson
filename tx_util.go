@@ -477,7 +477,7 @@ func (t *transaction) evaluate(ctx context.Context, c CollectionSchema, command 
 			return err
 		}
 		if !pass {
-			return errors.New(errors.Forbidden, "not authorized")
+			return errors.New(errors.Forbidden, "not authorized: %s", command.Action)
 		}
 	}
 
@@ -514,7 +514,9 @@ func (t *transaction) authorizeCommand(ctx context.Context, schema CollectionSch
 		}
 		return lo.Contains(a.Action, command.Action) && a.Effect == Allow
 	})
-
+	if len(allow) == 0 {
+		return true, nil
+	}
 	for _, d := range allow {
 		result, err := t.vm.RunString(d.Match)
 		if err != nil {
@@ -528,7 +530,7 @@ func (t *transaction) authorizeCommand(ctx context.Context, schema CollectionSch
 }
 
 func (t *transaction) authorizeQuery(ctx context.Context, schema CollectionSchema, query *Query) (bool, error) {
-	if isInternal(ctx) {
+	if isInternal(ctx) || isIndexing(ctx) {
 		return true, nil
 	}
 	if len(schema.Authz().Rules) == 0 {
@@ -566,7 +568,9 @@ func (t *transaction) authorizeQuery(ctx context.Context, schema CollectionSchem
 		}
 		return lo.Contains(a.Action, QueryAction) && a.Effect == Allow
 	})
-
+	if len(allow) == 0 {
+		return true, nil
+	}
 	for _, d := range allow {
 		result, err := t.vm.RunString(d.Match)
 		if err != nil {
@@ -618,7 +622,9 @@ func (t *transaction) authorizeRead(ctx context.Context, schema CollectionSchema
 		}
 		return lo.Contains(a.Action, GetAction) && a.Effect == Allow
 	})
-
+	if len(allow) == 0 {
+		return true, nil
+	}
 	for _, d := range allow {
 		result, err := t.vm.RunString(d.Match)
 		if err != nil {

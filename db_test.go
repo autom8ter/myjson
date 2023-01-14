@@ -86,6 +86,7 @@ func Test(t *testing.T) {
 	})
 	t.Run("create & stream", func(t *testing.T) {
 		assert.Nil(t, testutil.TestDB(func(ctx context.Context, db myjson.Database) {
+			fmt.Println(myjson.GetMetadataValue(ctx, "is_super_user"))
 			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 			defer cancel()
 			wg := sync.WaitGroup{}
@@ -107,7 +108,9 @@ func Test(t *testing.T) {
 			)
 			assert.Nil(t, db.Tx(ctx, kv.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx myjson.Tx) error {
 				id, err = tx.Create(ctx, "user", testutil.NewUserDoc())
+				assert.NoError(t, err)
 				_, err := tx.Get(ctx, "user", id)
+				assert.NoError(t, err)
 				return err
 			}))
 			u, err := db.Get(ctx, "user", id)
