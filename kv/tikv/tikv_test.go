@@ -45,7 +45,6 @@ func Test(t *testing.T) {
 				d, err := tx.Get(ctx, []byte(k))
 				assert.NoError(t, err)
 				assert.EqualValues(t, string(v), string(d), string(k))
-				fmt.Println(string(k))
 			}
 			return nil
 		}))
@@ -62,7 +61,6 @@ func Test(t *testing.T) {
 				i++
 				val, err := iter.Value()
 				assert.NoError(t, err)
-				fmt.Println(string(iter.Key()), string(val))
 				assert.EqualValues(t, data[string(iter.Key())], string(val))
 				assert.NoError(t, iter.Next())
 			}
@@ -125,7 +123,6 @@ func Test(t *testing.T) {
 			defer iter.Close()
 			var found [][]byte
 			for iter.Valid() {
-				fmt.Println(string(iter.Key()))
 				val, _ := iter.Value()
 				assert.EqualValues(t, string(val), data[string(iter.Key())])
 				found = append(found, iter.Key())

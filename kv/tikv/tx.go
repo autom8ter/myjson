@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"time"
 
 	"github.com/autom8ter/myjson/kv"
 	"github.com/autom8ter/myjson/kv/kvutil"
@@ -100,6 +99,7 @@ func (t *tikvTx) Commit(ctx context.Context) error {
 	if err := t.txn.Commit(ctx); err != nil {
 		return err
 	}
+	var toSet = map[string][]byte{}
 	for _, e := range t.entries {
 		bits, err := json.Marshal(e)
 		if err != nil {
@@ -108,10 +108,13 @@ func (t *tikvTx) Commit(ctx context.Context) error {
 		t.db.cache.Publish(ctx, string(e.Key), bits)
 		switch e.Operation {
 		case kv.DELOP:
-			t.db.cache.Del(ctx, string(e.Key))
+			toSet[string(e.Key)] = []byte("")
 		case kv.SETOP:
-			t.db.cache.Set(ctx, string(e.Key), string(e.Value), 1*time.Hour)
+			toSet[string(e.Key)] = e.Value
 		}
+	}
+	if err := t.db.cache.MSet(ctx, toSet).Err(); err != nil {
+		return err
 	}
 	t.entries = []kv.CDC{}
 	return nil

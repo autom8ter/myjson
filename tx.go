@@ -25,6 +25,7 @@ type transaction struct {
 	isBatch bool
 	cdc     []CDC
 	vm      *goja.Runtime
+	docs    map[string]struct{}
 }
 
 func (t *transaction) Commit(ctx context.Context) error {

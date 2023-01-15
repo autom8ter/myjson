@@ -3,11 +3,13 @@ package myjson
 import (
 	"context"
 	"reflect"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/dop251/goja"
 	"github.com/google/uuid"
+	"github.com/huandu/xstrings"
 	"github.com/segmentio/ksuid"
 	"github.com/spf13/cast"
 	"github.com/thoas/go-funk"
@@ -55,7 +57,7 @@ func getJavascriptVM(ctx context.Context, db Database, overrides map[string]any)
 	if err := vm.Set(string(JavascriptGlobalMeta), ExtractMetadata(ctx)); err != nil {
 		return nil, err
 	}
-	for k, v := range builtins {
+	for k, v := range JavascriptBuiltIns {
 		if err := vm.Set(k, v); err != nil {
 			return nil, err
 		}
@@ -68,7 +70,7 @@ func getJavascriptVM(ctx context.Context, db Database, overrides map[string]any)
 	return vm, nil
 }
 
-var builtins = map[string]any{
+var JavascriptBuiltIns = map[string]any{
 	"newDocumentFrom": NewDocumentFrom,
 	"newDocument":     NewDocument,
 	"ksuid": func() string {
@@ -86,9 +88,9 @@ var builtins = map[string]any{
 		if v == nil {
 			return false
 		}
-		switch v.(type) {
+		switch v := v.(type) {
 		case string:
-			return strings.Contains(v.(string), cast.ToString(e))
+			return strings.Contains(v, cast.ToString(e))
 		default:
 			return funk.Contains(v, e)
 		}
@@ -106,7 +108,9 @@ var builtins = map[string]any{
 	"difference": funk.Difference,
 	"isZero":     funk.IsZero,
 	"sum":        funk.Sum,
+	"set":        funk.Set,
 	"getOr":      funk.GetOrElse,
+	"prune":      funk.Prune,
 	"len":        func(v any) int { return len(cast.ToSlice(v)) },
 	"toSlice":    cast.ToSlice,
 	"toMap":      cast.ToStringMap,
@@ -120,5 +124,30 @@ var builtins = map[string]any{
 		d, _ := NewDocumentFrom(v)
 		return d
 	},
-	"indexOf": funk.IndexOf,
+	"indexOf":    funk.IndexOf,
+	"join":       strings.Join,
+	"split":      strings.Split,
+	"replace":    strings.ReplaceAll,
+	"lower":      strings.ToLower,
+	"upper":      strings.ToUpper,
+	"trim":       strings.TrimSpace,
+	"trimLeft":   strings.TrimLeft,
+	"trimRight":  strings.TrimRight,
+	"trimPrefix": strings.TrimPrefix,
+	"trimSuffix": strings.TrimSuffix,
+	"startsWith": strings.HasPrefix,
+	"endsWith":   strings.HasSuffix,
+	"camelCase":  xstrings.ToCamelCase,
+	"snakeCase":  xstrings.ToSnakeCase,
+	"kebabCase":  xstrings.ToKebabCase,
+	"quote":      strconv.Quote,
+	"unquote":    strconv.Unquote,
+	"parseTime":  time.Parse,
+	"since":      time.Since,
+	"until":      time.Until,
+	"after":      time.After,
+	"unixMicro":  time.UnixMicro,
+	"unixMilli":  time.UnixMilli,
+	"unix":       time.Unix,
+	"date":       time.Date,
 }

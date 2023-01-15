@@ -2,6 +2,7 @@ package badger
 
 import (
 	"context"
+	"sync"
 
 	"github.com/autom8ter/machine/v4"
 	"github.com/autom8ter/myjson/kv"
@@ -9,6 +10,7 @@ import (
 )
 
 type badgerTx struct {
+	mu      sync.Mutex
 	opts    kv.TxOpts
 	batch   *badger.WriteBatch
 	txn     *badger.Txn
@@ -53,6 +55,8 @@ func (b *badgerTx) Get(ctx context.Context, key []byte) ([]byte, error) {
 }
 
 func (b *badgerTx) Set(ctx context.Context, key, value []byte) error {
+	b.mu.Lock()
+	defer b.mu.Unlock()
 	var e = &badger.Entry{
 		Key:   key,
 		Value: value,
@@ -75,6 +79,8 @@ func (b *badgerTx) Set(ctx context.Context, key, value []byte) error {
 }
 
 func (b *badgerTx) Delete(ctx context.Context, key []byte) error {
+	b.mu.Lock()
+	defer b.mu.Unlock()
 	b.entries = append(b.entries, kv.CDC{
 		Operation: kv.DELOP,
 		Key:       key,
@@ -86,6 +92,8 @@ func (b *badgerTx) Delete(ctx context.Context, key []byte) error {
 }
 
 func (b *badgerTx) Rollback(ctx context.Context) error {
+	b.mu.Lock()
+	defer b.mu.Unlock()
 	if b.batch != nil {
 		b.batch.Cancel()
 	}
@@ -97,6 +105,8 @@ func (b *badgerTx) Rollback(ctx context.Context) error {
 }
 
 func (b *badgerTx) Commit(ctx context.Context) error {
+	b.mu.Lock()
+	defer b.mu.Unlock()
 	if b.batch != nil {
 		if err := b.batch.Flush(); err != nil {
 			return err
@@ -116,6 +126,8 @@ func (b *badgerTx) Commit(ctx context.Context) error {
 }
 
 func (b *badgerTx) Close(ctx context.Context) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
 	if b.txn != nil {
 		b.txn.Discard()
 	}

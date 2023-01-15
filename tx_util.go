@@ -90,7 +90,6 @@ func (t *transaction) setDocument(ctx context.Context, c CollectionSchema, docID
 }
 
 func (t *transaction) persistCommand(ctx context.Context, command *persistCommand) error {
-
 	c := t.db.GetSchema(ctx, command.Collection)
 	if c == nil {
 		return fmt.Errorf("tx: collection: %s does not exist", command.Collection)
@@ -111,7 +110,7 @@ func (t *transaction) persistCommand(ctx context.Context, command *persistComman
 	}
 	before, _ := t.Get(ctx, command.Collection, docID)
 	if isIndexing(ctx) {
-		for _, i := range t.db.GetSchema(ctx, command.Collection).Indexing() {
+		for _, i := range c.Indexing() {
 			if i.Primary {
 				continue
 			}
@@ -133,10 +132,12 @@ func (t *transaction) persistCommand(ctx context.Context, command *persistComman
 		if err := t.updateDocument(ctx, c, docID, before, command); err != nil {
 			return err
 		}
+		t.docs[fmt.Sprintf("%s/%s", command.Collection, docID)] = struct{}{}
 	case CreateAction:
 		if err := t.createDocument(ctx, c, command); err != nil {
 			return err
 		}
+		t.docs[fmt.Sprintf("%s/%s", command.Collection, docID)] = struct{}{}
 	case DeleteAction:
 		if err := t.deleteDocument(ctx, c, docID); err != nil {
 			return err
@@ -144,14 +145,17 @@ func (t *transaction) persistCommand(ctx context.Context, command *persistComman
 		if err := t.cascadeDelete(ctx, c, command); err != nil {
 			return err
 		}
+		delete(t.docs, fmt.Sprintf("%s/%s", command.Collection, docID))
 	case SetAction:
 		if err := t.setDocument(ctx, c, docID, command); err != nil {
 			return err
 		}
+		t.docs[fmt.Sprintf("%s/%s", command.Collection, docID)] = struct{}{}
 	default:
 		return fmt.Errorf("tx: unsupported action: %s", command.Action)
 	}
-	for _, i := range t.db.GetSchema(ctx, command.Collection).Indexing() {
+	for _, i := range c.Indexing() {
+		i := i
 		if err := t.updateSecondaryIndex(ctx, c, i, docID, before, command); err != nil {
 			return errors.Wrap(err, 0, "failed to update secondary index")
 		}
@@ -244,6 +248,7 @@ func (t *transaction) updateSecondaryIndex(ctx context.Context, schema Collectio
 				docID,
 			)
 		}
+		delete(t.docs, fmt.Sprintf("%s/%s", command.Collection, docID))
 	case SetAction, UpdateAction, CreateAction:
 		if before != nil {
 			if err := t.tx.Delete(ctx, seekPrefix(ctx, command.Collection, idx, before.Value()).Seek(docID).Path()); err != nil {
@@ -261,20 +266,11 @@ func (t *transaction) updateSecondaryIndex(ctx context.Context, schema Collectio
 			if fcollection == nil {
 				return errors.New(errors.Validation, "foreign_key collection does not exist: %s", idx.ForeignKey.Collection)
 			}
-			results, err := t.Query(ctx, idx.ForeignKey.Collection, Query{
-				Select: []Select{{Field: "*"}},
-				Where: []Where{
-					{
-						Field: fcollection.PrimaryKey(),
-						Op:    WhereOpEq,
-						Value: command.Document.Get(idx.Fields[0]),
-					},
-				},
-			})
+			has, err := t.hasDocID(ctx, fcollection, command.Document.GetString(idx.Fields[0]))
 			if err != nil {
 				return errors.Wrap(err, errors.Internal, "")
 			}
-			if results.Count == 0 {
+			if !has {
 				return errors.New(errors.Validation, "foreign key with value %v does not exist: %s/%s",
 					command.Document.Get(idx.Fields[0]),
 					idx.ForeignKey.Collection,
@@ -311,6 +307,7 @@ func (t *transaction) updateSecondaryIndex(ctx context.Context, schema Collectio
 				docID,
 			)
 		}
+		t.docs[fmt.Sprintf("%s/%s", command.Collection, docID)] = struct{}{}
 	}
 	return nil
 }
@@ -486,4 +483,33 @@ func (t *transaction) evaluate(ctx context.Context, c CollectionSchema, command 
 	}
 
 	return nil
+}
+
+func (t *transaction) hasDocID(ctx context.Context, schema CollectionSchema, id string) (bool, error) {
+	if _, ok := t.docs[fmt.Sprintf("%s/%s", schema.Collection(), id)]; ok {
+		return true, nil
+	}
+	results, err := t.Query(ctx, schema.Collection(), Query{
+		Select: []Select{{Field: "*"}},
+		Where: []Where{
+			{
+				Field: schema.PrimaryKey(),
+				Op:    WhereOpEq,
+				Value: id,
+			},
+		},
+		Limit: 1,
+	})
+	if err != nil {
+		return false, errors.Wrap(err, errors.Internal, "")
+	}
+	if results.Count == 0 {
+		return false, errors.New(errors.Validation, "foreign key with value %v does not exist: %s/%s",
+			id,
+			schema.Collection(),
+			schema.PrimaryKey(),
+		)
+	}
+	t.docs[fmt.Sprintf("%s/%s", schema.Collection(), id)] = struct{}{}
+	return true, nil
 }

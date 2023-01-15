@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// BenchmarkQuery-12    	    3634	    290003 ns/op	  183447 B/op	    2365 allocs/op
+// BenchmarkQuery-12    	    4530	    290003 ns/op	  183447 B/op	    2365 allocs/op
 func BenchmarkQuery(b *testing.B) {
 	b.ReportAllocs()
 	assert.Nil(b, testutil.TestDB(func(ctx context.Context, db myjson.Database) {

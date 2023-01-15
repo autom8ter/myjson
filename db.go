@@ -122,8 +122,9 @@ func (d *defaultDB) NewTx(opts kv.TxOpts) (Txn, error) {
 	return &transaction{
 		db:      d,
 		tx:      tx,
-		isBatch: false,
+		isBatch: opts.IsBatch,
 		vm:      vm,
+		docs:    map[string]struct{}{},
 	}, nil
 }
 
@@ -430,15 +431,15 @@ func (d *defaultDB) RunScript(ctx context.Context, function string, script strin
 	return fn(ctx, d, params)
 }
 
+// NewDoc creates a new document builder
+func (d *defaultDB) NewDoc() *DocBuilder {
+	return D()
+}
+
 func (d *defaultDB) Close(ctx context.Context) error {
 	d.cancel()
 	<-d.vmPool
 	d.machine.Close()
 	d.wg.Wait()
 	return errors.Wrap(d.kv.Close(ctx), 0, "")
-}
-
-// NewDoc creates a new document builder
-func (d *defaultDB) NewDoc() *DocBuilder {
-	return D()
 }

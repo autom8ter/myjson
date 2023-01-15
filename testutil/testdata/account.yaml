@@ -1,4 +1,5 @@
 type: object
+# collection name
 x-collection: account
 required:
   - _id
