@@ -80,6 +80,8 @@ Build powerful applications on top of simple key value storage.
 | Unique Fields     | Unique fields can be configured which ensure the uniqueness of a field value in a collection                          | [x]         |
 | Complex Queries   | Complex queries can be executed with support for select/where/join/having/orderby/groupby/limit/page clauses          | [x]         |
 | Aggregate Queries | Complex aggregate queries can be executed for analytical purposes                                                     | [x]         |
+| Time Travel       | Find the value of a   document at a specific timestamp                                                                | [x]         |
+| Revert            | Revert the value of a document to it's value at a specific timestamp                                                  | [x]         |
 
 ### Storage Providers
 

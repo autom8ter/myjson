@@ -3,6 +3,7 @@ package myjson
 import (
 	"context"
 	"encoding/json"
+	"time"
 
 	"github.com/autom8ter/myjson/kv"
 )
@@ -126,6 +127,12 @@ type Tx interface {
 	// results will not be ordered unless an index supporting the order by(s) was found by the optimizer
 	// Query should be used when order is more important than performance/resource-usage
 	ForEach(ctx context.Context, collection string, opts ForEachOpts, fn ForEachFunc) (Explain, error)
+	// TimeTravel sets the document to the value it was at the given timestamp.
+	// If the document did not exist at the given timestamp, it will return the first version of the document
+	TimeTravel(ctx context.Context, collection string, documentID string, timestamp time.Time) (*Document, error)
+	// Revert reverts the document to the value it was at the given timestamp.
+	// If the document did not exist at the given timestamp, it will persist the first version of the document
+	Revert(ctx context.Context, collection string, documentID string, timestamp time.Time) error
 	// DB returns the transactions underlying database
 	DB() Database
 }

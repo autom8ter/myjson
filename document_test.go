@@ -135,6 +135,41 @@ func TestDocument(t *testing.T) {
 		assert.Equal(t, myjson.JSONOpRemove, diff[0].Op)
 		assert.Equal(t, before.Get("contact.email"), diff[0].BeforeValue)
 	})
+	t.Run("apply - remove contact.email", func(t *testing.T) {
+		document := testutil.NewUserDoc()
+		diff := []myjson.JSONFieldOp{
+			{
+				Path: "contact.email",
+				Op:   myjson.JSONOpRemove,
+			},
+		}
+		assert.NoError(t, document.ApplyOps(diff))
+		assert.False(t, document.Exists("contact.email"))
+	})
+	t.Run("apply - set contact.email", func(t *testing.T) {
+		document := testutil.NewUserDoc()
+		email := gofakeit.Email()
+		diff := []myjson.JSONFieldOp{
+			{
+				Path:  "contact.email",
+				Op:    myjson.JSONOpAdd,
+				Value: email,
+			},
+		}
+		assert.NoError(t, document.ApplyOps(diff))
+		assert.Equal(t, email, document.Get("contact.email"))
+	})
+	t.Run("apply - set contact.email then revert", func(t *testing.T) {
+		document := testutil.NewUserDoc()
+		before := document.Clone()
+		assert.NoError(t, document.SetAll(map[string]any{
+			"contact.email": gofakeit.Email(),
+		}))
+		assert.NoError(t, document.Del("age"))
+		diff := document.Diff(before)
+		assert.NoError(t, document.RevertOps(diff))
+		assert.JSONEq(t, before.String(), document.String())
+	})
 	t.Run("overwrite", func(t *testing.T) {
 		before := testutil.NewUserDoc()
 		after := before.Clone()

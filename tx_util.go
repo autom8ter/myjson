@@ -513,3 +513,63 @@ func (t *transaction) hasDocID(ctx context.Context, schema CollectionSchema, id 
 	t.docs[fmt.Sprintf("%s/%s", schema.Collection(), id)] = struct{}{}
 	return true, nil
 }
+
+func (t *transaction) TimeTravel(ctx context.Context, collection string, documentID string, timestamp time.Time) (*Document, error) {
+	current, err := t.Get(ctx, collection, documentID)
+	if err != nil {
+		return nil, err
+	}
+	if current == nil {
+		return nil, errors.New(errors.NotFound, "document not found: %s/%s", collection, documentID)
+	}
+	results, err := t.Query(ctx, cdcCollectionName, Query{
+		Where: []Where{
+			{
+				Field: "documentID",
+				Op:    WhereOpEq,
+				Value: documentID,
+			},
+			{
+				Field: "collection",
+				Op:    WhereOpEq,
+				Value: collection,
+			},
+			{
+				Field: "timestamp",
+				Op:    WhereOpGte,
+				Value: timestamp.UnixNano(),
+			},
+		},
+		OrderBy: []OrderBy{
+			{
+				Field:     "timestamp",
+				Direction: OrderByDirectionDesc,
+			},
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
+	if len(results.Documents) == 0 {
+		return nil, errors.New(errors.NotFound, "not found: %s/%s", collection, documentID)
+	}
+	for _, doc := range results.Documents {
+		var cdc CDC
+		if err := doc.Scan(&cdc); err != nil {
+			return nil, err
+		}
+		if err := current.RevertOps(cdc.Diff); err != nil {
+			return nil, err
+		}
+	}
+
+	return current, nil
+}
+
+func (t *transaction) Revert(ctx context.Context, collection string, documentID string, timestamp time.Time) error {
+	document, err := t.TimeTravel(ctx, collection, documentID, timestamp)
+	if err != nil {
+		return err
+	}
+	return t.Set(ctx, collection, document)
+}

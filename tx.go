@@ -276,6 +276,21 @@ func (t *transaction) Cmd(ctx context.Context, cmd TxCmd) TxResponse {
 		return TxResponse{
 			Update: doc,
 		}
+	case cmd.TimeTravel != nil:
+		doc, err := t.TimeTravel(ctx, cmd.TimeTravel.Collection, cmd.TimeTravel.ID, cmd.TimeTravel.Timestamp)
+		if err != nil {
+			return TxResponse{Error: errors.Extract(err)}
+		}
+		return TxResponse{
+			TimeTravel: doc,
+		}
+	case cmd.Revert != nil:
+		if err := t.Revert(ctx, cmd.Revert.Collection, cmd.Revert.ID, cmd.Revert.Timestamp); err != nil {
+			return TxResponse{Error: errors.Extract(err)}
+		}
+		return TxResponse{
+			Revert: &struct{}{},
+		}
 	}
 	return TxResponse{Error: errors.Extract(errors.New(errors.Validation, "tx: unsupported command"))}
 }

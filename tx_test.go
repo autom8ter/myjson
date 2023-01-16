@@ -3,10 +3,12 @@ package myjson_test
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/autom8ter/myjson"
 	"github.com/autom8ter/myjson/kv"
 	"github.com/autom8ter/myjson/testutil"
+	"github.com/brianvoe/gofakeit/v6"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -90,6 +92,49 @@ func TestTx(t *testing.T) {
 				})
 				assert.NoError(t, err)
 				assert.Equal(t, 10, count)
+				return nil
+			}))
+		}))
+	})
+	t.Run("set then edit then time travel", func(t *testing.T) {
+		assert.Nil(t, testutil.TestDB(func(ctx context.Context, db myjson.Database) {
+			document := testutil.NewUserDoc()
+			now := time.Now()
+			before := document.Clone()
+			mid := time.Now()
+			assert.Nil(t, db.Tx(ctx, kv.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx myjson.Tx) error {
+				assert.NoError(t, tx.Set(ctx, "user", document))
+				assert.NoError(t, tx.Update(ctx, "user", document.GetString("_id"), map[string]any{
+					"age": 10,
+				}))
+				mid = time.Now()
+				assert.NoError(t, tx.Update(ctx, "user", document.GetString("_id"), map[string]any{
+					"age": 9,
+				}))
+				assert.NoError(t, tx.Update(ctx, "user", document.GetString("_id"), map[string]any{
+					"age": 28,
+				}))
+				assert.NoError(t, tx.Update(ctx, "user", document.GetString("_id"), map[string]any{
+					"name":          gofakeit.Name(),
+					"contact.email": gofakeit.Email(),
+				}))
+				return nil
+			}))
+			assert.Nil(t, db.Tx(ctx, kv.TxOpts{IsReadOnly: true}, func(ctx context.Context, tx myjson.Tx) error {
+				result, err := tx.TimeTravel(ctx, "user", document.GetString("_id"), now)
+				assert.NoError(t, err)
+				assert.NotNil(t, result)
+				assert.Equal(t, before.Get("age"), result.Get("age"))
+				assert.Equal(t, before.Get("name"), result.Get("name"))
+				assert.Equal(t, before.Get("language"), result.Get("language"))
+				assert.Equal(t, before.Get("contact.email"), result.Get("contact.email"))
+				return nil
+			}))
+			assert.Nil(t, db.Tx(ctx, kv.TxOpts{IsReadOnly: true}, func(ctx context.Context, tx myjson.Tx) error {
+				result, err := tx.TimeTravel(ctx, "user", document.GetString("_id"), mid)
+				assert.NoError(t, err)
+				assert.NotNil(t, result)
+				assert.Equal(t, float64(10), result.Get("age"))
 				return nil
 			}))
 		}))

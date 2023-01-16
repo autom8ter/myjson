@@ -373,6 +373,10 @@ type TxCmd struct {
 	Delete *DeleteCmd `json:"delete,omitempty"`
 	// Query is a query command
 	Query *QueryCmd `json:"query,omitempty"`
+	// Revert is a revert command
+	Revert *RevertCmd `json:"revert,omitempty"`
+	// TimeTravel is a time travel command
+	TimeTravel *TimeTravelCmd `json:"timeTravel,omitempty"`
 	// Commit is a commit command - it ends the transaction
 	Commit *CommitCmd `json:"commit,omitempty"`
 	// Rollback is a rollback command - it ends the transaction
@@ -393,6 +397,10 @@ type TxResponse struct {
 	Delete *struct{} `json:"delete,omitempty"`
 	// Query is a query response - it contains the documents returned from the query
 	Query *Page `json:"page,omitempty"`
+	// Revert is a revert response - it contains the document after the revert was applied
+	Revert *struct{} `json:"revert,omitempty"`
+	// TimeTravel is a time travel response - it contains the document after the time travel was applied
+	TimeTravel *Document `json:"timeTravel,omitempty"`
 	// Commit is an empty commit response
 	Commit *struct{} `json:"commit,omitempty"`
 	// Rollback is an empty rollback response
@@ -449,6 +457,26 @@ type QueryCmd struct {
 	Collection string `json:"collection" validate:"required"`
 	// Query is the query to execute
 	Query Query `json:"query,omitempty"`
+}
+
+// TimeTravelCmd is a serializable time travel command
+type TimeTravelCmd struct {
+	// Collection is the collection the document belongs to
+	Collection string `json:"collection" validate:"required"`
+	// ID is the unique id of the document
+	ID string `json:"id" validate:"required"`
+	// Timestamp is the timestamp to travel to
+	Timestamp time.Time `json:"timestamp" validate:"required"`
+}
+
+// RevertCmd is a serializable revert command
+type RevertCmd struct {
+	// Collection is the collection the document belongs to
+	Collection string `json:"collection" validate:"required"`
+	// ID is the unique id of the document
+	ID string `json:"id" validate:"required"`
+	// Timestamp is the timestamp to revert to
+	Timestamp time.Time `json:"timestamp" validate:"required"`
 }
 
 // RollbackCmd is a serializable rollback command

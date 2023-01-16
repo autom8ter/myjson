@@ -553,6 +553,37 @@ func (d *Document) Diff(before *Document) []JSONFieldOp {
 	return ops
 }
 
+// ApplyOps applies the given JSON field operations to the document
+func (d *Document) ApplyOps(ops []JSONFieldOp) error {
+	for _, op := range ops {
+		switch op.Op {
+		case JSONOpRemove:
+			if err := d.Del(op.Path); err != nil {
+				return err
+			}
+		case JSONOpReplace, JSONOpAdd:
+			if err := d.Set(op.Path, op.Value); err != nil {
+				return err
+			}
+		default:
+			return errors.New(errors.Validation, "unsupported op: %s", op.Op)
+		}
+	}
+	return nil
+}
+
+// RevertOps reverts the given JSON field operations to the document
+func (d *Document) RevertOps(diff []JSONFieldOp) error {
+	for _, op := range diff {
+		if op.BeforeValue != nil {
+			if err := d.Set(op.Path, op.BeforeValue); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
 // FieldPaths returns the paths to fields & nested fields in dot notation format
 func (d *Document) FieldPaths() []string {
 	d.mu.RLock()
