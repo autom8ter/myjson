@@ -120,9 +120,9 @@ func (t *transaction) persistCommand(ctx context.Context, command *persistComman
 		}
 		return nil
 	}
-	if t.db.collectionIsLocked(ctx, command.Collection) {
-		return errors.New(errors.Forbidden, "collection %s is locked", command.Collection)
-	}
+	//if t.db.collectionIsLocked(ctx, command.Collection) {
+	//	return errors.New(errors.Forbidden, "collection %s is locked", command.Collection)
+	//}
 	if err := t.evaluate(ctx, c, command); err != nil {
 		return err
 	}
@@ -323,9 +323,9 @@ func (t *transaction) queryScan(ctx context.Context, collection string, where []
 	var err error
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	if t.db.collectionIsLocked(ctx, collection) {
-		return Explain{}, errors.New(errors.Forbidden, "collection %s is locked", collection)
-	}
+	//if t.db.collectionIsLocked(ctx, collection) {
+	//	return Explain{}, errors.New(errors.Forbidden, "collection %s is locked", collection)
+	//}
 	explain, err := t.db.optimizer.Optimize(t.db.GetSchema(ctx, collection), where)
 	if err != nil {
 		return Explain{}, err

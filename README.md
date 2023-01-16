@@ -343,11 +343,7 @@ var (
     taskSchema string
 )
 
-if err := db.Configure(ctx, map[string]any{
-	"account": accountSchema,
-    "user": userSchema,
-    "task": taskSchema,
-}); err != nil {
+if err := db.Configure(ctx, []string{accountSchema, userSchema, taskSchema}); err != nil {
     panic(err)
 })
 ```

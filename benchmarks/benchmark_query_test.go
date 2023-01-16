@@ -13,7 +13,7 @@ import (
 func BenchmarkQuery(b *testing.B) {
 	b.ReportAllocs()
 	assert.Nil(b, testutil.TestDB(func(ctx context.Context, db myjson.Database) {
-		assert.NoError(b, seedDatabase(ctx, db))
+		assert.NoError(b, testutil.SeedUsers(ctx, db, 10, 3))
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			_, err := db.Query(ctx, "account", myjson.Query{
@@ -34,7 +34,7 @@ func BenchmarkQuery(b *testing.B) {
 func BenchmarkQuery2(b *testing.B) {
 	b.ReportAllocs()
 	assert.Nil(b, testutil.TestDB(func(ctx context.Context, db myjson.Database) {
-		assert.NoError(b, seedDatabase(ctx, db))
+		assert.NoError(b, testutil.SeedUsers(ctx, db, 10, 3))
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			_, err := db.Query(ctx, "user", myjson.Query{

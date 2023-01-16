@@ -1202,3 +1202,38 @@ func TestTriggers(t *testing.T) {
 		}))
 	})
 }
+
+func TestConfigure(t *testing.T) {
+	t.Run("test configure", func(t *testing.T) {
+		assert.NoError(t, testutil.TestDB(func(ctx context.Context, db myjson.Database) {
+			assert.NoError(t, testutil.SeedUsers(ctx, db, 10, 3))
+			assert.NoError(t, db.Configure(ctx, []string{testutil.AccountSchema, testutil.UserSchema}))
+			assert.False(t, db.HasCollection(ctx, "task"))
+			assert.NoError(t, db.Configure(ctx, []string{testutil.AccountSchema, testutil.UserSchema, testutil.TaskSchema}))
+			assert.True(t, db.HasCollection(ctx, "task"))
+			assert.NoError(t, db.Configure(ctx, []string{testutil.AccountSchema}))
+			assert.False(t, db.HasCollection(ctx, "task"))
+			assert.False(t, db.HasCollection(ctx, "user"))
+			assert.True(t, db.HasCollection(ctx, "account"))
+		}))
+	})
+	t.Run("test configure while seeding concurrently", func(t *testing.T) {
+		assert.NoError(t, testutil.TestDB(func(ctx context.Context, db myjson.Database) {
+			wg := sync.WaitGroup{}
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				testutil.SeedUsers(ctx, db, 10, 3)
+			}()
+			assert.NoError(t, db.Configure(ctx, []string{testutil.AccountSchema, testutil.UserSchema}))
+			assert.False(t, db.HasCollection(ctx, "task"))
+			assert.NoError(t, db.Configure(ctx, []string{testutil.AccountSchema, testutil.UserSchema, testutil.TaskSchema}))
+			assert.True(t, db.HasCollection(ctx, "task"))
+			assert.NoError(t, db.Configure(ctx, []string{testutil.AccountSchema}))
+			assert.False(t, db.HasCollection(ctx, "task"))
+			assert.False(t, db.HasCollection(ctx, "user"))
+			assert.True(t, db.HasCollection(ctx, "account"))
+			wg.Wait()
+		}))
+	})
+}

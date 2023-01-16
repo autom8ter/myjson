@@ -59,8 +59,9 @@ type Database interface {
 	// HasCollection reports whether a collection exists in the database
 	HasCollection(ctx context.Context, collection string) bool
 	// Configure sets the database collection configurations. It will create/update/delete the necessary collections and indexes to
-	// match the given configuration
-	Configure(ctx context.Context, config CollectionConfiguration) error
+	// match the given configuration. Each element in the config should be a YAML string representing a CollectionSchema.
+	// Collections are updated sequentially and will block until all collections are updated.
+	Configure(ctx context.Context, config []string) error
 	// Tx executes the given function against a new transaction.
 	// if the function returns an error, all changes will be rolled back.
 	// otherwise, the changes will be commited to the database

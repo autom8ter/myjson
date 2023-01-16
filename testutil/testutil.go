@@ -8,7 +8,6 @@ import (
 
 	"github.com/autom8ter/myjson"
 	"github.com/autom8ter/myjson/kv"
-
 	"github.com/brianvoe/gofakeit/v6"
 	// import embed package
 	_ "embed"
@@ -24,11 +23,7 @@ var (
 	UserSchema string
 	//go:embed testdata/account.yaml
 	AccountSchema  string
-	AllCollections = map[string]string{
-		"task":    TaskSchema,
-		"user":    UserSchema,
-		"account": AccountSchema,
-	}
+	AllCollections = []string{AccountSchema, UserSchema, TaskSchema}
 )
 
 func NewUserDoc() *myjson.Document {
@@ -101,5 +96,37 @@ func TestDB(fn func(ctx context.Context, db myjson.Database), opts ...myjson.DBO
 
 	defer db.Close(ctx)
 	fn(ctx, db)
+	return nil
+}
+
+func SeedUsers(ctx context.Context, db myjson.Database, perAccount int, tasksPerUser int) error {
+	results, err := db.Query(ctx, "account", myjson.Q().Query())
+	if err != nil {
+		return err
+	}
+	if err := db.Tx(ctx, kv.TxOpts{IsBatch: true}, func(ctx context.Context, tx myjson.Tx) error {
+		for _, a := range results.Documents {
+			for i := 0; i < perAccount; i++ {
+				u := NewUserDoc()
+				if err := u.Set("account_id", a.Get("_id")); err != nil {
+					return err
+				}
+				if err := tx.Set(ctx, "user", u); err != nil {
+					return err
+				}
+
+				for i := 0; i < tasksPerUser; i++ {
+					t := NewTaskDoc(u.GetString("_id"))
+					_, err := tx.Create(ctx, "task", t)
+					if err != nil {
+						return err
+					}
+				}
+			}
+		}
+		return nil
+	}); err != nil {
+		return err
+	}
 	return nil
 }

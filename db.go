@@ -11,10 +11,8 @@ import (
 	"github.com/autom8ter/myjson/errors"
 	"github.com/autom8ter/myjson/kv"
 	"github.com/autom8ter/myjson/kv/registry"
-	"github.com/autom8ter/myjson/util"
 	"github.com/dop251/goja"
 	"github.com/samber/lo"
-	"golang.org/x/sync/errgroup"
 )
 
 // defaultDB is an embedded, durable NoSQL database with support for schemas, indexing, and aggregation
@@ -54,9 +52,7 @@ func Open(ctx context.Context, provider string, providerParams map[string]any, o
 	}
 
 	if len(d.Collections(ctx)) == 0 {
-		if err := d.Configure(context.WithValue(ctx, internalKey, true), map[string]string{
-			cdcCollectionName: cdcSchema,
-		}); err != nil {
+		if err := d.Configure(context.WithValue(ctx, internalKey, true), []string{cdcSchema}); err != nil {
 			return nil, errors.Wrap(err, errors.Internal, "failed to configure cdc collection")
 		}
 	}
@@ -242,11 +238,9 @@ func (d *defaultDB) dropCollection(ctx context.Context, collection CollectionSch
 	return nil
 }
 
-func (d *defaultDB) Configure(ctx context.Context, config CollectionConfiguration) error {
-	egp, ctx := errgroup.WithContext(ctx)
+func (d *defaultDB) Configure(ctx context.Context, config []string) error {
 	removed := d.removedCollections(ctx, config)
 	for _, r := range removed {
-		r := r
 		pass, err := d.authorizeConfigure(ctx, r)
 		if err != nil {
 			return err
@@ -254,15 +248,18 @@ func (d *defaultDB) Configure(ctx context.Context, config CollectionConfiguratio
 		if !pass {
 			return errors.New(errors.Forbidden, "not authorized: %s", ConfigureAction)
 		}
-		egp.Go(func() error {
-			return d.dropCollection(ctx, r)
-		})
+		if err := d.dropCollection(ctx, r); err != nil {
+			return err
+		}
 	}
 
-	for name, collectionSchemaBytes := range config {
-		name := name
+	for _, collectionSchemaBytes := range config {
 		collectionSchemaBytes := collectionSchemaBytes
-		before := d.GetSchema(ctx, name)
+		schema, err := newCollectionSchema([]byte(collectionSchemaBytes))
+		if err != nil {
+			return err
+		}
+		before := d.GetSchema(ctx, schema.Collection())
 		if before != nil {
 			if bits, _ := before.MarshalYAML(); string(bits) == collectionSchemaBytes {
 				continue
@@ -275,19 +272,11 @@ func (d *defaultDB) Configure(ctx context.Context, config CollectionConfiguratio
 				return errors.New(errors.Forbidden, "not authorized: %s", ConfigureAction)
 			}
 		}
-		jsonBytes, err := util.YAMLToJSON([]byte(collectionSchemaBytes))
-		if err != nil {
+		if err := d.configureCollection(ctx, schema); err != nil {
 			return err
 		}
-		collection, err := newCollectionSchema(jsonBytes)
-		if err != nil {
-			return err
-		}
-		egp.Go(func() error {
-			return d.configureCollection(ctx, collection)
-		})
 	}
-	return egp.Wait()
+	return nil
 }
 
 func (d *defaultDB) configureCollection(ctx context.Context, collection CollectionSchema) error {
@@ -340,15 +329,22 @@ func (d *defaultDB) configureCollection(ctx context.Context, collection Collecti
 	return nil
 }
 
-func (d *defaultDB) removedCollections(ctx context.Context, config CollectionConfiguration) []CollectionSchema {
+func (d *defaultDB) removedCollections(ctx context.Context, config []string) []CollectionSchema {
 	var removed []CollectionSchema
 	existing := d.Collections(ctx)
-	keys := lo.Keys(config)
+	var names []string
+	for _, c := range config {
+		c, _ := newCollectionSchema([]byte(c))
+		if c == nil {
+			continue
+		}
+		names = append(names, c.Collection())
+	}
 	for _, key := range existing {
 		if key == cdcCollectionName {
 			continue
 		}
-		if !lo.Contains(keys, key) {
+		if !lo.Contains(names, key) {
 			removed = append(removed, d.GetSchema(ctx, key))
 		}
 	}
