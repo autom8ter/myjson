@@ -255,4 +255,5 @@ func TestUtil(t *testing.T) {
 	t.Run("defaultAs", func(t *testing.T) {
 		assert.Equal(t, "count_account_id", defaultAs(AggregateFunctionCount, "account_id"))
 	})
+
 }

@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/autom8ter/dagger"
 	"github.com/autom8ter/machine/v4"
 	"github.com/autom8ter/myjson/errors"
 	"github.com/autom8ter/myjson/kv"
@@ -17,15 +18,16 @@ import (
 
 // defaultDB is an embedded, durable NoSQL database with support for schemas, indexing, and aggregation
 type defaultDB struct {
-	ctx         context.Context
-	cancel      context.CancelFunc
-	wg          sync.WaitGroup
-	kv          kv.DB
-	machine     machine.Machine
-	optimizer   Optimizer
-	jsOverrides map[string]any
-	vmPool      chan *goja.Runtime
-	collections sync.Map
+	ctx           context.Context
+	cancel        context.CancelFunc
+	wg            sync.WaitGroup
+	kv            kv.DB
+	machine       machine.Machine
+	optimizer     Optimizer
+	jsOverrides   map[string]any
+	vmPool        chan *goja.Runtime
+	collections   sync.Map
+	collectionDag *collectionDag
 }
 
 // Open opens a new database instance from the given config
@@ -45,6 +47,11 @@ func Open(ctx context.Context, provider string, providerParams map[string]any, o
 		jsOverrides: map[string]any{},
 		vmPool:      make(chan *goja.Runtime, 20),
 		collections: sync.Map{},
+		collectionDag: &collectionDag{
+			dagger:  dagger.NewGraph(),
+			schemas: map[string]CollectionSchema{},
+			mu:      sync.RWMutex{},
+		},
 	}
 
 	for _, o := range opts {
@@ -64,6 +71,7 @@ func Open(ctx context.Context, provider string, providerParams map[string]any, o
 		if coll != nil {
 			d.collections.Store(c, coll)
 		}
+		d.collectionDag.AddSchema(coll)
 	}
 	d.wg.Add(1)
 	go func() {
@@ -79,6 +87,7 @@ func Open(ctx context.Context, provider string, providerParams map[string]any, o
 					coll, _ := d.getPersistedCollection(context.WithValue(ctx, internalKey, true), c)
 					if coll != nil {
 						d.collections.Store(c, coll)
+						d.collectionDag.AddSchema(coll)
 					}
 				}
 			}
@@ -239,29 +248,45 @@ func (d *defaultDB) dropCollection(ctx context.Context, collection CollectionSch
 }
 
 func (d *defaultDB) Configure(ctx context.Context, config []string) error {
+
 	removed := d.removedCollections(ctx, config)
-	for _, r := range removed {
-		pass, err := d.authorizeConfigure(ctx, r)
+
+	for _, schema := range d.collectionDag.TopologicalSort() {
+		exists := false
+		for _, remove := range removed {
+			if remove.Collection() == schema.Collection() {
+				exists = true
+				break
+			}
+		}
+		if !exists {
+			continue
+		}
+		pass, err := d.authorizeConfigure(ctx, schema)
 		if err != nil {
 			return err
 		}
 		if !pass {
 			return errors.New(errors.Forbidden, "not authorized: %s", ConfigureAction)
 		}
-		if err := d.dropCollection(ctx, r); err != nil {
+		if err := d.dropCollection(ctx, schema); err != nil {
 			return err
 		}
+		d.collectionDag.RemoveSchema(schema.Collection())
 	}
-
-	for _, collectionSchemaBytes := range config {
-		collectionSchemaBytes := collectionSchemaBytes
-		schema, err := newCollectionSchema([]byte(collectionSchemaBytes))
+	for _, c := range config {
+		schema, err := newCollectionSchema([]byte(c))
 		if err != nil {
 			return err
 		}
+		d.collectionDag.AddSchema(schema)
+	}
+
+	for _, schema := range d.collectionDag.ReverseTopologicalSort() {
 		before := d.GetSchema(ctx, schema.Collection())
 		if before != nil {
-			if bits, _ := before.MarshalYAML(); string(bits) == collectionSchemaBytes {
+			nowBits, _ := schema.MarshalYAML()
+			if bits, _ := before.MarshalYAML(); string(bits) == string(nowBits) {
 				continue
 			}
 			pass, err := d.authorizeConfigure(ctx, before)
