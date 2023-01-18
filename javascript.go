@@ -2,6 +2,11 @@ package myjson
 
 import (
 	"context"
+	"crypto/md5"
+	"crypto/sha1"
+	"crypto/sha256"
+	"crypto/sha512"
+	"encoding/hex"
 	"reflect"
 	"strconv"
 	"strings"
@@ -150,4 +155,24 @@ var JavascriptBuiltIns = map[string]any{
 	"unixMilli":  time.UnixMilli,
 	"unix":       time.Unix,
 	"date":       time.Date,
+	"sha1": func(v any) string {
+		h := sha1.New()
+		h.Write([]byte(cast.ToString(v)))
+		return hex.EncodeToString(h.Sum(nil))
+	},
+	"sha256": func(v any) string {
+		h := sha256.New()
+		h.Write([]byte(cast.ToString(v)))
+		return hex.EncodeToString(h.Sum(nil))
+	},
+	"sha512": func(v any) string {
+		h := sha512.New()
+		h.Write([]byte(cast.ToString(v)))
+		return hex.EncodeToString(h.Sum(nil))
+	},
+	"md5": func(v any) string {
+		h := md5.New()
+		h.Write([]byte(cast.ToString(v)))
+		return hex.EncodeToString(h.Sum(nil))
+	},
 }
