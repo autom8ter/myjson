@@ -39,6 +39,7 @@ func Test(t *testing.T) {
 			assert.NoError(t, err)
 
 			assert.NotNil(t, u)
+			assert.Less(t, time.Now().UTC().Sub(u.GetTime("timestamp")), 1*time.Second)
 			assert.Equal(t, id, u.GetString("_id"))
 		}))
 	})
@@ -365,6 +366,48 @@ func Benchmark(b *testing.B) {
 				})
 				assert.Nil(b, err)
 			}
+		}))
+	})
+}
+
+func TestImmutable(t *testing.T) {
+	t.Run("update immutable property", func(t *testing.T) {
+		var (
+			currentName string
+		)
+		assert.Nil(t, testutil.TestDB(func(ctx context.Context, db myjson.Database) {
+			assert.NoError(t, db.Tx(ctx, kv.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx myjson.Tx) error {
+				current, err := tx.Get(ctx, "account", "1")
+				if err != nil {
+					return err
+				}
+				currentName = current.GetString("name")
+				return tx.Update(ctx, "account", "1", map[string]any{
+					"name": gofakeit.Company(),
+				})
+			}))
+			now, err := db.Get(ctx, "account", "1")
+			assert.NoError(t, err)
+			assert.Equal(t, currentName, now.GetString("name"))
+		}))
+	})
+	t.Run("set immutable property", func(t *testing.T) {
+		var (
+			currentName string
+		)
+		assert.Nil(t, testutil.TestDB(func(ctx context.Context, db myjson.Database) {
+			assert.NoError(t, db.Tx(ctx, kv.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx myjson.Tx) error {
+				current, err := tx.Get(ctx, "account", "1")
+				if err != nil {
+					return err
+				}
+				currentName = current.GetString("name")
+				assert.NoError(t, current.Set("name", gofakeit.Company()))
+				return tx.Set(ctx, "account", current)
+			}))
+			now, err := db.Get(ctx, "account", "1")
+			assert.NoError(t, err)
+			assert.Equal(t, currentName, now.GetString("name"))
 		}))
 	})
 }

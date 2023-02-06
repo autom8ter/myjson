@@ -21,8 +21,14 @@ func (t *transaction) updateDocument(ctx context.Context, c CollectionSchema, do
 	if before == nil {
 		return errors.New(errors.Internal, "tx: updateDocument - empty before value")
 	}
+	for p, v := range c.PropertyPaths() {
+		if v.Immutable {
+			if err := command.Document.Set(p, before.Get(p)); err != nil {
+				return errors.Wrap(err, errors.Internal, "failed to set immutable property")
+			}
+		}
+	}
 	primaryIndex := c.PrimaryIndex()
-
 	after := before.Clone()
 	flattened, err := flat.Flatten(command.Document.Value(), nil)
 	if err != nil {
@@ -73,9 +79,18 @@ func (t *transaction) createDocument(ctx context.Context, c CollectionSchema, co
 	return nil
 }
 
-func (t *transaction) setDocument(ctx context.Context, c CollectionSchema, docID string, command *persistCommand) error {
+func (t *transaction) setDocument(ctx context.Context, c CollectionSchema, docID string, before *Document, command *persistCommand) error {
 	if docID == "" {
 		return errors.New(errors.Validation, "tx: set command - empty document id")
+	}
+	if before != nil {
+		for p, v := range c.PropertyPaths() {
+			if v.Immutable && command.Document.Get(p) != before.Get(p) {
+				if err := command.Document.Set(p, before.Get(p)); err != nil {
+					return errors.Wrap(err, errors.Internal, "failed to set immutable property")
+				}
+			}
+		}
 	}
 	if err := c.ValidateDocument(ctx, command.Document); err != nil {
 		return err
@@ -147,7 +162,7 @@ func (t *transaction) persistCommand(ctx context.Context, command *persistComman
 		}
 		delete(t.docs, fmt.Sprintf("%s/%s", command.Collection, docID))
 	case SetAction:
-		if err := t.setDocument(ctx, c, docID, command); err != nil {
+		if err := t.setDocument(ctx, c, docID, before, command); err != nil {
 			return err
 		}
 		t.docs[fmt.Sprintf("%s/%s", command.Collection, docID)] = struct{}{}
@@ -453,6 +468,7 @@ func (t *transaction) evaluate(ctx context.Context, c CollectionSchema, command 
 	}
 
 	for _, trigger := range c.Triggers() {
+		trigger.Script = t.db.globalScripts + trigger.Script
 		switch {
 		case command.Action == DeleteAction && lo.Contains(trigger.Events, OnDelete):
 			if _, err := t.vm.RunString(trigger.Script); err != nil {

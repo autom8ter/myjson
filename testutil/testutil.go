@@ -17,6 +17,8 @@ import (
 )
 
 var (
+	//go:embed testdata/scripts.js
+	GlobalScript string
 	//go:embed testdata/task.yaml
 	TaskSchema string
 	//go:embed testdata/user.yaml
@@ -61,6 +63,7 @@ func NewTaskDoc(usrID string) *myjson.Document {
 }
 
 func TestDB(fn func(ctx context.Context, db myjson.Database), opts ...myjson.DBOpt) error {
+	opts = append(opts, myjson.WithGlobalJavascriptFunctions([]string{GlobalScript}))
 	_ = os.MkdirAll("tmp", 0700)
 	dir, err := os.MkdirTemp("./tmp", "")
 	if err != nil {

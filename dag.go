@@ -4,6 +4,7 @@ import (
 	"sync"
 
 	"github.com/autom8ter/dagger"
+	"github.com/autom8ter/myjson/errors"
 )
 
 type collectionDag struct {
@@ -58,24 +59,34 @@ func (c *collectionDag) RemoveSchema(schema string) {
 	})
 }
 
-func (c *collectionDag) TopologicalSort() []CollectionSchema {
+func (c *collectionDag) TopologicalSort() ([]CollectionSchema, error) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	var schemas []CollectionSchema
+	var err error
 	c.dagger.TopologicalSort("collection", "foreignkey", func(node dagger.Node) bool {
+		if c.schemas[node.Path.XID] == nil {
+			err = errors.New(errors.Validation, "schema not found for node %s", node.Path.XID)
+			return false
+		}
 		schemas = append(schemas, c.schemas[node.Path.XID])
 		return true
 	})
-	return schemas
+	return schemas, err
 }
 
-func (c *collectionDag) ReverseTopologicalSort() []CollectionSchema {
+func (c *collectionDag) ReverseTopologicalSort() ([]CollectionSchema, error) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	var schemas []CollectionSchema
+	var err error
 	c.dagger.ReverseTopologicalSort("collection", "foreignkey", func(node dagger.Node) bool {
+		if c.schemas[node.Path.XID] == nil {
+			err = errors.New(errors.Validation, "schema not found for node %s", node.Path.XID)
+			return false
+		}
 		schemas = append(schemas, c.schemas[node.Path.XID])
 		return true
 	})
-	return schemas
+	return schemas, err
 }

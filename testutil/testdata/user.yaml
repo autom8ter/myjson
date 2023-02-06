@@ -70,4 +70,4 @@ x-triggers:
       - onSet
     # script is the javascript to execute
     script: |
-      doc.Set('timestamp', new Date().toISOString())
+      setDocTimestamp(doc)

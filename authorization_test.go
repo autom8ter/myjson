@@ -8,10 +8,19 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+var globalScript = `
+function isSuperUser(meta) {
+    return contains(meta.Get('roles'), 'super_user')
+}
+function accountQueryAuth(query, meta) {
+    return query.where?.length > 0 && query.where[0].field == '_id' && query.where[0].op == 'eq' && contains(meta.Get('groups'), query.where[0].value)
+}
+`
+
 func TestAuthorization(t *testing.T) {
 	t.Run("set as super user (allow)", func(t *testing.T) {
 		ctx := SetMetadataRoles(context.Background(), []string{"super_user"})
-		db, err := Open(ctx, "badger", map[string]any{})
+		db, err := Open(ctx, "badger", map[string]any{}, WithGlobalJavascriptFunctions([]string{globalScript}))
 		assert.NoError(t, err)
 		assert.NoError(t, db.Configure(ctx, []string{accountSchema, userSchema, taskSchema}))
 		assert.NoError(t, db.Tx(ctx, kv.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx Tx) error {
@@ -23,7 +32,7 @@ func TestAuthorization(t *testing.T) {
 	})
 	t.Run("set as readonly user (deny)", func(t *testing.T) {
 		ctx := SetMetadataRoles(context.Background(), []string{"read_only"})
-		db, err := Open(ctx, "badger", map[string]any{})
+		db, err := Open(ctx, "badger", map[string]any{}, WithGlobalJavascriptFunctions([]string{globalScript}))
 		assert.NoError(t, err)
 		assert.NoError(t, db.Configure(ctx, []string{accountSchema, userSchema, taskSchema}))
 		assert.Error(t, db.Tx(ctx, kv.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx Tx) error {
@@ -35,7 +44,7 @@ func TestAuthorization(t *testing.T) {
 	})
 	t.Run("set as no role user (deny)", func(t *testing.T) {
 		ctx := context.Background()
-		db, err := Open(ctx, "badger", map[string]any{})
+		db, err := Open(ctx, "badger", map[string]any{}, WithGlobalJavascriptFunctions([]string{globalScript}))
 		assert.NoError(t, err)
 		assert.NoError(t, db.Configure(ctx, []string{accountSchema, userSchema, taskSchema}))
 		assert.Error(t, db.Tx(ctx, kv.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx Tx) error {
@@ -47,7 +56,7 @@ func TestAuthorization(t *testing.T) {
 	})
 	t.Run("read other account as readonly user (deny)", func(t *testing.T) {
 		ctx := SetMetadataRoles(context.Background(), []string{"read_only"})
-		db, err := Open(ctx, "badger", map[string]any{})
+		db, err := Open(ctx, "badger", map[string]any{}, WithGlobalJavascriptFunctions([]string{globalScript}))
 		assert.NoError(t, err)
 		assert.NoError(t, db.Configure(ctx, []string{accountSchema, userSchema, taskSchema}))
 		assert.Error(t, db.Tx(ctx, kv.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx Tx) error {
@@ -57,7 +66,7 @@ func TestAuthorization(t *testing.T) {
 	})
 	t.Run("read account as readonly user with proper group (allow)", func(t *testing.T) {
 		ctx := context.Background()
-		db, err := Open(ctx, "badger", map[string]any{})
+		db, err := Open(ctx, "badger", map[string]any{}, WithGlobalJavascriptFunctions([]string{globalScript}))
 		assert.NoError(t, err)
 		ctx = SetMetadataRoles(context.Background(), []string{"super_user"})
 		assert.NoError(t, db.Configure(ctx, []string{accountSchema, userSchema, taskSchema}))

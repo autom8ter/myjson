@@ -336,6 +336,8 @@ type SchemaProperty struct {
 	Type string `json:"type" validate:"required"`
 	// Path is a dot notation path to the property
 	Path string `json:"path" validate:"required"`
+	// Immutable indicates the field value is immutable - it will be ignored on updates
+	Immutable bool `json:"x-immutable,omitempty"`
 	// Unique indicates the field value is unique
 	Unique bool `json:"x-unique,omitempty"`
 	// ForeignKey is a relationship to another collection

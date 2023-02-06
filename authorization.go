@@ -22,6 +22,7 @@ func (t *transaction) authorizeCommand(ctx context.Context, schema CollectionSch
 	})
 	if len(deny) > 0 {
 		for _, d := range deny {
+			d.Match = t.db.globalScripts + d.Match
 			result, err := t.vm.RunString(d.Match)
 			if err != nil {
 				return false, errors.Wrap(err, 0, "failed to run authz match script")
@@ -41,6 +42,7 @@ func (t *transaction) authorizeCommand(ctx context.Context, schema CollectionSch
 		return true, nil
 	}
 	for _, d := range allow {
+		d.Match = t.db.globalScripts + d.Match
 		result, err := t.vm.RunString(d.Match)
 		if err != nil {
 			return false, errors.Wrap(err, 0, "failed to run authz match script")
@@ -81,6 +83,7 @@ func (t *transaction) authorizeQuery(ctx context.Context, schema CollectionSchem
 	})
 	if len(deny) > 0 {
 		for _, d := range deny {
+			d.Match = t.db.globalScripts + d.Match
 			result, err := t.vm.RunString(d.Match)
 			if err != nil {
 				return false, errors.Wrap(err, 0, "failed to run authz match script")
@@ -100,6 +103,7 @@ func (t *transaction) authorizeQuery(ctx context.Context, schema CollectionSchem
 		return true, nil
 	}
 	for _, d := range allow {
+		d.Match = t.db.globalScripts + d.Match
 		result, err := t.vm.RunString(d.Match)
 		if err != nil {
 			return false, errors.Wrap(err, 0, "failed to run authz match script")
@@ -138,6 +142,7 @@ func (t *defaultDB) authorizeConfigure(ctx context.Context, schema CollectionSch
 	})
 	if len(deny) > 0 {
 		for _, d := range deny {
+			d.Match = t.globalScripts + d.Match
 			result, err := vm.RunString(d.Match)
 			if err != nil {
 				return false, errors.Wrap(err, 0, "failed to run authz match script")
@@ -157,6 +162,7 @@ func (t *defaultDB) authorizeConfigure(ctx context.Context, schema CollectionSch
 		return true, nil
 	}
 	for _, d := range allow {
+		d.Match = t.globalScripts + d.Match
 		result, err := vm.RunString(d.Match)
 		if err != nil {
 			return false, errors.Wrap(err, 0, "failed to run authz match script")
@@ -198,6 +204,7 @@ func (t *defaultDB) authorizeChangeStream(ctx context.Context, schema Collection
 	})
 	if len(deny) > 0 {
 		for _, d := range deny {
+			d.Match = t.globalScripts + d.Match
 			result, err := vm.RunString(d.Match)
 			if err != nil {
 				return false, errors.Wrap(err, 0, "failed to run authz match script")
@@ -217,6 +224,7 @@ func (t *defaultDB) authorizeChangeStream(ctx context.Context, schema Collection
 		return true, nil
 	}
 	for _, d := range allow {
+		d.Match = t.globalScripts + d.Match
 		result, err := vm.RunString(d.Match)
 		if err != nil {
 			return false, errors.Wrap(err, 0, "failed to run authz match script")

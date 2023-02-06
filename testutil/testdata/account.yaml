@@ -12,6 +12,7 @@ properties:
   name:
     type: string
     description: The accounts's name.
+    x-immutable: true
 x-authorization:
   rules:
     ## allow super users to do anything
@@ -21,7 +22,7 @@ x-authorization:
       - "*"
       ## context metadata must have is_super_user set to true
       match: |
-        contains(meta.Get('roles'), 'super_user')
+        isSuperUser(meta)
 
       ## dont allow read-only users to create/update/delete/set accounts
     - effect: deny
@@ -54,4 +55,4 @@ x-authorization:
         - query
         ## user must have a group matching the account's _id
       match: |
-        query.where?.length > 0 && query.where[0].field == '_id' && query.where[0].op == 'eq' && contains(meta.Get('groups'), query.where[0].value) 
+        accountQueryAuth(query, meta) 

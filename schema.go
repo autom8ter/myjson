@@ -38,6 +38,7 @@ const (
 	indexPath        schemaPath = "x-index"
 	primaryPath      schemaPath = "x-primary"
 	uniquePath       schemaPath = "x-unique"
+	immutablePath    schemaPath = "x-immutable"
 	triggersPath     schemaPath = "x-triggers"
 	readOnlyPath     schemaPath = "x-read-only"
 	refPrefix                   = "common."
@@ -142,6 +143,7 @@ func (c *collectionSchema) loadProperties(properties map[string]SchemaProperty, 
 			Description: value.Get("description").String(),
 			Type:        value.Get("type").String(),
 			Unique:      value.Get(string(uniquePath)).Bool(),
+			Immutable:   value.Get(string(immutablePath)).Bool(),
 			Path:        path,
 			Properties:  map[string]SchemaProperty{},
 		}

@@ -119,12 +119,13 @@ foreign keys, authorization, and triggers.
 #### Custom Field Level Properties
 
 
-| Property  | Description                                                                             |
-|-----------|-----------------------------------------------------------------------------------------|
-| x-primary | x-primary configures the documents primary key (exactly 1 field must specify x-primary) |
-| x-foreign | x-foreign configures a foreign key relationship                                         |
-| x-unique  | x-unique configures a unique field for the document                                     |
-| x-index   | x-index configures a secondary index                                                    |
+| Property    | Description                                                                                               |
+|-------------|-----------------------------------------------------------------------------------------------------------|
+| x-primary   | x-primary configures the documents primary key (exactly 1 field must specify x-primary)                   |
+| x-foreign   | x-foreign configures a foreign key relationship                                                           |
+| x-unique    | x-unique configures a unique field for the document                                                       |
+| x-index     | x-index configures a secondary index                                                                      |
+| x-immutable | x-immutable indicates that the field is immutable and all edits will be replaced with it's original value |
 
 
 #### Example Schema

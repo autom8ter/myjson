@@ -28,6 +28,7 @@ type defaultDB struct {
 	vmPool        chan *goja.Runtime
 	collections   sync.Map
 	collectionDag *collectionDag
+	globalScripts string
 }
 
 // Open opens a new database instance from the given config
@@ -248,10 +249,12 @@ func (d *defaultDB) dropCollection(ctx context.Context, collection CollectionSch
 }
 
 func (d *defaultDB) Configure(ctx context.Context, config []string) error {
-
 	removed := d.removedCollections(ctx, config)
-
-	for _, schema := range d.collectionDag.TopologicalSort() {
+	sorted, err := d.collectionDag.TopologicalSort()
+	if err != nil {
+		return errors.Wrap(err, errors.Internal, "failed to topological collections")
+	}
+	for _, schema := range sorted {
 		exists := false
 		for _, remove := range removed {
 			if remove.Collection() == schema.Collection() {
@@ -281,8 +284,11 @@ func (d *defaultDB) Configure(ctx context.Context, config []string) error {
 		}
 		d.collectionDag.AddSchema(schema)
 	}
-
-	for _, schema := range d.collectionDag.ReverseTopologicalSort() {
+	sorted, err = d.collectionDag.ReverseTopologicalSort()
+	if err != nil {
+		return errors.Wrap(err, errors.Internal, "failed to reverse topological collections")
+	}
+	for _, schema := range sorted {
 		before := d.GetSchema(ctx, schema.Collection())
 		if before != nil {
 			nowBits, _ := schema.MarshalYAML()
@@ -441,6 +447,7 @@ func (d *defaultDB) RunScript(ctx context.Context, function string, script strin
 	if err != nil {
 		return false, err
 	}
+	script = d.globalScripts + script
 	_, err = vm.RunString(script)
 	if err != nil {
 		return nil, err
