@@ -26,4 +26,45 @@ func TestJavascript(t *testing.T) {
 
 		assert.True(t, res, v.String())
 	})
+	t.Run("fetch", func(t *testing.T) {
+		ctx := context.Background()
+		db, err := Open(ctx, "badger", nil)
+		assert.NoError(t, err)
+		defer db.Close(ctx)
+		vm, err := getJavascriptVM(ctx, db, map[string]any{})
+		assert.NoError(t, err)
+		assert.NotNil(t, vm)
+		var fetch = `
+	fetch({
+      method: "GET",
+      url: "https://google.com",
+      query: {
+		q: "hello world"
+      }
+	})
+`
+		val, err := vm.RunString(fetch)
+		assert.NoError(t, err)
+		assert.NotNil(t, val)
+	})
+	t.Run("fetch error", func(t *testing.T) {
+		ctx := context.Background()
+		db, err := Open(ctx, "badger", nil)
+		assert.NoError(t, err)
+		defer db.Close(ctx)
+		vm, err := getJavascriptVM(ctx, db, map[string]any{})
+		assert.NoError(t, err)
+		assert.NotNil(t, vm)
+		var fetch = `
+	fetch({
+      method: "GET",
+      url: "google.com",
+      query: {
+		q: "hello world"
+      }
+	})
+`
+		_, err = vm.RunString(fetch)
+		assert.Error(t, err)
+	})
 }
