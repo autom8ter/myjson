@@ -225,6 +225,12 @@ func (d *Document) GetFloat(field string) float64 {
 	return cast.ToFloat64(d.Get(field))
 }
 
+// GetInt gets an int field value on the document. GetInt has GJSON syntax support
+// For information on gjson syntax, check out https://github.com/tidwall/gjson/blob/master/SYNTAX.md
+func (d *Document) GetInt(field string) int {
+	return cast.ToInt(d.Get(field))
+}
+
 // GetTime gets a time.Time field value on the document. GetTime has GJSON syntax support
 // For information on gjson syntax, check out https://github.com/tidwall/gjson/blob/master/SYNTAX.md
 func (d *Document) GetTime(field string) time.Time {

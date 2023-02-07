@@ -21,7 +21,24 @@ func (t *transaction) updateDocument(ctx context.Context, c CollectionSchema, do
 	if before == nil {
 		return errors.New(errors.Internal, "tx: updateDocument - empty before value")
 	}
+	if c.Immutable() {
+		return errors.New(errors.Forbidden, "tx: collection: %s is immutable", c.Collection())
+	}
 	for p, v := range c.PropertyPaths() {
+		if v.Compute != nil && v.Compute.Write {
+			val, err := t.vm.RunString(v.Compute.Expr)
+			if err != nil {
+				return errors.Wrap(err, errors.Internal, "failed to compute value")
+			}
+			if err := command.Document.Set(p, val.Export()); err != nil {
+				return errors.Wrap(err, errors.Internal, "failed to set computed property: %s = %v", p, v.Compute)
+			}
+		}
+		if v.Default != nil && !command.Document.Exists(p) {
+			if err := command.Document.Set(p, v.Default); err != nil {
+				return errors.Wrap(err, errors.Internal, "failed to set default property: %s = %v", p, v.Compute)
+			}
+		}
 		if v.Immutable {
 			if err := command.Document.Set(p, before.Get(p)); err != nil {
 				return errors.Wrap(err, errors.Internal, "failed to set immutable property")
@@ -50,6 +67,12 @@ func (t *transaction) updateDocument(ctx context.Context, c CollectionSchema, do
 }
 
 func (t *transaction) deleteDocument(ctx context.Context, c CollectionSchema, docID string) error {
+	if c.Immutable() {
+		return errors.New(errors.Forbidden, "tx: collection: %s is immutable", c.Collection())
+	}
+	if c.PreventDeletes() {
+		return errors.New(errors.Forbidden, "tx: collection: %s prevents deletes", c.Collection())
+	}
 	if docID == "" {
 		return errors.New(errors.Validation, "tx: delete command - empty document id")
 	}
@@ -68,6 +91,22 @@ func (t *transaction) createDocument(ctx context.Context, c CollectionSchema, co
 	if err := c.SetPrimaryKey(command.Document, docID); err != nil {
 		return err
 	}
+	for p, v := range c.PropertyPaths() {
+		if v.Compute != nil && v.Compute.Write {
+			val, err := t.vm.RunString(cast.ToString(v.Compute.Expr))
+			if err != nil {
+				return errors.Wrap(err, errors.Internal, "failed to compute value")
+			}
+			if err := command.Document.Set(p, val.Export()); err != nil {
+				return errors.Wrap(err, errors.Internal, "failed to compute property: %s = %v", p, v.Compute)
+			}
+		}
+		if v.Default != nil && !command.Document.Exists(p) {
+			if err := command.Document.Set(p, v.Default); err != nil {
+				return errors.Wrap(err, errors.Internal, "failed to set default property: %s = %v", p, v.Default)
+			}
+		}
+	}
 	if err := c.ValidateDocument(ctx, command.Document); err != nil {
 		return err
 	}
@@ -83,12 +122,27 @@ func (t *transaction) setDocument(ctx context.Context, c CollectionSchema, docID
 	if docID == "" {
 		return errors.New(errors.Validation, "tx: set command - empty document id")
 	}
-	if before != nil {
-		for p, v := range c.PropertyPaths() {
-			if v.Immutable && command.Document.Get(p) != before.Get(p) {
-				if err := command.Document.Set(p, before.Get(p)); err != nil {
-					return errors.Wrap(err, errors.Internal, "failed to set immutable property")
-				}
+	if c.Immutable() && before != nil {
+		return errors.New(errors.Forbidden, "tx: collection: %s is immutable", command.Collection)
+	}
+	for p, v := range c.PropertyPaths() {
+		if v.Compute != nil && v.Compute.Write {
+			val, err := t.vm.RunString(v.Compute.Expr)
+			if err != nil {
+				return errors.Wrap(err, errors.Internal, "failed to compute value")
+			}
+			if err := command.Document.Set(p, val.Export()); err != nil {
+				return errors.Wrap(err, errors.Internal, "failed to compute property: %s = %v", p, v.Compute)
+			}
+		}
+		if v.Default != nil && !command.Document.Exists(p) {
+			if err := command.Document.Set(p, v.Default); err != nil {
+				return errors.Wrap(err, errors.Internal, "failed to set default property: %s = %v", p, v.Default)
+			}
+		}
+		if before != nil && v.Immutable && command.Document.Get(p) != before.Get(p) {
+			if err := command.Document.Set(p, before.Get(p)); err != nil {
+				return errors.Wrap(err, errors.Internal, "failed to set immutable property")
 			}
 		}
 	}
@@ -144,6 +198,9 @@ func (t *transaction) persistCommand(ctx context.Context, command *persistComman
 
 	switch command.Action {
 	case UpdateAction:
+		if c.Immutable() {
+			return errors.New(errors.Forbidden, "tx: collection: %s is immutable", command.Collection)
+		}
 		if err := t.updateDocument(ctx, c, docID, before, command); err != nil {
 			return err
 		}
@@ -335,6 +392,12 @@ func (t *transaction) queryScan(ctx context.Context, collection string, where []
 	if c == nil {
 		return Explain{}, errors.New(errors.Validation, "tx: unsupported collection: %s", collection)
 	}
+	var computed = map[string]*ComputedField{}
+	for p, v := range c.PropertyPaths() {
+		if v.Compute != nil && v.Compute.Read {
+			computed[p] = v.Compute
+		}
+	}
 	var err error
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -380,6 +443,15 @@ func (t *transaction) queryScan(ctx context.Context, collection string, where []
 			id := split[len(split)-1]
 			document, err = t.Get(ctx, collection, string(id))
 			if err != nil {
+				return explain, err
+			}
+		}
+		for p, c := range computed {
+			val, err := t.vm.RunString(c.Expr)
+			if err != nil {
+				return explain, errors.Wrap(err, errors.Internal, "failed to compute field %s", p)
+			}
+			if err := document.Set(p, val.Export()); err != nil {
 				return explain, err
 			}
 		}

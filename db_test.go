@@ -412,6 +412,50 @@ func TestImmutable(t *testing.T) {
 	})
 }
 
+func TestComputedProperty(t *testing.T) {
+	start := time.Now().UnixMilli()
+	t.Run("check computed property", func(t *testing.T) {
+		assert.Nil(t, testutil.TestDB(func(ctx context.Context, db myjson.Database) {
+			assert.NoError(t, db.Tx(ctx, kv.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx myjson.Tx) error {
+				current, err := tx.Get(ctx, "account", "1")
+				if err != nil {
+					return err
+				}
+				assert.Greater(t, current.GetFloat("created_at"), float64(start))
+				assert.NoError(t, tx.Set(ctx, "account", current.Clone()))
+				updated, err := tx.Get(ctx, "account", "1")
+				if err != nil {
+					return err
+				}
+				assert.Equal(t, current.GetFloat("created_at"), updated.GetFloat("created_at"))
+				return nil
+			}))
+		}))
+	})
+}
+
+func TestDefaultProperty(t *testing.T) {
+	t.Run("check default property", func(t *testing.T) {
+		assert.Nil(t, testutil.TestDB(func(ctx context.Context, db myjson.Database) {
+			assert.NoError(t, db.Tx(ctx, kv.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx myjson.Tx) error {
+				current, err := tx.Get(ctx, "account", "1")
+				if err != nil {
+					return err
+				}
+				assert.Equal(t, "inactive", current.Get("status"))
+				assert.NoError(t, current.Del("status"))
+				assert.NoError(t, tx.Set(ctx, "account", current))
+				updated, err := tx.Get(ctx, "account", "1")
+				if err != nil {
+					return err
+				}
+				assert.Equal(t, "inactive", updated.Get("status"))
+				return nil
+			}))
+		}))
+	})
+}
+
 func TestIndexing1(t *testing.T) {
 	t.Run("matching unique index (contact.email)", func(t *testing.T) {
 		assert.Nil(t, testutil.TestDB(func(ctx context.Context, db myjson.Database) {

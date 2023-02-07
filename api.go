@@ -36,6 +36,10 @@ type CollectionSchema interface {
 	IsReadOnly() bool
 	// Authz returns the collection's authz if it exists
 	Authz() Authz
+	// Immutable returns whether the collection is immutable
+	Immutable() bool
+	// PreventDeletes returns whether the collection prevents deletes
+	PreventDeletes() bool
 	// MarshalYAML returns the collection schema as yaml bytes
 	MarshalYAML() ([]byte, error)
 	// UnmarshalYAML refreshes the collection schema with the given json bytes

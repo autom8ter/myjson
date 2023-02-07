@@ -109,24 +109,67 @@ foreign keys, authorization, and triggers.
 
 #### Custom Root Level Properties
 
-| Property        | Description                                                                                                      | Required |
-|-----------------|------------------------------------------------------------------------------------------------------------------|----------|
-| x-collection    | x-collection configures the unique name of the collection                                                        | [x]      |
-| x-authorization | x-authorization is a set of javascript authorization rules to enforce against actions taken against the database | [ ]      |
-| x-triggers      | x-triggers are a set of javascript triggers that execute when certain actions are taken against the database     | [ ]      |
-| x-read-only     | x-readonly indicates that the collection is updated internally and may only be read                              | [ ]      |
+MyJSON supports a number of custom root level properties that can be used to configure the schema of a collection.
+
+##### x-collection
+`x-collection` configures the unique name of the collection. The name of the collection must be unique across all collections in the database.
+`x-collection` is a required property.
+
+##### x-authorization
+`x-authorization` is a set of javascript authorization rules to enforce against actions taken against the database.
+`x-authorization` is an optional property.
+
+##### x-triggers
+`x-triggers` are a set of javascript triggers that execute when certain actions are taken against the database.
+`x-triggers` is an optional property.
+
+##### x-read-only
+`x-readonly` indicates that the collection is updated internally and may only be read.
+`x-readonly` is an optional property.
+
+##### x-prevent-deletes
+`x-prevent-deletes` indicates that documents in the collection may not be deleted.
+`x-prevent-deletes` is an optional property.
+
+##### x-immutable
+`x-immutable` indicates that documents in the collection may not be updated or deleted.
 
 #### Custom Field Level Properties
 
+MyJSON supports a number of custom field level properties that can be used to configure the schema of a collection.
 
-| Property    | Description                                                                                               |
-|-------------|-----------------------------------------------------------------------------------------------------------|
-| x-primary   | x-primary configures the documents primary key (exactly 1 field must specify x-primary)                   |
-| x-foreign   | x-foreign configures a foreign key relationship                                                           |
-| x-unique    | x-unique configures a unique field for the document                                                       |
-| x-index     | x-index configures a secondary index                                                                      |
-| x-immutable | x-immutable indicates that the field is immutable and all edits will be replaced with it's original value |
 
+#### x-primary
+`x-primary` configures the documents primary key (exactly 1 field must specify x-primary).
+The value of the field must be unique across all documents in the collection.
+
+#### x-foreign
+`x-foreign` configures a foreign key relationship. The value of the field must be the primary key of another document in the database.
+Foreign keys are enforced by the database at runtime and boost query join performance.
+
+#### x-unique
+`x-unique` configures a unique field for the document. The value of the field must be unique across all documents in the collection.
+a unique field is enforced by the database and is not configurable.
+For example, if a document has a field called `_secondary_id` with `x-unique` set to true, then the value of the field
+must be unique across all documents in the collection. Unique indexes also boost query performance.
+
+#### x-index
+`x-index` configures a secondary index. The value of the field is indexed and can be used to boost query performance.
+For example, if a document has a field called `_secondary_id` with `x-index` set to true, then the value of the field
+will be indexed and can be used to boost query performance.
+
+#### x-immutable
+`x-immutable` indicates that the field is immutable and all edits will be replaced with it's original value.
+For example, if a document has a field called `_secondary_id` with `x-immutable` set to true, then the value of the field
+will be set to it's permanent, immutable value on creattion. If the document is updated, the value of the field will
+not be changed. Immutable properties override the `x-compute` and `default` properties.
+
+##### x-compute
+
+`x-compute` is a javascript expression that is evaluated when the document is created or updated. The expression
+is evaluated in the context of the document and the result is stored in the field. The expression is evaluated
+before the document is validated against the schema. The expression may be used to compute a value for a field
+based on the values of other fields in the document. Computed properties override the `default` property.
 
 #### Example Schema
 
@@ -220,7 +263,7 @@ properties:
       email:
         type: string
         description: The user's email.
-        x-unique: true
+        `x-unique`: true
   age:
     description: Age in years which must be equal to or greater than zero.
     type: integer
@@ -232,15 +275,15 @@ properties:
       collection: account
       field: _id
       cascade: true
-    # x-index specifies a secondary index which can have 1-many fields
-    x-index:
+    # `x-index` specifies a secondary index which can have 1-many fields
+    `x-index`:
       account_email_idx:
         additional_fields:
           - contact.email
   language:
     type: string
     description: The user's first language.
-    x-index:
+    `x-index`:
       language_idx: { }
   gender:
     type: string

@@ -16,17 +16,19 @@ import (
 )
 
 type collectionSchema struct {
-	schema        *gojsonschema.Schema
-	raw           gjson.Result
-	collection    string
-	primaryIndex  Index
-	indexing      map[string]Index
-	properties    map[string]SchemaProperty
-	propertyPaths map[string]SchemaProperty
-	triggers      []Trigger
-	readOnly      bool
-	mu            sync.RWMutex
-	authz         Authz
+	schema         *gojsonschema.Schema
+	raw            gjson.Result
+	collection     string
+	primaryIndex   Index
+	immutable      bool
+	preventDeletes bool
+	indexing       map[string]Index
+	properties     map[string]SchemaProperty
+	propertyPaths  map[string]SchemaProperty
+	triggers       []Trigger
+	readOnly       bool
+	mu             sync.RWMutex
+	authz          Authz
 }
 
 type schemaPath string
@@ -39,10 +41,12 @@ const (
 	primaryPath      schemaPath = "x-primary"
 	uniquePath       schemaPath = "x-unique"
 	immutablePath    schemaPath = "x-immutable"
+	computedPath     schemaPath = "x-compute"
 	triggersPath     schemaPath = "x-triggers"
 	readOnlyPath     schemaPath = "x-read-only"
 	refPrefix                   = "common."
 	authzPath        schemaPath = "x-authorization"
+	preventDeletes   schemaPath = "x-prevent-deletes"
 )
 
 func newCollectionSchema(yamlContent []byte) (CollectionSchema, error) {
@@ -59,13 +63,15 @@ func newCollectionSchema(yamlContent []byte) (CollectionSchema, error) {
 	}
 	r := gjson.ParseBytes(jsonContent)
 	s := &collectionSchema{
-		schema:        schema,
-		raw:           r,
-		collection:    r.Get(string(collectionPath)).String(),
-		indexing:      map[string]Index{},
-		properties:    map[string]SchemaProperty{},
-		propertyPaths: map[string]SchemaProperty{},
-		readOnly:      r.Get(string(readOnlyPath)).Bool(),
+		schema:         schema,
+		raw:            r,
+		collection:     r.Get(string(collectionPath)).String(),
+		indexing:       map[string]Index{},
+		properties:     map[string]SchemaProperty{},
+		propertyPaths:  map[string]SchemaProperty{},
+		readOnly:       r.Get(string(readOnlyPath)).Bool(),
+		immutable:      r.Get(string(immutablePath)).Bool(),
+		preventDeletes: r.Get(string(preventDeletes)).Bool(),
 	}
 	if err := s.loadProperties(s.properties, s.raw.Get("properties")); err != nil {
 		return nil, err
@@ -147,6 +153,16 @@ func (c *collectionSchema) loadProperties(properties map[string]SchemaProperty, 
 			Path:        path,
 			Properties:  map[string]SchemaProperty{},
 		}
+		if compute := value.Get(string(computedPath)); compute.Exists() {
+			var computed ComputedField
+			if err := util.Decode(compute.Value(), &computed); err != nil {
+				return errors.Wrap(err, errors.Validation, "failed to decode computed field")
+			}
+			schema.Compute = &computed
+		}
+		if value.Get("default").Exists() {
+			schema.Default = lo.ToPtr(value.Get("default").Value())
+		}
 
 		if props := value.Get("properties"); props.Exists() && schema.Type == "object" {
 			if err := c.loadProperties(schema.Properties, props); err != nil {
@@ -201,6 +217,7 @@ func (c *collectionSchema) loadProperties(properties map[string]SchemaProperty, 
 				Unique:  true,
 				Primary: false,
 			}
+			fallthrough
 		case schema.ForeignKey != nil:
 			idxName := fmt.Sprintf("%s.foreignidx", path)
 			c.indexing[idxName] = Index{
@@ -230,6 +247,10 @@ func (c *collectionSchema) refreshSchema(jsonContent []byte) error {
 	c.properties = newSchema.properties
 	c.readOnly = newSchema.readOnly
 	c.authz = newSchema.authz
+	c.immutable = newSchema.immutable
+	c.preventDeletes = newSchema.preventDeletes
+	c.triggers = newSchema.triggers
+	c.primaryIndex = newSchema.primaryIndex
 	return nil
 }
 
@@ -275,6 +296,20 @@ func (c *collectionSchema) Indexing() map[string]Index {
 		i[k] = v
 	}
 	return i
+}
+
+// Immutable returns true if the collection schema has the immutable flag set to true
+func (c *collectionSchema) Immutable() bool {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.immutable
+}
+
+// PreventDeletes returns true if the collection schema has the preventDeletes flag set to true
+func (c *collectionSchema) PreventDeletes() bool {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.preventDeletes
 }
 
 func (c *collectionSchema) ValidateDocument(ctx context.Context, doc *Document) error {

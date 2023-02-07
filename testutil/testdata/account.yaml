@@ -4,6 +4,8 @@ x-collection: account
 required:
   - _id
   - name
+  - created_at
+  - status
 properties:
   _id:
     type: string
@@ -13,6 +15,20 @@ properties:
     type: string
     description: The accounts's name.
     x-immutable: true
+  created_at:
+    type: integer
+    description: The time at which the account was created. (UTC)
+    x-immutable: true
+    x-compute:
+      expr: now().UnixMilli()
+      write: true
+      read: false
+  status:
+    type: string
+    description: The account's status.
+    default: inactive
+    x-index:
+      status_idx: { }
 x-authorization:
   rules:
     ## allow super users to do anything

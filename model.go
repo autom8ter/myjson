@@ -337,15 +337,29 @@ type SchemaProperty struct {
 	// Path is a dot notation path to the property
 	Path string `json:"path" validate:"required"`
 	// Immutable indicates the field value is immutable - it will be ignored on updates
-	Immutable bool `json:"x-immutable,omitempty"`
+	Immutable bool `json:"x-immutable"`
 	// Unique indicates the field value is unique
-	Unique bool `json:"x-unique,omitempty"`
+	Unique bool `json:"x-unique"`
 	// ForeignKey is a relationship to another collection
 	ForeignKey *ForeignKey `json:"x-foreign,omitempty"`
 	// Index is a secondary index mapped by index name
 	Index map[string]PropertyIndex `json:"x-index,omitempty"`
 	// Properties are object properties
 	Properties map[string]SchemaProperty `json:"properties,omitempty"`
+	// Compute is a computed field that is evaluated at runtime
+	Compute *ComputedField `json:"x-compute,omitempty"`
+	// Default is the default value of the field
+	Default *any `json:"default,omitempty"`
+}
+
+// ComputedField is a computed field
+type ComputedField struct {
+	// Read indicates if the field is computed on read
+	Read bool `json:"read"`
+	// Write indicates if the field is computed on write
+	Write bool `json:"write"`
+	// Expr is the javascript expression to compute the value of the field at runtime
+	Expr string `json:"expr" validate:"required"`
 }
 
 // PropertyIndex is an index attached to a json schema property
