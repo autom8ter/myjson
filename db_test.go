@@ -1317,6 +1317,7 @@ func TestConfigure(t *testing.T) {
 		}
 		assert.Error(t, db.Configure(ctx, "", []string{testutil.AccountSchema, testutil.UserSchema, badTaskSchema}))
 		assert.NoError(t, db.Configure(ctx, "", []string{testutil.AccountSchema, testutil.UserSchema, testutil.TaskSchema}))
+
 		assert.NoError(t, db.Configure(ctx, "", []string{testutil.AccountSchema}))
 		assert.True(t, db.HasCollection(ctx, "account"), db.Collections(ctx))
 		assert.False(t, db.HasCollection(ctx, "user"), db.Collections(ctx))

@@ -311,6 +311,9 @@ func (d *defaultDB) Configure(ctx context.Context, valuesYaml string, yamlSchema
 }
 
 func (d *defaultDB) ConfigurePlan(ctx context.Context, plan ConfigurationPlan) error {
+	if len(plan.ToDelete) == 0 && len(plan.ToCreate) == 0 && len(plan.ToReplace) == 0 {
+		return nil
+	}
 	var newSchemas []CollectionSchema
 	for _, schema := range plan.ToCreate {
 		doc := NewDocument()
@@ -340,6 +343,9 @@ func (d *defaultDB) ConfigurePlan(ctx context.Context, plan ConfigurationPlan) e
 			return err
 		}
 		newSchemas = append(newSchemas, c)
+	}
+	if len(newSchemas) == 0 {
+		return errors.New(errors.Validation, "no schemas to configure")
 	}
 	var dag = newCollectionDag()
 	if err := dag.SetSchemas(newSchemas); err != nil {
@@ -376,6 +382,9 @@ func (d *defaultDB) ConfigurePlan(ctx context.Context, plan ConfigurationPlan) e
 		}
 		return nil
 	})
+	if err := egp.Wait(); err != nil {
+		return err
+	}
 	reversed, err := dag.ReverseTopologicalSort()
 	if err != nil {
 		return errors.Wrap(err, errors.Internal, "failed to reverse topological collections")
@@ -398,9 +407,7 @@ func (d *defaultDB) ConfigurePlan(ctx context.Context, plan ConfigurationPlan) e
 			return err
 		}
 	}
-	if err := egp.Wait(); err != nil {
-		return err
-	}
+
 	return d.collectionDag.SetSchemas(reversed)
 }
 
@@ -515,10 +522,6 @@ func (d *defaultDB) calcConfigPlan(ctx context.Context, existingSchema, newSchem
 			return nil, err
 		}
 		existingDoc, _ := NewDocumentFromBytes(existingBytes)
-		diff := newDoc.Diff(existingDoc)
-		if len(diff) == 0 {
-			continue
-		}
 		plan.ToReplace = append(plan.ToReplace, &CollectionPlan{
 			Collection: name,
 			Diff:       newDoc.Diff(existingDoc),
