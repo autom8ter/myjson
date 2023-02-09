@@ -407,8 +407,16 @@ func (d *defaultDB) ConfigurePlan(ctx context.Context, plan ConfigurationPlan) e
 			return err
 		}
 	}
-
-	return d.collectionDag.SetSchemas(reversed)
+	{
+		collections, err := d.getPersistedCollections(ctx)
+		if err != nil {
+			return err
+		}
+		if err := d.collectionDag.SetSchemas(collections); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (d *defaultDB) configureCollection(ctx context.Context, collection CollectionSchema) error {

@@ -11,6 +11,7 @@ import (
 	"github.com/autom8ter/myjson/kv"
 	"github.com/autom8ter/myjson/testutil"
 	"github.com/brianvoe/gofakeit/v6"
+	"github.com/samber/lo"
 	"github.com/segmentio/ksuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/tidwall/sjson"
@@ -1337,9 +1338,38 @@ func TestConfigure(t *testing.T) {
 		assert.NoError(t, testutil.Seed(ctx, db, 100, 10, 3))
 		//_, err := db.Plan(ctx, "", []string{testutil.AccountSchema, testutil.UserSchema, badTaskSchema})
 		//assert.Error(t, err)
-		plan, err := db.Plan(ctx, "", []string{testutil.AccountSchema, testutil.UserSchema})
-		assert.NoError(t, err)
-		fmt.Println(plan)
+
+		{
+			plan, err := db.Plan(ctx, "", []string{testutil.AccountSchema, testutil.UserSchema})
+			assert.NoError(t, err)
+			assert.True(t, lo.ContainsBy(plan.ToDelete, func(val *myjson.CollectionPlan) bool {
+				return val.Collection == "task"
+			}))
+			assert.False(t, lo.ContainsBy(plan.ToDelete, func(val *myjson.CollectionPlan) bool {
+				return val.Collection == "user"
+			}))
+			assert.False(t, lo.ContainsBy(plan.ToDelete, func(val *myjson.CollectionPlan) bool {
+				return val.Collection == "account"
+			}))
+		}
+		{
+			plan, err := db.Plan(ctx, "", []string{testutil.AccountSchema})
+			assert.NoError(t, err)
+			assert.True(t, lo.ContainsBy(plan.ToDelete, func(val *myjson.CollectionPlan) bool {
+				return val.Collection == "task"
+			}))
+			assert.True(t, lo.ContainsBy(plan.ToDelete, func(val *myjson.CollectionPlan) bool {
+				return val.Collection == "user"
+			}))
+			assert.False(t, lo.ContainsBy(plan.ToDelete, func(val *myjson.CollectionPlan) bool {
+				return val.Collection == "account"
+			}))
+		}
+		{
+			_, err := db.Plan(ctx, "", []string{testutil.AccountSchema, testutil.TaskSchema})
+			assert.Error(t, err)
+		}
+
 	}))
 	t.Run("test configure while seeding concurrently", func(t *testing.T) {
 		assert.NoError(t, testutil.TestDB(func(ctx context.Context, db myjson.Database) {
