@@ -83,8 +83,11 @@ type Database interface {
 	// Query queries a list of documents
 	Query(ctx context.Context, collection string, query Query) (Page, error)
 	// RunScript executes a javascript function within the script
-	// The following global variables will be injected: 'db' - a database instance, 'ctx' - the context passed to RunScript, and 'params' - the params passed to RunScript
-	RunScript(ctx context.Context, function string, script string, params map[string]any) (any, error)
+	// The following global variables will be injected:
+	// 'db' - a database instance,
+	// 'ctx' - the context passed to RunScript,
+	// and 'params' - the params passed to RunScript
+	RunScript(ctx context.Context, script string, params map[string]any) (any, error)
 	// RawKV returns the database key value provider - it should be used with caution and only when standard database functionality is insufficient.
 	RawKV() kv.DB
 	// Serve serves the database over the given transport

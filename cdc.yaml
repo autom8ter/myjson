@@ -1,5 +1,6 @@
 type: object
-x-collection: cdc
+x-collection: system_cdc
+x-immutable: true
 x-read-only: true
 required:
   - _id

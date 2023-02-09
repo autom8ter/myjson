@@ -138,7 +138,7 @@ func (d *defaultDB) deleteCollectionConfig(ctx context.Context, collection strin
 	return nil
 }
 
-func (d *defaultDB) getCollectionConfigs(ctx context.Context) ([]CollectionSchema, error) {
+func (d *defaultDB) getPersistedCollections(ctx context.Context) ([]CollectionSchema, error) {
 	var existing []CollectionSchema
 	if err := d.kv.Tx(kv.TxOpts{IsReadOnly: true}, func(tx kv.Tx) error {
 		i, err := tx.NewIterator(kv.IterOpts{
@@ -190,4 +190,13 @@ func (d *defaultDB) getPersistedCollection(ctx context.Context, collection strin
 		return nil, errors.New(errors.Validation, "collection not found")
 	}
 	return cfg, nil
+}
+
+func (d *defaultDB) getCachedCollections() []CollectionSchema {
+	var existing []CollectionSchema
+	d.collections.Range(func(key, value interface{}) bool {
+		existing = append(existing, value.(CollectionSchema))
+		return true
+	})
+	return existing
 }

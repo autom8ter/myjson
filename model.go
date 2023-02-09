@@ -296,7 +296,7 @@ type JSONFieldOp struct {
 //go:embed cdc.yaml
 var cdcSchema string
 
-const cdcCollectionName = "cdc"
+const cdcCollectionName = "system_cdc"
 
 // CDC is a change data capture object used for tracking changes to documents over time
 type CDC struct {

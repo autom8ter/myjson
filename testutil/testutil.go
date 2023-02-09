@@ -4,11 +4,14 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"testing"
 	"time"
 
 	"github.com/autom8ter/myjson"
 	"github.com/autom8ter/myjson/kv"
 	"github.com/brianvoe/gofakeit/v6"
+	"github.com/stretchr/testify/assert"
+
 	// import embed package
 	_ "embed"
 
@@ -62,6 +65,60 @@ func NewTaskDoc(usrID string) *myjson.Document {
 	return doc
 }
 
+type TestFunc func(ctx context.Context, t *testing.T, db myjson.Database)
+
+type TestConfig struct {
+	Opts        []myjson.DBOpt
+	Persist     bool
+	Collections []string
+	Roles       []string
+	Timeout     time.Duration
+}
+
+func Test(t *testing.T, cfg TestConfig, fn TestFunc) func(*testing.T) {
+	ctx := context.Background()
+	var (
+		db  myjson.Database
+		err error
+	)
+	var closers []func()
+	if cfg.Persist {
+		_ = os.MkdirAll("tmp", 0700)
+		dir, err := os.MkdirTemp("./tmp", "")
+		assert.NoError(t, err)
+		closers = append(closers, func() {
+			os.RemoveAll(dir)
+		})
+		db, err = myjson.Open(ctx, "badger", map[string]any{
+			"storage_path": dir,
+		}, cfg.Opts...)
+	} else {
+		db, err = myjson.Open(ctx, "badger", map[string]any{}, cfg.Opts...)
+	}
+	assert.NoError(t, err)
+	closers = append(closers, func() {
+		db.Close(ctx)
+	})
+	assert.NoError(t, err)
+	if len(cfg.Collections) > 0 {
+		assert.NoError(t, db.Configure(ctx, cfg.Collections))
+	}
+	return func(t *testing.T) {
+		if cfg.Timeout == 0 {
+			cfg.Timeout = 5 * time.Minute
+		}
+		ctx, cancel := context.WithTimeout(ctx, cfg.Timeout)
+		defer cancel()
+		if len(cfg.Roles) > 0 {
+			ctx = myjson.SetMetadataRoles(ctx, cfg.Roles)
+		}
+		fn(ctx, t, db)
+		for _, closer := range closers {
+			closer()
+		}
+	}
+}
+
 func TestDB(fn func(ctx context.Context, db myjson.Database), opts ...myjson.DBOpt) error {
 	opts = append(opts, myjson.WithGlobalJavascriptFunctions([]string{GlobalScript}))
 	_ = os.MkdirAll("tmp", 0700)
@@ -99,6 +156,27 @@ func TestDB(fn func(ctx context.Context, db myjson.Database), opts ...myjson.DBO
 
 	defer db.Close(ctx)
 	fn(ctx, db)
+	return nil
+}
+
+func Seed(ctx context.Context, db myjson.Database, accounts int, usersPerAccount int, tasksPerUser int) error {
+	if err := db.Tx(ctx, kv.TxOpts{IsBatch: true}, func(ctx context.Context, tx myjson.Tx) error {
+		for i := 0; i <= accounts; i++ {
+			d, _ := myjson.NewDocumentFrom(map[string]any{
+				"_id":  fmt.Sprint(i),
+				"name": gofakeit.Company(),
+			})
+			if err := tx.Set(ctx, "account", d); err != nil {
+				return err
+			}
+		}
+		return nil
+	}); err != nil {
+		return err
+	}
+	if err := SeedUsers(ctx, db, usersPerAccount, tasksPerUser); err != nil {
+		return err
+	}
 	return nil
 }
 

@@ -13,6 +13,7 @@ import (
 	"github.com/brianvoe/gofakeit/v6"
 	"github.com/segmentio/ksuid"
 	"github.com/stretchr/testify/assert"
+	"github.com/tidwall/sjson"
 )
 
 func timer() func(t *testing.T) {
@@ -645,7 +646,7 @@ func TestIndexing1(t *testing.T) {
 				}))
 				count := 0
 				now := time.Now().UnixNano()
-				o, err := db.ForEach(ctx, "cdc", myjson.ForEachOpts{
+				o, err := db.ForEach(ctx, "system_cdc", myjson.ForEachOpts{
 					Where: []myjson.Where{{
 						Field: "timestamp",
 						Op:    myjson.WhereOpGt,
@@ -679,7 +680,7 @@ func TestIndexing1(t *testing.T) {
 				}))
 				count := 0
 				now := time.Now().Truncate(5 * time.Minute).UnixNano()
-				o, err := db.ForEach(ctx, "cdc", myjson.ForEachOpts{
+				o, err := db.ForEach(ctx, "system_cdc", myjson.ForEachOpts{
 					Where: []myjson.Where{{
 						Field: "timestamp",
 						Op:    myjson.WhereOpGt,
@@ -713,7 +714,7 @@ func TestIndexing1(t *testing.T) {
 				}))
 				count := 0
 				now := time.Now().Add(5 * time.Minute).UnixNano()
-				o, err := db.ForEach(ctx, "cdc", myjson.ForEachOpts{
+				o, err := db.ForEach(ctx, "system_cdc", myjson.ForEachOpts{
 					Where: []myjson.Where{{
 						Field: "timestamp",
 						Op:    myjson.WhereOpLt,
@@ -748,7 +749,7 @@ func TestIndexing1(t *testing.T) {
 				}))
 				count := 0
 				now := time.Now().UnixNano()
-				o, err := db.ForEach(ctx, "cdc", myjson.ForEachOpts{
+				o, err := db.ForEach(ctx, "system_cdc", myjson.ForEachOpts{
 					Where: []myjson.Where{{
 						Field: "timestamp",
 						Op:    myjson.WhereOpGt,
@@ -782,7 +783,7 @@ func TestIndexing1(t *testing.T) {
 				}))
 				count := 0
 				now := time.Now().Truncate(15 * time.Minute).UnixNano()
-				o, err := db.ForEach(ctx, "cdc", myjson.ForEachOpts{
+				o, err := db.ForEach(ctx, "system_cdc", myjson.ForEachOpts{
 					Where: []myjson.Where{{
 						Field: "timestamp",
 						Op:    myjson.WhereOpLt,
@@ -971,12 +972,10 @@ func TestScript(t *testing.T) {
 	t.Run("getAccount", func(t *testing.T) {
 		assert.NoError(t, testutil.TestDB(func(ctx context.Context, db myjson.Database) {
 			getAccountScript := `
-function getAccount(ctx, db, params) {
-	let res = db.Get(ctx, 'account', params.id)
-	return res.Get('_id')
-}
+let res = db.Get(ctx, 'account', params.id)
+res.Get('_id')
  `
-			results, err := db.RunScript(ctx, "getAccount", getAccountScript, map[string]any{
+			results, err := db.RunScript(ctx, getAccountScript, map[string]any{
 				"id": "1",
 			})
 			assert.NoError(t, err)
@@ -986,12 +985,10 @@ function getAccount(ctx, db, params) {
 	t.Run("getAccounts", func(t *testing.T) {
 		assert.NoError(t, testutil.TestDB(func(ctx context.Context, db myjson.Database) {
 			getAccountScript := `
-function getAccounts(ctx, db, params) {
-	let res = db.Query(ctx, 'account', {Select: [{Field: '*'}]})
-	return res.documents
-}
+let res = db.Query(ctx, 'account', {Select: [{Field: '*'}]})
+res.documents
  `
-			results, err := db.RunScript(ctx, "getAccounts", getAccountScript, map[string]any{})
+			results, err := db.RunScript(ctx, getAccountScript, map[string]any{})
 			assert.NoError(t, err)
 			assert.Equal(t, 101, len(results.(myjson.Documents)))
 		}))
@@ -999,18 +996,16 @@ function getAccounts(ctx, db, params) {
 	t.Run("setAccount", func(t *testing.T) {
 		assert.NoError(t, testutil.TestDB(func(ctx context.Context, db myjson.Database) {
 			getAccountScript := `
-function setAccount(ctx, db, params) {
-	db.Tx(ctx, {IsReadOnly: false}, (ctx, tx) => {
-		tx.Set(ctx, "account", params.doc)
-	})
-}
+db.Tx(ctx, {IsReadOnly: false}, (ctx, tx) => {
+	tx.Set(ctx, "account", params.doc)
+})
  `
 			id := ksuid.New().String()
 			doc, err := myjson.NewDocumentFrom(map[string]any{
 				"_id":  id,
 				"name": gofakeit.Company(),
 			})
-			_, err = db.RunScript(ctx, "setAccount", getAccountScript, map[string]any{
+			_, err = db.RunScript(ctx, getAccountScript, map[string]any{
 				"doc": doc,
 			})
 			assert.NoError(t, err)
@@ -1022,12 +1017,10 @@ function setAccount(ctx, db, params) {
 	t.Run("forEachAccount", func(t *testing.T) {
 		assert.NoError(t, testutil.TestDB(func(ctx context.Context, db myjson.Database) {
 			getAccountScript := `
-function forEachAccount(ctx, db, params) {
-	db.ForEach(ctx, 'account', undefined, params.fn)
-}
+db.ForEach(ctx, 'account', undefined, params.fn)
  `
 			count := 0
-			_, err := db.RunScript(ctx, "forEachAccount", getAccountScript, map[string]any{
+			_, err := db.RunScript(ctx, getAccountScript, map[string]any{
 				"fn": myjson.ForEachFunc(func(d *myjson.Document) (bool, error) {
 					count++
 					return true, nil
@@ -1304,6 +1297,31 @@ func TestConfigure(t *testing.T) {
 			assert.True(t, db.HasCollection(ctx, "account"))
 		}))
 	})
+	t.Run("test bad configure", testutil.Test(t, testutil.TestConfig{
+		Opts: []myjson.DBOpt{
+			myjson.WithGlobalJavascriptFunctions([]string{testutil.GlobalScript}),
+		},
+		Persist:     false,
+		Collections: testutil.AllCollections,
+		Roles:       []string{"super_user"},
+	}, func(ctx context.Context, t *testing.T, db myjson.Database) {
+		assert.NoError(t, testutil.Seed(ctx, db, 100, 10, 3))
+		var badTaskSchema string
+		{
+			schema := db.GetSchema(ctx, "task")
+			bits, err := schema.MarshalJSON()
+			assert.NoError(t, err)
+			bits, err = sjson.SetBytes(bits, "properties.user.x-foreign.collection", "usr")
+			assert.NoError(t, err)
+			badTaskSchema = string(bits)
+		}
+		assert.Error(t, db.Configure(ctx, []string{testutil.AccountSchema, testutil.UserSchema, badTaskSchema}))
+		assert.NoError(t, db.Configure(ctx, []string{testutil.AccountSchema, testutil.UserSchema, testutil.TaskSchema}))
+		assert.NoError(t, db.Configure(ctx, []string{testutil.AccountSchema}))
+		assert.False(t, db.HasCollection(ctx, "task"))
+		assert.False(t, db.HasCollection(ctx, "user"))
+		assert.True(t, db.HasCollection(ctx, "account"))
+	}))
 	t.Run("test configure while seeding concurrently", func(t *testing.T) {
 		assert.NoError(t, testutil.TestDB(func(ctx context.Context, db myjson.Database) {
 			wg := sync.WaitGroup{}

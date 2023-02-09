@@ -252,7 +252,7 @@ func (t *transaction) persistCommand(ctx context.Context, command *persistComman
 
 		ctx = context.WithValue(ctx, internalKey, true)
 		if err := t.persistCommand(ctx, &persistCommand{
-			Collection: "cdc",
+			Collection: "system_cdc",
 			Action:     CreateAction,
 			Document:   cdcDoc,
 			Timestamp:  cdc.Timestamp,
@@ -266,12 +266,8 @@ func (t *transaction) persistCommand(ctx context.Context, command *persistComman
 }
 
 func (t *transaction) cascadeDelete(ctx context.Context, schema CollectionSchema, command *persistCommand) error {
-	configs, err := t.db.getCollectionConfigs(ctx)
-	if err != nil {
-		return err
-	}
 	egp, ctx := errgroup.WithContext(ctx)
-	for _, c := range configs {
+	for _, c := range t.db.getCachedCollections() {
 		c := c
 		egp.Go(func() error {
 			for _, i := range c.Indexing() {

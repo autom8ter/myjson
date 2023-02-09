@@ -633,7 +633,7 @@ Checkout Branch
 
 Run Tests
 
-    go test -race -covermode=atomic -coverprofile=coverage.out ./...
+    go test -race -covermode=atomic -coverprofile=coverage.out -v .
 
 Run Benchmarks
 
