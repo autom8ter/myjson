@@ -22,7 +22,7 @@ func TestAuthorization(t *testing.T) {
 		ctx := SetMetadataRoles(context.Background(), []string{"super_user"})
 		db, err := Open(ctx, "badger", map[string]any{}, WithGlobalJavascriptFunctions([]string{globalScript}))
 		assert.NoError(t, err)
-		assert.NoError(t, db.Configure(ctx, []string{accountSchema, userSchema, taskSchema}))
+		assert.NoError(t, db.Configure(ctx, "", []string{accountSchema, userSchema, taskSchema}))
 		assert.NoError(t, db.Tx(ctx, kv.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx Tx) error {
 			_, err := tx.Create(ctx, "account", db.NewDoc().Set(map[string]any{
 				"name": "acme",
@@ -34,7 +34,7 @@ func TestAuthorization(t *testing.T) {
 		ctx := SetMetadataRoles(context.Background(), []string{"read_only"})
 		db, err := Open(ctx, "badger", map[string]any{}, WithGlobalJavascriptFunctions([]string{globalScript}))
 		assert.NoError(t, err)
-		assert.NoError(t, db.Configure(ctx, []string{accountSchema, userSchema, taskSchema}))
+		assert.NoError(t, db.Configure(ctx, "", []string{accountSchema, userSchema, taskSchema}))
 		assert.Error(t, db.Tx(ctx, kv.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx Tx) error {
 			_, err := tx.Create(ctx, "account", db.NewDoc().Set(map[string]any{
 				"name": "acme",
@@ -46,7 +46,7 @@ func TestAuthorization(t *testing.T) {
 		ctx := context.Background()
 		db, err := Open(ctx, "badger", map[string]any{}, WithGlobalJavascriptFunctions([]string{globalScript}))
 		assert.NoError(t, err)
-		assert.NoError(t, db.Configure(ctx, []string{accountSchema, userSchema, taskSchema}))
+		assert.NoError(t, db.Configure(ctx, "", []string{accountSchema, userSchema, taskSchema}))
 		assert.Error(t, db.Tx(ctx, kv.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx Tx) error {
 			_, err := tx.Create(ctx, "account", db.NewDoc().Set(map[string]any{
 				"name": "acme",
@@ -58,7 +58,7 @@ func TestAuthorization(t *testing.T) {
 		ctx := SetMetadataRoles(context.Background(), []string{"read_only"})
 		db, err := Open(ctx, "badger", map[string]any{}, WithGlobalJavascriptFunctions([]string{globalScript}))
 		assert.NoError(t, err)
-		assert.NoError(t, db.Configure(ctx, []string{accountSchema, userSchema, taskSchema}))
+		assert.NoError(t, db.Configure(ctx, "", []string{accountSchema, userSchema, taskSchema}))
 		assert.Error(t, db.Tx(ctx, kv.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx Tx) error {
 			_, err := tx.Get(ctx, "account", "1")
 			return err
@@ -69,7 +69,7 @@ func TestAuthorization(t *testing.T) {
 		db, err := Open(ctx, "badger", map[string]any{}, WithGlobalJavascriptFunctions([]string{globalScript}))
 		assert.NoError(t, err)
 		ctx = SetMetadataRoles(context.Background(), []string{"super_user"})
-		assert.NoError(t, db.Configure(ctx, []string{accountSchema, userSchema, taskSchema}))
+		assert.NoError(t, db.Configure(ctx, "", []string{accountSchema, userSchema, taskSchema}))
 		assert.NoError(t, db.Tx(ctx, kv.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx Tx) error {
 			assert.NoError(t, tx.Set(ctx, "account", db.NewDoc().Set(map[string]any{
 				"_id":  "1",

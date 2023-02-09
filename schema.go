@@ -2,7 +2,9 @@ package myjson
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"reflect"
 	"sort"
 	"strings"
 	"sync"
@@ -395,4 +397,14 @@ func (c *collectionSchema) Authz() Authz {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	return c.authz
+}
+
+func (c *collectionSchema) Equals(schema CollectionSchema) bool {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	var this, that = map[string]interface{}{}, map[string]interface{}{}
+	json.Unmarshal([]byte(c.raw.Raw), &this)
+	bits, _ := schema.MarshalJSON()
+	json.Unmarshal(bits, &that)
+	return reflect.DeepEqual(this, that)
 }

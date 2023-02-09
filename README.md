@@ -387,7 +387,7 @@ var (
     taskSchema string
 )
 
-if err := db.Configure(ctx, []string{accountSchema, userSchema, taskSchema}); err != nil {
+if err := db.Configure(ctx, "", []string{accountSchema, userSchema, taskSchema}); err != nil {
     panic(err)
 })
 ```
