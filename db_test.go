@@ -1287,11 +1287,11 @@ func TestConfigure(t *testing.T) {
 	t.Run("test configure", func(t *testing.T) {
 		assert.NoError(t, testutil.TestDB(func(ctx context.Context, db myjson.Database) {
 			assert.NoError(t, testutil.SeedUsers(ctx, db, 10, 3))
-			assert.NoError(t, db.Configure(ctx, []string{testutil.AccountSchema, testutil.UserSchema}))
+			assert.NoError(t, db.Configure(ctx, "", []string{testutil.AccountSchema, testutil.UserSchema}))
 			assert.False(t, db.HasCollection(ctx, "task"))
-			assert.NoError(t, db.Configure(ctx, []string{testutil.AccountSchema, testutil.UserSchema, testutil.TaskSchema}))
+			assert.NoError(t, db.Configure(ctx, "", []string{testutil.AccountSchema, testutil.UserSchema, testutil.TaskSchema}))
 			assert.True(t, db.HasCollection(ctx, "task"))
-			assert.NoError(t, db.Configure(ctx, []string{testutil.AccountSchema}))
+			assert.NoError(t, db.Configure(ctx, "", []string{testutil.AccountSchema}))
 			assert.False(t, db.HasCollection(ctx, "task"))
 			assert.False(t, db.HasCollection(ctx, "user"))
 			assert.True(t, db.HasCollection(ctx, "account"))
@@ -1315,12 +1315,30 @@ func TestConfigure(t *testing.T) {
 			assert.NoError(t, err)
 			badTaskSchema = string(bits)
 		}
-		assert.Error(t, db.Configure(ctx, []string{testutil.AccountSchema, testutil.UserSchema, badTaskSchema}))
-		assert.NoError(t, db.Configure(ctx, []string{testutil.AccountSchema, testutil.UserSchema, testutil.TaskSchema}))
-		assert.NoError(t, db.Configure(ctx, []string{testutil.AccountSchema}))
-		assert.False(t, db.HasCollection(ctx, "task"))
-		assert.False(t, db.HasCollection(ctx, "user"))
-		assert.True(t, db.HasCollection(ctx, "account"))
+		assert.Error(t, db.Configure(ctx, "", []string{testutil.AccountSchema, testutil.UserSchema, badTaskSchema}))
+		assert.NoError(t, db.Configure(ctx, "", []string{testutil.AccountSchema, testutil.UserSchema, testutil.TaskSchema}))
+		assert.NoError(t, db.Configure(ctx, "", []string{testutil.AccountSchema}))
+		assert.True(t, db.HasCollection(ctx, "account"), db.Collections(ctx))
+		assert.False(t, db.HasCollection(ctx, "user"), db.Collections(ctx))
+		assert.False(t, db.HasCollection(ctx, "task"), db.Collections(ctx))
+
+	}))
+	t.Run("test plan", testutil.Test(t, testutil.TestConfig{
+		Opts: []myjson.DBOpt{
+			myjson.WithGlobalJavascriptFunctions([]string{testutil.GlobalScript}),
+		},
+		Persist:     false,
+		Collections: testutil.AllCollections,
+		Values:      "",
+		Roles:       []string{"super_user"},
+		Timeout:     0,
+	}, func(ctx context.Context, t *testing.T, db myjson.Database) {
+		assert.NoError(t, testutil.Seed(ctx, db, 100, 10, 3))
+		//_, err := db.Plan(ctx, "", []string{testutil.AccountSchema, testutil.UserSchema, badTaskSchema})
+		//assert.Error(t, err)
+		plan, err := db.Plan(ctx, "", []string{testutil.AccountSchema, testutil.UserSchema})
+		assert.NoError(t, err)
+		fmt.Println(plan)
 	}))
 	t.Run("test configure while seeding concurrently", func(t *testing.T) {
 		assert.NoError(t, testutil.TestDB(func(ctx context.Context, db myjson.Database) {
@@ -1330,11 +1348,11 @@ func TestConfigure(t *testing.T) {
 				defer wg.Done()
 				testutil.SeedUsers(ctx, db, 10, 3)
 			}()
-			assert.NoError(t, db.Configure(ctx, []string{testutil.AccountSchema, testutil.UserSchema}))
+			assert.NoError(t, db.Configure(ctx, "", []string{testutil.AccountSchema, testutil.UserSchema}))
 			assert.False(t, db.HasCollection(ctx, "task"))
-			assert.NoError(t, db.Configure(ctx, []string{testutil.AccountSchema, testutil.UserSchema, testutil.TaskSchema}))
+			assert.NoError(t, db.Configure(ctx, "", []string{testutil.AccountSchema, testutil.UserSchema, testutil.TaskSchema}))
 			assert.True(t, db.HasCollection(ctx, "task"))
-			assert.NoError(t, db.Configure(ctx, []string{testutil.AccountSchema}))
+			assert.NoError(t, db.Configure(ctx, "", []string{testutil.AccountSchema}))
 			assert.False(t, db.HasCollection(ctx, "task"))
 			assert.False(t, db.HasCollection(ctx, "user"))
 			assert.True(t, db.HasCollection(ctx, "account"))

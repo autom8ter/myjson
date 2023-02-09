@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"github.com/autom8ter/myjson/util"
+	"github.com/zyedidia/generic/set"
+
 	// import embed package
 	_ "embed"
 
@@ -256,4 +258,19 @@ func TestUtil(t *testing.T) {
 		assert.Equal(t, "count_account_id", defaultAs(AggregateFunctionCount, "account_id"))
 	})
 
+}
+
+func TestSets(t *testing.T) {
+	var all = set.NewMapset[int]()
+	for i := 0; i < 100; i++ {
+		all.Put(i)
+	}
+	var evens = set.NewMapset[int]()
+	for i := 0; i < 100; i++ {
+		if i%2 == 0 {
+			evens.Put(i)
+		}
+	}
+	fmt.Println(all.Difference(evens).Keys())
+	//assert.True(t, set1.Equal(set2))
 }

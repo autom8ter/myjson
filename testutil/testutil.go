@@ -71,6 +71,7 @@ type TestConfig struct {
 	Opts        []myjson.DBOpt
 	Persist     bool
 	Collections []string
+	Values      string
 	Roles       []string
 	Timeout     time.Duration
 }
@@ -101,7 +102,7 @@ func Test(t *testing.T, cfg TestConfig, fn TestFunc) func(*testing.T) {
 	})
 	assert.NoError(t, err)
 	if len(cfg.Collections) > 0 {
-		assert.NoError(t, db.Configure(ctx, cfg.Collections))
+		assert.NoError(t, db.Configure(ctx, cfg.Values, cfg.Collections))
 	}
 	return func(t *testing.T) {
 		if cfg.Timeout == 0 {
@@ -136,7 +137,7 @@ func TestDB(fn func(ctx context.Context, db myjson.Database), opts ...myjson.DBO
 	if err != nil {
 		return err
 	}
-	if err := db.Configure(ctx, AllCollections); err != nil {
+	if err := db.Configure(ctx, "", AllCollections); err != nil {
 		return err
 	}
 	if err := db.Tx(ctx, kv.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx myjson.Tx) error {

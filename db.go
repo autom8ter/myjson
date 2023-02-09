@@ -1,20 +1,28 @@
 package myjson
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
+	"text/template"
 
 	// import embed package
 	_ "embed"
 	"sync"
 	"time"
 
+	"github.com/Masterminds/sprig/v3"
 	"github.com/autom8ter/machine/v4"
 	"github.com/autom8ter/myjson/errors"
 	"github.com/autom8ter/myjson/kv"
 	"github.com/autom8ter/myjson/kv/registry"
+	"github.com/autom8ter/myjson/util"
 	"github.com/dop251/goja"
+	"github.com/ghodss/yaml"
 	"github.com/samber/lo"
+	"github.com/zyedidia/generic/set"
+	"golang.org/x/sync/errgroup"
 )
 
 // defaultDB is an embedded, durable NoSQL database with support for schemas, indexing, and aggregation
@@ -64,7 +72,7 @@ func Open(ctx context.Context, provider string, providerParams map[string]any, o
 		return nil, err
 	}
 	if len(existing) == 0 {
-		if err := d.Configure(context.WithValue(ctx, internalKey, true), []string{cdcSchema}); err != nil {
+		if err := d.Configure(context.WithValue(ctx, internalKey, true), "", []string{cdcSchema}); err != nil {
 			return nil, errors.Wrap(err, errors.Internal, "failed to configure cdc collection")
 		}
 	}
@@ -256,60 +264,126 @@ func (d *defaultDB) dropCollection(ctx context.Context, collection CollectionSch
 	return nil
 }
 
-func (d *defaultDB) Configure(ctx context.Context, config []string) error {
-	var newSchemas []CollectionSchema
-	for _, c := range config {
-		schema, err := newCollectionSchema([]byte(c))
+func (d *defaultDB) Plan(ctx context.Context, valuesYaml string, yamlSchemas []string) (*ConfigurationPlan, error) {
+	var values = make(map[string]interface{})
+	if len(valuesYaml) > 0 {
+		bits, err := util.YAMLToJSON([]byte(valuesYaml))
 		if err != nil {
-			return err
+			return nil, errors.Wrap(err, errors.Validation, "failed to parse values")
+		}
+		if err := json.Unmarshal(bits, &values); err != nil {
+			return nil, errors.Wrap(err, errors.Validation, "failed to parse values")
+		}
+	}
+	if err := yaml.Unmarshal([]byte(valuesYaml), &values); err != nil {
+		return nil, errors.Wrap(err, errors.Validation, "failed to parse values")
+	}
+	var newSchemas []CollectionSchema
+	for _, c := range yamlSchemas {
+		t, err := template.New("schema").Funcs(sprig.TxtFuncMap()).Parse(c)
+		buf := bytes.NewBuffer(nil)
+		if err := t.Execute(buf, values); err != nil {
+			return nil, errors.Wrap(err, errors.Validation, "failed to execute template")
+		}
+		schema, err := newCollectionSchema(buf.Bytes())
+		if err != nil {
+			return nil, err
 		}
 		newSchemas = append(newSchemas, schema)
 	}
 	var dag = newCollectionDag()
 	if err := dag.SetSchemas(newSchemas); err != nil {
-		return errors.Wrap(err, errors.Validation, "failed to set configure schemas")
+		return nil, errors.Wrap(err, errors.Validation, "failed to set plan configuration")
 	}
 	sorted, err := d.collectionDag.TopologicalSort()
 	if err != nil {
-		return errors.Wrap(err, errors.Internal, "failed to topological collections")
+		return nil, errors.Wrap(err, errors.Internal, "failed to topological sort collections")
 	}
-	removed, err := d.removedCollections(ctx, sorted, newSchemas)
-	if err != nil {
-		return errors.Wrap(err, errors.Internal, "failed to get removed collections")
-	}
+	return d.calcConfigPlan(ctx, sorted, newSchemas)
+}
 
-	for _, schema := range sorted {
-		exists := false
-		for _, remove := range removed {
-			if remove.Collection() == schema.Collection() {
-				exists = true
-				break
-			}
+func (d *defaultDB) Configure(ctx context.Context, valuesYaml string, yamlSchemas []string) error {
+	plan, err := d.Plan(ctx, valuesYaml, yamlSchemas)
+	if err != nil {
+		return err
+	}
+	return d.ConfigurePlan(ctx, *plan)
+}
+
+func (d *defaultDB) ConfigurePlan(ctx context.Context, plan ConfigurationPlan) error {
+	var newSchemas []CollectionSchema
+	for _, schema := range plan.ToCreate {
+		doc := NewDocument()
+		if err := doc.ApplyOps(schema.Diff); err != nil {
+			return errors.Wrap(err, errors.Internal, "failed to apply diff")
 		}
-		if !exists {
-			continue
-		}
-		pass, err := d.authorizeConfigure(ctx, schema)
+		c, err := newCollectionSchema(doc.Bytes())
 		if err != nil {
 			return err
 		}
-		if !pass {
-			return errors.New(errors.Forbidden, "not authorized: %s", ConfigureAction)
+		newSchemas = append(newSchemas, c)
+	}
+	for _, schema := range plan.ToReplace {
+		if !d.HasCollection(ctx, schema.Collection) {
+			return errors.New(errors.Validation, "collection %s not found", schema.Collection)
 		}
-		if err := d.dropCollection(ctx, schema); err != nil {
+		currentBytes, err := d.GetSchema(ctx, schema.Collection).MarshalJSON()
+		if err != nil {
+			return errors.Wrap(err, errors.Internal, "failed to get current schema")
+		}
+		doc, err := NewDocumentFromBytes(currentBytes)
+		if err := doc.ApplyOps(schema.Diff); err != nil {
+			return errors.Wrap(err, errors.Internal, "failed to apply diff")
+		}
+		c, err := newCollectionSchema(doc.Bytes())
+		if err != nil {
 			return err
 		}
+		newSchemas = append(newSchemas, c)
 	}
+	var dag = newCollectionDag()
+	if err := dag.SetSchemas(newSchemas); err != nil {
+		return errors.Wrap(err, errors.Validation, "failed to set configure schemas")
+	}
+	egp, _ := errgroup.WithContext(ctx)
+	egp.Go(func() error {
+		sorted, err := d.collectionDag.TopologicalSort()
+		if err != nil {
+			return errors.Wrap(err, errors.Internal, "failed to topological sort collections")
+		}
+		for _, schema := range sorted {
+			exists := false
+			for _, remove := range plan.ToDelete {
+				if remove.Collection == schema.Collection() {
+					exists = true
+					break
+				}
+			}
+			if !exists {
+				continue
+			}
 
-	sorted, err = dag.ReverseTopologicalSort()
+			pass, err := d.authorizeConfigure(ctx, schema)
+			if err != nil {
+				return err
+			}
+			if !pass {
+				return errors.New(errors.Forbidden, "not authorized: %s", ConfigureAction)
+			}
+			if err := d.dropCollection(ctx, schema); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	reversed, err := dag.ReverseTopologicalSort()
 	if err != nil {
 		return errors.Wrap(err, errors.Internal, "failed to reverse topological collections")
 	}
-	for _, schema := range sorted {
+	for _, schema := range reversed {
 		before := d.GetSchema(ctx, schema.Collection())
 		if before != nil {
-			nowBits, _ := schema.MarshalYAML()
-			if bits, _ := before.MarshalYAML(); string(bits) == string(nowBits) {
+			if before.Equals(schema) {
 				continue
 			}
 			pass, err := d.authorizeConfigure(ctx, before)
@@ -324,7 +398,10 @@ func (d *defaultDB) Configure(ctx context.Context, config []string) error {
 			return err
 		}
 	}
-	return d.collectionDag.SetSchemas(sorted)
+	if err := egp.Wait(); err != nil {
+		return err
+	}
+	return d.collectionDag.SetSchemas(reversed)
 }
 
 func (d *defaultDB) configureCollection(ctx context.Context, collection CollectionSchema) error {
@@ -377,21 +454,77 @@ func (d *defaultDB) configureCollection(ctx context.Context, collection Collecti
 	return nil
 }
 
-func (d *defaultDB) removedCollections(ctx context.Context, existing, config []CollectionSchema) ([]CollectionSchema, error) {
-	var removed []CollectionSchema
-	var names []string
-	for _, c := range config {
-		names = append(names, c.Collection())
+func (d *defaultDB) calcConfigPlan(ctx context.Context, existingSchema, newSchema []CollectionSchema) (*ConfigurationPlan, error) {
+	plan := &ConfigurationPlan{}
+	existingSet := set.NewMapset[string]()
+	existingMap := map[string]CollectionSchema{}
+	newSet := set.NewMapset[string]()
+	newMap := map[string]CollectionSchema{}
+	{
+		for _, c := range existingSchema {
+			existingSet.Put(c.Collection())
+			existingMap[c.Collection()] = c
+		}
+		for _, c := range newSchema {
+			newSet.Put(c.Collection())
+			newMap[c.Collection()] = c
+		}
 	}
-	for _, schema := range existing {
-		if schema.Collection() == cdcCollectionName {
+	if existingSet.Equal(newSet) {
+		return &ConfigurationPlan{}, nil
+	}
+	toDelete := lo.Filter(existingSet.Difference(newSet).Keys(), func(name string, i int) bool {
+		return name != cdcCollectionName
+	})
+	toCreate := newSet.Difference(existingSet).Keys()
+	toEdit := existingSet.Intersection(newSet).Keys()
+
+	for _, name := range toDelete {
+		bits, err := existingMap[name].MarshalJSON()
+		if err != nil {
+			return nil, err
+		}
+		doc, _ := NewDocumentFromBytes(bits)
+		plan.ToDelete = append(plan.ToDelete, &CollectionPlan{
+			Collection: name,
+			Diff:       NewDocument().Diff(doc),
+		})
+	}
+	for _, name := range toCreate {
+		bits, err := newMap[name].MarshalJSON()
+		if err != nil {
+			return nil, err
+		}
+		doc, _ := NewDocumentFromBytes(bits)
+		plan.ToCreate = append(plan.ToCreate, &CollectionPlan{
+			Collection: name,
+			Diff:       doc.Diff(NewDocument()),
+		})
+	}
+	for _, name := range toEdit {
+		if existingMap[name].Equals(newMap[name]) {
 			continue
 		}
-		if !lo.Contains(names, schema.Collection()) {
-			removed = append(removed, schema)
+		newBytes, err := newMap[name].MarshalJSON()
+		if err != nil {
+			return nil, err
 		}
+		newDoc, _ := NewDocumentFromBytes(newBytes)
+		existingBytes, err := existingMap[name].MarshalJSON()
+		if err != nil {
+			return nil, err
+		}
+		existingDoc, _ := NewDocumentFromBytes(existingBytes)
+		diff := newDoc.Diff(existingDoc)
+		if len(diff) == 0 {
+			continue
+		}
+		plan.ToReplace = append(plan.ToReplace, &CollectionPlan{
+			Collection: name,
+			Diff:       newDoc.Diff(existingDoc),
+		})
 	}
-	return removed, nil
+	return plan, nil
 }
 
 func (d *defaultDB) Collections(ctx context.Context) []string {
@@ -430,7 +563,7 @@ func (d *defaultDB) ChangeStream(ctx context.Context, collection string, filter 
 		}
 	}
 
-	pfx := indexPrefix(ctx, "system_cdc", "_id.primaryidx")
+	pfx := indexPrefix(ctx, cdcCollectionName, "_id.primaryidx")
 	return d.kv.ChangeStream(ctx, pfx, func(cdc kv.CDC) (bool, error) {
 		doc, _ := NewDocumentFromBytes(cdc.Value)
 		pass, err := doc.Where(filter)

@@ -2,6 +2,7 @@ package myjson
 
 import (
 	"context"
+	"encoding/json"
 	"time"
 
 	// import embed package
@@ -528,4 +529,21 @@ type AuthzRule struct {
 	Action []Action `json:"action" validate:"min=1,required"`
 	// Match is a javscript boolean expression to match the rule against
 	Match string `json:"match" validate:"required"`
+}
+
+type ConfigurationPlan struct {
+	PreviousHash string            `json:"previousHash,omitempty"`
+	ToDelete     []*CollectionPlan `json:"toDelete,omitempty"`
+	ToCreate     []*CollectionPlan `json:"toCreate,omitempty"`
+	ToReplace    []*CollectionPlan `json:"toReplace,omitempty"`
+}
+
+func (c *ConfigurationPlan) String() string {
+	bits, _ := json.MarshalIndent(c, "", "  ")
+	return string(bits)
+}
+
+type CollectionPlan struct {
+	Collection string        `json:"collection,omitempty" validate:"required"`
+	Diff       []JSONFieldOp `json:"diff,omitempty"`
 }

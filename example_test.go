@@ -79,7 +79,7 @@ x-authorization:
         query.where?.length > 0 && query.where[0].field == '_id' && query.where[0].op == 'eq' && contains(meta.Get('groups'), query.where[0].value) 
 
 `
-	if err := db.Configure(ctx, []string{accountSchema}); err != nil {
+	if err := db.Configure(ctx, "", []string{accountSchema}); err != nil {
 		panic(err)
 	}
 	if err := db.Tx(ctx, kv.TxOpts{IsReadOnly: false}, func(ctx context.Context, tx myjson.Tx) error {
